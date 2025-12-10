@@ -1,0 +1,12 @@
+{
+  "name": "stockfish-chess-analyzer",
+  "version": "1.0.0",
+  "description": "Browser-based chess game analyzer using Stockfish.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "build": "echo 'Static site - no build needed'"
+  },
+  "keywords": ["chess", "stockfish", "analyzer"],
+  "license": "MIT"
+}

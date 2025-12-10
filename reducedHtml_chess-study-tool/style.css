@@ -1,0 +1,601 @@
+.board {
+    width: 324px;
+    margin: auto;
+    transition: width 0.3s ease;
+}
+
+/* Drag and Drop Zone */
+.drag-drop-zone {
+    border: 2px dashed #007acc;
+    border-radius: 10px;
+    padding: 20px;
+    margin: 10px 0;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f8f9fa;
+}
+
+.drag-drop-zone:hover {
+    background: #e9ecef;
+    border-color: #0056b3;
+}
+
+.drag-drop-zone.drag-over {
+    background: #e3f2fd;
+    border-color: #1976d2;
+    border-style: solid;
+}
+
+.drag-drop-zone p {
+    margin: 0;
+    font-size: 16px;
+    color: #007acc;
+    font-weight: bold;
+}
+
+.import-button {
+    background-color: #007acc;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+    transition: background-color 0.3s ease;
+}
+
+.import-button:hover {
+    background-color: #0056b3;
+}
+
+.info {
+    width: 400px;
+    margin: auto;
+}
+
+.move-history {
+    max-height: 100px;
+    overflow-y: scroll;
+}
+
+/*!
+ * chessboard.js $version$
+ *
+ * Copyright 2013 Chris Oakman
+ * Released under the MIT license
+ * https://github.com/oakmac/chessboardjs/blob/master/LICENSE
+ *
+ * Date: $date$
+ */
+
+/* clearfix */
+.clearfix-7da63 {
+  clear: both;
+}
+
+/* board */
+.board-b72b1 {
+  border: 2px solid #404040;
+  -moz-box-sizing: content-box;
+  box-sizing: content-box;
+}
+
+/* square */
+.square-55d63 {
+  float: left;
+  position: relative;
+
+  /* disable any native browser highlighting */
+  -webkit-touch-callout: none;
+    -webkit-user-select: none;
+     -khtml-user-select: none;
+       -moz-user-select: none;
+        -ms-user-select: none;
+            user-select: none;
+}
+
+/* white square */
+.white-1e1d7 {
+  background-color: #f0d9b5;
+  color: #b58863;
+}
+
+/* black square */
+.black-3c85d {
+  background-color: #b58863;
+  color: #f0d9b5;
+}
+
+/* highlighted square */
+.highlight1-32417, .highlight2-9c5d2 {
+  -webkit-box-shadow: inset 0 0 3px 3px yellow;
+  -moz-box-shadow: inset 0 0 3px 3px yellow;
+  box-shadow: inset 0 0 3px 3px yellow;
+}
+
+/* notation */
+.notation-322f9 {
+  cursor: default;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  position: absolute;
+}
+.alpha-d2270 {
+  bottom: 1px;
+  right: 3px;
+}
+.numeric-fc462 {
+  top: 2px;
+  left: 2px;
+}
+
+
+.center-container {
+ 	display: flex;
+ 	justify-content: center;
+ 	flex-wrap: wrap;
+ 	text-align: center;
+ }
+        
+.center-text {
+ 	margin: 0;
+ }
+        
+  @media only screen and (max-width: 600px) {
+  	.center-container {
+    flex-direction: column;
+    }
+}
+
+.hide-element {
+  display: none;
+}
+
+.tally-container {
+  display: flex;
+  justify-content: center; /* Center the content horizontally */
+  flex-wrap: nowrap; /* Prevents wrapping */
+}
+
+.tally-column {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid #000;
+  margin: 0; /* Removes margin */
+  padding: 0; /* Removes padding */
+}
+
+.sub-column {
+  flex: none;
+  width: 10em; /* Adjust the width as needed */
+  border-right: 1px solid #000; /* Optional: adds a border between sub-columns */
+}
+
+.sub-column:last-child {
+  border-right: none; /* Removes the right border on the last sub-column */
+}
+
+.key {
+  color: purple;
+}
+
+#fenRevealFENorPGN {
+  display: block;
+  width: 95%;
+  max-width: 1200px;
+  min-height: 40px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  padding: 8px;
+  margin: 0 auto;
+}
+
+#fenRevealCommentary {
+  display: inline-block;
+  max-width: 600px;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  color: #333;
+  font-style: italic;
+  font-size: 1.5em;
+}
+
+/* Prevent tables from exceeding screen width */
+#my-table, #my-table2 {
+  border-collapse: collapse;
+  font-size: 1.2em;
+  display: table;
+}
+
+#my-table td, #my-table2 td {
+  border: 1px solid #ddd;
+  vertical-align: top;
+}
+
+/* Mobile responsive improvements for tables */
+@media only screen and (max-width: 768px) {
+  #my-table, #my-table2 {
+    font-size: 1em;
+  }
+  
+  .table-container {
+    max-width: calc(100vw - 20px); /* Less margin on mobile */
+    padding: 0 5px;
+  }
+  
+  #my-table td:first-child, #my-table2 td:first-child {
+    padding: 6px;
+    font-size: 0.9em; /* Slightly smaller text on mobile */
+  }
+}
+
+/* Hide column 3 (source/filename column) */
+#my-table td:nth-child(3), #my-table2 td:nth-child(3) {
+  display: none;
+}
+
+/* Container for tables to prevent overflow */
+.table-container {
+  width: 100%;
+  max-width: calc(100vw - 40px); /* Leave some margin */
+  overflow-x: auto;
+  margin: 0 auto; /* Center the container */
+}
+
+/* Force table to respect container width */
+#my-table, #my-table2 {
+  table-layout: fixed; /* Force fixed layout for better width control */
+  width: 100%;
+  max-width: none; /* Remove max-width so it respects container */
+}
+
+/* First column (row number) - small fixed width */
+#my-table td:first-child, #my-table2 td:first-child {
+  width: 50px; /* Fixed width for row numbers */
+  min-width: 50px;
+  max-width: 50px;
+  text-align: center;
+  padding: 8px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+}
+
+/* Second column (content) - takes remaining space */
+#my-table td:nth-child(2), #my-table2 td:nth-child(2) {
+  width: calc(100% - 50px); /* Take remaining space after row number column */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  padding: 8px;
+  overflow: hidden;
+}
+
+/* Ensure body doesn't exceed viewport width */
+body {
+  max-width: 100vw;
+  overflow-x: auto;
+  display: flex;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Sidebar styles */
+.sidebar {
+  width: 260px;
+  background-color: #f5f5f5;
+  padding: 0;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sticky sidebar header */
+.sidebar-header {
+  position: sticky;
+  top: 0;
+  background-color: #f5f5f5;
+  padding: 15px;
+  border-bottom: 2px solid #ddd;
+  z-index: 10;
+}
+
+/* Sidebar content area (scrollable) */
+.sidebar-content {
+  flex: 1;
+  padding: 20px 15px;
+  overflow-y: auto;
+}
+
+/* Sidebar button styles */
+.sidebar-button {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: left;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Inline button styles - same colors as sidebar buttons but inline */
+.inline-button {
+  display: inline-block;
+  padding: 8px 12px;
+  margin: 0 2px;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  text-align: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-button:hover {
+  background-color: #005c99;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.inline-button:hover {
+  background-color: #005c99;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.inline-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-button:last-child {
+  margin-bottom: 0;
+}
+
+.sidebar-item {
+  padding: 10px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  font-size: 10px;
+}
+
+.sidebar-item:hover {
+  background-color: #e0e0e0;
+}
+
+.sidebar-item.active {
+  background-color: #d0d0d0;
+}
+
+/* Sidebar search styles */
+.sidebar-search-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.sidebar-search {
+  width: 300px;
+  padding: 10px;
+  font-size: 14px;
+  border: 2px solid #007acc;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.sidebar-search:focus {
+  border-color: #005c99;
+  box-shadow: 0 0 10px rgba(0, 122, 204, 0.3);
+}
+
+.sidebar-search::placeholder {
+  color: #888;
+  font-style: italic;
+}
+
+/* Read board position button styles */
+.read-board-btn {
+  width: 300px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: bold;
+  background: linear-gradient(45deg, #28a745, #218838);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+}
+
+.read-board-btn:hover {
+  background: linear-gradient(45deg, #218838, #1e7e34);
+  box-shadow: 0 6px 12px rgba(40, 167, 69, 0.3);
+  transform: translateY(-2px);
+}
+
+.read-board-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+/* Main container for the rest of the content */
+.main-container {
+  flex-grow: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+/* Center the move reveal information above the board */
+.move-reveal-container {
+  text-align: center;
+  margin-bottom: 10px;
+  margin-top: 10px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+
+#loadChessPgn {
+    display: none;
+}
+
+/* Style for highlighted chess notation symbols */
+.chess-mistake {
+    color: #ff8c00;
+    font-weight: bold;
+    background-color: rgba(255, 140, 0, 0.1);
+    padding: 1px 2px;
+    border-radius: 2px;
+}
+
+/* Chess Modal Styles */
+.chess-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.8);
+}
+
+.chess-modal-content {
+    background-color: #ffffff;
+    margin: 2% auto;
+    padding: 20px;
+    border: 2px solid #007acc;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 1200px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    position: relative;
+}
+
+.chess-modal-close {
+    color: #aaa;
+    float: right;
+    font-size: 32px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+    transition: color 0.2s;
+}
+
+.chess-modal-close:hover,
+.chess-modal-close:focus {
+    color: #000;
+}
+
+.chess-modal-body {
+    display: flex;
+    gap: 30px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.chess-modal-board-section {
+    flex: 1;
+    min-width: 324px;
+    display: flex;
+    justify-content: center;
+}
+
+.chess-modal-notation-section {
+    flex: 1;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.chess-modal-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.chess-modal-buttons .sidebar-button {
+    margin-bottom: 0;
+}
+
+.chess-modal-move-reveal {
+    text-align: center;
+    padding: 10px;
+    font-size: 18px;
+    font-weight: bold;
+    color: #007acc;
+    border: 2px solid #007acc;
+    border-radius: 6px;
+    background: #f0f8ff;
+    margin: 10px 0;
+}
+
+.chess-modal-move-reveal span {
+    display: inline-block;
+}
+
+.chess-modal-notation-display {
+    background: #f8f9fa;
+    border: 2px solid #007acc;
+    border-radius: 8px;
+    padding: 20px;
+    min-height: 150px;
+    max-height: 400px;
+    overflow-y: auto;
+    font-size: 16px;
+    line-height: 1.6;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.chess-modal-notation-display span {
+    display: block;
+}
+
+@media only screen and (max-width: 768px) {
+    .chess-modal-content {
+        width: 95%;
+        margin: 5% auto;
+        padding: 15px;
+    }
+
+    .chess-modal-body {
+        flex-direction: column;
+    }
+
+    .chess-modal-board-section {
+        width: 100%;
+    }
+}

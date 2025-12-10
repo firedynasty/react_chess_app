@@ -1,0 +1,260 @@
+/* PDF Viewer specific styles */
+.pdf-viewer-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  width: 100%;
+}
+
+.pdf-viewer-inner {
+  width: 100%;
+  max-width: 64rem;
+  background-color: #f3f4f6;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.pdf-viewer-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
+  text-align: center;
+  color: #1f2937;
+}
+
+.pdf-file-input {
+  margin-bottom: 1.5rem;
+}
+
+.pdf-file-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.pdf-file-input-field {
+  margin-top: 0.5rem;
+  display: block;
+  width: 100%;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.pdf-error {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  color: #b91c1c;
+  background-color: #fee2e2;
+  border-radius: 0.375rem;
+}
+
+.pdf-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* PDF Toolbar */
+.pdf-toolbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: #e5e7eb;
+  border-radius: 0.375rem;
+}
+
+.pdf-nav-buttons {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pdf-nav-buttons button {
+  padding: 0.5rem 1rem;
+  background-color: #2563eb;
+  color: white;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+}
+
+.pdf-nav-buttons button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.pdf-page-info {
+  color: #4b5563;
+  margin: 0 0.5rem;
+}
+
+.pdf-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pdf-zoom-controls button {
+  padding: 0.5rem;
+  background-color: #4b5563;
+  color: white;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+}
+
+.pdf-zoom-controls span {
+  margin: 0 0.25rem;
+  min-width: 3rem;
+  text-align: center;
+}
+
+/* Document Container */
+.pdf-document-container {
+  margin-bottom: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  overflow: auto;
+  background-color: white;
+  max-height: 70vh;
+  width: 100%;
+}
+
+.pdf-document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pdf-page {
+  margin: 1em 0;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Auto-Scroll Controls */
+.pdf-auto-scroll-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0.5rem;
+  background-color: #f3f4f6;
+  border-radius: 0.375rem;
+}
+
+.scroll-toggle {
+  padding: 0.5rem 1rem;
+  color: white;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  background-color: #64748b;
+  font-weight: bold;
+}
+
+.scroll-toggle.active {
+  background-color: #059669;
+}
+
+.speed-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.speed-controls button {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: none;
+  background-color: #4b5563;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.speed-controls button:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.interval-display {
+  min-width: 2.5rem;
+  text-align: center;
+  font-weight: bold;
+}
+
+.sound-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sound-controls label {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+/* Info Text */
+.pdf-info-text {
+  text-align: center;
+  color: #059669;
+  font-weight: 500;
+  margin-top: 0.5rem;
+}
+
+.pdf-info-small {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+/* Make sure text layers work properly */
+.react-pdf__Page__textContent {
+  user-select: text;
+  -webkit-user-select: text;
+  pointer-events: auto;
+}
+
+.react-pdf__Page__textContent > span {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.react-pdf__Page__textContent > span::selection {
+  background-color: rgba(0, 128, 255, 0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pdf-toolbar,
+  .pdf-auto-scroll-controls {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .pdf-nav-buttons,
+  .pdf-zoom-controls,
+  .speed-controls {
+    width: 100%;
+    justify-content: center;
+  }
+}

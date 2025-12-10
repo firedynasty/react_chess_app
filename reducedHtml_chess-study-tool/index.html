@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Chess Study Tool</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="./style.css">
+
+</head>
+<body>
+
+<!-- Report Loading Controls -->
+<div id="reportControls" style="margin: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+  <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Load Analysis Report (from clipboard)</button>
+
+  <button id="selectReportFolder" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;" onclick="document.getElementById('reportFolderInput').click()">📂 Select Reports Folder</button>
+  <input type="file" id="reportFolderInput" accept=".txt" webkitdirectory style="display: none;">
+
+  <span id="reportsCountDisplay" style="color: #28a745; font-weight: bold; margin-left: 10px;"></span>
+
+  <button id="viewPreloadedReports" style="background: #6f42c1; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; display: none; margin-left: 10px;">📋 View Reports</button>
+  <button id="saveReportBtn" style="background: #28a745; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-left: 10px;">💾 Save Report</button>
+</div>
+
+<!-- Analysis Report Container -->
+<div id="analysisReportContainer" style="display: none; margin-top: 15px; max-width: 800px; box-sizing: border-box; margin-left: 10px; margin-right: 10px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 5px;">
+    <span style="font-weight: bold; color: #dc3545;">Full Analysis Report</span>
+    <div>
+      <button id="loadPgnFromHighlight" style="background: #17a2b8; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; margin-right: 8px;">Load PGN from Highlight</button>
+      <button id="loadRefImageBtn" style="background: #17a2b8; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px; margin-right: 8px;">🖼️ Load Reference Image</button>
+      <input type="file" id="refImageFileInput" accept="image/*" style="display: none;">
+      <button id="toggleReportBtn" style="background: #6c757d; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer; font-size: 12px;">Hide Report</button>
+    </div>
+  </div>
+  <div id="analysisReportText" style="
+    background: #ffffff;
+    color: #000000;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  "></div>
+</div>
+
+<!-- Chess Board 2 -->
+<div id="myBoard2" class="board" tabindex="0" style="width: 400px; margin: 10px;"></div>
+
+<!-- Board 2 Navigation Container -->
+<div id="board2NavContainer" style="display: block; margin: 10px; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; max-width: 600px;">
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <button id="board2PrevMove" style="background: #007acc; color: white; border: none; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-size: 14px;">← Prev</button>
+    <span id="board2MoveIndicator" style="font-weight: bold; min-width: 50px; text-align: center;">Start</span>
+    <button id="board2NextMove" style="background: #007acc; color: white; border: none; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-size: 14px;">Next →</button>
+    <span>Position: <span id="board2PositionCount" style="font-weight: bold;">0/0</span></span>
+    <a id="lichessBoard2Link" href="#" target="_blank" style="color: #007bff; text-decoration: none;">Lichess(analysis link)</a>
+    <span id="flip_board2" style="cursor: pointer; color: #007bff;"><u>Flip Board</u></span>
+    <button id="loadPgnFromClipboard" style="background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 3px; cursor: pointer; font-size: 14px;">Load PGN from Clipboard</button>
+  </div>
+</div>
+
+<!-- Reference Image Modal -->
+<div id="refImageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 90%; max-height: 90%;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <span style="font-weight: bold;">Reference Image</span>
+      <button id="closeRefImageModal" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Close</button>
+    </div>
+    <div id="refImagePlaceholder" style="text-align: center; padding: 40px; color: #666;">No image loaded</div>
+    <img id="refImagePreview" src="" alt="Reference Image" style="display: none; max-width: 100%; max-height: 70vh; cursor: zoom-in;">
+  </div>
+</div>
+
+<!-- Report Files Modal -->
+<div id="reportFilesModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80%; overflow-y: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+      <h3 style="margin: 0;">Select Report File</h3>
+      <button id="closeReportFilesModal" style="background: #dc3545; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">Close</button>
+    </div>
+    <div id="reportFilesList"></div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src='https://code.jquery.com/jquery-2.2.4.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/PapaParse/4.3.5/papaparse.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js'></script>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'></script>
+<script src="./script.js"></script>
+
+</body>
+</html>

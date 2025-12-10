@@ -1,0 +1,150 @@
+.faq-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.faq-modal {
+  background-color: white;
+  border-radius: 6px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+}
+
+.faq-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  background-color: #f0f0f0;
+}
+
+.faq-modal-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #333;
+}
+
+.faq-close-button {
+  background: none;
+  border: none;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #666;
+  padding: 0 8px;
+}
+
+.faq-close-button:hover {
+  color: #000;
+}
+
+.faq-modal-content {
+  padding: 20px;
+  color: #333;
+  line-height: 1.5;
+}
+
+.faq-modal-content h3 {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+  margin-top: 25px;
+  margin-bottom: 15px;
+  color: #2078e7;
+}
+
+.faq-modal-content h3:first-child {
+  margin-top: 0;
+}
+
+.faq-modal-content ul, 
+.faq-modal-content ol {
+  padding-left: 25px;
+  margin-bottom: 20px;
+}
+
+.faq-modal-content li {
+  margin-bottom: 8px;
+}
+
+.faq-modal-content strong {
+  color: #505050;
+}
+
+/* Formatting for the dynamic FAQ content */
+.faq-formatted-content {
+  line-height: 1.5;
+}
+
+.faq-section {
+  margin-bottom: 25px;
+}
+
+.faq-section h3 {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+  margin-top: 25px;
+  margin-bottom: 15px;
+  color: #2078e7;
+}
+
+.faq-section:first-child h3 {
+  margin-top: 0;
+}
+
+.faq-paragraph {
+  margin-bottom: 15px;
+}
+
+.faq-list-item {
+  margin-bottom: 10px;
+  padding-left: 15px;
+}
+
+/* Loading and error states */
+.faq-loading,
+.faq-error {
+  padding: 20px;
+  text-align: center;
+  border-radius: 4px;
+  margin: 20px 0;
+}
+
+.faq-loading {
+  background-color: #f0f8ff;
+  color: #0277bd;
+}
+
+.faq-error {
+  background-color: #fff0f0;
+  color: #d32f2f;
+}
+
+@media (max-width: 768px) {
+  .faq-modal {
+    width: 95%;
+    max-height: 95vh;
+  }
+  
+  .faq-modal-header h2 {
+    font-size: 1.2rem;
+  }
+  
+  .faq-modal-content {
+    padding: 15px;
+    font-size: 14px;
+  }
+}

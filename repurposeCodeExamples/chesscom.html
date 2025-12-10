@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess.com Game Fetcher</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #7fa650;
+            padding-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .chesscom-import {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .chesscom-import label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .chesscom-import input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background-color: #fff;
+            color: #333;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .chesscom-import input[type="text"]:focus {
+            border-color: #7fa650;
+            box-shadow: 0 0 0 3px rgba(127, 166, 80, 0.2);
+        }
+
+        .chesscom-import input[type="text"]::placeholder {
+            color: #999;
+        }
+
+        #fetch-games-btn {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+
+        #fetch-games-btn:hover {
+            background-color: #f5f5f5;
+            border-color: #7fa650;
+        }
+
+        #fetch-games-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .game-selection {
+            margin-top: 20px;
+        }
+
+        .game-selection label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        #game-dropdown {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+
+        #game-dropdown:focus {
+            border-color: #7fa650;
+            outline: none;
+        }
+
+        #game-details {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            font-size: 13px;
+            border-left: 4px solid #7fa650;
+        }
+
+        #game-details p {
+            margin: 5px 0;
+        }
+
+        #game-details a {
+            color: #7fa650;
+            text-decoration: none;
+        }
+
+        #game-details a:hover {
+            text-decoration: underline;
+        }
+
+        .pgn-section {
+            margin-top: 20px;
+        }
+
+        .pgn-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        #pgn-input {
+            width: 100%;
+            height: 180px;
+            padding: 12px;
+            font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+            font-size: 13px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        #pgn-input:focus {
+            border-color: #7fa650;
+            outline: none;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            background-color: #7fa650;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: #6b8f45;
+        }
+
+        .btn-secondary {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background-color: #f5f5f5;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ccc;
+            border-top: 2px solid #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: #dc3545;
+            padding: 12px;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .success-message {
+            color: #155724;
+            padding: 12px;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .info-message {
+            color: #0c5460;
+            padding: 12px;
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+
+        .num-games-select {
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            background-color: #fff;
+            cursor: pointer;
+        }
+
+        .game-count-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .game-count-row label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        footer a {
+            color: #7fa650;
+        }
+    </style>
+</head>
+<body>
+    <h1>&#9823; Chess.com Game Fetcher</h1>
+
+    <div class="card">
+        <h3>Import from Chess.com</h3>
+        <div class="chesscom-import">
+            <label for="chesscom-username">Chess.com Username:</label>
+            <input
+                type="text"
+                id="chesscom-username"
+                placeholder="Enter your Chess.com username"
+                aria-label="Chess.com Username"
+                autocomplete="username"
+            >
+            <button type="button" id="fetch-games-btn" onclick="fetchChesscomGames()">
+                &#x1F4E5; Fetch Games
+            </button>
+        </div>
+
+        <div class="game-count-row">
+            <label for="num-games">Number of games:</label>
+            <select id="num-games" class="num-games-select">
+                <option value="5" selected>5 games</option>
+                <option value="10">10 games</option>
+                <option value="15">15 games</option>
+                <option value="20">20 games</option>
+            </select>
+        </div>
+
+        <div class="game-selection" id="game-selection-container" style="display: none;">
+            <label for="game-dropdown">Select a game to analyze:</label>
+            <select id="game-dropdown" onchange="loadSelectedGame()">
+                <option value="">-- Select a game --</option>
+            </select>
+            <div id="game-details"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>PGN / Moves</h3>
+        <div class="pgn-section">
+            <label for="pgn-input">Game moves (auto-populated when you select a game above):</label>
+            <textarea
+                id="pgn-input"
+                placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5 a6..."
+            ></textarea>
+        </div>
+        <div class="btn-row">
+            <button type="button" class="btn-primary" onclick="copyPGN()">
+                &#x1F4CB; Copy PGN
+            </button>
+            <button type="button" class="btn-secondary" onclick="clearPGN()">
+                &#x1F5D1; Clear
+            </button>
+            <button type="button" class="btn-secondary" onclick="openInLichess()">
+                &#x2197; Open in Lichess
+            </button>
+        </div>
+    </div>
+
+    <footer>
+        Powered by <a href="https://www.chess.com/news/view/published-data-api" target="_blank">Chess.com Public API</a>
+    </footer>
+
+    <script>
+        let fetchedGames = {};
+
+        // Validate Chess.com username format
+        function validateUsername(username) {
+            const pattern = /^[a-zA-Z0-9_]{3,25}$/;
+            return pattern.test(username);
+        }
+
+        // Extract clean moves from PGN (remove headers and annotations)
+        function extractPgnMoves(pgnText) {
+            const lines = pgnText.split('\n');
+            const moveLines = [];
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || trimmed.startsWith('[')) {
+                    continue;
+                }
+                moveLines.push(trimmed);
+            }
+
+            let movesText = moveLines.join(' ');
+
+            // Remove annotations
+            movesText = movesText.replace(/\{[^}]*\}/g, '');      // {comments}
+            movesText = movesText.replace(/\([^)]*\)/g, '');      // (variations)
+            movesText = movesText.replace(/\[%[^\]]*\]/g, '');    // [%clk annotations]
+            movesText = movesText.replace(/\s+/g, ' ').trim();
+
+            return movesText;
+        }
+
+        // Format timestamp to readable date
+        function formatDate(timestamp) {
+            if (!timestamp) return 'Unknown';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+
+        async function fetchChesscomGames() {
+            const usernameInput = document.getElementById('chesscom-username');
+            const fetchBtn = document.getElementById('fetch-games-btn');
+            const gameSelectionContainer = document.getElementById('game-selection-container');
+            const gameDropdown = document.getElementById('game-dropdown');
+            const numGamesSelect = document.getElementById('num-games');
+
+            const username = usernameInput.value.trim().toLowerCase();
+            const numGames = parseInt(numGamesSelect.value);
+
+            if (!username) {
+                showMessage('Please enter a Chess.com username', 'error');
+                return;
+            }
+
+            if (!validateUsername(username)) {
+                showMessage('Invalid username format. Use 3-25 alphanumeric characters or underscores.', 'error');
+                return;
+            }
+
+            // Clear previous messages and games
+            clearMessages();
+            fetchedGames = {};
+            gameDropdown.innerHTML = '<option value="">-- Select a game --</option>';
+            gameSelectionContainer.style.display = 'none';
+
+            // Show loading state
+            fetchBtn.disabled = true;
+            fetchBtn.innerHTML = '<span class="spinner"></span> Fetching...';
+
+            try {
+                const headers = {
+                    'Accept': 'application/json'
+                };
+
+                let gamesList = [];
+
+                // Get current month's archive
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+
+                const archiveUrl = `https://api.chess.com/pub/player/${username}/games/${year}/${month}`;
+
+                try {
+                    const response = await fetch(archiveUrl, { headers });
+
+                    if (response.status === 404) {
+                        throw new Error('User not found on Chess.com. Check the username and try again.');
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.games) {
+                            gamesList = gamesList.concat(data.games);
+                        }
+                    }
+                } catch (e) {
+                    if (e.message.includes('User not found')) throw e;
+                    // Continue to try previous month
+                }
+
+                // If not enough games, try previous month
+                if (gamesList.length < numGames) {
+                    let prevMonth = now.getMonth(); // 0-indexed, so this is previous month
+                    let prevYear = year;
+                    if (prevMonth === 0) {
+                        prevMonth = 12;
+                        prevYear -= 1;
+                    }
+
+                    const prevUrl = `https://api.chess.com/pub/player/${username}/games/${prevYear}/${String(prevMonth).padStart(2, '0')}`;
+
+                    try {
+                        const prevResponse = await fetch(prevUrl, { headers });
+                        if (prevResponse.ok) {
+                            const prevData = await prevResponse.json();
+                            if (prevData.games) {
+                                gamesList = gamesList.concat(prevData.games);
+                            }
+                        }
+                    } catch (e) {
+                        // Ignore errors from previous month
+                    }
+                }
+
+                if (gamesList.length === 0) {
+                    showMessage('No games found for this user in the last 2 months.', 'info');
+                    return;
+                }
+
+                // Sort by end_time (most recent first)
+                gamesList.sort((a, b) => (b.end_time || 0) - (a.end_time || 0));
+
+                // Take requested number of games
+                const recentGames = gamesList.slice(0, numGames);
+
+                // Build games dictionary
+                for (let idx = 0; idx < recentGames.length; idx++) {
+                    const game = recentGames[idx];
+                    if (!game.pgn) continue;
+
+                    const white = game.white || {};
+                    const black = game.black || {};
+                    const whiteUsername = white.username || 'Unknown';
+                    const blackUsername = black.username || 'Unknown';
+                    const whiteResult = white.result || '';
+                    const blackResult = black.result || '';
+
+                    // Determine result from player's perspective
+                    let opponent, resultDisplay, playerColor;
+                    if (username.toLowerCase() === whiteUsername.toLowerCase()) {
+                        opponent = blackUsername;
+                        playerColor = 'White';
+                        if (whiteResult === 'win') resultDisplay = 'Win';
+                        else if (blackResult === 'win') resultDisplay = 'Loss';
+                        else resultDisplay = 'Draw';
+                    } else {
+                        opponent = whiteUsername;
+                        playerColor = 'Black';
+                        if (blackResult === 'win') resultDisplay = 'Win';
+                        else if (whiteResult === 'win') resultDisplay = 'Loss';
+                        else resultDisplay = 'Draw';
+                    }
+
+                    const gameDate = formatDate(game.end_time);
+                    const timeClass = game.time_class || 'unknown';
+
+                    // Create label
+                    const label = `Game ${idx + 1}: vs ${opponent} (${resultDisplay} as ${playerColor}) - ${timeClass} - ${gameDate}`;
+
+                    // Store game data
+                    fetchedGames[label] = {
+                        pgn: extractPgnMoves(game.pgn),
+                        fullPgn: game.pgn,
+                        metadata: {
+                            white: whiteUsername,
+                            black: blackUsername,
+                            white_rating: white.rating || '?',
+                            black_rating: black.rating || '?',
+                            result: game.result || 'Unknown',
+                            time_class: timeClass,
+                            time_control: game.time_control || '',
+                            url: game.url || '',
+                            end_time: game.end_time
+                        }
+                    };
+                }
+
+                // Check if any games were processed
+                if (Object.keys(fetchedGames).length === 0) {
+                    showMessage('No valid games found (games may be missing PGN data).', 'info');
+                    return;
+                }
+
+                // Populate dropdown
+                for (const label of Object.keys(fetchedGames)) {
+                    const option = document.createElement('option');
+                    option.value = label;
+                    option.textContent = label;
+                    gameDropdown.appendChild(option);
+                }
+
+                gameSelectionContainer.style.display = 'block';
+                showMessage(`Found ${Object.keys(fetchedGames).length} recent games!`, 'success');
+
+            } catch (error) {
+                showMessage(error.message || 'Failed to fetch games. Please try again.', 'error');
+                gameSelectionContainer.style.display = 'none';
+            } finally {
+                fetchBtn.disabled = false;
+                fetchBtn.innerHTML = '&#x1F4E5; Fetch Games';
+            }
+        }
+
+        function loadSelectedGame() {
+            const gameDropdown = document.getElementById('game-dropdown');
+            const gameDetails = document.getElementById('game-details');
+            const pgnTextarea = document.getElementById('pgn-input');
+
+            const selectedLabel = gameDropdown.value;
+
+            if (!selectedLabel || !fetchedGames[selectedLabel]) {
+                gameDetails.innerHTML = '';
+                return;
+            }
+
+            const game = fetchedGames[selectedLabel];
+            const meta = game.metadata;
+
+            // Show game details
+            gameDetails.innerHTML = `
+                <p><strong>White:</strong> ${meta.white} (${meta.white_rating})</p>
+                <p><strong>Black:</strong> ${meta.black} (${meta.black_rating})</p>
+                <p><strong>Time Control:</strong> ${meta.time_class} (${meta.time_control})</p>
+                <p><strong>Result:</strong> ${meta.result}</p>
+                ${meta.url ? `<p><a href="${meta.url}" target="_blank">View on Chess.com &#x2197;</a></p>` : ''}
+            `;
+
+            // Load PGN into textarea
+            pgnTextarea.value = game.pgn;
+        }
+
+        function copyPGN() {
+            const pgnTextarea = document.getElementById('pgn-input');
+            const pgn = pgnTextarea.value.trim();
+
+            if (!pgn) {
+                showMessage('No PGN to copy', 'error');
+                return;
+            }
+
+            navigator.clipboard.writeText(pgn).then(() => {
+                showMessage('PGN copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback for older browsers
+                pgnTextarea.select();
+                document.execCommand('copy');
+                showMessage('PGN copied to clipboard!', 'success');
+            });
+        }
+
+        function clearPGN() {
+            document.getElementById('pgn-input').value = '';
+            document.getElementById('game-dropdown').value = '';
+            document.getElementById('game-details').innerHTML = '';
+        }
+
+        function openInLichess() {
+            const pgn = document.getElementById('pgn-input').value.trim();
+
+            if (!pgn) {
+                showMessage('No PGN to analyze', 'error');
+                return;
+            }
+
+            // Open Lichess analysis board with the PGN
+            const encodedPgn = encodeURIComponent(pgn);
+            const lichessUrl = `https://lichess.org/paste?pgn=${encodedPgn}`;
+            window.open(lichessUrl, '_blank');
+        }
+
+        function showMessage(message, type) {
+            clearMessages();
+
+            const div = document.createElement('div');
+            if (type === 'error') {
+                div.className = 'error-message';
+            } else if (type === 'success') {
+                div.className = 'success-message';
+            } else {
+                div.className = 'info-message';
+            }
+            div.textContent = message;
+
+            const container = document.querySelector('.chesscom-import');
+            container.parentNode.insertBefore(div, container.nextSibling);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => div.remove(), 5000);
+        }
+
+        function clearMessages() {
+            const existing = document.querySelectorAll('.error-message, .success-message, .info-message');
+            existing.forEach(el => el.remove());
+        }
+
+        // Enter key triggers fetch
+        document.getElementById('chesscom-username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchChesscomGames();
+            }
+        });
+    </script>
+</body>
+</html>

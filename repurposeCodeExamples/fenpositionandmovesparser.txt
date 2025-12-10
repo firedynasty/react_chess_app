@@ -1,0 +1,395 @@
+# FEN Position and Moves Parser - Documentation for Repurposing
+
+This document explains how the chess study tool parses FEN/PGN strings and enables
+arrow key navigation through board positions. Use this as a guide when implementing
+similar functionality in another application.
+
+================================================================================
+## DEPENDENCIES REQUIRED
+================================================================================
+
+1. Chess.js library - for move validation and FEN generation
+   - CDN: https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js
+   - Used for: game.load(fen), game.move(move), game.fen()
+
+2. Chessboard.js library - for visual board rendering
+   - CDN: https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js
+   - Used for: board.position(fen)
+
+================================================================================
+## CORE DATA STRUCTURES
+================================================================================
+
+// Global variables needed:
+var currentGamePositions = [];  // Array of FEN strings for each position
+var positionCounter = 0;        // Current position index (0-based)
+var board;                      // Chessboard.js instance
+
+================================================================================
+## FUNCTION 1: DETECT VARIANT FEN FORMAT
+================================================================================
+
+Purpose: Check if text matches [Variant "From Position"][FEN "..."] format
+
+function isVariantFenContent(text) {
+    if (!text || typeof text !== 'string') return false;
+
+    const cleanText = text.trim();
+    // Matches: [Variant "From Position"][FEN "rnbqkbnr/..."] optionally followed by moves
+    return /\[Variant\s+"From\s+Position"\]\s*\[FEN\s+"[^"]+"\]/.test(cleanText);
+}
+
+Example matches:
+- [Variant "From Position"][FEN "rnbqk2r/ppp2pp1/3p1n1p/2b1N3/2B1P3/2N5/PPPP1PPP/R1BQK2R w KQkq - 0 6"]
+- [Variant "From Position"][FEN "..."] 6. Nxf7 Bxf2+ 7. Kxf2 Ng4+
+
+================================================================================
+## FUNCTION 2: DETECT STANDARD PGN
+================================================================================
+
+Purpose: Check if text looks like standard PGN notation
+
+function isPgnContent(text) {
+    if (!text || typeof text !== 'string') return false;
+
+    const cleanText = text.trim();
+    if (cleanText.length < 10) return false;
+
+    // Must start with "[" (headers) or digit (moves)
+    if (!/^[\[\d]/.test(cleanText)) return false;
+
+    // Scoring system for PGN detection
+    let score = 0;
+
+    // Check for move numbers like "1." "2."
+    if (/\d+\./.test(cleanText)) score += 3;
+
+    // Check for game results
+    if (/(1-0|0-1|1\/2-1\/2|\*)/.test(cleanText)) score += 2;
+
+    // Check for chess moves (piece moves, pawn moves)
+    if (/[NBRQK]?[a-h]?[1-8]?x?[a-h][1-8](\+|#)?/.test(cleanText)) score += 2;
+
+    // Check for castling
+    if (/(O-O-O|O-O)/.test(cleanText)) score += 1;
+
+    // Check for PGN headers
+    if (/\[[\w\s]+\s+"[^"]*"\]/.test(cleanText)) score += 2;
+
+    // Check for comments {}, variations (), annotations !?
+    if (/\{[^}]*\}/.test(cleanText)) score += 1;
+    if (/\([^)]*\)/.test(cleanText)) score += 1;
+    if (/[!?]{1,2}/.test(cleanText)) score += 1;
+
+    return score >= 4;
+}
+
+================================================================================
+## FUNCTION 3: DETECT LOOSE FEN (single position)
+================================================================================
+
+Purpose: Check if text is a standalone FEN position string
+
+function isFenContentLoose(text) {
+    if (!text || typeof text !== 'string') return false;
+
+    const cleanText = text.trim();
+    if (cleanText.length < 8) return false;
+
+    const parts = cleanText.split(/\s+/);
+    const boardPart = parts[0];
+
+    // Must have 7 slashes (8 ranks)
+    const slashCount = (boardPart.match(/\//g) || []).length;
+    if (slashCount !== 7) return false;
+
+    // Must have chess piece characters
+    if (!/[pnbrqkPNBRQK1-8]/.test(boardPart)) return false;
+
+    // Optional: check for turn indicator (w/b)
+    if (parts.length > 1 && /^[wb]$/.test(parts[1])) return true;
+
+    return true;
+}
+
+Example matches:
+- rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+- r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R
+
+================================================================================
+## FUNCTION 4: PARSE PGN TO POSITIONS ARRAY (CORE FUNCTION)
+================================================================================
+
+Purpose: Convert PGN/FEN string into array of FEN positions for each move
+
+function parsePgnToPositions(pgnString) {
+    try {
+        var game = new Chess();  // Chess.js instance
+
+        // Step 1: Extract FEN header if present
+        var fenMatch = pgnString.match(/\[FEN\s+"([^"]+)"\]/);
+        if (fenMatch) {
+            var startingFen = fenMatch[1];
+            try {
+                game.load(startingFen);  // Load custom starting position
+            } catch (fenError) {
+                game = new Chess();  // Fallback to standard position
+            }
+        }
+
+        // Step 2: Store starting position
+        var positions = [game.fen()];
+
+        // Step 3: Clean PGN - remove headers, comments, variations, annotations
+        var cleanPgn = pgnString
+            .replace(/\[.*?\]/g, '')      // Remove headers [...]
+            .replace(/\{[^}]*\}/g, '')    // Remove comments {...}
+            .replace(/\([^)]*\)/g, '')    // Remove variations (...)
+            .replace(/\$\d+/g, '')        // Remove NAG symbols $1, $2, $6
+            .replace(/[!?]{1,2}/g, '')    // Remove annotations !, ?, !!, ??
+            .replace(/\+\+/g, '')         // Remove double check
+            .trim();
+
+        // Step 4: Extract move tokens
+        var tokens = cleanPgn.split(/\s+/).filter(token =>
+            token &&
+            !/(1-0|0-1|1\/2-1\/2|\*)/g.test(token) &&  // Remove results
+            !/^\d+\.$/g.test(token)                     // Remove standalone "1."
+        );
+
+        // Step 5: Parse moves from tokens
+        var moves = [];
+        for (var i = 0; i < tokens.length; i++) {
+            var token = tokens[i];
+
+            // Skip ellipsis notation "22..."
+            if (/^\d+\.\.\.$/.test(token)) continue;
+
+            // Handle move numbers attached to moves "1.e4"
+            if (/^\d+\./.test(token)) {
+                var moveMatch = token.match(/^\d+\.(.+)$/);
+                if (moveMatch && moveMatch[1]) {
+                    moves.push(moveMatch[1]);
+                }
+            } else if (token.length > 0) {
+                moves.push(token);
+            }
+        }
+
+        // Step 6: Apply moves and collect positions
+        for (var j = 0; j < moves.length; j++) {
+            var result = game.move(moves[j]);
+            if (result) {
+                positions.push(game.fen());
+            }
+        }
+
+        return positions;
+
+    } catch (error) {
+        console.error('PGN parsing error:', error);
+        return [];
+    }
+}
+
+================================================================================
+## FUNCTION 5: LOAD POSITION TO BOARD
+================================================================================
+
+Purpose: Update the chessboard display with a specific position
+
+function loadPositionBoardOnly(index) {
+    if (currentGamePositions.length > 0 &&
+        index >= 0 &&
+        index < currentGamePositions.length) {
+
+        board.position(currentGamePositions[index]);
+        console.log('Position ' + (index + 1) + '/' + currentGamePositions.length);
+    }
+}
+
+================================================================================
+## FUNCTION 6: HANDLE ROW CLICK (CONTENT DETECTION)
+================================================================================
+
+Purpose: When user clicks a table row, detect content type and load appropriately
+
+function handleRowClick(cellText) {
+    // Priority 1: Semicolon-delimited FEN positions
+    if (cellText.includes(';')) {
+        currentGamePositions = cellText.trim().split(';');
+        positionCounter = 0;
+        loadPositionBoardOnly(0);
+        return;
+    }
+
+    // Priority 2: Standard PGN
+    if (isPgnContent(cellText)) {
+        currentGamePositions = parsePgnToPositions(cellText);
+        positionCounter = 0;
+        if (currentGamePositions.length > 0) {
+            board.position(currentGamePositions[0]);
+        }
+        return;
+    }
+
+    // Priority 3: Variant FEN format [Variant "From Position"][FEN "..."]
+    if (isVariantFenContent(cellText)) {
+        currentGamePositions = parsePgnToPositions(cellText);
+        positionCounter = 0;
+        if (currentGamePositions.length > 0) {
+            board.position(currentGamePositions[0]);
+        }
+        return;
+    }
+
+    // Priority 4: Single FEN position
+    if (isFenContentLoose(cellText)) {
+        currentGamePositions = [cellText.trim()];
+        positionCounter = 0;
+        loadPositionBoardOnly(0);
+        return;
+    }
+
+    // Priority 5: Not chess content - do nothing or handle as text
+    console.log('Not recognized as chess content');
+}
+
+================================================================================
+## FUNCTION 7: ARROW KEY NAVIGATION
+================================================================================
+
+Purpose: Navigate through positions with keyboard
+
+document.addEventListener('keydown', function(e) {
+    // Skip if focus is in input/textarea
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+    // Left Arrow (keyCode 37) - Previous position
+    if (e.keyCode === 37) {
+        if (currentGamePositions.length > 0) {
+            // Wrap to end if at beginning
+            positionCounter = positionCounter === 0
+                ? currentGamePositions.length - 1
+                : positionCounter - 1;
+            loadPositionBoardOnly(positionCounter);
+        }
+    }
+
+    // Right Arrow (keyCode 39) - Next position
+    if (e.keyCode === 39) {
+        if (currentGamePositions.length > 0) {
+            // Wrap to beginning if at end
+            positionCounter = (positionCounter + 1) % currentGamePositions.length;
+            loadPositionBoardOnly(positionCounter);
+        }
+    }
+
+    // Optional: Up/Down arrows for jumping multiple positions
+    if (e.keyCode === 38 || e.keyCode === 40) {  // Up or Down
+        if (currentGamePositions.length > 0) {
+            positionCounter = (positionCounter + 10) % currentGamePositions.length;
+            loadPositionBoardOnly(positionCounter);
+        }
+    }
+});
+
+================================================================================
+## MINIMAL IMPLEMENTATION TEMPLATE
+================================================================================
+
+Copy this template for a new app:
+
+<!-- HTML -->
+<div id="myBoard" style="width: 400px"></div>
+<table id="my-table">
+    <tr><td>[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"] 1.e4 e5 2.Nf3</td></tr>
+</table>
+
+<!-- Scripts -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css">
+
+<script>
+// Global state
+var currentGamePositions = [];
+var positionCounter = 0;
+var board;
+
+// Initialize board
+board = Chessboard('myBoard', {
+    position: 'start',
+    pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png'
+});
+
+// Add detection functions here: isVariantFenContent, isPgnContent, isFenContentLoose
+// Add parsePgnToPositions function here
+// Add loadPositionBoardOnly function here
+
+// Table row click handler
+document.getElementById('my-table').addEventListener('click', function(e) {
+    var row = e.target.closest('tr');
+    if (row) {
+        var cellText = row.cells[0].textContent;
+        handleRowClick(cellText);
+    }
+});
+
+// Arrow key navigation
+document.addEventListener('keydown', function(e) {
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+    if (e.keyCode === 37 && currentGamePositions.length > 0) {
+        positionCounter = positionCounter === 0
+            ? currentGamePositions.length - 1
+            : positionCounter - 1;
+        loadPositionBoardOnly(positionCounter);
+    }
+
+    if (e.keyCode === 39 && currentGamePositions.length > 0) {
+        positionCounter = (positionCounter + 1) % currentGamePositions.length;
+        loadPositionBoardOnly(positionCounter);
+    }
+});
+</script>
+
+================================================================================
+## FLOW SUMMARY
+================================================================================
+
+1. User clicks row containing: [Variant "From Position"][FEN "..."] 6. Nxf7 Bxf2+
+2. isVariantFenContent() returns true
+3. parsePgnToPositions() called:
+   - Extracts FEN from [FEN "..."] header
+   - Loads FEN into Chess.js: game.load(fen)
+   - Cleans move text: removes headers, comments, annotations
+   - Parses moves: Nxf7, Bxf2+, Kxf2, etc.
+   - For each move: game.move(move) then positions.push(game.fen())
+4. currentGamePositions[] now contains FEN for each position
+5. board.position(currentGamePositions[0]) shows starting position
+6. Left/Right arrows: update positionCounter, call loadPositionBoardOnly()
+
+================================================================================
+## REPURPOSING CHECKLIST
+================================================================================
+
+When adapting for another app:
+
+[ ] Include Chess.js and Chessboard.js libraries
+[ ] Create board container div with unique ID
+[ ] Initialize Chessboard instance
+[ ] Copy detection functions (isVariantFenContent, isPgnContent, isFenContentLoose)
+[ ] Copy parsePgnToPositions function
+[ ] Copy loadPositionBoardOnly function
+[ ] Set up click handler for your content source (table, list, etc.)
+[ ] Set up keydown listener for arrow navigation
+[ ] Declare global variables: currentGamePositions, positionCounter, board
+
+Optional enhancements:
+[ ] Display current move number/notation
+[ ] Add position display (FEN text)
+[ ] Add move list highlighting
+[ ] Add flip board functionality
+[ ] Add animation speed control

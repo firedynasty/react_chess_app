@@ -1,0 +1,40 @@
+HOW AUTO-SCROLL WORKS IN THE PDF VIEWER
+
+The PDF Auto-Scroll feature automatically advances through PDF pages at a specified interval. Here's how it works:
+
+KEY CONTROLS:
+-------------
+- Press the '/' key to toggle auto-scroll ON/OFF
+- Press 'm' to manually go to the next page (resets scroll position)
+- Press ',' to manually go to the next page (maintains scroll position)
+- Press 'z' to manually go to the previous page (maintains scroll position)
+- Press 'o' to scroll to the top of the current page (like Home key)
+- Press 'p' to scroll to the bottom of the current page (like End key)
+
+PAGE NAVIGATION:
+--------------
+- Click on the page number to edit it directly and navigate to a specific page
+- Press Enter after editing to confirm and navigate to that page
+
+AUTO-SCROLL FEATURES:
+--------------------
+1. When activated (SCROLL ON), the viewer will automatically advance through pages:
+   - At normal zoom (100%): Uses the ',' key method that preserves scroll position
+   - When zoomed in: First scrolls to the bottom of the current page (like 'p' key), then advances to next page
+
+2. Speed Control:
+   - The "-" button increases scrolling speed (reduces interval time)
+   - The "+" button decreases scrolling speed (increases interval time)
+   - Default interval is 13 seconds
+
+3. Sound Feedback:
+   - Toggle sound ON/OFF via radio buttons
+   - When enabled, a subtle audio beep plays when changing pages
+
+IMPLEMENTATION DETAILS:
+---------------------
+- Auto-scroll uses a timer (setInterval) that checks if enough time has passed since the last page change
+- When the interval elapses, it automatically clicks the Next button
+- The scroll timer resets whenever you manually navigate pages
+- Error handling prevents issues if the PDF fails to load correctly
+- The system automatically disables auto-scroll after multiple errors

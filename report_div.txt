@@ -1,0 +1,262 @@
+# Report DIV Documentation
+## How <div id="analysisReportText"> Works for Chess Analysis Display
+
+================================================================================
+## OVERVIEW
+================================================================================
+
+The `analysisReportText` div is a scrollable text container that displays raw
+chess analysis reports. It lives inside a parent container (`analysisReportContainer`)
+that controls visibility.
+
+================================================================================
+## HTML STRUCTURE
+================================================================================
+
+```html
+<!-- Parent container (controls visibility) -->
+<div id="analysisReportContainer" style="display: none; margin-top: 15px; max-width: 800px; box-sizing: border-box;">
+
+  <!-- Header bar with title and action buttons -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+    <span style="font-weight: bold; color: #dc3545;">Full Analysis Report</span>
+    <div>
+      <button id="loadPgnFromHighlight">Load PGN from Highlight</button>
+      <button id="loadRefImageBtn">Load Reference Image</button>
+      <button id="toggleReportBtn">Hide Report</button>
+    </div>
+  </div>
+
+  <!-- THE MAIN REPORT TEXT DIV -->
+  <div id="analysisReportText" style="
+    background: #ffffff;
+    color: #000000;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  ">Loading report...</div>
+
+</div>
+```
+
+================================================================================
+## CSS STYLING EXPLAINED
+================================================================================
+
+| Property            | Value                     | Purpose                              |
+|---------------------|---------------------------|--------------------------------------|
+| background          | #ffffff                   | White background for readability     |
+| color               | #000000                   | Black text for contrast              |
+| padding             | 15px                      | Inner spacing around text            |
+| border-radius       | 6px                       | Rounded corners                      |
+| font-family         | 'Courier New', monospace  | Fixed-width font for PGN/FEN display |
+| font-size           | 14px                      | Readable text size                   |
+| line-height         | 1.5                       | Space between lines                  |
+| max-height          | 400px                     | Limits height, enables scrolling     |
+| overflow-y          | auto                      | Vertical scroll when needed          |
+| overflow-x          | hidden                    | No horizontal scroll                 |
+| white-space         | pre-wrap                  | Preserves whitespace AND wraps       |
+| word-wrap           | break-word                | Breaks long words to prevent overflow|
+| border              | 1px solid #ccc            | Light gray border                    |
+| box-sizing          | border-box                | Padding included in width            |
+
+================================================================================
+## HOW CONTENT IS LOADED
+================================================================================
+
+### Step 1: User Triggers Report Load
+- User clicks "View Reports" button
+- User selects a report file from modal
+- OR user loads from clipboard
+
+### Step 2: File Content is Read
+```javascript
+const content = await file.text();  // Read file as text
+loadAnalysisReportFromContent(content, file.name);
+```
+
+### Step 3: Content is Displayed in DIV
+```javascript
+function loadAnalysisReportFromContent(clipboardText, sourceName) {
+  // Show the container
+  const reportContainer = document.getElementById('analysisReportContainer');
+  const reportText = document.getElementById('analysisReportText');
+
+  reportContainer.style.display = 'block';  // Make visible
+  reportText.textContent = clipboardText;   // Set the raw text content
+
+  // Store for later access
+  window.analysisReportRawText = clipboardText;
+}
+```
+
+### Step 4: Content is Parsed for Interactive Features
+The function also extracts:
+- Mistake positions (FEN strings)
+- PGN game notation
+- Move annotations
+
+================================================================================
+## SUPPORTED REPORT FORMATS
+================================================================================
+
+### Format 1: Standard Mistake Format (with Eval)
+```
+Move 4...: Bxe5
+BLUNDER: trading off the white bishop is bad
+Eval: +2.5
+FEN: rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1 b KQkq - 0 1
+```
+
+### Format 2: Standard Mistake Format (without Eval)
+```
+Move 4...: Unk
+BLUNDER: going in white squares are exposed
+FEN: rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1 b KQkq - 0 1
+```
+
+### Format 3: Double Bracket Format (with description)
+```
+[[Position Name]]
+Description of the position
+FEN: rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1 b KQkq - 0 1
+```
+
+### Format 4: PGN with Variant Header
+```
+[Variant "From Position"]
+[FEN "rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1 b KQkq - 0 1"]
+
+1... b5 2. Nc3 Bb7 3. Qb3 Bxe5 4. fxe5
+```
+
+================================================================================
+## TOGGLE SHOW/HIDE FUNCTIONALITY
+================================================================================
+
+```javascript
+document.getElementById('toggleReportBtn').addEventListener('click', function() {
+  const reportText = document.getElementById('analysisReportText');
+  const toggleBtn = document.getElementById('toggleReportBtn');
+
+  if (reportText.style.display === 'none') {
+    reportText.style.display = 'block';
+    toggleBtn.textContent = 'Hide Report';
+  } else {
+    reportText.style.display = 'none';
+    toggleBtn.textContent = 'Show Report';
+  }
+});
+```
+
+================================================================================
+## GLOBAL VARIABLES SET
+================================================================================
+
+After loading, these window variables are available:
+
+| Variable                      | Type     | Description                           |
+|-------------------------------|----------|---------------------------------------|
+| window.analysisReportRawText  | string   | Raw text content of loaded report     |
+| window.analysisReportPositions| array    | Array of FEN positions from PGN       |
+| window.analysisReportPositionIndex | number | Current position index in array   |
+
+================================================================================
+## REPURPOSING THIS DIV ELSEWHERE
+================================================================================
+
+To create a similar report display section, you need:
+
+### 1. HTML Container
+```html
+<div id="myReportContainer" style="display: none; margin-top: 15px;">
+  <div id="myReportText" style="
+    background: #ffffff;
+    color: #000000;
+    padding: 15px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.5;
+    max-height: 400px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+  "></div>
+</div>
+```
+
+### 2. JavaScript to Load Content
+```javascript
+function loadMyReport(content) {
+  const container = document.getElementById('myReportContainer');
+  const textDiv = document.getElementById('myReportText');
+
+  container.style.display = 'block';
+  textDiv.textContent = content;
+}
+```
+
+### 3. Optional: Parse for FEN/PGN
+```javascript
+function extractFenPositions(text) {
+  const fenPattern = /FEN:\s*([^\n]+)/g;
+  const positions = [];
+  let match;
+  while ((match = fenPattern.exec(text)) !== null) {
+    positions.push(match[1].trim());
+  }
+  return positions;
+}
+```
+
+================================================================================
+## EXAMPLE USAGE
+================================================================================
+
+Your example report content:
+
+```
+[Variant "From Position"]
+[FEN "rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1 b KQkq - 0 1"]
+
+1... b5 2. Nc3 Bb7 3. Qb3 Bxe5 4. fxe5 Nc6 5. Bf4 Nd4 6. Qd1 Rad8...
+
+https://lichess.org/analysis/rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1_b_KQkq_-_0_1#7
+
+play this position:
+Move 4...: Unk
+BLUNDER: going in white squares are exposed, trading off the white bishop is mad
+FEN: rnb2rk1/1pq2ppp/p2b4/2pQN3/5P2/3P2P1/PP2P2P/RNB2RK1 b KQkq - 0 1
+```
+
+When this content is loaded:
+1. The raw text appears in the `analysisReportText` div (scrollable, monospace)
+2. The PGN is parsed to create navigable positions
+3. The FEN string is extracted for board display
+4. The BLUNDER annotation is parsed for the sidebar
+5. The Lichess link remains clickable when highlighted
+
+================================================================================
+## KEY FUNCTIONS REFERENCE (index.html)
+================================================================================
+
+| Function                          | Line  | Purpose                            |
+|-----------------------------------|-------|------------------------------------|
+| loadAnalysisReportFromContent()   | 1088  | Main function to load report text  |
+| openReportFilesModal()            | 1004  | Opens file selection modal         |
+| toggleReportBtn click handler     | 673   | Show/hide report text              |
+
+================================================================================
