@@ -1,0 +1,77 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/9/2025, 8:07:27 PM
+======================================================================
+
+Opening: C50 Four Knights Game: Italian Variation
+
+Game: White: weradach (831) vs Black: TTTstanley (837) | rapid (600) | Result: Draw | https://www.chess.com/game/live/146528543260
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... Nc6 3. Bc4 3... Bc5 4. Nc3 4... Nf6 5. h3 5... O-O 6. O-O 6... d6 7. d3 7... Re8 8. Re1 8... a6 9. Bg5 9... b5 10. Bd5 10... Bb7 11. a3 11... h6 12. Bxf6 12... Qxf6 13. b4 13... Bd4 14. Nxd4 14... exd4 15. Ne2 15... Rab8 16. a4 16... Nxb4 17. Bxb7 17... Rxb7 18. axb5 18... axb5 19. Qd2 19... c5 20. c3 20... dxc3 21. Nxc3 21... Nc6 22. Ra6 22... Ne5 23. d4 23... Nc4 24. Qd1 24... Rb6 25. Nd5 25... Qd8 26. Nxb6 26... Nxb6 27. dxc5 27... dxc5 28. Qxd8 28... Rxd8 29. Rxb6 29... b4 30. Rc1 30... Rc8 31. e5 31... Kf8 32. f4 32... Ke7 33. Rd1 33... Ra8 34. Rc6 34... b3 35. Rxc5 35... b2 36. Rb5 36... Ra1 37. Rxb2 37... Rxd1+ 38. Kh2 38... g5 39. fxg5 39... hxg5 40. Kg3 40... Rd4 41. Re2 41... Ke6 42. Kf3 42... Rf4+ 43. Kg3 43... Kf5 44. Kh2 44... Re4 45. Rxe4 45... Kxe4 46. Kg3 46... Kxe5 47. Kg4 47... f6 48. h4 48... gxh4 49. Kxh4 49... Kf5 50. Kg3 50... Kg5 51. Kf3 51... f5 52. Kg3 52... f4+ 53. Kf3 53... Kf5 54. Kf2 54... Kg4 55. Kf1 55... Kg3 56. Kg1 56... f3 57. gxf3 57... Kxf3 1/2-1/2
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 2
+Mistakes: 5
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+5... O-O (book: d6 75.0%)
+  Alternatives: d6 (75.0%), a6 (25.0%)
+  https://lichess.org/analysis/r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N1P/PPPP1PP1/R1BQK2R_b_KQkq_-_0_5
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 16. a4, Eval: 0.78 → -1.39 (-2.17), MISTAKE: 23. d4, Eval: -0.51 → -2.96 (-2.45), MISTAKE: 24. Qd1, Eval: -2.40 → -4.37 (-1.97), BLUNDER: 24... Rb6, Eval: 4.37 → -2.20 (-6.57), MISTAKE: 25... Qd8, Eval: -1.93 → -4.25 (-2.32), MISTAKE: 35... b2, Eval: -5.77 → -7.79 (-2.02), BLUNDER: 37. Rxb2, Eval: 7.79 → 0.78 (-7.01)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 16. a4
+  https://lichess.org/analysis/1r2r1k1/1bp2pp1/p1np1q1p/1p1B4/1P1pP3/P2P3P/2P1NPP1/R2QR1K1_w_-_-_2_16
+
+Move 23. d4
+  https://lichess.org/analysis/4r1k1/1r3pp1/R2p1q1p/1pp1n3/4P3/2NP3P/3Q1PP1/4R1K1_w_-_-_3_23
+
+Move 24. Qd1
+  https://lichess.org/analysis/4r1k1/1r3pp1/R2p1q1p/1pp5/2nPP3/2N4P/3Q1PP1/4R1K1_w_-_-_1_24
+
+Move 24... Rb6
+  https://lichess.org/analysis/4r1k1/1r3pp1/R2p1q1p/1pp5/2nPP3/2N4P/5PP1/3QR1K1_b_-_-_2_24
+
+Move 25... Qd8
+  https://lichess.org/analysis/4r1k1/5pp1/Rr1p1q1p/1ppN4/2nPP3/7P/5PP1/3QR1K1_b_-_-_4_25
+
+images/weradach..numbers progress.png
+
+Chess is impossible.
+

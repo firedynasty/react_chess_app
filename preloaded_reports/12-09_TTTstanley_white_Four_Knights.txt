@@ -1,0 +1,95 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/9/2025, 10:08:47 AM
+======================================================================
+
+Opening: C47 Four Knights Game: Italian Variation
+
+Game: White: TTTstanley (837) vs Black: Parag1306 (863) | rapid (600) | Result: Loss | https://www.chess.com/game/live/146510260116
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... Nc6 3. Bc4 3... Nf6 4. Nc3 4... d6 5. O-O 5... Bg4 6. h3 6... Bxf3 7. Qxf3 7... Be7 8. Nd5 8... Nd4 9. Qc3 9... Nxd5 10. exd5 10... O-O 11. Bd3 11... Bh4 12. f4 12... c5 13. dxc6 13... bxc6 14. Qc4 14... Qb6 15. c3 15... Ne2+ 16. Kh2 16... Bg3+ 17. Kh1 17... Nxf4 18. Be4 18... d5 19. Bxh7+ 19... Kxh7 20. Qa4 20... Nd3 21. Rf3 21... Nf2+ 22. Rxf2 22... Qxf2 23. Qg4 23... Qf1# 0-1
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 2
+Mistakes: 7
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+4... d6 (book: Nxe4 56.0%)
+  Alternatives: Nxe4 (56.0%), Bc5 (33.3%), Be7 (7.0%)
+  https://lichess.org/analysis/r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R_b_KQkq_-_5_4
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 9. Qc3, Eval: 0.72 → -1.69 (-2.41), MISTAKE: 9... Nxd5, Eval: 1.69 → -0.15 (-1.84), MISTAKE: 11. Bd3, Eval: 0.10 → -1.73 (-1.83), MISTAKE: 12. f4, Eval: -0.45 → -1.99 (-1.54), MISTAKE: 15. c3, Eval: -0.63 → -2.80 (-2.17), BLUNDER: 18. Be4, Eval: -2.12 → -5.69 (-3.57), MISTAKE: 19. Bxh7+, Eval: -5.16 → -7.06 (-1.90), MISTAKE: 20. Qa4, Eval: -6.26 → -8.36 (-2.10), BLUNDER: 23. Qg4, Eval: -8.16 → -99.99 (-91.83)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 9. Qc3
+  https://lichess.org/analysis/r2qk2r/ppp1bppp/3p1n2/3Np3/2BnP3/5Q1P/PPPP1PP1/R1B2RK1_w_kq_-_3_9
+
+Move 9... Nxd5
+  https://lichess.org/analysis/r2qk2r/ppp1bppp/3p1n2/3Np3/2BnP3/2Q4P/PPPP1PP1/R1B2RK1_b_kq_-_4_9
+
+Move 11. Bd3
+  https://lichess.org/analysis/r2q1rk1/ppp1bppp/3p4/3Pp3/2Bn4/2Q4P/PPPP1PP1/R1B2RK1_w_-_-_1_11
+
+Move 12. f4
+  https://lichess.org/analysis/r2q1rk1/ppp2ppp/3p4/3Pp3/3n3b/2QB3P/PPPP1PP1/R1B2RK1_w_-_-_3_12
+
+Move 15. c3
+  https://lichess.org/analysis/r4rk1/p4ppp/1qpp4/4p3/2Qn1P1b/3B3P/PPPP2P1/R1B2RK1_w_-_-_2_15
+
+
+I shouldn't block my own pawn, and the best way when the knight jumps to the center is get the queen back to the starting squar, 
+
+[Variant "From Position"]
+[FEN "r2qk2r/ppp1bppp/3p1n2/3Np3/2BnP3/5Q1P/PPPP1PP1/R1B2RK1 w kq - 3 9"]
+
+
+and here, don't block the pawn 
+
+[Variant "From Position"]
+[FEN "r2q1rk1/ppp1bppp/3p4/3Pp3/2Bn4/2Q4P/PPPP1PP1/R1B2RK1 w - - 1 11"]
+
+11. Qd3 c6 12. c3 b5 13. cxd4 bxc4 14. Qxc4 c5 15. dxe5 dxe5 16. b3
+
+
+requires long term vision though? 
+
+[Variant "From Position"]
+[FEN "r4rk1/p4ppp/1qpp4/4p3/2Qn1P1b/3B3P/PPPP2P1/R1B2RK1 w - - 2 15"]
+
+15. fxe5 Nxc2+ 16. Kh1 Nxa1 17. Qxh4
+

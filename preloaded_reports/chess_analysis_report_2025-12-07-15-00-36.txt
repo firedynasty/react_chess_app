@@ -1,0 +1,118 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/7/2025, 6:59:00 AM
+======================================================================
+
+Opening: C50 Italian Game: Giuoco Piano
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... Nc6 3. Bc4 3... Bc5 4. O-O 4... d6 5. c3 5... Bg4 6. d3 6... Qf6 7. Nbd2 7... h5 8. h3 8... Bd7 9. b4 9... Bb6 10. a4 10... a6 11. Nb3 11... Qg6 12. Ng5 12... O-O-O 13. Re1 13... Qf6 14. Nf3 14... h4 15. Bg5 15... Qg6 16. Bxd8 16... Kxd8 17. d4 17... Bxh3 18. Bf1 18... Bg4 19. dxe5 19... h3 20. g3 20... Nxe5 21. Be2 21... h2+ 22. Kh1 22... Bxf2 23. Nxh2 23... Qxe4+ 0-1
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 8
+Mistakes: 5
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+7... h5 (book: Nge7 80.0%)
+  Alternatives: Nge7 (80.0%), a6 (20.0%)
+  https://lichess.org/analysis/r3k1nr/ppp2ppp/2np1q2/2b1p3/2B1P1b1/2PP1N2/PP1N1PPP/R1BQ1RK1_b_kq_-_2_7
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 12... O-O-O
+  Eval: -0.83 → -3.78 (-2.95)
+
+MISTAKE: 13. Re1
+  Eval: 3.78 → 0.84 (-2.94)
+
+MISTAKE: 13... Qf6
+  Eval: -0.84 → -2.73 (-1.89)
+
+MISTAKE: 14. Nf3
+  Eval: 2.73 → 1.20 (-1.53)
+
+MISTAKE: 16... Kxd8
+  Eval: -1.52 → -3.06 (-1.54)
+
+BLUNDER: 17. d4
+  Eval: 3.06 → -2.73 (-5.79)
+
+BLUNDER: 18. Bf1
+  Eval: -3.37 → -6.49 (-3.12)
+
+BLUNDER: 18... Bg4
+  Eval: 6.49 → -0.45 (-6.94)
+
+BLUNDER: 19. dxe5
+  Eval: 0.45 → -4.40 (-4.85)
+
+BLUNDER: 20... Nxe5
+  Eval: 3.87 → -2.45 (-6.32)
+
+BLUNDER: 21. Be2
+  Eval: 2.45 → -6.59 (-9.04)
+
+BLUNDER: 22... Bxf2
+  Eval: 6.41 → -1.37 (-7.78)
+
+BLUNDER: 23. Nxh2
+  Eval: 1.37 → -99.97 (-101.34)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 12... O-O-O
+  https://lichess.org/analysis/r3k1nr/1ppb1pp1/pbnp2q1/4p1Np/PPB1P3/1NPP3P/5PP1/R1BQ1RK1_b_kq_-_3_12
+
+Move 13. Re1
+  https://lichess.org/analysis/2kr2nr/1ppb1pp1/pbnp2q1/4p1Np/PPB1P3/1NPP3P/5PP1/R1BQ1RK1_w_-_-_4_13
+
+[Variant "From Position"]
+[FEN "2kr2nr/1ppb1pp1/pbnp2q1/4p1Np/PPB1P3/1NPP3P/5PP1/R1BQ1RK1 w - - 4 13"]
+
+13. Bxf7 Qf6 14. b5 Nb8 15. Bc4 Nh6 16. d4 a5 17. f4 Qe7 18. fxe5 dxe5 19. Qd2 Qd6 20. Ba3 Qg6 21. Bd5 c6 22. Bc4 Rde8 23. Rae1 Bxh3 24. Nxh3 cxb5 25. Bxb5 Bd8
+
+Move 13... Qf6
+  https://lichess.org/analysis/2kr2nr/1ppb1pp1/pbnp2q1/4p1Np/PPB1P3/1NPP3P/5PP1/R1BQR1K1_b_-_-_5_13
+
+Move 14. Nf3
+  https://lichess.org/analysis/2kr2nr/1ppb1pp1/pbnp1q2/4p1Np/PPB1P3/1NPP3P/5PP1/R1BQR1K1_w_-_-_6_14
+
+Move 16... Kxd8
+  https://lichess.org/analysis/2kB2nr/1ppb1pp1/pbnp2q1/4p3/PPB1P2p/1NPP1N1P/5PP1/R2QR1K1_b_-_-_0_16
+
+[Variant "From Position"]
+[FEN "3k2nr/1ppb1pp1/pbnp2q1/4p3/PPB1P2p/1NPP1N1P/5PP1/R2QR1K1 w - - 0 17"]
+
+17. Qd2 Bxh3 18. Qg5+ Nf6 19. gxh3 Qxg5+ 20. Nxg5 Ke7
+

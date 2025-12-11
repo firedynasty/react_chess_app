@@ -1,0 +1,87 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/8/2025, 2:35:56 PM
+======================================================================
+
+Opening: C50 Italian Game: Giuoco Piano
+
+Game: white: ghabiiiix (878) vs black:TTTstanley (853) | rapid (600) | Result: Loss | https://www.chess.com/game/live/146480300164
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... Nc6 3. Bc4 3... Bc5 4. O-O 4... Nf6 5. d3 5... O-O 6. Bg5 6... h6 7. Bxf6 7... Qxf6 8. Nc3 8... d6 9. Nd5 9... Qd8 10. a3 10... Ne7 11. b4 11... Bd4 12. Qd2 12... Bxa1 13. Rxa1 13... c6 14. Nxe7+ 14... Qxe7 15. d4 15... Be6 16. Bxe6 16... Qxe6 17. dxe5 17... dxe5 18. Qe3 18... Rfd8 19. h3 19... a5 20. bxa5 20... Rxa5 21. c3 21... Qb3 22. a4 22... Rxa4 23. Rxa4 23... Qxa4 24. Nxe5 24... f6 25. Nf3 25... Rd1+ 26. Kh2 26... Qc2 27. e5 27... Rd3 28. Qa7 28... Qb3 29. Qb8+ 29... Kh7 30. exf6 30... gxf6 31. Qc7+ 31... Kg6 32. Nh4+ 32... Kg5 33. Nf3+ 33... Kf5 34. g4+ 34... Kg6 35. Nh4+ 35... Kg5 36. Qg7+ 36... Kxh4 37. Qxh6# 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 6
+Mistakes: 3
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+6. Bg5 (book: c3 29.2%)
+  Alternatives: c3 (29.2%), h3 (21.6%), Nbd2 (15.4%)
+  https://lichess.org/analysis/r1bq1rk1/pppp1ppp/2n2n2/2b1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1_w_-_-_1_6
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+BLUNDER: 12. Qd2, Eval: 0.60 → -2.96 (-3.56), MISTAKE: 21. c3, Eval: -2.27 → -4.25 (-1.98), MISTAKE: 27... Rd3, Eval: 3.47 → 1.21 (-2.26), MISTAKE: 28... Qb3, Eval: 1.74 → 0.20 (-1.54), BLUNDER: 31... Kg6, Eval: 0.00 → -99.93 (-99.93), BLUNDER: 33. Nf3+, Eval: 99.97 → 0.00 (-99.97), BLUNDER: 33... Kf5, Eval: 0.00 → -12.75 (-12.75), BLUNDER: 34. g4+, Eval: 12.75 → 0.00 (-12.75), BLUNDER: 34... Kg6, Eval: 0.00 → -99.96 (-99.96)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 12. Qd2
+  https://lichess.org/analysis/r1bq1rk1/ppp1npp1/3p3p/3Np3/1PBbP3/P2P1N2/2P2PPP/R2Q1RK1_w_-_-_1_12
+
+[Variant "From Position"]
+[FEN "r1bq1rk1/ppp1npp1/3p3p/3Np3/1PBbP3/P2P1N2/2P2PPP/R2Q1RK1 w - - 1 12"]
+
+12. Qd2 Bxa1 13. Nxe7+ Qxe7 14. Rxa1 Bg4 15. Qe3 Bxf3 16. Q xf3 Kh8 17. a4 d5 18. Bxd5 Qxb4 19. h4 Rad8 20. Qf5 c6 21. Bb3 Qd4 22. Rb1 Rd6 23. Qf3 b6 24. Kf1 Rf6 25. Qe2 b5 26. Qe1 a5 27. Kg1 bxa4 28. Bc4 a3 29. c3 Qa7 30. Qe3 Qxe3 31. fxe3 a4 32. Rb4 Ra8 33. d4 c5 34. dxc5 Rc6 35. Rb5 Rac8 36. Bd5 Rxc5
+
+Move 21. c3
+  https://lichess.org/analysis/3r2k1/1p3pp1/2p1q2p/r3p3/4P3/P3QN1P/2P2PP1/R5K1_w_-_-_0_21
+
+[Variant "From Position"]
+[FEN "3r2k1/1p3pp1/2p1q2p/r3p3/4P3/P3QN1P/2P2PP1/R5K1 w - - 0 21"]
+
+21. c3 Qe7 22. Kh2 Qc5 23. Qxc5 Rxc5 24. a4 Kf8 25. Rb1 Rd7 26. c4 Ke7 27. Rb2 Ra5 28. Kg3 g6 29. Nh2 
+
+here the idea is to get to the middle pawn to guard by the black king then the rooks can go chomp down or else the knight will get that middle pawn
+
+Move 27... Rd3
+  https://lichess.org/analysis/6k1/1p4p1/2p2p1p/4P3/8/2P1QN1P/2q2PPK/3r4_b_-_-_0_27
+
+Move 28... Qb3
+  https://lichess.org/analysis/6k1/Qp4p1/2p2p1p/4P3/8/2Pr1N1P/2q2PPK/8_b_-_-_2_28
+
+Move 31... Kg6
+  https://lichess.org/analysis/8/1pQ4k/2p2p1p/8/8/1qPr1N1P/5PPK/8_b_-_-_1_31
+
+
+*when you get to the middlegame trade down pieces and take out the knight with bishop before moving and worrying about pawns

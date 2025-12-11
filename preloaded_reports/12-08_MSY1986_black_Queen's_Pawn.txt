@@ -1,0 +1,80 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/8/2025, 2:20:48 PM
+======================================================================
+
+Opening: D00 Queen's Pawn Game
+
+Game: MSY1986 (899) black vs TTTstanley (861)  | rapid (600) | Result: Loss | https://www.chess.com/game/live/146479963008
+
+GAME PGN
+----------------------------------------------------------------------
+1. d4 1... d5 2. c3 2... b6 3. g3 3... c5 4. Bg2 4... Nf6 5. Qa4+ 5... Bd7 6. Qb3 6... Bc6 7. Nd2 7... e6 8. Ndf3 8... Be7 9. Ne5 9... O-O 10. Nxc6 10... Nxc6 11. Bg5 11... Ne4 12. Bxe4 12... Bxg5 13. Bb1 13... cxd4 14. Qc2 14... dxc3 15. Qxh7# 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 1
+Mistakes: 3
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+2. c3 (book: c4 76.9%)
+  Alternatives: c4 (76.9%), Nf3 (17.9%), Bf4 (2.6%)
+  https://lichess.org/analysis/rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR_w_KQkq_d6_0_2
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 11. Bg5, Eval: -0.67 → -2.50 (-1.83), MISTAKE: 11... Ne4, Eval: 2.50 → 0.37 (-2.13), MISTAKE: 12. Bxe4, Eval: -0.37 → -2.53 (-2.16), BLUNDER: 14... dxc3, Eval: 3.08 → -99.99 (-103.07)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 11. Bg5
+  https://lichess.org/analysis/r2q1rk1/p3bppp/1pn1pn2/2pp4/3P4/1QP3P1/PP2PPBP/R1B1K1NR_w_KQ_-_0_11
+
+Move 11... Ne4
+  https://lichess.org/analysis/r2q1rk1/p3bppp/1pn1pn2/2pp2B1/3P4/1QP3P1/PP2PPBP/R3K1NR_b_KQ_-_1_11
+
+[Variant "From Position"]
+[FEN "r2q1rk1/p3bppp/1pn1pn2/2pp2B1/3P4/1QP3P1/PP2PPBP/R3K1NR b KQ - 1 11"]
+
+11... cxd4 12. cxd4 Nxd4 13. Qd3 Bb4+ 14. Bd2 Bxd2+ 15. Qxd2 Nf5 16. e3 Rc8
+
+
+
+Move 12. Bxe4
+  https://lichess.org/analysis/r2q1rk1/p3bppp/1pn1p3/2pp2B1/3Pn3/1QP3P1/PP2PPBP/R3K1NR_w_KQ_-_2_12
+
+Move 14... dxc3
+  https://lichess.org/analysis/r2q1rk1/p4ppp/1pn1p3/3p2b1/3p4/2P3P1/PPQ1PP1P/RB2K1NR_b_KQ_-_1_14
+
+
+[Variant "From Position"]
+[FEN "r2q1rk1/p4ppp/1pn1p3/3p2b1/3p4/1QP3P1/PP2PP1P/RB2K1NR w KQ - 0 14"]
+
+14. Qc2 g6 15. cxd4 Nxd4 16. Qd1 Bf6 17. Bd3 Qe7 18. e3 Nc6 19. Rb1 Qc5 20. a3 Ne5 21. Ne2 Qa5+ 22. Kf1 Nc4 23. Bxc4 dxc4 24. Kg2 Rfd8 (24... Rad8) 25. Qc2 Qd5+ 26. e4 Qc6 27. Rbc1 b5 28. Rhd1 Rxd1 29. Rxd1 a5 30. h4 h5 31. Rc1 Qb7 32. Nf4 Rd8 33. Re1 Rd4 34. Re3 b4 35. axb4 axb4 36. Re2 Be5 37. Re1 Bxf4 38. gxf4 Qe7 39. Kg3 Qd6 40. Re3 e5 41. fxe5 Qxe5+ 42. f4 Qe6 43. Qe2 Rd3 44. Rxd3 cxd3 45. Qxd3 Qg4+ 46. Kf2 Qxf4+ 47. Kg2 Qg4+ 48. Kf1 Qxh4 49. Qd4 b3 50. Qe5 Qh3+ 51. Ke2 Qe6
+
+form the fortress 

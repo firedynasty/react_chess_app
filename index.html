@@ -507,6 +507,7 @@
             <div id="analysisReportContainer" style="display: none; margin-top: 15px; max-width: 800px; box-sizing: border-box;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
                     <span style="font-weight: bold; color: #00d4ff;">Full Analysis Report</span>
+                    <span id="reportFilenameDisplay" style="color: #51cf66; font-size: 12px; margin-left: 10px;"></span>
                     <button id="toggleReportBtn" style="background: #0f3460; color: #00d4ff; padding: 6px 12px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer;">Hide Report</button>
                 </div>
                 <div id="analysisReportText" style="
@@ -525,6 +526,22 @@
                     border: 1px solid #ccc;
                     box-sizing: border-box;
                 ">Loading report...</div>
+                <textarea id="reportEditTextarea" style="
+                    display: none;
+                    width: 100%;
+                    min-height: 400px;
+                    max-height: 500px;
+                    background: white;
+                    color: #333;
+                    padding: 15px;
+                    font-family: 'Courier New', monospace;
+                    font-size: 14px;
+                    line-height: 1.5;
+                    resize: vertical;
+                    border: 3px solid rgba(156, 39, 176, 0.5);
+                    border-radius: 6px;
+                    box-sizing: border-box;
+                "></textarea>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
                     <button id="loadPgnFromHighlight" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load PGN from Highlight</button>
                     <button id="loadFenVariantFromHighlight" style="background: #6f42c1; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load [Fen Variant] from Highlight</button>
@@ -540,9 +557,11 @@
       <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Load Analysis Report (from clipboard)</button>
       <button id="selectReportFolder" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('reportFolderInput').click()">📂 Select Reports Folder</button>
       <input type="file" id="reportFolderInput" accept=".txt" webkitdirectory style="display: none;">
+      <button id="loadPreloadedReports" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Preloaded Reports</button>
       <span id="reportsCountDisplay" style="color: #51cf66; font-weight: bold;"></span>
       <button id="viewPreloadedReports" style="background: #6f42c1; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📋 View Reports</button>
       <button id="saveReportBtn" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">💾 Save Report</button>
+      <button id="editViewToggleBtn" style="background: #9c27b0; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Edit</button>
       <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
       <button id="loadMistakesBtn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ Load Mistakes</button>
       <button id="removeMistakesBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">✓ Remove Mistakes</button>
@@ -567,6 +586,8 @@
           <a id="lichessBoard2Link" href="#" target="_blank" style="color: #00d4ff; text-decoration: underline;">Go to Lichess (Analysis)</a>
           <button id="loadPgnFromClipboard" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load PGN from Clipboard</button>
           <button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
+          <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
+          <span id="currentFenMoves" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px;"></span>
         </div>
       </div>
     </div>
@@ -1368,6 +1389,9 @@
             // Set the report text
             reportText.textContent = report;
 
+            // Update filename display in header
+            updateReportFilenameDisplay();
+
             // Store for later access
             window.analysisReportRawText = report;
 
@@ -1446,6 +1470,49 @@
             cleaned = cleaned.replace(/\[%[^\]]*\]/g, '');
             cleaned = cleaned.replace(/\s+/g, ' ').trim();
             return cleaned;
+        }
+
+        // Generate report filename based on current game info
+        function generateReportFilename() {
+            let filenameParts = [];
+
+            // Add date (month-day)
+            const now = new Date();
+            const monthDay = (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
+            filenameParts.push(monthDay);
+
+            // Get White player name
+            const gameDetails = document.getElementById('game-details');
+            if (gameDetails) {
+                const whiteMatch = gameDetails.textContent.match(/White:\s*(\w+)/);
+                if (whiteMatch) filenameParts.push(whiteMatch[1]);
+            }
+
+            // Get color played
+            const selectedGame = document.getElementById('game-dropdown');
+            if (selectedGame && selectedGame.value.includes('as White')) {
+                filenameParts.push('white');
+            } else if (selectedGame && selectedGame.value.includes('as Black')) {
+                filenameParts.push('black');
+            }
+
+            // Get 2nd and 3rd word from opening name
+            const openingEl = document.getElementById('openingName');
+            if (openingEl && openingEl.textContent && openingEl.textContent !== '-') {
+                const words = openingEl.textContent.replace(/^[A-E]\d+:\s*/, '').split(/\s+/);
+                if (words.length >= 2) filenameParts.push(words.slice(0, 2).join('_'));
+            }
+
+            return filenameParts.length > 0 ? filenameParts.join('_') + '.txt' : 'chess_report.txt';
+        }
+
+        // Update the filename display in the report header
+        function updateReportFilenameDisplay() {
+            const filenameDisplay = document.getElementById('reportFilenameDisplay');
+            if (filenameDisplay) {
+                const filename = generateReportFilename();
+                filenameDisplay.textContent = '📁 ' + filename;
+            }
         }
 
         function clearResults() {
@@ -1929,6 +1996,23 @@
             if (reportContainer && reportText) {
                 reportContainer.style.display = 'block';
                 reportText.textContent = clipboardText;
+                // Update filename display - use source filename if it's a .txt file
+                const filenameDisplay = document.getElementById('reportFilenameDisplay');
+                if (filenameDisplay) {
+                    if (sourceName && sourceName !== 'clipboard' && sourceName.endsWith('.txt')) {
+                        filenameDisplay.textContent = '📁 ' + sourceName;
+                    } else {
+                        updateReportFilenameDisplay();
+                    }
+                }
+                // Rescan FEN variants with new report content
+                window.fenVariants = [];
+                if (typeof window.scanReportForFenVariants === 'function') {
+                    window.scanReportForFenVariants();
+                }
+                if (document.getElementById('currentFenMoves')) {
+                    document.getElementById('currentFenMoves').textContent = '';
+                }
             }
 
             // Extract PGN from report and load to board2
@@ -2164,6 +2248,76 @@
                 });
             }
 
+            // Next FEN Variant Button
+            window.fenVariants = [];
+            window.currentFenVariantIndex = 0;
+
+            window.scanReportForFenVariants = function() {
+                const reportText = document.getElementById('analysisReportText');
+                const textarea = document.getElementById('reportEditTextarea');
+                const content = isReportEditMode ? textarea.value : reportText.textContent;
+
+                window.fenVariants = [];
+                // Regex to match [Variant "From Position"][FEN "..."] followed by moves
+                // Captures: FEN string, then everything until next [Variant or end
+                const pattern = /\[Variant\s+"From\s+Position"\]\s*\[FEN\s+"([^"]+)"\]\s*([\s\S]*?)(?=\[Variant|$)/g;
+
+                let match;
+                while ((match = pattern.exec(content)) !== null) {
+                    // Extract just the moves line (starts with a number like "14." or "11.")
+                    const movesText = match[2].trim();
+                    // Find the line that starts with moves (number followed by dot)
+                    const movesMatch = movesText.match(/(\d+\.\s*[\s\S]*)/);
+                    const moves = movesMatch ? movesMatch[1].trim() : movesText;
+
+                    window.fenVariants.push({
+                        fen: match[1],
+                        moves: moves
+                    });
+                    console.log('Found FEN variant:', match[1], 'Moves:', moves);
+                }
+                window.currentFenVariantIndex = 0;
+                console.log('Total FEN variants found:', window.fenVariants.length);
+                return window.fenVariants.length;
+            };
+
+            window.loadCurrentFenVariant = function() {
+                if (window.fenVariants.length === 0) return;
+
+                const variant = window.fenVariants[window.currentFenVariantIndex];
+                const pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
+
+                window.studyReportPositions = window.parsePgnToPositions(pgnString);
+                window.studyReportPositionIndex = 0;
+
+                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                    window.board2.position(window.studyReportPositions[0]);
+                    updateBoard2MoveIndicator(0);
+                }
+
+                // Update span to show moves (limited to 100 chars)
+                const movesSpan = document.getElementById('currentFenMoves');
+                const movesDisplay = variant.moves.length > 100 ? variant.moves.substring(0, 100) + '...' : variant.moves;
+                console.log('Setting moves span to:', movesDisplay);
+                movesSpan.textContent = movesDisplay;
+            };
+
+            const nextFenVariantBtn = document.getElementById('nextFenVariant');
+            if (nextFenVariantBtn) {
+                nextFenVariantBtn.addEventListener('click', function() {
+                    if (window.fenVariants.length === 0) {
+                        const count = window.scanReportForFenVariants();
+                        if (count === 0) {
+                            alert('No [Variant "From Position"][FEN "..."] blocks found in report.');
+                            return;
+                        }
+                    } else {
+                        window.currentFenVariantIndex = (window.currentFenVariantIndex + 1) % window.fenVariants.length;
+                    }
+                    window.loadCurrentFenVariant();
+                });
+            }
+
             // Keyboard Navigation for Board2
             document.addEventListener('keydown', function(e) {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -2221,6 +2375,63 @@
                 });
             }
 
+            // Load Preloaded Reports Button (from JSON files)
+            const loadPreloadedBtn = document.getElementById('loadPreloadedReports');
+            if (loadPreloadedBtn) {
+                loadPreloadedBtn.addEventListener('click', async function() {
+                    try {
+                        log('Loading preloaded reports...', 'info');
+
+                        // Fetch the reports JSON
+                        const response = await fetch('preloaded/reports.json');
+                        if (!response.ok) {
+                            throw new Error('Could not load preloaded reports. Run generate_preloaded_chess.py first.');
+                        }
+
+                        const reportsData = await response.json();
+                        const filenames = Object.keys(reportsData);
+
+                        if (filenames.length === 0) {
+                            log('No preloaded reports found', 'warning');
+                            return;
+                        }
+
+                        // Convert to the same format as folder selection
+                        // Create file-like objects with name and content
+                        window.loadedReportFiles = filenames.map(filename => ({
+                            name: filename,
+                            content: reportsData[filename],
+                            text: function() { return Promise.resolve(this.content); }
+                        }));
+
+                        // Sort naturally
+                        window.loadedReportFiles.sort((a, b) =>
+                            a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+                        );
+
+                        // Show the View Reports button
+                        const viewBtn = document.getElementById('viewPreloadedReports');
+                        if (viewBtn) {
+                            viewBtn.style.display = 'inline-block';
+                        }
+
+                        // Update count display
+                        const countDisplay = document.getElementById('reportsCountDisplay');
+                        if (countDisplay) {
+                            countDisplay.textContent = `${filenames.length} Reports Loaded`;
+                        }
+
+                        log(`Loaded ${filenames.length} preloaded report files`, 'success');
+                        openReportFilesModal();
+
+                    } catch (err) {
+                        console.error('Error loading preloaded reports:', err);
+                        log('Failed to load preloaded reports: ' + err.message, 'error');
+                        alert('Failed to load preloaded reports. Make sure to run:\npython generate_preloaded_chess.py');
+                    }
+                });
+            }
+
             // View Reports Button
             const viewReportsBtn = document.getElementById('viewPreloadedReports');
             if (viewReportsBtn) {
@@ -2244,50 +2455,68 @@
                 });
             }
 
+            // Edit/View Toggle for Report
+            let isReportEditMode = false;
+            const editViewToggleBtn = document.getElementById('editViewToggleBtn');
+            if (editViewToggleBtn) {
+                editViewToggleBtn.addEventListener('click', function() {
+                    const reportDiv = document.getElementById('analysisReportText');
+                    const textarea = document.getElementById('reportEditTextarea');
+                    const toggleBtn = this;
+
+                    if (!isReportEditMode) {
+                        // Switch to Edit mode
+                        textarea.value = reportDiv.textContent;
+                        reportDiv.style.display = 'none';
+                        textarea.style.display = 'block';
+                        toggleBtn.textContent = 'View only';
+                        toggleBtn.style.background = '#6a1b9a';
+                        isReportEditMode = true;
+                        textarea.focus();
+                    } else {
+                        // Switch to View only mode - apply edits
+                        reportDiv.textContent = textarea.value;
+                        window.analysisReportRawText = textarea.value;
+                        textarea.style.display = 'none';
+                        reportDiv.style.display = 'block';
+                        toggleBtn.textContent = 'Edit';
+                        toggleBtn.style.background = '#9c27b0';
+                        isReportEditMode = false;
+                        // Rescan FEN variants with updated content
+                        window.fenVariants = [];
+                        window.scanReportForFenVariants();
+                        document.getElementById('currentFenMoves').textContent = '';
+                    }
+                });
+            }
+
             // Save Report Button
             const saveReportBtn = document.getElementById('saveReportBtn');
             if (saveReportBtn) {
                 saveReportBtn.addEventListener('click', function() {
                     const reportText = document.getElementById('analysisReportText');
-                    if (reportText && reportText.textContent.trim() && reportText.textContent !== 'Loading report...') {
-                        const content = reportText.textContent;
+                    const reportTextarea = document.getElementById('reportEditTextarea');
+                    // Get content based on current mode
+                    const content = isReportEditMode ? reportTextarea.value : reportText.textContent;
+                    if (content && content.trim() && content !== 'Loading report...') {
                         const blob = new Blob([content], { type: 'text/plain' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
 
-                        // Build filename: date_player_color_opening
-                        let filenameParts = [];
-
-                        // Add date (month-day)
-                        const now = new Date();
-                        const monthDay = (now.getMonth() + 1).toString().padStart(2, '0') + '-' + now.getDate().toString().padStart(2, '0');
-                        filenameParts.push(monthDay);
-
-                        // Get White player name
-                        const gameDetails = document.getElementById('game-details');
-                        if (gameDetails) {
-                            const whiteMatch = gameDetails.textContent.match(/White:\s*(\w+)/);
-                            if (whiteMatch) filenameParts.push(whiteMatch[1]);
+                        // Use filename from display span if available, otherwise generate
+                        const filenameDisplay = document.getElementById('reportFilenameDisplay');
+                        let filename = 'chess_report.txt';
+                        if (filenameDisplay && filenameDisplay.textContent) {
+                            // Remove the 📁 prefix and trim
+                            filename = filenameDisplay.textContent.replace(/^📁\s*/, '').trim();
+                            if (!filename.endsWith('.txt')) filename += '.txt';
                         }
-
-                        // Get color played
-                        const selectedGame = document.getElementById('game-dropdown');
-                        if (selectedGame && selectedGame.value.includes('as White')) {
-                            filenameParts.push('white');
-                        } else if (selectedGame && selectedGame.value.includes('as Black')) {
-                            filenameParts.push('black');
+                        if (!filename || filename === '.txt') {
+                            filename = generateReportFilename();
                         }
-
-                        // Get 2nd and 3rd word from opening name
-                        const openingEl = document.getElementById('openingName');
-                        if (openingEl && openingEl.textContent && openingEl.textContent !== '-') {
-                            const words = openingEl.textContent.replace(/^[A-E]\d+:\s*/, '').split(/\s+/);
-                            if (words.length >= 2) filenameParts.push(words.slice(0, 2).join('_'));
-                        }
-
-                        const filename = filenameParts.length > 0 ? filenameParts.join('_') + '.txt' : 'chess_report.txt';
                         a.download = filename;
+                        a.style.display = 'none';
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);

@@ -1,0 +1,5 @@
+1. e4 e5 2. Nf3 Nc6 3. d3 Bc5 4. Qe2 Nf6 5. Nc3 O-O 6. Be3 Bb6 7. Bxb6 axb6 8. O-O-O d6 9. d4 Re8 10. dxe5 Nxe5 11. Nd5 Rxa2 12. Nxf6+ Qxf6 13. Qb5 Bd7 14. Qb3 Ra1+ 15. Kd2 Rxd1+ 16. Kxd1 Qf4 17. g3 Qxf3+ 18. Ke1 Qxh1 19. f4 Nf3+ 20. Kf2 Qg1+ 21. Kxf3 Qxf1+ 22. Ke3 Qe1+ 23. Kf3 Qxe4+ 24. Kf2 Qe1+ 25. Kg2 Re2+ 26. Kf3 Rf2#
+
+images/endgame1.png-endgame3.png
+
+what this does is that , when you check the easiest way to chop down the opponent is to trade equal value pieces and then see if bishop cuts off king and queen and rook decimates

@@ -1,0 +1,24 @@
+
+  1. generate_preloaded_chess.py - A Python script that:
+  - Reads all .txt and .md files from ./preloaded_reports/
+  - Generates ./preloaded/index.json (file list with metadata)
+  - Generates ./preloaded/reports.json (all file contents)
+
+  2. Added "Preloaded Reports" button to the UI (blue button) that:
+  - Fetches the preloaded JSON files
+  - Loads them into window.loadedReportFiles (same format as "Select Reports
+   Folder")
+  - Opens the report files modal
+  - Shows the count and "View Reports" button
+
+  Usage:
+  # When you add/change reports in ./preloaded_reports/, regenerate:
+  python generate_preloaded_chess.py
+
+  # Then serve the app and click "Preloaded Reports" button
+
+  The preloaded reports work exactly like selecting a folder manually -
+  clicking any report in the modal loads it the same way.
+
+
+so I copy from chess/notes/reports/ to ./preloaded_reports so that it will load that as a button

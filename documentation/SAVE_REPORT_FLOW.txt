@@ -1,0 +1,70 @@
+SAVE REPORT FILENAME FLOW
+=========================
+
+This document explains how the report filename is generated and displayed.
+
+
+1. FILENAME GENERATION (generateReportFilename function)
+--------------------------------------------------------
+
+The filename is built from 4 parts joined by underscores:
+
+   [DATE]_[PLAYER]_[COLOR]_[OPENING].txt
+
+   - DATE: Current month-day (MM-DD format, e.g., "12-11")
+   - PLAYER: White player's name from game-details element
+   - COLOR: "white" or "black" based on game-dropdown selection
+   - OPENING: First 2 words of opening name (underscored, e.g., "Italian_Game")
+
+   Example: 12-11_TTTstanley_white_Italian_Game.txt
+
+
+2. FILENAME DISPLAY (reportFilenameDisplay span)
+------------------------------------------------
+
+Location: Next to "Full Analysis Report" header
+Format: 📁 [filename]
+
+The display is updated in two scenarios:
+
+   A. After analyzing a game:
+      - updateReportFilenameDisplay() is called
+      - Generates filename from current game info
+      - Shows: 📁 12-11_TTTstanley_white_Italian_Game.txt
+
+   B. After loading a report from View Reports:
+      - Uses the actual loaded file's name
+      - Shows: 📁 [original-filename.txt]
+
+
+3. SAVE REPORT BUTTON FLOW
+--------------------------
+
+When user clicks "Save Report":
+
+   1. Gets report content (from view or edit mode)
+   2. Checks reportFilenameDisplay span for filename
+   3. Removes 📁 emoji prefix
+   4. Falls back to generateReportFilename() if span is empty
+   5. Creates download with that filename
+
+   Result: Browser save dialog shows the pre-filled filename
+
+
+4. FILE LOCATIONS IN CODE (index.html)
+--------------------------------------
+
+   - Span element:           Line ~510
+   - generateReportFilename: Line ~1472
+   - updateReportFilenameDisplay: Line ~1506
+   - Called after analysis:  Line ~1392
+   - Called after load:      Line ~1999-2005
+   - Save button handler:    Line ~2437-2469
+
+
+5. BROWSER COMPATIBILITY NOTE
+-----------------------------
+
+The download attribute works best in Chrome and Firefox.
+Safari may not respect the suggested filename and will
+prompt the user to enter a name manually.

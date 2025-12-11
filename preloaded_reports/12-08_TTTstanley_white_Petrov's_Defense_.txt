@@ -1,0 +1,88 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/8/2025, 12:05:10 PM
+======================================================================
+
+Opening: C42 Petrov's Defense: Three Knights Game
+
+Game: TTTstanley (845) white vs magaumachanov (808) | rapid (600) | Result: Win | https://www.chess.com/game/live/146475528756
+
+This was an easy win to pick up
+
+see that there is a b4 attack 
+
+/images/b4attack.png
+
+failedFriedLiver1.png
+failedFriedLiver2.png
+failedFriedLiver3-centerpawnup
+failedFriedLiver3-centerpawnup2
+failedFriedLiver3-centerpawnup3
+failedFriedLiver3-centerpawnup4
+
+
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... Nf6 3. Nc3 3... Bc5 4. Bc4 4... Ng4 5. O-O 5... Qf6 6. d3 6... h6 7. Nd5 7... Qg6 8. Nxc7+ 8... Kf8 9. Nxa8 9... d6 10. Nc7 10... Nxf2 11. Rxf2 11... Bxf2+ 12. Kxf2 12... Nc6 13. c3 13... Bg4 14. Nd5 14... Bxf3 15. Qxf3 15... Ne7 16. Nxe7 16... Ke8 17. Nxg6 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 3
+Mistakes: 6
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+4... Ng4 (book: d6 65.7%)
+  Alternatives: d6 (65.7%), Nc6 (28.6%), O-O (2.9%)
+  https://lichess.org/analysis/rnbqk2r/pppp1ppp/5n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R_b_KQkq_-_5_4
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 4... Ng4, Eval: 0.13 → -1.62 (-1.75), BLUNDER: 5... Qf6, Eval: -1.19 → -4.86 (-3.67), MISTAKE: 6. d3, Eval: 4.86 → 2.25 (-2.61), MISTAKE: 6... h6, Eval: -2.25 → -3.80 (-1.55), BLUNDER: 7... Qg6, Eval: -3.08 → -8.12 (-5.04), MISTAKE: 10... Nxf2, Eval: -7.92 → -10.19 (-2.27), MISTAKE: 15... Ne7, Eval: -10.01 → -11.67 (-1.66), MISTAKE: 16. Nxe7, Eval: 11.67 → 9.98 (-1.69), BLUNDER: 16... Ke8, Eval: -9.98 → -31.30 (-21.32)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 4... Ng4
+  https://lichess.org/analysis/rnbqk2r/pppp1ppp/5n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R_b_KQkq_-_5_4
+
+Move 5... Qf6
+  https://lichess.org/analysis/rnbqk2r/pppp1ppp/8/2b1p3/2B1P1n1/2N2N2/PPPP1PPP/R1BQ1RK1_b_kq_-_7_5
+
+Move 6. d3
+  https://lichess.org/analysis/rnb1k2r/pppp1ppp/5q2/2b1p3/2B1P1n1/2N2N2/PPPP1PPP/R1BQ1RK1_w_kq_-_8_6
+
+Move 6... h6
+  https://lichess.org/analysis/rnb1k2r/pppp1ppp/5q2/2b1p3/2B1P1n1/2NP1N2/PPP2PPP/R1BQ1RK1_b_kq_-_0_6
+
+Move 7... Qg6
+  https://lichess.org/analysis/rnb1k2r/pppp1pp1/5q1p/2bNp3/2B1P1n1/3P1N2/PPP2PPP/R1BQ1RK1_b_kq_-_1_7
+

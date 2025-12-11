@@ -1,0 +1,80 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/8/2025, 9:07:47 PM
+======================================================================
+
+Opening: C50 Italian Game: Anti-Fried Liver Defense
+
+Game: White: TTTstanley (845) vs Black: AmmiratesV96 (880) | rapid (600) | Result: Loss | https://www.chess.com/game/live/146482671312
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... Nc6 3. Bc4 3... h6 4. d4 4... exd4 5. Nxd4 5... Nxd4 6. Qxd4 6... Nf6 7. e5 7... Nh7 8. Nc3 8... d6 9. O-O 9... Be7 10. Bxf7+ 10... Kxf7 11. f4 11... dxe5 12. Qxe5 12... Bf6 13. Qh5+ 13... Kg8 14. Qg6 14... Nf8 15. Qg3 15... Qd4+ 16. Be3 16... Qd6 17. Rad1 17... Qe6 18. f5 18... Qf7 19. Rd5 19... Bxc3 20. bxc3 20... Qxd5 21. f6 21... g6 22. f7+ 22... Kg7 23. Bd4+ 23... Kh7 24. Qe3 24... Be6 25. Rf3 25... Bxf7 26. Rh3 26... h5 27. Qe7 27... Qxa2 28. Qxf7+ 28... Qxf7 0-1
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 10
+Mistakes: 5
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+3... h6 (book: Bc5 53.4%)
+  Alternatives: Bc5 (53.4%), Nf6 (42.6%), Be7 (2.4%)
+  https://lichess.org/analysis/r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R_b_KQkq_-_3_3
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 3... h6, Eval: 0.06 → -1.59 (-1.65), BLUNDER: 10. Bxf7+, Eval: 3.86 → -1.04 (-4.90), BLUNDER: 11... dxe5, Eval: 1.98 → -2.37 (-4.35), BLUNDER: 12. Qxe5, Eval: 2.37 → -4.30 (-6.67), MISTAKE: 15... Qd4+, Eval: 3.39 → 1.16 (-2.23), MISTAKE: 16... Qd6, Eval: 2.30 → -0.31 (-2.61), MISTAKE: 17... Qe6, Eval: 0.44 → -1.28 (-1.72), MISTAKE: 18... Qf7, Eval: 0.00 → -1.70 (-1.70), BLUNDER: 19. Rd5, Eval: 1.70 → -8.52 (-10.22), BLUNDER: 24... Be6, Eval: 8.85 → 2.39 (-6.46), BLUNDER: 25. Rf3, Eval: -2.39 → -8.98 (-6.59), BLUNDER: 25... Bxf7, Eval: 8.98 → 4.11 (-4.87), BLUNDER: 26. Rh3, Eval: -4.11 → -9.97 (-5.86), BLUNDER: 27... Qxa2, Eval: 10.84 → 5.25 (-5.59), BLUNDER: 28. Qxf7+, Eval: -5.25 → -19.28 (-14.03)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 3... h6
+  https://lichess.org/analysis/r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R_b_KQkq_-_3_3
+
+Move 10. Bxf7+
+  https://lichess.org/analysis/r1bqk2r/ppp1bppn/3p3p/4P3/2BQ4/2N5/PPP2PPP/R1B2RK1_w_kq_-_2_10
+
+Move 11... dxe5
+  https://lichess.org/analysis/r1bq3r/ppp1bkpn/3p3p/4P3/3Q1P2/2N5/PPP3PP/R1B2RK1_b_-_f3_0_11
+
+Move 12. Qxe5
+  https://lichess.org/analysis/r1bq3r/ppp1bkpn/7p/4p3/3Q1P2/2N5/PPP3PP/R1B2RK1_w_-_-_0_12
+
+Move 15... Qd4+
+  https://lichess.org/analysis/r1bq1nkr/ppp3p1/5b1p/8/5P2/2N3Q1/PPP3PP/R1B2RK1_b_-_-_6_15
+
+
+[Variant "From Position"]
+[FEN "r1b2nkr/ppp2qp1/5b1p/5P2/8/2N1B1Q1/PPP3PP/3R1RK1 w - - 1 19"]
+
+19. Ne4 Bd7 20. Nxf6+ Qxf6 21. Bd4 Qf7 22. Rde1 Re8 23. Bxg7 Qxg7 24. f6 Qxg3 25. f7+ Kh7 26. fxe8=Q Bxe8 27. hxg3 Ng6 28. Rd1 Kg7 29. Rf5
+
+trade pieces and open up the line to the king with pawn move / images / pawnOpen.png

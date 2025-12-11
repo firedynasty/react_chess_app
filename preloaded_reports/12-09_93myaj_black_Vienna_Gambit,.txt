@@ -1,0 +1,75 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/9/2025, 2:42:43 PM
+======================================================================
+
+that's not a free pawn
+
+Opening: C25 Vienna Gambit, with Max Lange Defense
+
+Game: White: 93myaj (867) vs Black: TTTstanley (837) | rapid (600) | Result: Loss | https://www.chess.com/game/live/146521169564
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nc3 2... Nc6 3. f4 3... Bc5 4. fxe5 4... Nxe5 5. d4 5... Qh4+ 6. g3 6... Qg4 7. Be2 7... Qg6 8. dxc5 8... Nf6 9. Qd4 9... Nc6 10. Qe3 10... O-O 11. Bd3 11... d6 12. Bd2 12... Bg4 13. e5 13... Nb4 14. Bxg6 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 2
+Mistakes: 9
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+4... Nxe5 (book: Bxg1 50.0%)
+  Alternatives: Bxg1 (50.0%), d6 (33.3%), Qe7 (8.3%)
+  https://lichess.org/analysis/r1bqk1nr/pppp1ppp/2n5/2b1P3/4P3/2N5/PPPP2PP/R1BQKBNR_b_KQkq_-_0_4
+
+MISTAKES & BLUNDERS
+----------------------------------------------------------------------
+MISTAKE: 3. f4, Eval: 0.92 → -0.77 (-1.69), MISTAKE: 3... Bc5, Eval: 0.77 → -0.85 (-1.62), BLUNDER: 4... Nxe5, Eval: -0.36 → -4.47 (-4.11), MISTAKE: 5. d4, Eval: 4.47 → 2.84 (-1.63), MISTAKE: 5... Qh4+, Eval: -2.84 → -5.41 (-2.57), MISTAKE: 6... Qg4, Eval: -4.46 → -6.57 (-2.11), MISTAKE: 9. Qd4, Eval: 6.86 → 5.04 (-1.82), MISTAKE: 11. Bd3, Eval: 5.33 → 3.82 (-1.51), MISTAKE: 12... Bg4, Eval: -3.02 → -5.56 (-2.54), MISTAKE: 13. e5, Eval: 5.56 → 3.11 (-2.45), BLUNDER: 13... Nb4, Eval: -3.11 → -12.12 (-9.01)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 3. f4
+  https://lichess.org/analysis/r1bqkbnr/pppp1ppp/2n5/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR_w_KQkq_-_2_3
+
+Move 3... Bc5
+  https://lichess.org/analysis/r1bqkbnr/pppp1ppp/2n5/4p3/4PP2/2N5/PPPP2PP/R1BQKBNR_b_KQkq_f3_0_3
+
+Move 4... Nxe5
+  https://lichess.org/analysis/r1bqk1nr/pppp1ppp/2n5/2b1P3/4P3/2N5/PPPP2PP/R1BQKBNR_b_KQkq_-_0_4
+
+Move 5. d4
+  https://lichess.org/analysis/r1bqk1nr/pppp1ppp/8/2b1n3/4P3/2N5/PPPP2PP/R1BQKBNR_w_KQkq_-_0_5
+
+Move 5... Qh4+
+  https://lichess.org/analysis/r1bqk1nr/pppp1ppp/8/2b1n3/3PP3/2N5/PPP3PP/R1BQKBNR_b_KQkq_d3_0_5
+

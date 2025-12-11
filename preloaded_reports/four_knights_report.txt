@@ -1,0 +1,161 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 2025-11-29 06:55:51
+======================================================================
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 e5 2. Nf3 Nf6 3. Nc3 Nc6 4. Bb5 d6 5. O-O Bd7 6. Bxc6 Bxc6 7. d4 Nxe4 8. Nxe4 Bxe4 9. Re1 Bxf3 10. Qxf3 Be7 $1 11. dxe5 dxe5 12. Rxe5 c6 $2 13. Bg5 13... f6 14. Rd1 $2 ) 14... Qxd1+ $9 15. Qxd1 fxe5 16. Be3 Rd8 17. Qh5+ g6 18. Qg4 h5 $2 19. Qe2 $9 b6 $6 20. f4 $9 exf4 21. Bxf4 Rf8 22. Bg5 Rf7 23. Bh4 Rd7 24. Bg3 Kf8 25. Qe4 $4 Bc5+ $1 26. Bf2 $6 Rd1+ 0-1
+
+SUMMARY
+----------------------------------------------------------------------
+Total moves analyzed: 52
+Blunders: 4
+Mistakes: 4
+Inaccuracies: 3
+Tactical errors: 11
+Positional errors: 0
+
+DETAILED MISTAKE ANALYSIS
+----------------------------------------------------------------------
+
+
+BLUNDERS (4):
+  Move 12...: c6
+    BLUNDER: allows fork, exposes back rank weakness
+    Eval: -29 -> -318 (swing: -289)
+    FEN: r2qk2r/ppp1bppp/8/4R3/8/5Q2/PPP2PPP/R1B3K1 b kq - 0 12
+
+  Move 14.: Rd1
+    BLUNDER: hangs piece(s): R on e5, allows fork, exposes back rank weakness
+    Eval: 419 -> 105 (swing: -314)
+    FEN: r2qk2r/pp2b1pp/2p2p2/4R1B1/8/5Q2/PPP2PPP/R5K1 w kq - 0 14
+
+  Move 19.: Qe2
+    BLUNDER: allows fork, exposes back rank weakness
+    Eval: 378 -> 76 (swing: -302)
+    FEN: 3rk2r/pp2b3/2p3p1/4p2p/6Q1/4B3/PPP2PPP/6K1 w k - 0 19
+
+  Move 25.: Qe4
+    BLUNDER: allows fork, exposes back rank weakness
+    Eval: -38 -> -9996 (swing: -9958)
+    FEN: 5k2/p2rbr2/1pp3p1/7p/8/6B1/PPP1Q1PP/6K1 w - - 7 25
+
+
+MISTAKES (4):
+  Move 14...: Qxd1+
+    MISTAKE: hangs piece(s): q on d1
+    Eval: -83 -> -234 (swing: -151)
+    FEN: r2qk2r/pp2b1pp/2p2p2/4R1B1/8/5Q2/PPP2PPP/3R2K1 b kq - 1 14
+
+  Move 18...: h5
+    MISTAKE: hangs piece(s): p on g6, p on a7
+    Eval: -161 -> -358 (swing: -197)
+    FEN: 3rk2r/pp2b2p/2p3p1/4p3/6Q1/4B3/PPP2PPP/6K1 b k - 1 18
+
+  Move 19...: b6
+    MISTAKE: allows fork
+    Eval: -72 -> -191 (swing: -119)
+    FEN: 3rk2r/pp2b3/2p3p1/4p2p/8/4B3/PPP1QPPP/6K1 b k - 1 19
+
+  Move 20.: f4
+    MISTAKE: allows fork, exposes back rank weakness
+    Eval: 178 -> -20 (swing: -198)
+    FEN: 3rk2r/p3b3/1pp3p1/4p2p/8/4B3/PPP1QPPP/6K1 w k - 0 20
+
+
+INACCURACYS (3):
+  Move 23.: Bh4
+    INACCURACY: hangs piece(s): B on h4, allows fork, exposes back rank weakness
+    Eval: 0 -> -84 (swing: -84)
+    FEN: 3rk3/p3br2/1pp3p1/6Bp/8/8/PPP1Q1PP/6K1 w - - 3 23
+
+  Move 23...: Rd7
+    INACCURACY: allows fork, exposes back rank weakness
+    Eval: 73 -> 13 (swing: -60)
+    FEN: 3rk3/p3br2/1pp3p1/7p/7B/8/PPP1Q1PP/6K1 b - - 4 23
+
+  Move 24.: Bg3
+    INACCURACY: allows fork, exposes back rank weakness
+    Eval: -2 -> -94 (swing: -92)
+    FEN: 4k3/p2rbr2/1pp3p1/7p/7B/8/PPP1Q1PP/6K1 w - - 5 24
+
+
+
+https://www.chess.com/openings/Four-Knights-Game
+
+
+[Variant "From Position"][FEN "r2qk2r/pp2bppp/2p5/4R3/8/5Q2/PPP2PPP/R1B3K1 w KQkq - 0 1"] 1. Bf4 f6 2. Re4 f5 3. Re5 O-O 4. Rd1 Qe8 5. Rde1 Rf7 6. Bg5 h6 7. Bxe7 Qd7 8. Bb4 c5 9. Bxc5 Rc8 10. Qb3 Rxc5 11. Rxc5 Kh7
+
+
+[Variant "From Position"][FEN "r2qk2r/pp2b1pp/2p2p2/4R1B1/8/5Q2/PPP2PPP/3R2K1 w KQkq - 0 1"] 1. Bxf6 gxf6 2. Qxf6 Rf8 3. Qg7 Qc7 4. Rde1 O-O-O 5. Rxe7 Qf4 6. f3 Qa4
+
+
+[Variant "From Position"][FEN "3rk2r/pp2b3/2p3p1/4p2p/6Q1/4B3/PPP2PPP/6K1 w - - 0 1"] 1. Qxg6+
+
+
+
+
+
+======================================================================
+PATTERN RECOGNITION SUMMARY
+======================================================================
+
+Patterns detected:
+  Tactical: 11 occurrence(s)
+  Positional: 0 occurrence(s)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Backrankmate
+   Deliver checkmate on the back rank
+   Practice: https://lichess.org/training/backRankMate
+
+🎯 Hangingpiece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Daily Puzzle
+   Today's puzzle (Rating: 1904, Themes: endgame, advancedPawn, crushing)
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 12...: c6
+  Position (FEN): r2qk2r/ppp1bppp/8/4R3/8/5Q2/PPP2PPP/R1B3K1 b kq - 0 12
+  You can analyze this position at:
+  https://lichess.org/analysis/r2qk2r/ppp1bppp/8/4R3/8/5Q2/PPP2PPP/R1B3K1_b_kq_-_0_12
+
+Move 14.: Rd1
+  Position (FEN): r2qk2r/pp2b1pp/2p2p2/4R1B1/8/5Q2/PPP2PPP/R5K1 w kq - 0 14
+  You can analyze this position at:
+  https://lichess.org/analysis/r2qk2r/pp2b1pp/2p2p2/4R1B1/8/5Q2/PPP2PPP/R5K1_w_kq_-_0_14
+
+Move 19.: Qe2
+  Position (FEN): 3rk2r/pp2b3/2p3p1/4p2p/6Q1/4B3/PPP2PPP/6K1 w k - 0 19
+  You can analyze this position at:
+  https://lichess.org/analysis/3rk2r/pp2b3/2p3p1/4p2p/6Q1/4B3/PPP2PPP/6K1_w_k_-_0_19
+
+Move 25.: Qe4
+  Position (FEN): 5k2/p2rbr2/1pp3p1/7p/8/6B1/PPP1Q1PP/6K1 w - - 7 25
+  You can analyze this position at:
+  https://lichess.org/analysis/5k2/p2rbr2/1pp3p1/7p/8/6B1/PPP1Q1PP/6K1_w_-_-_7_25
+
