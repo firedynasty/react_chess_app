@@ -3275,11 +3275,27 @@ the pattern step-by-step, and assign specific practice.`
 
             // Load analysis report into textarea
             const loadAnalysisReport = () => {
-                const reportText = window.analysisReportRawText;
+                // Check multiple sources for report text:
+                // 1. window.analysisReportRawText - from running analysis
+                // 2. window.studyReportRawText - from loading via clipboard/file
+                // 3. DOM element - the actual displayed report text
+                let reportText = window.analysisReportRawText;
+
+                if (!reportText || !reportText.trim()) {
+                    reportText = window.studyReportRawText;
+                }
+
+                if (!reportText || !reportText.trim()) {
+                    const reportElement = document.getElementById('analysisReportText');
+                    if (reportElement && reportElement.textContent && reportElement.textContent !== 'Loading report...') {
+                        reportText = reportElement.textContent;
+                    }
+                }
+
                 if (reportText && reportText.trim()) {
                     setInputValue(prev => prev + (prev ? '\n\n' : '') + reportText);
                 } else {
-                    alert('No analysis report loaded. Please analyze a game first.');
+                    alert('No analysis report loaded. Please analyze a game first or load a report from clipboard.');
                 }
             };
 
