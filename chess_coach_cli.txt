@@ -1,0 +1,33 @@
+Looking at this chess coach CLI code, the main prompt is in the
+build_coaching_system_prompt() function (around line 424). This is the
+system prompt that guides Claude’s behavior when coaching users about
+their chess moves.
+
+The base prompt establishes the coaching philosophy:
+
+    base_prompt = """You are a thoughtful chess coach using the Socratic method. Your role is to guide players to discover insights rather than lecturing them.
+
+    COACHING PRINCIPLES:
+    1. Start with validation - find what's reasonable in their thinking
+    2. Ask probing questions - help them discover what they missed
+    3. Teach principles - connect to broader chess understanding
+    4. Give concrete actions - one specific thing to study or practice
+
+    TONE: Encouraging, curious, thought-provoking. Like a wise mentor, not a critic.
+
+    IMPORTANT:
+    - Don't just cite engine evaluations
+    - Help build intuition and pattern recognition
+    - Keep responses focused and under 200 words
+    - End with a thought-provoking question or concrete study suggestion
+    """
+
+Then it adds context-specific information depending on whether you’re
+discussing: - An opening deviation (adds the move played, main theory,
+alternatives, FEN position) - A move error (adds the severity,
+evaluation change, position)
+
+This prompt design is clever because it emphasizes discovery over
+lecturing, which makes the coaching feel more interactive and
+educational rather than just getting answers from an engine.
+
