@@ -1,0 +1,500 @@
+/* ==================== DARK MODE STYLES ==================== */
+body {
+  transition: background-color 0.3s, color 0.3s;
+}
+
+body.dark-mode {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.dark-mode .container {
+  background: #1a1a1a;
+}
+
+body.dark-mode .flashcard-navbar {
+  background-color: #2a2a2a;
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .navbar-brand h2 {
+  color: #e0e0e0;
+}
+
+body.dark-mode .paste-zone {
+  background-color: #2a2a2a;
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .paste-zone p {
+  color: #b0b0b0;
+}
+
+body.dark-mode .paste-zone code {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+}
+
+body.dark-mode .paste-zone textarea {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .paste-zone textarea::placeholder {
+  color: #666;
+}
+
+body.dark-mode .flashcard .front.border,
+body.dark-mode .flashcard .back.border {
+  background-color: #2a2a2a;
+  border-color: #3a3a3a;
+}
+
+body.dark-mode .flashcard .front h3,
+body.dark-mode .flashcard .back p {
+  color: #e0e0e0;
+}
+
+body.dark-mode .flashcard:hover {
+  box-shadow: 0 4px 12px rgba(255,255,255,0.1);
+}
+
+body.dark-mode h4 {
+  color: #e0e0e0;
+}
+
+body.dark-mode .text-muted {
+  color: #888 !important;
+}
+
+body.dark-mode #blockCounter {
+  color: #8b9cff;
+}
+
+/* ==================== END DARK MODE ==================== */
+
+.front, .back {
+  width:100%;
+  min-height:300px;
+  display: table;
+}
+
+.front h3, .back p {
+  display: table-cell;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.fast {
+  animation-duration: .5s;
+}
+.flashcard {
+  cursor:pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.flashcard:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Known/mastered flashcards styling */
+.flashcard.known {
+  background-color: #10B981 !important;
+  opacity: 0.8;
+}
+
+.flashcard.known .front.border,
+.flashcard.known .back.border {
+  background-color: #10B981 !important;
+  color: white !important;
+  border-color: #059669 !important;
+}
+
+.flashcard.known .front h3,
+.flashcard.known .back p {
+  color: white !important;
+}
+
+.drag-drop-zone {
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 2rem;
+  margin: 2rem 0;
+  text-align: center;
+  background-color: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.drag-drop-zone.drag-over {
+  border-color: #3B82F6;
+  background-color: #f0f9ff;
+}
+
+.drag-drop-zone p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.import-button, .export-button, .reverse-button {
+  background-color: #3B82F6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  margin: 0 0.5rem;
+}
+.import-button:hover, .export-button:hover, .reverse-button:hover {
+  background-color: #2563EB;
+}
+.export-button {
+  background-color: #10B981;
+}
+.export-button:hover {
+  background-color: #059669;
+}
+.reverse-button {
+  background-color: #A78BFA;
+}
+.reverse-button:hover {
+  background-color: #8B5CF6;
+}
+
+#dynamicFlashcards {
+  margin-top: 2rem;
+}
+
+/* Paste Zone Styles */
+.paste-zone {
+  border: 2px solid #6366F1;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+  background-color: #f8f7ff;
+}
+
+.paste-zone p {
+  margin: 0 0 1rem 0;
+  color: #4338CA;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.paste-zone code {
+  background-color: #E0E7FF;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.paste-zone textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 1rem;
+  border: 1px solid #C7D2FE;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: 1rem;
+}
+
+.paste-zone textarea:focus {
+  outline: none;
+  border-color: #6366F1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+}
+
+.paste-zone textarea::placeholder {
+  color: #9CA3AF;
+}
+
+.paste-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.generate-button {
+  background-color: #6366F1;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.generate-button:hover {
+  background-color: #4F46E5;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.clear-paste-button {
+  background-color: #F3F4F6;
+  color: #374151;
+  border: 1px solid #D1D5DB;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.clear-paste-button:hover {
+  background-color: #E5E7EB;
+}
+
+.export-to-textarea-button {
+  background-color: #10B981;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.export-to-textarea-button:hover {
+  background-color: #059669;
+}
+
+.copy-textarea-button {
+  background-color: #F59E0B;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.copy-textarea-button:hover {
+  background-color: #D97706;
+}
+
+/* Clipboard Button */
+.clipboard-button {
+  background-color: #8B5CF6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.clipboard-button:hover {
+  background-color: #7C3AED;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+/* Scan and Navigation Buttons */
+.scan-button {
+  background-color: #F59E0B;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.scan-button:hover {
+  background-color: #D97706;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.nav-button {
+  background-color: #3B82F6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.nav-button:hover {
+  background-color: #2563EB;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+#blockCounter {
+  color: #4338CA;
+  font-size: 1rem;
+}
+
+/* Navbar Styles */
+.flashcard-navbar {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.navbar-brand h2 {
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.navbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Dropdown Styles */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-btn {
+  background-color: #007acc;
+  color: white;
+  padding: 8px 16px;
+  font-size: 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.dropdown-btn:hover {
+  background-color: #0056b3;
+}
+
+.dropdown-arrow {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.dropdown-btn.active .dropdown-arrow {
+  transform: rotate(180deg);
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: white;
+  min-width: 200px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+  border-radius: 6px;
+  z-index: 1000;
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+}
+
+.dropdown-content.show {
+  display: block;
+}
+
+.dropdown-item {
+  color: #333;
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid #f1f1f1;
+  transition: all 0.2s ease;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+  color: #007acc;
+}
+
+.dropdown-item.active {
+  background-color: #007acc;
+  color: white;
+}
+
+/* Navbar Button Styles */
+.navbar-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.navbar-btn.import-button {
+  background-color: #3B82F6;
+  color: white;
+}
+
+.navbar-btn.import-button:hover {
+  background-color: #2563EB;
+}
+
+.navbar-btn.export-button {
+  background-color: #10B981;
+  color: white;
+}
+
+.navbar-btn.export-button:hover {
+  background-color: #059669;
+}
+
+/* Clipboard button specific styling */
+.navbar-btn#loadFromClipboard:hover {
+  background-color: #5a369a !important;
+}
+
+/* Responsive navbar */
+@media (max-width: 768px) {
+  .flashcard-navbar {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .navbar-controls {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .dropdown-btn {
+    min-width: 160px;
+  }
+}

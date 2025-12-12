@@ -1,0 +1,213 @@
+================================================================================
+BLOCK NAVIGATION PATTERN: HOW 'NEXT FEN' AND 'NEXT PGN' WORK
+================================================================================
+
+OVERVIEW
+--------
+The system uses a "scan-and-cycle" pattern with these components:
+
+1. Global arrays to store found blocks
+2. Global index counters to track current position
+3. Scan functions to parse content and populate arrays
+4. Load functions to display the current block
+5. Button handlers that cycle through with modulo arithmetic
+
+
+================================================================================
+DATA STRUCTURES
+================================================================================
+
+// Storage for parsed blocks
+window.fenVariants = [];
+window.pgnVariants = [];
+
+// Index trackers (which block we're on)
+window.currentFenVariantIndex = 0;
+window.currentPgnVariantIndex = 0;
+
+// Track which type is currently active
+window.currentVariantType = null; // 'fen' or 'pgn'
+
+
+================================================================================
+SCANNING FUNCTIONS
+================================================================================
+
+scanReportForFenVariants():
+- Reads the report text content
+- Uses regex to find [Variant "From Position"][FEN "..."] blocks
+- Pushes each match into window.fenVariants array as {fen, moves}
+- Resets index to 0
+- Returns count of found blocks
+
+scanReportForPgnVariants():
+- Parses line-by-line looking for PGN patterns (lines starting with "1. e4" etc.)
+- Skips FEN variant blocks
+- Pushes each PGN string into window.pgnVariants
+- Resets index to 0
+- Returns count
+
+
+================================================================================
+BUTTON CLICK LOGIC
+================================================================================
+
+nextFenVariantBtn.addEventListener('click', function() {
+    // First click: scan and populate if empty
+    if (window.fenVariants.length === 0) {
+        const count = window.scanReportForFenVariants();
+        if (count === 0) {
+            alert('No FEN blocks found');
+            return;
+        }
+    } else {
+        // Subsequent clicks: cycle to next with wrap-around
+        window.currentFenVariantIndex = (window.currentFenVariantIndex + 1) % window.fenVariants.length;
+    }
+    // Display the current block
+    window.loadCurrentFenVariant();
+});
+
+THE MODULO TRICK: (index + 1) % array.length handles wrap-around:
+- If at index 2 of 3 items: (2+1) % 3 = 0 (back to start)
+- If at index 0 of 3 items: (0+1) % 3 = 1 (next)
+- If at index 1 of 3 items: (1+1) % 3 = 2 (next)
+
+
+================================================================================
+LOAD FUNCTIONS
+================================================================================
+
+window.loadCurrentFenVariant = function() {
+    if (window.fenVariants.length === 0) return;
+
+    const variant = window.fenVariants[window.currentFenVariantIndex];
+
+    // Apply to UI
+    window.studyReportPositions = window.parsePgnToPositions(pgnString);
+    window.board2.position(window.studyReportPositions[0]);
+
+    // Update display: "FEN 2/5"
+    indexSpan.textContent = `FEN ${window.currentFenVariantIndex + 1}/${window.fenVariants.length}`;
+};
+
+
+================================================================================
+TEMPLATE FOR YOUR OWN IMPLEMENTATION
+================================================================================
+
+// 1. Global state
+window.myBlocks = [];
+window.currentMyBlockIndex = 0;
+
+// 2. Scan function - finds blocks in content
+window.scanForMyBlocks = function() {
+    const content = document.getElementById('myContent').textContent;
+    window.myBlocks = [];
+
+    // Your parsing logic here (regex, line-by-line, etc.)
+    const pattern = /YOUR_PATTERN/g;
+    let match;
+    while ((match = pattern.exec(content)) !== null) {
+        window.myBlocks.push({
+            data: match[1],
+            // other fields...
+        });
+    }
+
+    window.currentMyBlockIndex = 0;
+    return window.myBlocks.length;
+};
+
+// 3. Load function - displays current block
+window.loadCurrentMyBlock = function() {
+    if (window.myBlocks.length === 0) return;
+
+    const block = window.myBlocks[window.currentMyBlockIndex];
+
+    // Apply to your UI
+    document.getElementById('display').textContent = block.data;
+
+    // Update counter display
+    document.getElementById('counter').textContent =
+        `${window.currentMyBlockIndex + 1}/${window.myBlocks.length}`;
+};
+
+// 4. Next button handler
+document.getElementById('nextMyBlockBtn').addEventListener('click', function() {
+    if (window.myBlocks.length === 0) {
+        const count = window.scanForMyBlocks();
+        if (count === 0) {
+            alert('No blocks found');
+            return;
+        }
+    } else {
+        // Cycle with wrap-around
+        window.currentMyBlockIndex = (window.currentMyBlockIndex + 1) % window.myBlocks.length;
+    }
+    window.loadCurrentMyBlock();
+});
+
+// 5. Optional: Previous button
+document.getElementById('prevMyBlockBtn').addEventListener('click', function() {
+    if (window.myBlocks.length === 0) return;
+
+    // Go backwards with wrap-around
+    window.currentMyBlockIndex = (window.currentMyBlockIndex - 1 + window.myBlocks.length) % window.myBlocks.length;
+    window.loadCurrentMyBlock();
+});
+
+
+================================================================================
+KEY POINTS SUMMARY
+================================================================================
+
+Component        | Purpose
+-----------------|----------------------------------------------------------
+blocks[]         | Stores all parsed blocks
+currentIndex     | Tracks which block is shown
+scan()           | Parses content, populates array, resets index
+load()           | Reads blocks[currentIndex] and updates UI
+(i+1) % len      | Wrap-around forward: goes 0->1->2->0->1...
+(i-1+len) % len  | Wrap-around backward: goes 2->1->0->2->1...
+
+The first button click scans; subsequent clicks just increment and load.
+
+
+================================================================================
+WHEN TO RE-SCAN
+================================================================================
+
+Re-scan (reset the arrays) when:
+- New content is loaded
+- Content is edited/modified
+- User explicitly requests refresh
+
+Example from the codebase - re-scan when loading a new report:
+
+    if (typeof window.scanReportForFenVariants === 'function') {
+        window.scanReportForFenVariants();
+    }
+    if (typeof window.scanReportForPgnVariants === 'function') {
+        window.scanReportForPgnVariants();
+    }
+
+
+================================================================================
+HTML ELEMENTS NEEDED
+================================================================================
+
+<!-- Button to cycle through blocks -->
+<button id="nextMyBlockBtn">Next Block</button>
+
+<!-- Optional: previous button -->
+<button id="prevMyBlockBtn">Prev Block</button>
+
+<!-- Display current position: "3/10" -->
+<span id="counter"></span>
+
+<!-- Where block content is displayed -->
+<div id="display"></div>
+
+<!-- Source content to scan -->
+<div id="myContent">...content with blocks to parse...</div>

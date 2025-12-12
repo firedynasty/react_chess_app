@@ -545,6 +545,7 @@
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
                     <button id="loadPgnFromHighlight" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load PGN from Highlight</button>
                     <button id="loadFenVariantFromHighlight" style="background: #6f42c1; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load [Fen Variant] from Highlight</button>
+                    <button id="copyReportText" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Copy Text</button>
                 </div>
             </div>
         </div>
@@ -3406,6 +3407,31 @@ END OF GUIDE
                     } else {
                         alert('PGN parser not available.');
                     }
+                });
+            }
+
+            // Copy Report Text Button
+            const copyReportTextBtn = document.getElementById('copyReportText');
+            if (copyReportTextBtn) {
+                copyReportTextBtn.addEventListener('click', function() {
+                    const reportText = document.getElementById('analysisReportText');
+                    const textarea = document.getElementById('reportEditTextarea');
+                    const content = isReportEditMode ? textarea.value : reportText.textContent;
+
+                    if (!content || content === 'Loading report...' || content.trim() === '') {
+                        alert('No report text to copy.');
+                        return;
+                    }
+
+                    navigator.clipboard.writeText(content).then(function() {
+                        const originalText = copyReportTextBtn.textContent;
+                        copyReportTextBtn.textContent = 'Copied!';
+                        setTimeout(function() {
+                            copyReportTextBtn.textContent = originalText;
+                        }, 1500);
+                    }).catch(function(err) {
+                        alert('Failed to copy text: ' + err);
+                    });
                 });
             }
 

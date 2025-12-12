@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Animated Flashcards</title>
+  <link rel="stylesheet" href="./style.css">
+
+  <!-- BOOTSTRAP 4 -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+  <!-- ANIMATE CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.0/animate.min.css">
+</head>
+<body>
+<!--
+DEVELOPED BY MATIE NATOV 3/13/19
+-->
+
+<br>
+<br>
+
+<!-- Navbar -->
+<nav class="flashcard-navbar">
+  <div class="navbar-brand">
+    <h2>Flash Cards</h2>
+  </div>
+
+  <div class="navbar-controls">
+    <!-- Flashcard Set Dropdown (hidden - using block counter instead) -->
+    <div class="dropdown" style="display: none;">
+      <button class="dropdown-btn" id="flashcardDropdownBtn">
+        <span id="currentSetName">default_computer_specs</span>
+        <span class="dropdown-arrow">▼</span>
+      </button>
+      <div class="dropdown-content" id="flashcardDropdown">
+        <!-- Dynamic content will be loaded here -->
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <button class="navbar-btn import-button" onclick="document.getElementById('fileInput').click()">Import Files</button>
+    <button class="navbar-btn export-button" onclick="exportFlashcards()">Export .txt</button>
+    <button class="navbar-btn reverse-button" onclick="reverseFlashcards()">Reverse Cards</button>
+    <button class="navbar-btn" id="darkModeButton" onclick="toggleDarkMode()" style="background-color: #6366F1;">🌙 Dark</button>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+    <h4>Hover on cards to learn about computer specs.</h4>
+    <p class="text-muted"><strong>💡 Tip:</strong> Double-click the answer to mark it green. Export will skip green cards!</p>
+
+    <!-- Textarea 2: Block Source Input -->
+    <div class="paste-zone" id="blockSourceZone">
+      <p>📦 <strong>Textarea 2:</strong> Paste text with block markers <code>[1]</code>, <code>[2]</code>, etc.</p>
+      <textarea id="blockSourceInput" placeholder="[1]
+大家好;Hello everyone,daai6 gaa1 hou2
+我係 Charlotte;I am Charlotte,ngo5 hai6 Charlotte
+
+[2]
+蛋菜;egg dish
+炒飯;fried rice"></textarea>
+      <div class="paste-buttons">
+        <button class="clipboard-button" onclick="pasteAndScanBlocks()">📋 Paste from Clipboard</button>
+        <button class="scan-button" onclick="scanForBlocks()">🔍 Scan Blocks</button>
+        <button class="nav-button" onclick="prevBlock()">◀ Prev</button>
+        <button class="nav-button" onclick="nextBlock()">Next ▶</button>
+        <span id="blockCounter" style="margin-left: 10px; font-weight: bold;">0/0</span>
+      </div>
+    </div>
+
+    <!-- Textarea 1: Current Block Content -->
+    <div class="paste-zone" id="pasteZone">
+      <p>📝 <strong>Textarea 1:</strong> Current block content (format: <code>Term; Definition</code>)</p>
+      <textarea id="pasteInput" placeholder="Retina display; A term used by Apple to describe displays with higher pixel density
+GHz; Short for gigahertz, describes the speed the computer's brain works
+Processor; The computer's brain - i3, i5, i7, i9 indicate processing power"></textarea>
+      <div class="paste-buttons">
+        <button class="clipboard-button" onclick="pasteAndGenerate()">📋 Paste from Clipboard</button>
+        <button class="generate-button" onclick="generateFromPaste()">Generate Flashcards</button>
+        <button class="clear-paste-button" onclick="clearPasteInput()">Clear</button>
+        <button class="export-to-textarea-button" onclick="exportToTextarea()">Export Nongreen to Textarea</button>
+        <button class="copy-textarea-button" onclick="copyTextareaToClipboard()">📋 Copy Textarea</button>
+      </div>
+    </div>
+
+    <!-- Drag and Drop Zone (hidden) -->
+    <div class="drag-drop-zone" id="dragDropZone" style="display: none;">
+      <p>📁 Or drag and drop .txt files here</p>
+      <input type="file" id="fileInput" accept=".txt,.csv,.tsv" multiple style="display: none;">
+      <button class="import-button" onclick="document.getElementById('fileInput').click()">Select Files</button>
+      <button class="export-button" onclick="exportFlashcards()">Export .txt</button>
+    </div>
+
+    </div><!-- end col -->
+  </div><!-- end row -->
+</div><!-- end container -->
+
+
+<br>
+<br>
+
+
+<!-- Dynamic Flashcards Container -->
+<div id="dynamicFlashcards"></div>
+
+<script src="http://code.jquery.com/jquery-3.3.1.min.js"
+  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+  crossorigin="anonymous"></script>
+<script src="./script.js"></script>
+
+</body>
+</html>
