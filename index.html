@@ -659,6 +659,7 @@
           <button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
           <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
           <button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
+          <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px; font-style: italic;"></span>
           <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
           <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
         </div>
@@ -2419,6 +2420,21 @@
                 const lines = content.split('\n');
                 let currentPgn = '';
                 let inPgn = false;
+                let pgnStartLineIndex = -1;
+
+                // Helper function to get notes from 2 lines before a given index
+                function getNotesFromLinesBefore(lineIndex) {
+                    // Look back up to 2 lines for non-empty content
+                    for (let k = lineIndex - 1; k >= Math.max(0, lineIndex - 2); k--) {
+                        const prevLine = lines[k].trim();
+                        // Skip empty lines and lines starting with [ or containing FEN/Variant
+                        if (prevLine && !prevLine.startsWith('[') && !prevLine.includes('[FEN') && !prevLine.includes('[Variant') && !/^\d+\./.test(prevLine)) {
+                            // Remove curly braces if present
+                            return prevLine.replace(/^\{|\}$/g, '');
+                        }
+                    }
+                    return '';
+                }
 
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i].trim();
@@ -2426,10 +2442,12 @@
                     // Skip FEN variant blocks
                     if (line.includes('[Variant "From Position"]') || line.includes('[FEN "')) {
                         if (currentPgn.trim()) {
-                            window.pgnVariants.push(currentPgn.trim());
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.pgnVariants.push({ pgn: currentPgn.trim(), notes: notes });
                         }
                         currentPgn = '';
                         inPgn = false;
+                        pgnStartLineIndex = -1;
                         // Skip until we find a non-PGN line
                         while (i < lines.length && (lines[i].includes('[') || /^\d+\./.test(lines[i].trim()))) {
                             i++;
@@ -2440,8 +2458,12 @@
                     // Check if line starts with move number (e.g., "1. e4" or "14. Qe2")
                     if (/^\d+\.\s*[A-Za-z]/.test(line)) {
                         if (!inPgn && currentPgn.trim()) {
-                            window.pgnVariants.push(currentPgn.trim());
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.pgnVariants.push({ pgn: currentPgn.trim(), notes: notes });
                             currentPgn = '';
+                        }
+                        if (!inPgn) {
+                            pgnStartLineIndex = i;
                         }
                         inPgn = true;
                         currentPgn += line + ' ';
@@ -2451,15 +2473,18 @@
                     } else if (inPgn && line === '') {
                         // End of PGN block
                         if (currentPgn.trim()) {
-                            window.pgnVariants.push(currentPgn.trim());
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.pgnVariants.push({ pgn: currentPgn.trim(), notes: notes });
                         }
                         currentPgn = '';
                         inPgn = false;
+                        pgnStartLineIndex = -1;
                     }
                 }
                 // Don't forget last PGN if file doesn't end with empty line
                 if (currentPgn.trim()) {
-                    window.pgnVariants.push(currentPgn.trim());
+                    const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                    window.pgnVariants.push({ pgn: currentPgn.trim(), notes: notes });
                 }
 
                 window.currentPgnVariantIndex = 0;
@@ -2470,7 +2495,8 @@
             window.loadCurrentPgnVariant = function() {
                 if (window.pgnVariants.length === 0) return;
 
-                const pgn = window.pgnVariants[window.currentPgnVariantIndex];
+                const variant = window.pgnVariants[window.currentPgnVariantIndex];
+                const pgn = variant.pgn;
                 window.currentVariantType = 'pgn';
 
                 window.studyReportPositions = window.parsePgnToPositions(pgn);
@@ -2493,6 +2519,12 @@
                     const movesDisplay = pgn.length > 7 ? pgn.substring(0, 7) : pgn;
                     movesSpan.textContent = movesDisplay;
                 }
+
+                // Update notes display
+                const notesSpan = document.getElementById('variantNotesDisplay');
+                if (notesSpan) {
+                    notesSpan.textContent = variant.notes || '';
+                }
             };
 
             window.scanReportForFenVariants = function() {
@@ -2501,23 +2533,94 @@
                 const content = isReportEditMode ? textarea.value : reportText.textContent;
 
                 window.fenVariants = [];
-                // Regex to match [Variant "From Position"][FEN "..."] followed by moves
-                // Captures: FEN string, then everything until next [Variant or end
-                const pattern = /\[Variant\s+"From\s+Position"\]\s*\[FEN\s+"([^"]+)"\]\s*([\s\S]*?)(?=\[Variant|$)/g;
+                const lines = content.split('\n');
+                let pendingVariant = false;  // Track if we saw [Variant...] on previous line
+                let variantLineIndex = -1;   // Track line index where [Variant...] was found
 
-                let match;
-                while ((match = pattern.exec(content)) !== null) {
-                    // Extract just the moves line (starts with a number like "14." or "11.")
-                    const movesText = match[2].trim();
-                    // Find the line that starts with moves (number followed by dot)
-                    const movesMatch = movesText.match(/(\d+\.\s*[\s\S]*)/);
-                    const moves = movesMatch ? movesMatch[1].trim() : movesText;
+                // Helper function to get notes from 2 lines before a given index
+                function getNotesFromLinesBefore(lineIndex) {
+                    // Look back up to 2 lines for non-empty content
+                    for (let k = lineIndex - 1; k >= Math.max(0, lineIndex - 2); k--) {
+                        const prevLine = lines[k].trim();
+                        // Skip empty lines and lines starting with [ or containing FEN/Variant
+                        if (prevLine && !prevLine.startsWith('[') && !prevLine.includes('[FEN') && !prevLine.includes('[Variant')) {
+                            // Remove curly braces if present
+                            return prevLine.replace(/^\{|\}$/g, '');
+                        }
+                    }
+                    return '';
+                }
 
-                    window.fenVariants.push({
-                        fen: match[1],
-                        moves: moves
-                    });
-                    console.log('Found FEN variant:', match[1], 'Moves:', moves);
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    // Check for [Variant...][FEN...] on same line
+                    const combinedMatch = line.match(/\[Variant\s+"From\s+Position"\]\s*\[FEN\s+"([^"]+)"\]/);
+                    if (combinedMatch) {
+                        // Look back for notes
+                        const notes = getNotesFromLinesBefore(i);
+
+                        // Look ahead for moves on next line(s)
+                        let moves = '';
+                        for (let j = i + 1; j < lines.length; j++) {
+                            const nextLine = lines[j].trim();
+                            if (nextLine.match(/^\d+\./)) {
+                                moves = nextLine;
+                                break;
+                            }
+                            // Stop if we hit another block
+                            if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
+                        }
+
+                        window.fenVariants.push({
+                            notes: notes,
+                            fen: combinedMatch[1],
+                            moves: moves
+                        });
+                        console.log('Found FEN variant:', combinedMatch[1], 'Notes:', notes, 'Moves:', moves);
+                        pendingVariant = false;
+                        continue;
+                    }
+
+                    // Check for [Variant "From Position"] alone on a line
+                    if (line.match(/\[Variant\s+"From\s+Position"\]/)) {
+                        pendingVariant = true;
+                        variantLineIndex = i;
+                        continue;
+                    }
+
+                    // Check for [FEN "..."] after we saw [Variant...]
+                    const fenOnlyMatch = line.match(/\[FEN\s+"([^"]+)"\]/);
+                    if (fenOnlyMatch && pendingVariant) {
+                        // Look back for notes (from the [Variant...] line)
+                        const notes = getNotesFromLinesBefore(variantLineIndex);
+
+                        // Look ahead for moves on next line(s)
+                        let moves = '';
+                        for (let j = i + 1; j < lines.length; j++) {
+                            const nextLine = lines[j].trim();
+                            if (nextLine.match(/^\d+\./)) {
+                                moves = nextLine;
+                                break;
+                            }
+                            // Stop if we hit another block
+                            if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
+                        }
+
+                        window.fenVariants.push({
+                            notes: notes,
+                            fen: fenOnlyMatch[1],
+                            moves: moves
+                        });
+                        console.log('Found FEN variant (split lines):', fenOnlyMatch[1], 'Notes:', notes, 'Moves:', moves);
+                        pendingVariant = false;
+                        continue;
+                    }
+
+                    // Reset pendingVariant if we hit a non-matching line (but not empty lines)
+                    if (pendingVariant && line && !line.startsWith('[')) {
+                        pendingVariant = false;
+                    }
                 }
                 window.currentFenVariantIndex = 0;
                 console.log('Total FEN variants found:', window.fenVariants.length);
@@ -2550,6 +2653,12 @@
                 if (movesSpan) {
                     const movesDisplay = variant.moves.length > 7 ? variant.moves.substring(0, 7) : variant.moves;
                     movesSpan.textContent = movesDisplay;
+                }
+
+                // Update notes display
+                const notesSpan = document.getElementById('variantNotesDisplay');
+                if (notesSpan) {
+                    notesSpan.textContent = variant.notes || '';
                 }
             };
 

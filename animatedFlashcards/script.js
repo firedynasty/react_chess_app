@@ -13,32 +13,60 @@ window.scanForBlocks = function() {
         return 0;
     }
 
-    // Split by [number] pattern
-    const blockPattern = /\[(\d+)\]\s*/g;
-    const parts = content.split(blockPattern);
-
-    // parts will be: [text before first block, "1", block1 content, "2", block2 content, ...]
+    // Parse line by line to capture [n] and notes on same line
+    const lines = content.split('\n');
     let blocks = [];
-    for (let i = 1; i < parts.length; i += 2) {
-        const blockNum = parts[i];
-        const blockContent = parts[i + 1] ? parts[i + 1].trim() : '';
+    let currentBlock = null;
+    let currentContent = [];
 
-        if (blockContent) {
-            blocks.push({
-                id: blockNum,
-                content: blockContent
-            });
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Match [number] followed by optional notes (with or without dash)
+        // e.g. "[1] - eternal life" or "[1] eternal life" or "[1]"
+        const blockMatch = line.match(/^\[(\d+)\]\s*-?\s*(.*)/);
+
+        if (blockMatch) {
+            // Save previous block if exists
+            if (currentBlock !== null) {
+                blocks.push({
+                    id: currentBlock.id,
+                    notes: currentBlock.notes,
+                    content: currentContent.join('\n').trim()
+                });
+            }
+
+            // Start new block - capture notes after [n], strip leading dash if present
+            currentBlock = {
+                id: blockMatch[1],
+                notes: blockMatch[2] ? blockMatch[2].trim() : ''
+            };
+            currentContent = [];
+        } else if (currentBlock !== null) {
+            // Add line to current block content
+            currentContent.push(line);
         }
+    }
+
+    // Don't forget the last block
+    if (currentBlock !== null) {
+        blocks.push({
+            id: currentBlock.id,
+            notes: currentBlock.notes,
+            content: currentContent.join('\n').trim()
+        });
     }
 
     window.flashcardBlocks = blocks;
     window.currentBlockIndex = 0;
 
     console.log('DEBUG: scanForBlocks found', blocks.length, 'blocks');
+    blocks.forEach(b => console.log('DEBUG: Block', b.id, 'notes:', b.notes));
 
     if (blocks.length === 0) {
         alert('No blocks found. Make sure text has [1], [2], etc. markers.');
         $('#blockCounter').text('0/0');
+        $('#blockTitle').text('');
         return 0;
     }
 
@@ -62,13 +90,15 @@ window.loadBlockByIndex = function(index, autoGenerate = false) {
     window.currentBlockIndex = index;
     const block = window.flashcardBlocks[index];
 
-    console.log('DEBUG: Loading block', block.id, 'at index', index);
+    console.log('DEBUG: Loading block', block.id, 'at index', index, 'notes:', block.notes);
 
     // Put content into Textarea 1
     document.getElementById('pasteInput').value = block.content;
 
-    // Update the currentSetName span
-    $('#currentSetName').text('Block ' + block.id);
+    // Update the currentSetName span - show notes if available, otherwise "Block N"
+    const displayName = block.notes ? block.notes : 'Block ' + block.id;
+    $('#currentSetName').text(displayName);
+    $('#blockTitle').text('- ' + displayName);
 
     // Update block counter
     $('#blockCounter').text((index + 1) + '/' + window.flashcardBlocks.length);
