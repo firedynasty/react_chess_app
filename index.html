@@ -581,13 +581,15 @@
           <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
           <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee;">Start</span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
-          <span style="color: #888;">Position: <span id="board2PositionCount" style="font-weight: bold; color: #eee;">0/0</span></span>
+          <span id="currentFenMoves" style="color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
+          <span id="board2PositionCount" style="font-weight: bold; color: #eee;">0/0</span>
           <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
           <a id="lichessBoard2Link" href="#" target="_blank" style="color: #00d4ff; text-decoration: underline;">Go to Lichess (Analysis)</a>
           <button id="loadPgnFromClipboard" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load PGN from Clipboard</button>
           <button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
           <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
-          <span id="currentFenMoves" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px;"></span>
+          <button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
+          <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
         </div>
       </div>
     </div>
@@ -2005,13 +2007,20 @@
                         updateReportFilenameDisplay();
                     }
                 }
-                // Rescan FEN variants with new report content
+                // Rescan FEN/PGN variants with new report content
                 window.fenVariants = [];
+                window.pgnVariants = [];
                 if (typeof window.scanReportForFenVariants === 'function') {
                     window.scanReportForFenVariants();
                 }
+                if (typeof window.scanReportForPgnVariants === 'function') {
+                    window.scanReportForPgnVariants();
+                }
                 if (document.getElementById('currentFenMoves')) {
                     document.getElementById('currentFenMoves').textContent = '';
+                }
+                if (document.getElementById('variantIndexDisplay')) {
+                    document.getElementById('variantIndexDisplay').textContent = '';
                 }
             }
 
@@ -2238,6 +2247,10 @@
                                 window.board2.position(window.studyReportPositions[0]);
                                 updateBoard2MoveIndicator(0);
                             }
+                            // Reset variant displays
+                            document.getElementById('currentFenMoves').textContent = '';
+                            document.getElementById('variantIndexDisplay').textContent = '';
+                            window.currentVariantType = null;
                             log(`Reloaded ${window.studyReportPositions.length} positions from original game`, 'success');
                         } else {
                             alert('Could not parse positions from the game PGN.');
@@ -2251,6 +2264,97 @@
             // Next FEN Variant Button
             window.fenVariants = [];
             window.currentFenVariantIndex = 0;
+            window.pgnVariants = [];
+            window.currentPgnVariantIndex = 0;
+            window.currentVariantType = null; // 'fen' or 'pgn'
+
+            // Scan report for regular PGN blocks (not FEN variants)
+            window.scanReportForPgnVariants = function() {
+                const reportText = document.getElementById('analysisReportText');
+                const textarea = document.getElementById('reportEditTextarea');
+                const content = isReportEditMode ? textarea.value : reportText.textContent;
+
+                window.pgnVariants = [];
+                // Match PGN that starts with move number and doesn't have [Variant or [FEN before it
+                // Look for lines starting with move numbers like "1. e4" or "14. Qe2"
+                const lines = content.split('\n');
+                let currentPgn = '';
+                let inPgn = false;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    // Skip FEN variant blocks
+                    if (line.includes('[Variant "From Position"]') || line.includes('[FEN "')) {
+                        if (currentPgn.trim()) {
+                            window.pgnVariants.push(currentPgn.trim());
+                        }
+                        currentPgn = '';
+                        inPgn = false;
+                        // Skip until we find a non-PGN line
+                        while (i < lines.length && (lines[i].includes('[') || /^\d+\./.test(lines[i].trim()))) {
+                            i++;
+                        }
+                        continue;
+                    }
+
+                    // Check if line starts with move number (e.g., "1. e4" or "14. Qe2")
+                    if (/^\d+\.\s*[A-Za-z]/.test(line)) {
+                        if (!inPgn && currentPgn.trim()) {
+                            window.pgnVariants.push(currentPgn.trim());
+                            currentPgn = '';
+                        }
+                        inPgn = true;
+                        currentPgn += line + ' ';
+                    } else if (inPgn && /^[A-Za-z0-9]/.test(line) && !line.startsWith('*') && !line.startsWith('[')) {
+                        // Continue PGN on next line
+                        currentPgn += line + ' ';
+                    } else if (inPgn && line === '') {
+                        // End of PGN block
+                        if (currentPgn.trim()) {
+                            window.pgnVariants.push(currentPgn.trim());
+                        }
+                        currentPgn = '';
+                        inPgn = false;
+                    }
+                }
+                // Don't forget last PGN if file doesn't end with empty line
+                if (currentPgn.trim()) {
+                    window.pgnVariants.push(currentPgn.trim());
+                }
+
+                window.currentPgnVariantIndex = 0;
+                console.log('Total PGN variants found:', window.pgnVariants.length);
+                return window.pgnVariants.length;
+            };
+
+            window.loadCurrentPgnVariant = function() {
+                if (window.pgnVariants.length === 0) return;
+
+                const pgn = window.pgnVariants[window.currentPgnVariantIndex];
+                window.currentVariantType = 'pgn';
+
+                window.studyReportPositions = window.parsePgnToPositions(pgn);
+                window.studyReportPositionIndex = 0;
+
+                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                    window.board2.position(window.studyReportPositions[0]);
+                    updateBoard2MoveIndicator(0);
+                }
+
+                // Update variant index display
+                const indexSpan = document.getElementById('variantIndexDisplay');
+                if (indexSpan) {
+                    indexSpan.textContent = `PGN ${window.currentPgnVariantIndex + 1}/${window.pgnVariants.length}`;
+                }
+
+                // Update moves span (limited to 7 chars)
+                const movesSpan = document.getElementById('currentFenMoves');
+                if (movesSpan) {
+                    const movesDisplay = pgn.length > 7 ? pgn.substring(0, 7) : pgn;
+                    movesSpan.textContent = movesDisplay;
+                }
+            };
 
             window.scanReportForFenVariants = function() {
                 const reportText = document.getElementById('analysisReportText');
@@ -2286,6 +2390,7 @@
 
                 const variant = window.fenVariants[window.currentFenVariantIndex];
                 const pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
+                window.currentVariantType = 'fen';
 
                 window.studyReportPositions = window.parsePgnToPositions(pgnString);
                 window.studyReportPositionIndex = 0;
@@ -2295,11 +2400,18 @@
                     updateBoard2MoveIndicator(0);
                 }
 
-                // Update span to show moves (limited to 100 chars)
+                // Update variant index display
+                const indexSpan = document.getElementById('variantIndexDisplay');
+                if (indexSpan) {
+                    indexSpan.textContent = `FEN ${window.currentFenVariantIndex + 1}/${window.fenVariants.length}`;
+                }
+
+                // Update moves span (limited to 7 chars)
                 const movesSpan = document.getElementById('currentFenMoves');
-                const movesDisplay = variant.moves.length > 100 ? variant.moves.substring(0, 100) + '...' : variant.moves;
-                console.log('Setting moves span to:', movesDisplay);
-                movesSpan.textContent = movesDisplay;
+                if (movesSpan) {
+                    const movesDisplay = variant.moves.length > 7 ? variant.moves.substring(0, 7) : variant.moves;
+                    movesSpan.textContent = movesDisplay;
+                }
             };
 
             const nextFenVariantBtn = document.getElementById('nextFenVariant');
@@ -2315,6 +2427,23 @@
                         window.currentFenVariantIndex = (window.currentFenVariantIndex + 1) % window.fenVariants.length;
                     }
                     window.loadCurrentFenVariant();
+                });
+            }
+
+            // Next PGN Variant Button
+            const nextPgnVariantBtn = document.getElementById('nextPgnVariant');
+            if (nextPgnVariantBtn) {
+                nextPgnVariantBtn.addEventListener('click', function() {
+                    if (window.pgnVariants.length === 0) {
+                        const count = window.scanReportForPgnVariants();
+                        if (count === 0) {
+                            alert('No PGN blocks found in report.');
+                            return;
+                        }
+                    } else {
+                        window.currentPgnVariantIndex = (window.currentPgnVariantIndex + 1) % window.pgnVariants.length;
+                    }
+                    window.loadCurrentPgnVariant();
                 });
             }
 
@@ -2482,10 +2611,13 @@
                         toggleBtn.textContent = 'Edit';
                         toggleBtn.style.background = '#9c27b0';
                         isReportEditMode = false;
-                        // Rescan FEN variants with updated content
+                        // Rescan FEN/PGN variants with updated content
                         window.fenVariants = [];
+                        window.pgnVariants = [];
                         window.scanReportForFenVariants();
+                        window.scanReportForPgnVariants();
                         document.getElementById('currentFenMoves').textContent = '';
+                        document.getElementById('variantIndexDisplay').textContent = '';
                     }
                 });
             }
