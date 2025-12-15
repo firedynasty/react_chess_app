@@ -670,6 +670,7 @@
           <button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
           <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
           <button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
+          <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN</button>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px; font-style: italic;"></span>
           <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
           <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
@@ -2204,6 +2205,7 @@
                 // Rescan FEN/PGN variants with new report content
                 window.fenVariants = [];
                 window.pgnVariants = [];
+                window.allVariants = [];
                 if (typeof window.scanReportForFenVariants === 'function') {
                     window.scanReportForFenVariants();
                 }
@@ -2764,6 +2766,194 @@
                 }
             };
 
+            // Combined FEN/PGN variants array (in document order)
+            window.allVariants = [];
+            window.currentVariantIndex = 0;
+
+            // Scan report for ALL variants (FEN and PGN) in document order
+            window.scanReportForAllVariants = function() {
+                const reportText = document.getElementById('analysisReportText');
+                const textarea = document.getElementById('reportEditTextarea');
+                const content = isReportEditMode ? textarea.value : reportText.textContent;
+
+                window.allVariants = [];
+                const lines = content.split('\n');
+                let pendingVariant = false;
+                let variantLineIndex = -1;
+
+                // Helper function to get notes from 2 lines before a given index
+                function getNotesFromLinesBefore(lineIndex) {
+                    for (let k = lineIndex - 1; k >= Math.max(0, lineIndex - 2); k--) {
+                        const prevLine = lines[k].trim();
+                        if (prevLine && !prevLine.startsWith('[') && !prevLine.includes('[FEN') && !prevLine.includes('[Variant') && !/^\d+\./.test(prevLine)) {
+                            return prevLine.replace(/^\{|\}$/g, '');
+                        }
+                    }
+                    return '';
+                }
+
+                // Track PGN state
+                let currentPgn = '';
+                let inPgn = false;
+                let pgnStartLineIndex = -1;
+
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i].trim();
+
+                    // Check for [Variant...][FEN...] on same line (FEN variant)
+                    const combinedMatch = line.match(/\[Variant\s+"From\s+Position"\]\s*\[FEN\s+"([^"]+)"\]/);
+                    if (combinedMatch) {
+                        // Save any pending PGN first
+                        if (currentPgn.trim()) {
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            currentPgn = '';
+                            inPgn = false;
+                        }
+
+                        const notes = getNotesFromLinesBefore(i);
+                        let moves = '';
+                        for (let j = i + 1; j < lines.length; j++) {
+                            const nextLine = lines[j].trim();
+                            if (nextLine.match(/^\d+\./)) {
+                                moves = nextLine;
+                                break;
+                            }
+                            if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
+                        }
+                        window.allVariants.push({ type: 'fen', fen: combinedMatch[1], moves: moves, notes: notes, lineIndex: i });
+                        pendingVariant = false;
+                        continue;
+                    }
+
+                    // Check for [Variant "From Position"] alone on a line
+                    if (line.match(/\[Variant\s+"From\s+Position"\]/)) {
+                        // Save any pending PGN first
+                        if (currentPgn.trim()) {
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            currentPgn = '';
+                            inPgn = false;
+                        }
+                        pendingVariant = true;
+                        variantLineIndex = i;
+                        continue;
+                    }
+
+                    // Check for [FEN "..."] after we saw [Variant...]
+                    const fenOnlyMatch = line.match(/\[FEN\s+"([^"]+)"\]/);
+                    if (fenOnlyMatch && pendingVariant) {
+                        const notes = getNotesFromLinesBefore(variantLineIndex);
+                        let moves = '';
+                        for (let j = i + 1; j < lines.length; j++) {
+                            const nextLine = lines[j].trim();
+                            if (nextLine.match(/^\d+\./)) {
+                                moves = nextLine;
+                                break;
+                            }
+                            if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
+                        }
+                        window.allVariants.push({ type: 'fen', fen: fenOnlyMatch[1], moves: moves, notes: notes, lineIndex: variantLineIndex });
+                        pendingVariant = false;
+                        continue;
+                    }
+
+                    // Reset pendingVariant if we hit a non-matching line (but not empty lines)
+                    if (pendingVariant && line && !line.startsWith('[')) {
+                        pendingVariant = false;
+                    }
+
+                    // Check for PGN (lines starting with move number like "1. e4")
+                    if (/^\d+\.\s*[A-Za-z]/.test(line) && !pendingVariant) {
+                        // Skip if this is part of a FEN variant (look back for [FEN])
+                        let isFenMoves = false;
+                        for (let k = i - 1; k >= Math.max(0, i - 3); k--) {
+                            if (lines[k].includes('[FEN')) {
+                                isFenMoves = true;
+                                break;
+                            }
+                            if (lines[k].trim() && !lines[k].startsWith('[')) break;
+                        }
+                        if (isFenMoves) continue;
+
+                        if (!inPgn && currentPgn.trim()) {
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            currentPgn = '';
+                        }
+                        if (!inPgn) {
+                            pgnStartLineIndex = i;
+                        }
+                        inPgn = true;
+                        currentPgn += line + ' ';
+                    } else if (inPgn && /^[A-Za-z0-9]/.test(line) && !line.startsWith('*') && !line.startsWith('[')) {
+                        currentPgn += line + ' ';
+                    } else if (inPgn && line === '') {
+                        if (currentPgn.trim()) {
+                            const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                        }
+                        currentPgn = '';
+                        inPgn = false;
+                        pgnStartLineIndex = -1;
+                    }
+                }
+                // Don't forget last PGN
+                if (currentPgn.trim()) {
+                    const notes = getNotesFromLinesBefore(pgnStartLineIndex);
+                    window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                }
+
+                // Sort by line index to maintain document order
+                window.allVariants.sort((a, b) => a.lineIndex - b.lineIndex);
+                window.currentVariantIndex = 0;
+                console.log('Total combined variants found:', window.allVariants.length);
+                return window.allVariants.length;
+            };
+
+            // Load current combined variant
+            window.loadCurrentVariant = function() {
+                if (window.allVariants.length === 0) return;
+
+                const variant = window.allVariants[window.currentVariantIndex];
+
+                if (variant.type === 'fen') {
+                    const pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
+                    window.currentVariantType = 'fen';
+                    window.studyReportPositions = window.parsePgnToPositions(pgnString);
+                } else {
+                    window.currentVariantType = 'pgn';
+                    window.studyReportPositions = window.parsePgnToPositions(variant.pgn);
+                }
+
+                window.studyReportPositionIndex = 0;
+                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                    window.board2.position(window.studyReportPositions[0]);
+                    updateBoard2MoveIndicator(0);
+                }
+
+                // Update variant index display
+                const indexSpan = document.getElementById('variantIndexDisplay');
+                if (indexSpan) {
+                    const typeLabel = variant.type === 'fen' ? 'FEN' : 'PGN';
+                    indexSpan.textContent = `${typeLabel} ${window.currentVariantIndex + 1}/${window.allVariants.length}`;
+                }
+
+                // Update moves span
+                const movesSpan = document.getElementById('currentFenMoves');
+                if (movesSpan) {
+                    const movesText = variant.type === 'fen' ? variant.moves : variant.pgn;
+                    const movesDisplay = movesText.length > 7 ? movesText.substring(0, 7) : movesText;
+                    movesSpan.textContent = movesDisplay;
+                }
+
+                // Update notes display
+                const notesSpan = document.getElementById('variantNotesDisplay');
+                if (notesSpan) {
+                    notesSpan.textContent = variant.notes || '';
+                }
+            };
+
             const nextFenVariantBtn = document.getElementById('nextFenVariant');
             if (nextFenVariantBtn) {
                 nextFenVariantBtn.addEventListener('click', function() {
@@ -2794,6 +2984,23 @@
                         window.currentPgnVariantIndex = (window.currentPgnVariantIndex + 1) % window.pgnVariants.length;
                     }
                     window.loadCurrentPgnVariant();
+                });
+            }
+
+            // Combined Next FEN/PGN Variant Button
+            const nextVariantBtn = document.getElementById('nextVariant');
+            if (nextVariantBtn) {
+                nextVariantBtn.addEventListener('click', function() {
+                    if (window.allVariants.length === 0) {
+                        const count = window.scanReportForAllVariants();
+                        if (count === 0) {
+                            alert('No FEN or PGN variants found in report.');
+                            return;
+                        }
+                    } else {
+                        window.currentVariantIndex = (window.currentVariantIndex + 1) % window.allVariants.length;
+                    }
+                    window.loadCurrentVariant();
                 });
             }
 
@@ -3073,6 +3280,7 @@
                         // Rescan FEN/PGN variants with updated content
                         window.fenVariants = [];
                         window.pgnVariants = [];
+                        window.allVariants = [];
                         window.scanReportForFenVariants();
                         window.scanReportForPgnVariants();
                         document.getElementById('currentFenMoves').textContent = '';

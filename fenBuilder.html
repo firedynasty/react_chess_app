@@ -13,6 +13,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chess FEN Builder</title>
+    <base href="https://chessboardjs.com/" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
 
     <style>
@@ -258,7 +259,16 @@
         input:checked + .slider:before {
             transform: translateX(26px);
         }
-        
+
+        /* Turn toggle slider - White to move (unchecked) is green/white, Black to move (checked) is dark */
+        .turn-slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .turn-slider {
+            background-color: #333;
+        }
+
         .tooltip {
             position: absolute;
             top: -30px;
@@ -349,6 +359,34 @@
                 max-width: 70vw;
             }
         }
+
+        /* FEN Keyboard styles */
+        .fen-keyboard {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin-bottom: 15px;
+        }
+
+        .keyboard-row {
+            display: flex;
+            gap: 0;
+            justify-content: center;
+        }
+
+        .fen-key {
+            padding: 10px 15px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            background: #f0f0f0;
+            cursor: pointer;
+            border-radius: 0;
+            min-width: 40px;
+        }
+
+        .fen-key:hover {
+            background: #e0e0e0;
+        }
     </style>
 </head>
 <body>
@@ -359,6 +397,9 @@
         <div style="margin-bottom: 15px; text-align: center;">
             <textarea id="imageNotes" placeholder="Take notes on the image here..." style="width: 100%; max-width: 500px; height: 80px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; resize: vertical;"></textarea>
         </div>
+
+        <!-- FEN Keyboard -->
+        <div class="fen-keyboard" id="fenKeyboard"></div>
 
         <!-- Load Image Button and Preview -->
         <div style="margin-bottom: 15px; text-align: center;">
@@ -419,8 +460,19 @@
                 <button class="white-piece" onclick="appendToFen('Q')">Q </button>
                 <button class="white-piece" onclick="appendToFen('K')">K </button>
             </div>
+
+            <!-- Turn toggle (White/Black to move) -->
+            <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 15px 0 10px 0; padding: 8px; background-color: #f0f0f0; border-radius: 8px;">
+                <span style="font-weight: bold; color: #fff; background: #333; padding: 4px 8px; border-radius: 4px; font-size: 12px;">WHITE to move</span>
+                <label class="switch">
+                    <input type="checkbox" id="turnToggle">
+                    <span class="slider turn-slider"></span>
+                </label>
+                <span style="font-weight: bold; color: #333; background: #ccc; padding: 4px 8px; border-radius: 4px; font-size: 12px;">BLACK to move</span>
+            </div>
+
             <!-- Load on Board button -->
-            <div style="margin-top: 20px; text-align: center; display: flex; gap: 10px; justify-content: center;">
+            <div style="margin-top: 10px; text-align: center; display: flex; gap: 10px; justify-content: center;">
                 <button class="complete-btn" onclick="showChessBoard()" style="background: #28a745;">👁️ Show Board</button>
                 <button class="complete-btn" onclick="loadFenOnBoard()">🏁 Load on Board</button>
             </div>
@@ -520,14 +572,13 @@
                 </label>
             </div>
         </div>
-        
+
         <div class="button-section" style="display: none;">
             <div class="button-grid" style="grid-template-columns: 1fr 1fr; margin-top: 10px; gap: 10px;">
                 <button class="complete-btn" onclick="loadFenOnBoard()">🏁 Load (for Links)</button>
                 <button class="copy-btn" onclick="readBoardPosition()">🔊 Read Board Position</button>
             </div>
         </div>
-                  <base href="https://chessboardjs.com/" /> 
 
         <div style="font-size: 12px; color: #666; margin: 10px 0; font-family: monospace; background: #f5f5f5; padding: 8px; border-radius: 4px;">
             <strong>Castling Rights in FEN:</strong><br>
@@ -541,10 +592,22 @@
 
         <textarea id="myTextArea2" style="width: 100%; height: 60px; margin-top: 10px; padding: 10px; border: 2px solid #ccc; border-radius: 5px; font-family: monospace; font-size: 14px;" placeholder="For adding extra notes"></textarea><br>
 
+        <textarea id="moveHistoryTextArea" style="width: 100%; height: 60px; margin-top: 10px; padding: 10px; border: 2px solid #4CAF50; border-radius: 5px; font-family: monospace; font-size: 14px;" placeholder="Paste PGN here or moves will appear here..."></textarea>
+
+        <!-- Move Navigation Buttons -->
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin: 10px 0; padding: 8px; background-color: #e8f5e9; border-radius: 8px;">
+            <button id="moveStartBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">⏮ Start</button>
+            <button id="movePrevBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">◀ Prev</button>
+            <span id="moveCounter" style="font-weight: bold; color: #333; padding: 4px 12px; background: #fff; border-radius: 4px; min-width: 60px; text-align: center;">0 / 0</span>
+            <button id="moveNextBtn" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next ▶</button>
+            <button id="moveEndBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">End ⏭</button>
+        </div>
+
         <div class="button-section">
             <div class="section-title">Board Setup</div>
-            <div class="button-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px;">
+            <div class="button-grid" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 10px;">
                 <button class="complete-btn" onclick="loadFenVariantOnBoard()">📥 Load FEN to Board</button>
+                <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
                 <button class="copy-btn" onclick="flipBoard()">🔄 Flip Board</button>
                 <button class="complete-btn" onclick="resetBoard()">♟️ Reset Board</button>
                 <button class="complete-btn" onclick="setKingVsKing()">King vs King</button>
@@ -688,46 +751,14 @@
     <!-- Chess dependencies -->
     <script src='https://code.jquery.com/jquery-2.2.4.min.js'></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js'></script>
 
-    <!-- Firebase integration (only loads when online) -->
-    <script type="module">
-        // Only initialize Firebase if online
-        if (navigator.onLine) {
-            try {
-                const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js");
-                const { getDatabase, ref, set } = await import("https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js");
-
-                // Initialize Firebase
-                const firebaseConfig = {
-                    apiKey: "AIzaSyB0_4AT0jzRoSeV5jK4rN4Ah7BTKKTl78I",
-                    authDomain: "linked-in-creators.firebaseapp.com",
-                    databaseURL: "https://linked-in-creators-default-rtdb.firebaseio.com",
-                    projectId: "linked-in-creators",
-                    storageBucket: "linked-in-creators.appspot.com",
-                    messagingSenderId: "282570385061",
-                    appId: "1:282570385061:web:24fcf17921e99540984f4c",
-                    measurementId: "G-5G6JG8VERG"
-                };
-
-                const app = initializeApp(firebaseConfig);
-                const database = getDatabase(app);
-
-                // Make Firebase functions accessible globally
-                window.firebaseDatabase = database;
-                window.firebaseRef = ref;
-                window.firebaseSet = set;
-                console.log('Firebase initialized (online)');
-            } catch (error) {
-                console.log('Firebase initialization skipped');
-            }
-        } else {
-            console.log('Offline - Firebase disabled');
-        }
-    </script>
-    
     <script>
         // Initialize chessboard.js board
         var board = null;
+
+        // Initialize turn to move (w = white, b = black) - default white
+        window.turnToMove = 'w';
 
         // Wait for dependencies and initialize board
         function initializeBoard() {
@@ -738,6 +769,12 @@
             }
 
             console.log('Initializing chessboard...');
+            // Initialize move history array
+            window.moveHistory = [];
+
+            // Initialize chess.js for move validation and PGN generation
+            window.chess = new Chess();
+
             board = Chessboard('myBoard', {
                 draggable: true,
                 dropOffBoard: 'snapback',
@@ -746,22 +783,61 @@
                 snapSpeed: 100,
                 pieceTheme: 'img/chesspieces/wikipedia/{piece}.png',
                 onDrop: function(source, target, piece, newPos, oldPos, orientation) {
-                    // After a piece is moved, update myTextArea2 with the new FEN variant
-                    setTimeout(function() {
-                        if (board) {
-                            const fenPosition = board.position('fen');
-                            const completeFen = fenPosition + ' w KQkq - 0 1';
-                            const fenVariant = '[Variant "From Position"][FEN "' + completeFen + '"]';
-                            document.getElementById('myTextArea2').value = fenVariant;
+                    console.log('onDrop:', source, '->', target, 'piece:', piece);
+                    console.log('chess.js FEN:', window.chess.fen());
+                    console.log('chess.js turn:', window.chess.turn());
 
-                            // Also copy to clipboard
-                            navigator.clipboard.writeText(fenVariant).then(function() {
-                                showTooltip('Position updated and copied to clipboard!');
-                            }).catch(function(err) {
-                                console.log('Clipboard write failed:', err);
-                            });
-                        }
-                    }, 100);
+                    // Attempt the move using chess.js
+                    const move = window.chess.move({
+                        from: source,
+                        to: target,
+                        promotion: 'q' // auto-promote to queen
+                    });
+
+                    console.log('Move result:', move);
+
+                    if (move === null) {
+                        // Invalid move - snap piece back to original position
+                        console.log('Invalid move - snapping back');
+                        return 'snapback';
+                    }
+
+                    // Valid move - display PGN with custom header format
+                    // Get just the moves from chess.js pgn (strip any headers)
+                    let pgnMoves = window.chess.pgn();
+                    // Remove any existing headers (lines starting with [)
+                    pgnMoves = pgnMoves.replace(/\[[^\]]*\]\s*/g, '').trim();
+
+                    // Build custom PGN with Variant header using the starting FEN
+                    const startFen = window.startingFen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+                    const customPgn = '[Variant "From Position"]\n[FEN "' + startFen + '"]\n\n' + pgnMoves;
+
+                    console.log('Custom PGN:', customPgn);
+                    document.getElementById('moveHistoryTextArea').value = customPgn;
+
+                    // Clear replay cache so navigation will re-parse with new moves
+                    window.replayMoves = [];
+                    window.replayIndex = 0;
+
+                    // Update move counter to show we're at the end
+                    const counterEl = document.getElementById('moveCounter');
+                    if (counterEl) {
+                        const moveCount = (pgnMoves.match(/\d+\./g) || []).length * 2;
+                        const actualMoves = pgnMoves.split(/\s+/).filter(m => /^[a-zA-Z]/.test(m)).length;
+                        counterEl.textContent = actualMoves + ' / ' + actualMoves;
+                    }
+
+                    // Update myTextArea2 with the current FEN from chess.js (accurate turn, castling, etc.)
+                    const currentFen = window.chess.fen();
+                    const fenVariant = '[Variant "From Position"][FEN "' + currentFen + '"]';
+                    document.getElementById('myTextArea2').value = fenVariant;
+
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(fenVariant).then(function() {
+                        showTooltip('Move: ' + move.san + ' - copied to clipboard!');
+                    }).catch(function(err) {
+                        console.log('Clipboard write failed:', err);
+                    });
                 }
             });
 
@@ -833,8 +909,23 @@
                 if (fen.includes('/')) {
                     // Extract just the board part for rendering
                     let boardPart = fen.split(' ')[0];
-                    console.log('DEBUG showChessBoard: Board part to render:', boardPart);
-                    fenToHtml(boardPart + ' w KQkq - 0 1');
+                    const turn = window.turnToMove || 'w';
+                    console.log('DEBUG showChessBoard: Board part to render:', boardPart, 'Turn:', turn);
+                    fenToHtml(boardPart + ' ' + turn + ' KQkq - 0 1');
+
+                    // Also update myBoard (chessboard.js) with the position
+                    if (board && typeof board.position === 'function') {
+                        board.position(boardPart);
+                        console.log('DEBUG showChessBoard: Updated myBoard with position');
+
+                        // Sync chess.js with full FEN using the selected turn
+                        if (window.chess) {
+                            const fullFen = boardPart + ' ' + turn + ' KQkq - 0 1';
+                            window.chess.load(fullFen);
+                            window.startingFen = fullFen;
+                            console.log('DEBUG showChessBoard: Synced chess.js with FEN:', fullFen);
+                        }
+                    }
                 } else {
                     // Show empty board if no valid FEN yet
                     console.log('DEBUG showChessBoard: No slashes, showing empty board');
@@ -955,23 +1046,12 @@
         function correctFen(fen) {
             // Split the FEN into its components
             let parts = fen.split(' ');
-            
-            // If we just have the position part (no spaces), assume it's incomplete
-            if (parts.length === 1) {
-                // Ensure we have the right number of ranks
-                let ranks = parts[0].split('/');
-                
-                // Validate each rank
-                if (ranks.length <= 8) {
-                    return parts[0]; // Return as is, we'll complete it later
-                }
-            }
-            
-            // Ensure the FEN has exactly 6 parts
+
+            // Ensure the FEN has exactly 6 parts (always complete it)
             while (parts.length < 6) {
                 switch (parts.length) {
-                    case 1: parts.push('w'); break; // Active color
-                    case 2: parts.push('KQkq'); break; // Castling availability
+                    case 1: parts.push('w'); break; // Active color (will be overridden by toggle)
+                    case 2: parts.push('-'); break; // Castling availability (default: none, safer for screenshots)
                     case 3: parts.push('-'); break; // En passant target square
                     case 4: parts.push('0'); break; // Halfmove clock
                     case 5: parts.push('1'); break; // Fullmove number
@@ -1170,9 +1250,35 @@
         // Function to generate Lichess links from FEN
         async function loadFenOnBoard() {
             const fenDisplay = document.getElementById('fenDisplay');
+            const imageNotes = document.getElementById('imageNotes');
             let fen = fenDisplay.value.trim();
 
-            // If empty, use starting position
+            // If FEN input is empty, try to get from imageNotes
+            if (!fen && imageNotes) {
+                const textAreaContent = imageNotes.value.trim();
+                if (textAreaContent) {
+                    // Extract FEN from variant format if present
+                    const fenMatch = textAreaContent.match(/\[FEN\s+"([^"]+)"\]/);
+                    if (fenMatch && fenMatch[1]) {
+                        fen = fenMatch[1];
+                        // If content has moves (after the headers), put full PGN in moveHistoryTextArea
+                        const movesMatch = textAreaContent.match(/\]\s*\n*([\d\.\s]+[a-zA-Z].+)/s);
+                        if (movesMatch) {
+                            // Content has moves - put full PGN in moveHistoryTextArea for navigation
+                            document.getElementById('moveHistoryTextArea').value = textAreaContent;
+                            console.log('Loaded PGN with moves to moveHistoryTextArea');
+                        }
+                    } else {
+                        // Use as plain FEN
+                        fen = textAreaContent;
+                    }
+                    // Put extracted FEN into input for visibility
+                    fenDisplay.value = fen.split(' ')[0]; // Just the position part
+                    console.log('Loaded FEN from imageNotes:', fen);
+                }
+            }
+
+            // If still empty, use starting position
             if (!fen) {
                 const startingFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
                 lastLoadedFen = startingFen;
@@ -1191,17 +1297,46 @@
 
                 // Check if it's a valid FEN (has slashes for ranks)
                 if (fen.includes('/')) {
-                    // Complete the FEN
+                    // Complete the FEN with the selected turn
                     let completedFen = correctFen(fen);
+
+                    // Update turn in FEN based on toggle
+                    const turn = window.turnToMove || 'w';
+                    const fenParts = completedFen.split(' ');
+                    if (fenParts.length >= 2) {
+                        fenParts[1] = turn;
+                        completedFen = fenParts.join(' ');
+                    }
 
                     // Store for redo functionality
                     lastLoadedFen = completedFen;
 
+                    // Clear move history and notes (unless we just loaded PGN with moves)
+                    const moveHistoryTA = document.getElementById('moveHistoryTextArea');
+                    const currentMoveHistory = moveHistoryTA.value;
+                    const hasPgnMoves = currentMoveHistory.includes('[FEN') && /\d+\.\s*[a-zA-Z]/.test(currentMoveHistory);
+
+                    window.moveHistory = [];
+                    if (!hasPgnMoves) {
+                        moveHistoryTA.value = '';
+                    }
+                    document.getElementById('myTextArea2').value = '';
+
                     // Render the board with Unicode pieces
                     fenToHtml(completedFen);
 
-                    // Save FEN to Firebase clipboardManager/FenBuilder
-                    await saveFenToFirebase(completedFen);
+                    // Update myBoard (chessboard.js) with the position
+                    const boardPart = completedFen.split(' ')[0];
+                    if (board && typeof board.position === 'function') {
+                        board.position(boardPart);
+                    }
+
+                    // Sync chess.js with full FEN
+                    if (window.chess) {
+                        window.chess.load(completedFen);
+                        window.startingFen = completedFen;
+                        console.log('chess.js synced to FEN:', completedFen);
+                    }
 
                     // Update Lichess URL display
                     updateLichessUrl(completedFen, fenPerspective);
@@ -1340,36 +1475,6 @@
             }
         }
 
-        // Function to save FEN to Firebase clipboardManager/FenBuilder (only when online)
-        async function saveFenToFirebase(fenString) {
-            // Skip if offline - no error messages
-            if (!navigator.onLine) {
-                console.log('Offline - skipping Firebase save');
-                return;
-            }
-
-            // Skip if Firebase not initialized
-            if (!window.firebaseDatabase || !window.firebaseRef || !window.firebaseSet) {
-                console.log('Firebase not available - skipping save');
-                return;
-            }
-
-            try {
-                // Format as FEN variant
-                const fenVariant = '[Variant "From Position"][FEN "' + fenString + '"]';
-
-                // Save to Firebase
-                const fenBuilderRef = window.firebaseRef(window.firebaseDatabase, 'clipboardManager/FenBuilder');
-                await window.firebaseSet(fenBuilderRef, fenVariant);
-
-                console.log('FEN saved to Firebase clipboardManager/FenBuilder:', fenVariant);
-
-            } catch (error) {
-                // Silently fail when offline or network error
-                console.log('Firebase save skipped (network issue)');
-            }
-        }
-        
         // Function to show a temporary tooltip
         function showTooltip(message) {
             const tooltip = document.getElementById('tooltip');
@@ -1843,6 +1948,63 @@
           }, 500);
         });
 
+        // Add event listener for Set Variant button (gets FEN from board, puts in myTextArea)
+        document.getElementById('setVariantBtn').addEventListener('click', function() {
+            // Get current FEN from chess.js if available, otherwise from board position
+            let fenString;
+
+            if (window.chess && typeof window.chess.fen === 'function') {
+                fenString = window.chess.fen();
+            } else {
+                // Fallback: get position from board and add default metadata
+                const position = board.position();
+                // Convert position object to FEN string
+                let fenParts = [];
+                for (let rank = 8; rank >= 1; rank--) {
+                    let rankStr = '';
+                    let emptyCount = 0;
+                    for (let file of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']) {
+                        const square = file + rank;
+                        if (position[square]) {
+                            if (emptyCount > 0) {
+                                rankStr += emptyCount;
+                                emptyCount = 0;
+                            }
+                            const piece = position[square];
+                            // Convert piece format (e.g., 'wK' to 'K', 'bk' to 'k')
+                            const color = piece.charAt(0);
+                            const type = piece.charAt(1);
+                            rankStr += color === 'w' ? type.toUpperCase() : type.toLowerCase();
+                        } else {
+                            emptyCount++;
+                        }
+                    }
+                    if (emptyCount > 0) {
+                        rankStr += emptyCount;
+                    }
+                    fenParts.push(rankStr);
+                }
+                const turn = window.turnToMove || 'w';
+                fenString = fenParts.join('/') + ' ' + turn + ' KQkq - 0 1';
+            }
+
+            // Format as FEN variant
+            const fenVariant = '[Variant "From Position"][FEN "' + fenString + '"]';
+
+            // Set to myTextArea
+            document.getElementById('myTextArea').value = fenVariant;
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(fenVariant).then(function() {
+                showTooltip('Set Variant copied to clipboard!');
+            }).catch(function(err) {
+                showTooltip('Set Variant - clipboard copy failed');
+                console.error('Clipboard copy failed:', err);
+            });
+
+            console.log('Set Variant:', fenVariant);
+        });
+
         // Add event listener for Convert FEN to Variant button
         document.getElementById('convertFenToVariant').addEventListener('click', function() {
           console.log('DEBUG: Convert FEN to Variant button clicked');
@@ -2053,41 +2215,72 @@
         function loadFenVariantOnBoard() {
             const textArea = document.getElementById('myTextArea');
             const content = textArea.value.trim();
-            
+
             // If empty, show a message
             if (!content) {
                 showTooltip('Textarea is empty');
                 return;
             }
-            
+
             try {
                 // Extract FEN from variant format like [Variant "From Position"][FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]
                 const fenMatch = content.match(/\[FEN\s+"([^"]+)"\]/);
-                
+                let fenString;
+
                 if (fenMatch && fenMatch[1]) {
-                    const fenString = fenMatch[1];
+                    fenString = fenMatch[1];
                     console.log('Extracted FEN:', fenString);
-                    
-                    // Extract just the position part (before first space) for chessboard.js
-                    const positionPart = fenString.split(' ')[0];
-                    
-                    // Load position on board
-                    board.position(positionPart);
-                    
-                    showTooltip('FEN variant loaded on board!');
-                    console.log('Loaded FEN variant on board:', positionPart);
                 } else {
                     // If no FEN variant format found, try to load it as a plain FEN
-                    const positionPart = content.split(' ')[0];
-                    board.position(positionPart);
-                    showTooltip('Plain FEN loaded on board!');
-                    console.log('Loaded plain FEN on board:', positionPart);
+                    fenString = content;
+                    console.log('Using plain FEN:', fenString);
                 }
+
+                // Extract just the position part (before first space) for chessboard.js
+                const positionPart = fenString.split(' ')[0];
+
+                // Load position on board
+                board.position(positionPart);
+
+                // Sync chess.js with the full FEN (includes turn, castling, move number)
+                if (window.chess) {
+                    const loaded = window.chess.load(fenString);
+                    if (loaded) {
+                        console.log('chess.js synced to FEN:', fenString);
+                        // Store the starting FEN for reference
+                        window.startingFen = fenString;
+                        // Update turn toggle to match loaded FEN
+                        const fenTurn = fenString.split(' ')[1];
+                        if (fenTurn === 'b' || fenTurn === 'w') {
+                            window.turnToMove = fenTurn;
+                            document.getElementById('turnToggle').checked = (fenTurn === 'b');
+                        }
+                    } else {
+                        console.log('chess.js failed to load FEN, using position only');
+                        // Try with turn from toggle if FEN is incomplete
+                        const turn = window.turnToMove || 'w';
+                        const fullFen = positionPart + ' ' + turn + ' KQkq - 0 1';
+                        window.chess.load(fullFen);
+                        window.startingFen = fullFen;
+                    }
+                }
+
+                // Clear move history
+                window.moveHistory = [];
+                document.getElementById('moveHistoryTextArea').value = '';
+
+                // Update myTextArea2 with the loaded FEN variant
+                const fenVariant = '[Variant "From Position"][FEN "' + fenString + '"]';
+                document.getElementById('myTextArea2').value = fenVariant;
+
+                showTooltip('FEN loaded! chess.js synced - moves will continue from this position');
+                console.log('Loaded FEN on board and synced chess.js');
+
             } catch (error) {
                 showTooltip('Invalid FEN format: ' + error.message);
                 console.error('Error loading FEN variant on board:', error);
             }
-            
+
             textArea.focus();
         }
 
@@ -2116,16 +2309,21 @@
         function resetBoard() {
             // Set up the standard chess starting position
             board.position('start');
-            
+
             // Clear the piece history
             whitePieceHistory = [];
             blackPieceHistory = [];
-            
+
+            // Clear move history and reset chess.js
+            window.moveHistory = [];
+            if (window.chess) window.chess.reset();
+            document.getElementById('moveHistoryTextArea').value = '';
+
             showTooltip('Board reset to starting position!');
-            
+
             // Clear the textarea
             document.getElementById('myTextArea').value = '';
-            
+
             console.log('Board reset to starting position');
         }
 
@@ -2133,24 +2331,29 @@
         function setKingVsKing() {
             // Clear the board first
             board.clear();
-            
+
             // Clear the piece history
             whitePieceHistory = [];
             blackPieceHistory = [];
-            
+
+            // Clear move history and reset chess.js
+            window.moveHistory = [];
+            if (window.chess) window.chess.reset();
+            document.getElementById('moveHistoryTextArea').value = '';
+
             // Set up king vs king position
             // White king on e1, Black king on e8
             const kingVsKingPosition = {
                 e1: 'wK',
                 e8: 'bK'
             };
-            
+
             board.position(kingVsKingPosition);
             showTooltip('King vs King setup!');
-            
+
             // Clear the textarea
             document.getElementById('myTextArea').value = '';
-            
+
             console.log('King vs King position set');
         }
 
@@ -2379,6 +2582,164 @@
             document.getElementById('globalAddRemoveToggle').addEventListener('change', function() {
                 addRemoveMode = this.checked ? 'remove' : 'add';
                 updateAddRemoveMode();
+            });
+
+            // Add event listener for the turn toggle (White/Black to move)
+            document.getElementById('turnToggle').addEventListener('change', function() {
+                window.turnToMove = this.checked ? 'b' : 'w';
+                console.log('Turn toggle switched to:', window.turnToMove === 'w' ? 'White' : 'Black', 'to move');
+
+                // Update chess.js with new turn if position exists
+                if (window.chess) {
+                    const currentFen = window.chess.fen();
+                    const fenParts = currentFen.split(' ');
+                    fenParts[1] = window.turnToMove; // Update the turn part
+                    const newFen = fenParts.join(' ');
+                    window.chess.load(newFen);
+                    window.startingFen = newFen;
+                    console.log('Updated chess.js FEN with new turn:', newFen);
+                }
+            });
+
+            // Move Navigation System
+            window.replayMoves = [];      // Array of moves to replay
+            window.replayIndex = 0;       // Current position in replay
+            window.replayStartFen = '';   // Starting FEN for replay
+            window.replayChess = null;    // Separate chess instance for replay
+
+            function updateMoveCounter() {
+                const counter = document.getElementById('moveCounter');
+                const total = window.replayMoves.length;
+                counter.textContent = window.replayIndex + ' / ' + total;
+            }
+
+            function parsePgnFromTextArea() {
+                const content = document.getElementById('moveHistoryTextArea').value.trim();
+                if (!content) {
+                    showTooltip('No moves to replay');
+                    return false;
+                }
+
+                // Extract FEN from header
+                const fenMatch = content.match(/\[FEN\s+"([^"]+)"\]/);
+                if (fenMatch && fenMatch[1]) {
+                    window.replayStartFen = fenMatch[1];
+                } else {
+                    window.replayStartFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+                }
+
+                // Extract moves (remove headers and parse)
+                let movesText = content.replace(/\[[^\]]*\]\s*/g, '').trim();
+
+                // Create a chess instance to parse moves
+                window.replayChess = new Chess(window.replayStartFen);
+
+                // Parse moves using chess.js
+                const moveTokens = movesText.match(/[a-zA-Z][a-zA-Z0-9+#=\-]+/g) || [];
+                window.replayMoves = [];
+
+                // Try each token as a move
+                for (const token of moveTokens) {
+                    // Skip move numbers and results
+                    if (/^\d+$/.test(token) || token === 'O' || token === '1-0' || token === '0-1' || token === '1/2-1/2') {
+                        continue;
+                    }
+                    try {
+                        const move = window.replayChess.move(token);
+                        if (move) {
+                            window.replayMoves.push(token);
+                        }
+                    } catch (e) {
+                        // Skip invalid move tokens
+                    }
+                }
+
+                // Reset to starting position
+                window.replayChess.load(window.replayStartFen);
+                window.replayIndex = 0;
+                updateMoveCounter();
+
+                console.log('Parsed replay:', window.replayMoves.length, 'moves from FEN:', window.replayStartFen);
+                return window.replayMoves.length > 0;
+            }
+
+            function goToMoveIndex(index) {
+                if (!window.replayChess || !window.replayMoves.length) {
+                    if (!parsePgnFromTextArea()) return;
+                }
+
+                // Clamp index
+                index = Math.max(0, Math.min(index, window.replayMoves.length));
+
+                // Reset and replay to index
+                window.replayChess.load(window.replayStartFen);
+                for (let i = 0; i < index; i++) {
+                    window.replayChess.move(window.replayMoves[i]);
+                }
+
+                window.replayIndex = index;
+
+                // Update board display
+                const fen = window.replayChess.fen();
+                const position = fen.split(' ')[0];
+                if (board && typeof board.position === 'function') {
+                    board.position(position);
+                }
+
+                updateMoveCounter();
+            }
+
+            // Navigation button event listeners
+            document.getElementById('moveStartBtn').addEventListener('click', function() {
+                if (!parsePgnFromTextArea()) return;
+                goToMoveIndex(0);
+
+                // Update board to starting position
+                const position = window.replayStartFen.split(' ')[0];
+                if (board && typeof board.position === 'function') {
+                    board.position(position);
+                }
+
+                // Sync main chess.js to starting position
+                if (window.chess) {
+                    window.chess.load(window.replayStartFen);
+                    window.startingFen = window.replayStartFen;
+                }
+
+                showTooltip('Start position');
+            });
+
+            document.getElementById('movePrevBtn').addEventListener('click', function() {
+                if (!window.replayMoves.length) {
+                    if (!parsePgnFromTextArea()) return;
+                }
+                if (window.replayIndex > 0) {
+                    goToMoveIndex(window.replayIndex - 1);
+                }
+            });
+
+            document.getElementById('moveNextBtn').addEventListener('click', function() {
+                if (!window.replayMoves.length) {
+                    if (!parsePgnFromTextArea()) return;
+                }
+                if (window.replayIndex < window.replayMoves.length) {
+                    goToMoveIndex(window.replayIndex + 1);
+                }
+            });
+
+            document.getElementById('moveEndBtn').addEventListener('click', function() {
+                if (!parsePgnFromTextArea()) return;
+                goToMoveIndex(window.replayMoves.length);
+
+                // Sync main chess.js with replay position so user can continue adding moves
+                if (window.chess && window.replayChess) {
+                    const currentFen = window.replayChess.fen();
+                    window.chess.load(currentFen);
+                    window.startingFen = window.replayStartFen;
+                    console.log('Synced main chess.js to final position:', currentFen);
+                }
+
+                showTooltip('Final position - ready to add moves');
             });
 
             // Setup button hover tracking for Escape key functionality
@@ -2630,6 +2991,55 @@
             loadedImages = [];
             currentImageIndex = 0;
         }
+
+        // FEN Keyboard initialization
+        (function() {
+            const imageNotesTextarea = document.getElementById('imageNotes');
+
+            // Define keyboard layout for FEN notation
+            const rows = [
+                ['1', '2', '3', '4', '5', '6', '7', '8'],
+                ['q', 'r', 'p', 'Q', 'R', 'P', 'k', 'K'],
+                ['b', 'n', '⌫', '/', 'B', 'N', '⌫', '/']
+            ];
+
+            // Create keyboard
+            const container = document.getElementById('fenKeyboard');
+
+            rows.forEach(row => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'keyboard-row';
+
+                row.forEach(char => {
+                    const button = document.createElement('button');
+                    button.className = 'fen-key';
+                    button.textContent = char;
+                    button.onclick = () => insertFenChar(char);
+                    rowDiv.appendChild(button);
+                });
+
+                container.appendChild(rowDiv);
+            });
+
+            function insertFenChar(char) {
+                if (char === '⌫') {
+                    // Backspace
+                    const start = imageNotesTextarea.selectionStart;
+                    const end = imageNotesTextarea.selectionEnd;
+                    if (start > 0 || end > start) {
+                        imageNotesTextarea.value = imageNotesTextarea.value.substring(0, start - 1) + imageNotesTextarea.value.substring(end);
+                        imageNotesTextarea.selectionStart = imageNotesTextarea.selectionEnd = start - 1;
+                    }
+                } else {
+                    // Insert character at cursor position
+                    const start = imageNotesTextarea.selectionStart;
+                    const end = imageNotesTextarea.selectionEnd;
+                    imageNotesTextarea.value = imageNotesTextarea.value.substring(0, start) + char + imageNotesTextarea.value.substring(end);
+                    imageNotesTextarea.selectionStart = imageNotesTextarea.selectionEnd = start + 1;
+                }
+                imageNotesTextarea.focus();
+            }
+        })();
     </script>
 </body>
 </html>
@@ -2637,5 +3047,6 @@
   
 </body>
 </html>
+
 
 
