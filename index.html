@@ -604,9 +604,11 @@
                     box-sizing: border-box;
                 "></textarea>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
-                    <button id="loadPgnFromHighlight" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load PGN from Highlight</button>
-                    <button id="loadFenVariantFromHighlight" style="background: #6f42c1; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load [Fen Variant] from Highlight</button>
+                    <button id="loadPgnFromHighlight" style="display: none; background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load PGN from Highlight</button>
+                    <button id="loadFenVariantFromHighlight" style="display: none; background: #6f42c1; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load [Fen Variant] from Highlight</button>
                     <button id="copyReportText" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Copy Text</button>
+                    <button id="saveReportBtn" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">💾 Save Report</button>
+                    <button id="editViewToggleBtn" style="background: #9c27b0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Edit</button>
                 </div>
             </div>
         </div>
@@ -622,8 +624,6 @@
       <button id="loadPreloadedReports" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Preloaded Reports</button>
       <span id="reportsCountDisplay" style="color: #51cf66; font-weight: bold;"></span>
       <button id="viewPreloadedReports" style="background: #6f42c1; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📋 View Reports</button>
-      <button id="saveReportBtn" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">💾 Save Report</button>
-      <button id="editViewToggleBtn" style="background: #9c27b0; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Edit</button>
       <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
       <button id="loadMistakesBtn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ Load Mistakes</button>
       <button id="removeMistakesBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">✓ Remove Mistakes</button>
@@ -673,6 +673,7 @@
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN</button>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px; font-style: italic;"></span>
           <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
+          <button id="reportAppendVariantBtn" style="display: none; background: #20c997; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Report Append Variant</button>
           <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
         </div>
         <!-- Move History Textarea for Set Variant -->
@@ -3064,6 +3065,9 @@
                         moveHistoryTextArea.value = '[Variant "From Position"]\n[FEN "' + fullFen + '"]\n\n';
                     }
 
+                    // Show the Report Append Variant button
+                    document.getElementById('reportAppendVariantBtn').style.display = 'inline-block';
+
                     // Reinitialize board2 with onDrop handler for move tracking
                     window.board2 = Chessboard('myBoard2', {
                         draggable: true,
@@ -3286,6 +3290,41 @@
                         document.getElementById('currentFenMoves').textContent = '';
                         document.getElementById('variantIndexDisplay').textContent = '';
                     }
+                });
+            }
+
+            // Report Append Variant Button
+            const reportAppendVariantBtn = document.getElementById('reportAppendVariantBtn');
+            if (reportAppendVariantBtn) {
+                reportAppendVariantBtn.addEventListener('click', function() {
+                    const moveHistoryTextArea = document.getElementById('moveHistoryTextArea');
+                    const variantText = moveHistoryTextArea.value.trim();
+
+                    if (!variantText) {
+                        alert('No variant to append. Use "Set Variant" first.');
+                        return;
+                    }
+
+                    const reportDiv = document.getElementById('analysisReportText');
+                    const textarea = document.getElementById('reportEditTextarea');
+
+                    if (isReportEditMode) {
+                        // Append to textarea in edit mode
+                        textarea.value += '\n\n' + variantText;
+                    } else {
+                        // Append to view mode content
+                        reportDiv.textContent += '\n\n' + variantText;
+                        window.analysisReportRawText = reportDiv.textContent;
+                    }
+
+                    // Clear moveHistoryTextArea and hide this button
+                    moveHistoryTextArea.value = '';
+                    moveHistoryTextArea.style.display = 'none';
+                    this.style.display = 'none';
+
+                    // Rescan variants to include newly appended one
+                    window.scanReportForFenVariants();
+                    window.scanReportForPgnVariants();
                 });
             }
 
