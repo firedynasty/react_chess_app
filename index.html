@@ -627,6 +627,8 @@
       <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
       <button id="loadMistakesBtn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ Load Mistakes</button>
       <button id="removeMistakesBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">✓ Remove Mistakes</button>
+      <button id="loadFromVercelBtn" style="background: #8b5cf6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📥 Load from Vercel</button>
+      <button id="saveToVercelBtn" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📤 Save to Vercel</button>
     </div>
 
     <!-- Board and Navigation (horizontal layout) -->
@@ -4041,6 +4043,159 @@ END OF GUIDE
                     updateBoard2MoveIndicator(window.studyReportPositionIndex);
                     log('Mistakes cleared - highlighting removed', 'info');
                     alert('Mistakes removed. Highlighting has been cleared.');
+                });
+            }
+
+            // Vercel Blob Storage Configuration
+            const VERCEL_API_BASE = 'https://react-chat-report-viewer.vercel.app';
+            const VERCEL_FILENAME = 'chess.txt';
+
+            // Helper function to get stored access code
+            function getVercelAccessCode() {
+                return localStorage.getItem('vercelAccessCode') || '';
+            }
+
+            // Helper function to store access code
+            function setVercelAccessCode(code) {
+                localStorage.setItem('vercelAccessCode', code);
+            }
+
+            // Load from Vercel Button
+            const loadFromVercelBtn = document.getElementById('loadFromVercelBtn');
+            if (loadFromVercelBtn) {
+                loadFromVercelBtn.addEventListener('click', async function() {
+                    try {
+                        log('Fetching chess.txt from Vercel...', 'info');
+
+                        const response = await fetch(`${VERCEL_API_BASE}/api/files`);
+                        const responseText = await response.text();
+
+                        // Check if response is HTML (error page) instead of JSON
+                        if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
+                            throw new Error('API endpoint not found. Make sure react-chat-report-viewer is deployed with /api/files endpoint.');
+                        }
+
+                        let data;
+                        try {
+                            data = JSON.parse(responseText);
+                        } catch (parseError) {
+                            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+                        }
+
+                        // Extract chess.txt from the files object
+                        const content = data.files && data.files[VERCEL_FILENAME];
+
+                        if (content) {
+                            // Load content into the report text area
+                            const reportContainer = document.getElementById('analysisReportContainer');
+                            const reportText = document.getElementById('analysisReportText');
+
+                            if (reportContainer && reportText) {
+                                reportContainer.style.display = 'block';
+                                reportText.textContent = content;
+                                window.studyReportRawText = content;
+
+                                // Update filename display
+                                const filenameDisplay = document.getElementById('reportFilenameDisplay');
+                                if (filenameDisplay) {
+                                    filenameDisplay.textContent = '📁 ' + VERCEL_FILENAME + ' (from Vercel)';
+                                }
+
+                                log(`Loaded ${VERCEL_FILENAME} from Vercel (${content.length} characters)`, 'success');
+                                alert(`Successfully loaded ${VERCEL_FILENAME} from Vercel!`);
+                            }
+                        } else {
+                            alert(`File ${VERCEL_FILENAME} does not exist on Vercel yet. Save some content first.`);
+                            log(`File ${VERCEL_FILENAME} not found on Vercel`, 'warning');
+                        }
+                    } catch (error) {
+                        console.error('Error loading from Vercel:', error);
+                        log('Error loading from Vercel: ' + error.message, 'error');
+                        alert('Error loading from Vercel: ' + error.message);
+                    }
+                });
+            }
+
+            // Save to Vercel Button
+            const saveToVercelBtn = document.getElementById('saveToVercelBtn');
+            if (saveToVercelBtn) {
+                saveToVercelBtn.addEventListener('click', async function() {
+                    const reportText = document.getElementById('analysisReportText');
+
+                    if (!reportText || !reportText.textContent || reportText.textContent === 'Loading report...') {
+                        alert('No report content to save. Please analyze a game or load a report first.');
+                        return;
+                    }
+
+                    const content = reportText.textContent;
+
+                    // Ask for access code
+                    let accessCode = getVercelAccessCode();
+                    const inputCode = prompt('Enter ACCESS_CODE for Vercel:', accessCode);
+
+                    if (inputCode === null) {
+                        // User cancelled
+                        return;
+                    }
+
+                    accessCode = inputCode.trim();
+                    if (!accessCode) {
+                        alert('Access code is required.');
+                        return;
+                    }
+
+                    setVercelAccessCode(accessCode);
+
+                    try {
+                        log('Saving to Vercel...', 'info');
+
+                        const response = await fetch(`${VERCEL_API_BASE}/api/files`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                filename: VERCEL_FILENAME,
+                                content: content,
+                                accessCode: accessCode
+                            })
+                        });
+
+                        const responseText = await response.text();
+
+                        // Check if response is HTML (error page) instead of JSON
+                        if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
+                            throw new Error('API endpoint not found. Make sure react-chat-report-viewer is deployed with /api/files endpoint.');
+                        }
+
+                        let data;
+                        try {
+                            data = JSON.parse(responseText);
+                        } catch (parseError) {
+                            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
+                        }
+
+                        log(`Saved ${VERCEL_FILENAME} to Vercel (${content.length} characters)`, 'success');
+                        alert(`Successfully saved to ${VERCEL_FILENAME} on Vercel!`);
+
+                        // Update filename display
+                        const filenameDisplay = document.getElementById('reportFilenameDisplay');
+                        if (filenameDisplay) {
+                            filenameDisplay.textContent = '📁 ' + VERCEL_FILENAME + ' (saved to Vercel)';
+                        }
+                    } catch (error) {
+                        console.error('Error saving to Vercel:', error);
+                        log('Error saving to Vercel: ' + error.message, 'error');
+                        alert('Error saving to Vercel: ' + error.message);
+                    }
                 });
             }
 
