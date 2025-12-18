@@ -448,6 +448,88 @@
         .toggle-label.active {
             color: #00d4ff;
         }
+        /* Markdown content styles for chat */
+        .markdown-content {
+            font-size: 14px;
+        }
+        .markdown-content p {
+            margin: 0 0 10px 0;
+        }
+        .markdown-content p:last-child {
+            margin-bottom: 0;
+        }
+        .markdown-content h1, .markdown-content h2, .markdown-content h3, .markdown-content h4 {
+            margin: 16px 0 8px 0;
+            color: #00d4ff;
+        }
+        .markdown-content h3 {
+            font-size: 16px;
+        }
+        .markdown-content h4 {
+            font-size: 14px;
+        }
+        .markdown-content strong {
+            color: #fff;
+            font-weight: 600;
+        }
+        .markdown-content em {
+            font-style: italic;
+        }
+        .markdown-content ul, .markdown-content ol {
+            margin: 8px 0;
+            padding-left: 24px;
+        }
+        .markdown-content li {
+            margin: 4px 0;
+        }
+        .markdown-content table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 12px 0;
+            font-size: 13px;
+        }
+        .markdown-content table th,
+        .markdown-content table td {
+            border: 1px solid #444;
+            padding: 8px 10px;
+            text-align: left;
+        }
+        .markdown-content table th {
+            background: #0f3460;
+            color: #00d4ff;
+            font-weight: 600;
+        }
+        .markdown-content table tr:nth-child(even) {
+            background: rgba(15, 52, 96, 0.3);
+        }
+        .markdown-content code {
+            background: #0f3460;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .markdown-content pre {
+            background: #0f3460;
+            padding: 12px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+        }
+        .markdown-content blockquote {
+            border-left: 3px solid #00d4ff;
+            margin: 12px 0;
+            padding-left: 12px;
+            color: #aaa;
+        }
+        .markdown-content hr {
+            border: none;
+            border-top: 1px solid #444;
+            margin: 16px 0;
+        }
     </style>
 </head>
 <body>
@@ -4460,6 +4542,7 @@ END OF GUIDE
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <!-- Chess Coach Chat Container -->
     <div class="panel" style="margin-top: 20px;" id="chess-chat-root"></div>
@@ -5188,9 +5271,17 @@ End with a Socratic question about a specific position to help me learn.`
                                     <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>
                                         {msg.role === 'user' ? 'You' : (aiProvider === 'ChatGPT' ? 'ChatGPT' : 'Claude')}
                                     </div>
-                                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                                        {msg.content}
-                                    </div>
+                                    {msg.role === 'assistant' ? (
+                                        <div
+                                            className="markdown-content"
+                                            style={{ lineHeight: '1.6' }}
+                                            dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) }}
+                                        />
+                                    ) : (
+                                        <div style={{ whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
+                                            {msg.content}
+                                        </div>
+                                    )}
                                 </div>
                             ))
                         )}
