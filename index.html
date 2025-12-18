@@ -1405,8 +1405,9 @@
             // Game Details (compact one-line format)
             const gameDropdown = document.getElementById('game-dropdown');
             const selectedLabel = gameDropdown ? gameDropdown.value : '';
-            if (selectedLabel && fetchedGames[selectedLabel]) {
-                const meta = fetchedGames[selectedLabel].metadata;
+            const gamesSource = fetchedGames[selectedLabel] ? fetchedGames : (window.fetchedGames || {});
+            if (selectedLabel && gamesSource[selectedLabel]) {
+                const meta = gamesSource[selectedLabel].metadata;
                 report += `Game: White: ${meta.white} (${meta.white_rating}) vs Black: ${meta.black} (${meta.black_rating}) | ${meta.time_class} (${meta.time_control}) | Result: ${meta.result}${meta.url ? ' | ' + meta.url : ''}\n\n`;
             }
 
@@ -1664,7 +1665,7 @@
         // CHESS.COM GAME FETCHER
         // =====================================================================
 
-        let fetchedGames = {};
+        let fetchedGames = window.fetchedGames || {};
 
         function validateUsername(username) {
             const pattern = /^[a-zA-Z0-9_]{3,25}$/;
@@ -1850,6 +1851,7 @@
                             end_time: game.end_time
                         }
                     };
+                    window.fetchedGames = fetchedGames; // Sync to window for batch analysis
                 }
 
                 if (Object.keys(fetchedGames).length === 0) {
@@ -4477,7 +4479,13 @@ at each moment, teach me the patterns, and give me a focused
 improvement plan.`,
             positionAnalysis: `Be a direct chess coach. In this position [FEN], I played [move]
 and lost advantage. Show me exactly what tactic I missed, explain
-the pattern step-by-step, and assign specific practice.`
+the pattern step-by-step, and assign specific practice.`,
+            compare3Games: `Compare these 3 recent games and identify patterns in my play.
+Create a summary table showing: Game (opponent), Color, Opening, Result, Blunders, Mistakes.
+Analyze: 1) Common tactical weaknesses across games, 2) Opening patterns and deviations,
+3) Where I'm losing advantage most often (opening/middlegame/endgame),
+4) One focused improvement area based on recurring themes.
+End with a Socratic question about a specific position to help me learn.`
         };
 
         // Available models
@@ -4507,6 +4515,12 @@ the pattern step-by-step, and assign specific practice.`
             const [messages, setMessages] = useState([]);
             const [inputValue, setInputValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
+
+            // Batch analysis state
+            const [batchUsername, setBatchUsername] = useState('');
+            const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
+            const [batchProgress, setBatchProgress] = useState(0);
+            const [batchStatus, setBatchStatus] = useState('');
 
             const chatContainerRef = useRef(null);
             const models = aiProvider === 'ChatGPT' ? openaiModels : anthropicModels;
@@ -4557,6 +4571,167 @@ the pattern step-by-step, and assign specific practice.`
             const appendPrompt = (promptKey) => {
                 const prompt = CHESS_PROMPTS[promptKey];
                 setInputValue(prev => prev + (prev ? '\n\n' : '') + prompt);
+            };
+
+            // Analyze last 3 games for a username - uses existing analyzeGame() function
+            const analyzeLast3Games = async () => {
+                if (!batchUsername.trim()) {
+                    alert('Please enter a Chess.com username');
+                    return;
+                }
+
+                setIsBatchAnalyzing(true);
+                setBatchProgress(0);
+                setBatchStatus('Fetching games...');
+                let allReports = '';
+
+                try {
+                    const username = batchUsername.trim().toLowerCase();
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+
+                    setBatchProgress(2);
+                    let response = await fetch(`https://api.chess.com/pub/player/${username}/games/${year}/${month}`);
+                    let gamesData;
+
+                    if (!response.ok) {
+                        const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+                        const prevYear = now.getMonth() === 0 ? year - 1 : year;
+                        response = await fetch(`https://api.chess.com/pub/player/${username}/games/${prevYear}/${String(prevMonth).padStart(2, '0')}`);
+                        if (!response.ok) throw new Error('Could not fetch games. Check username.');
+                    }
+                    gamesData = await response.json();
+
+                    if (!gamesData.games || gamesData.games.length === 0) {
+                        throw new Error('No games found.');
+                    }
+
+                    const recentGames = gamesData.games
+                        .filter(g => g.pgn)
+                        .sort((a, b) => (b.end_time || 0) - (a.end_time || 0))
+                        .slice(0, 3);
+
+                    if (recentGames.length === 0) throw new Error('No games with PGN found.');
+
+                    setBatchProgress(5);
+                    setBatchStatus(`Found ${recentGames.length} games. Starting analysis...`);
+                    const totalGames = recentGames.length;
+
+                    // Helper to format game date
+                    const formatDate = (timestamp) => {
+                        if (!timestamp) return '';
+                        const d = new Date(timestamp * 1000);
+                        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    };
+
+                    // Analyze each game using existing analyzeGame() function
+                    for (let i = 0; i < totalGames; i++) {
+                        const game = recentGames[i];
+                        const gameNum = i + 1;
+
+                        const white = game.white;
+                        const black = game.black;
+                        const whiteUsername = white.username || 'Unknown';
+                        const blackUsername = black.username || 'Unknown';
+                        const isWhite = whiteUsername.toLowerCase() === username;
+                        const opponent = isWhite ? blackUsername : whiteUsername;
+                        const playerColor = isWhite ? 'White' : 'Black';
+                        const timeClass = game.time_class || 'unknown';
+                        const gameDate = formatDate(game.end_time);
+
+                        let result = 'Draw';
+                        if (white.result === 'win') result = isWhite ? 'Win' : 'Loss';
+                        else if (black.result === 'win') result = isWhite ? 'Loss' : 'Win';
+
+                        setBatchStatus(`Analyzing game ${gameNum}/${totalGames}: vs ${opponent}...`);
+                        setBatchProgress(5 + (i * 30));
+
+                        // Extract clean PGN moves
+                        let pgn = game.pgn || '';
+                        const pgnLines = pgn.split('\n');
+                        const moveLines = pgnLines.filter(line => !line.startsWith('[') && line.trim());
+                        pgn = moveLines.join(' ').trim();
+                        pgn = pgn.replace(/\{[^}]*\}/g, '').replace(/\$\d+/g, '').replace(/\s+/g, ' ').trim();
+
+                        // Set up game data for the existing analysis system
+                        const label = `Game ${gameNum}: vs ${opponent} (${result} as ${playerColor}) - ${timeClass} - ${gameDate}`;
+
+                        // Store in fetchedGames for metadata access
+                        window.fetchedGames = window.fetchedGames || {};
+                        window.fetchedGames[label] = {
+                            pgn: pgn,
+                            fullPgn: game.pgn,
+                            metadata: {
+                                white: whiteUsername,
+                                black: blackUsername,
+                                white_rating: white.rating || '?',
+                                black_rating: black.rating || '?',
+                                result: result,
+                                time_class: timeClass,
+                                time_control: game.time_control || '',
+                                url: game.url || '',
+                                end_time: game.end_time
+                            }
+                        };
+
+                        // Update the dropdown and select this game
+                        const gameDropdown = document.getElementById('game-dropdown');
+                        if (gameDropdown) {
+                            // Add option if not exists
+                            let optionExists = Array.from(gameDropdown.options).some(o => o.value === label);
+                            if (!optionExists) {
+                                const option = document.createElement('option');
+                                option.value = label;
+                                option.textContent = label;
+                                gameDropdown.appendChild(option);
+                            }
+                            gameDropdown.value = label;
+                        }
+
+                        // Set PGN in the input
+                        const pgnInput = document.getElementById('pgnInput');
+                        if (pgnInput) {
+                            pgnInput.value = pgn;
+                        }
+
+                        // Clear previous report
+                        window.analysisReportRawText = null;
+
+                        // Run the existing analyzeGame function
+                        await analyzeGame();
+
+                        // Wait a moment for report to be generated
+                        await new Promise(resolve => setTimeout(resolve, 100));
+
+                        // Capture the report
+                        const report = window.analysisReportRawText;
+                        if (report) {
+                            allReports += `\n${'='.repeat(60)}\n`;
+                            allReports += `GAME ${gameNum} of 3\n`;
+                            allReports += `${'='.repeat(60)}\n`;
+                            allReports += report;
+                        }
+
+                        window.batch3GamesReports = allReports;
+                        setBatchProgress(5 + ((i + 1) * 30));
+                    }
+
+                    // Done - load into chat
+                    setBatchProgress(100);
+                    setBatchStatus('Done! Loading into chat...');
+                    const fullPrompt = CHESS_PROMPTS.compare3Games + '\n' + allReports;
+                    setInputValue(fullPrompt);
+
+                } catch (error) {
+                    setBatchStatus(`Error: ${error.message}`);
+                } finally {
+                    setTimeout(() => {
+                        setIsBatchAnalyzing(false);
+                        setBatchProgress(0);
+                        setBatchStatus('');
+                    }, 1500);
+                }
             };
 
             // Send message
@@ -4628,11 +4803,17 @@ the pattern step-by-step, and assign specific practice.`
 
                             if (!response.ok) {
                                 let errorMsg = 'API request failed';
-                                try {
-                                    const errorData = JSON.parse(responseText);
-                                    errorMsg = errorData.error || errorMsg;
-                                } catch (e) {
-                                    errorMsg = responseText || `HTTP ${response.status}`;
+                                // Check if running locally without Vercel API
+                                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                                if (isLocalhost && (response.status === 404 || responseText.includes('File not found'))) {
+                                    errorMsg = "Stanley's shared key requires Vercel deployment. Use your own API key for local testing, or deploy to Vercel.";
+                                } else {
+                                    try {
+                                        const errorData = JSON.parse(responseText);
+                                        errorMsg = errorData.error || errorMsg;
+                                    } catch (e) {
+                                        errorMsg = responseText || `HTTP ${response.status}`;
+                                    }
                                 }
                                 throw new Error(errorMsg);
                             }
@@ -4914,25 +5095,76 @@ the pattern step-by-step, and assign specific practice.`
                     </div>
 
                     {/* Prompt Buttons */}
-                    <div style={styles.promptButtons}>
-                        <button
-                            onClick={() => appendPrompt('moveAnalysis')}
-                            style={{ ...styles.button, background: '#17a2b8', color: 'white' }}
-                        >
-                            Move Analysis
-                        </button>
-                        <button
-                            onClick={() => appendPrompt('fullGameReview')}
-                            style={{ ...styles.button, background: '#6f42c1', color: 'white' }}
-                        >
-                            Full Game Review
-                        </button>
-                        <button
-                            onClick={() => appendPrompt('positionAnalysis')}
-                            style={{ ...styles.button, background: '#dc3545', color: 'white' }}
-                        >
-                            Position Analysis
-                        </button>
+                    <div style={{ marginBottom: '12px' }}>
+                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>
+                            Prompts to attach to chatbox:
+                        </div>
+                        <div style={styles.promptButtons}>
+                            <button
+                                onClick={() => appendPrompt('moveAnalysis')}
+                                style={{ ...styles.button, background: '#17a2b8', color: 'white' }}
+                            >
+                                Move Analysis
+                            </button>
+                            <button
+                                onClick={() => appendPrompt('fullGameReview')}
+                                style={{ ...styles.button, background: '#6f42c1', color: 'white' }}
+                            >
+                                Full Game Review
+                            </button>
+                            <button
+                                onClick={() => appendPrompt('positionAnalysis')}
+                                style={{ ...styles.button, background: '#dc3545', color: 'white' }}
+                            >
+                                Position Analysis
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Batch Analysis Section */}
+                    <div style={{ background: '#0a1628', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <input
+                                type="text"
+                                value={batchUsername}
+                                onChange={(e) => setBatchUsername(e.target.value)}
+                                placeholder="Chess.com username"
+                                style={{ ...styles.input, flex: '1', minWidth: '150px' }}
+                                disabled={isBatchAnalyzing}
+                            />
+                            <button
+                                onClick={analyzeLast3Games}
+                                disabled={isBatchAnalyzing || !batchUsername.trim()}
+                                style={{
+                                    ...styles.button,
+                                    background: isBatchAnalyzing ? '#555' : '#e83e8c',
+                                    color: 'white',
+                                    opacity: isBatchAnalyzing || !batchUsername.trim() ? 0.7 : 1
+                                }}
+                            >
+                                {isBatchAnalyzing ? 'Analyzing...' : 'Analyze Last 3 Games'}
+                            </button>
+                        </div>
+                        {(isBatchAnalyzing || batchStatus) && (
+                            <div style={{ marginTop: '10px' }}>
+                                <div style={{
+                                    background: '#1a1a2e',
+                                    borderRadius: '4px',
+                                    height: '8px',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{
+                                        background: 'linear-gradient(90deg, #e83e8c, #00d4ff)',
+                                        height: '100%',
+                                        width: `${batchProgress}%`,
+                                        transition: 'width 0.3s ease'
+                                    }} />
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
+                                    {batchStatus}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Chat Messages */}

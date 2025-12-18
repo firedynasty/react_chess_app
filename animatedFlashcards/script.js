@@ -159,6 +159,73 @@ window.pasteAndScanBlocks = function() {
 
 // ==================== END BLOCK NAVIGATION ====================
 
+// ==================== TEXTAREA 3: PARENTHESIS EXTRACTION ====================
+// Extracts words before parentheses and creates word ; translation pairs
+
+window.extractParenthesis = function() {
+    const input = document.getElementById('parenthesisInput').value;
+
+    if (!input.trim()) {
+        alert('Textarea 3 is empty. Paste text with word (translation) patterns first.');
+        return;
+    }
+
+    // Regex to match: word(s) followed by (translation)
+    // Captures the word(s) before the parenthesis and the content inside
+    const regex = /(\S+)\s*\(([^)]+)\)/g;
+
+    const flashcards = [];
+    let match;
+
+    while ((match = regex.exec(input)) !== null) {
+        const word = match[1].trim();
+        const translation = match[2].trim();
+
+        if (word && translation) {
+            flashcards.push({ word, translation });
+            console.log('DEBUG: Extracted -', word, ';', translation);
+        }
+    }
+
+    if (flashcards.length === 0) {
+        alert('No word (translation) patterns found. Format: word (translation)');
+        return;
+    }
+
+    // Convert to semicolon-delimited format for Textarea 1
+    const output = flashcards.map(card => `${card.word} ; ${card.translation}`).join('\n');
+
+    // Put into Textarea 1
+    document.getElementById('pasteInput').value = output;
+
+    console.log('DEBUG: Extracted', flashcards.length, 'word pairs to Textarea 1');
+    alert(`Extracted ${flashcards.length} word pairs. Click "Generate Flashcards" to create cards.`);
+};
+
+window.pasteParenthesis = function() {
+    navigator.clipboard.readText()
+        .then(text => {
+            if (!text.trim()) {
+                alert('Clipboard is empty. Please copy some text first.');
+                return;
+            }
+
+            document.getElementById('parenthesisInput').value = text;
+            console.log('DEBUG: Pasted from clipboard into Textarea 3, length:', text.length);
+        })
+        .catch(err => {
+            console.error('Failed to read clipboard contents:', err);
+            alert('Unable to access clipboard. Please check browser permissions or paste manually.');
+        });
+};
+
+window.clearParenthesisInput = function() {
+    document.getElementById('parenthesisInput').value = '';
+    console.log('DEBUG: Textarea 3 cleared');
+};
+
+// ==================== END PARENTHESIS EXTRACTION ====================
+
 // Forward declarations for onclick handlers
 window.generateFromPaste = function() {
     const pasteInput = document.getElementById('pasteInput');
@@ -924,7 +991,22 @@ function reverseFlashcards() {
 
     console.log('DEBUG: isReversed now:', isReversed);
 
-    // Reload the current flashcard set
+    // Update button text to show current state
+    const reverseBtn = document.querySelector('.reverse-button');
+    if (reverseBtn) {
+        reverseBtn.textContent = isReversed ? '↩ Unreverse Cards' : 'Reverse Cards';
+        reverseBtn.style.backgroundColor = isReversed ? '#10B981' : ''; // Green when reversed
+    }
+
+    // First priority: Check if Textarea 1 has content and use that
+    const textarea1Content = document.getElementById('pasteInput').value.trim();
+    if (textarea1Content) {
+        console.log('DEBUG: Regenerating from Textarea 1 content with reversed state');
+        window.generateFromPaste();
+        return;
+    }
+
+    // Second priority: Try to reload from tempFlashcardDatabase
     const currentSetName = $('#currentSetName').text();
 
     if (window.tempFlashcardDatabase && window.tempFlashcardDatabase[currentSetName]) {

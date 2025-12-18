@@ -71,6 +71,19 @@ DEVELOPED BY MATIE NATOV 3/13/19
       </div>
     </div>
 
+    <!-- Textarea 3: Parenthesis Extraction -->
+    <div class="paste-zone" id="parenthesisZone">
+      <p>🔤 <strong>Textarea 3:</strong> Extract words before parentheses: <code>word (translation)</code> → <code>word ; translation</code></p>
+      <textarea id="parenthesisInput" placeholder="Eu sei que a vida (life) não é um conto (tale) de fadas (fairy)
+O importante é ser feliz (happy) essa é a frase (phrase) mais postada
+Maquiando (masking) a realidade (reality) no perfil (profile) da Internet"></textarea>
+      <div class="paste-buttons">
+        <button class="clipboard-button" onclick="pasteParenthesis()">📋 Paste from Clipboard</button>
+        <button class="generate-button" onclick="extractParenthesis()">Extract to Textarea 1</button>
+        <button class="clear-paste-button" onclick="clearParenthesisInput()">Clear</button>
+      </div>
+    </div>
+
     <!-- Textarea 1: Current Block Content -->
     <div class="paste-zone" id="pasteZone">
       <p>📝 <strong>Textarea 1:</strong> Current block content (format: <code>Term; Definition</code>)</p>
