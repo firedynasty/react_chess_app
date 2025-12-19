@@ -37,6 +37,26 @@
       "size": 3801
     },
     {
+      "name": "12-18_francescodevivo_black_Italian_Game_.txt",
+      "size": 3661
+    },
+    {
+      "name": "12-18_TTTstanley_white_Elephant_Gambit.txt",
+      "size": 4451
+    },
+    {
+      "name": "12-18_TTTstanley_white_Philidor_Defense.txt",
+      "size": 6873
+    },
+    {
+      "name": "12-18_TTTstanley_white_Sicilian_Defense_.txt",
+      "size": 3886
+    },
+    {
+      "name": "12-19_gaps09_black_Queen's_Gambit.txt",
+      "size": 5061
+    },
+    {
       "name": "23_12-07_TTTstanley_white_Italian_Game_.txt",
       "size": 7266
     },
@@ -73,5 +93,5 @@
       "size": 99
     }
   ],
-  "count": 18
+  "count": 23
 }

@@ -1,0 +1,74 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/18/2025, 3:14:56 PM
+======================================================================
+
+Opening: C40 Elephant Gambit
+
+Game: White: TTTstanley (805) vs Black: 009deniz (800) | rapid (600) | Result: Win | https://www.chess.com/game/live/146889558568
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... d5 3. exd5 3... Qxd5 4. d3 4... e4 5. dxe4 5... Qxe4+ 6. Be2 6... Bb4+ 7. Nc3 7... Bxc3+ 8. bxc3 8... Na6 9. O-O 9... Qg6 10. Bc4 10... Ne7 11. Ba3 11... c5 12. Re1 12... O-O 13. Rxe7 13... Bh3 14. g3 14... Qf6 15. Qe2 15... b6 16. Bxa6 16... Bg4 17. Bb7 17... Rab8 18. Bd5 18... Rbd8 19. Rd1 19... Rde8 20. Rxe8 20... h5 21. Bc1 21... g5 22. Bxg5 22... Qf5 23. Rxf8+ 23... Kxf8 24. Qe7+ 24... Kg8 25. Qe8+ 25... Kg7 26. Bh6+ 26... Kxh6 27. Qc6+ 27... f6 28. Nh4 28... Qxc2 29. Qxf6+ 29... Kh7 30. Qf7+ 30... Kh6 31. Re1 31... Be2 32. Nf5+ 32... Kg5 33. Rxe2 33... Qxe2 34. h4+ 34... Kg4 35. Qg6+ 35... Kh3 36. Bg2# 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 10
+Mistakes: 10
+Inaccuracies: 9
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+2... d5 (book: Nc6 85.6%)
+  Alternatives: Nc6 (85.6%), Nf6 (11.7%), d6 (2.4%)
+  https://lichess.org/analysis/rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R_b_KQkq_-_1_2
+
+MISTAKES, BLUNDERS & INACCURACIES
+----------------------------------------------------------------------
+MISTAKE: 4. d3, Eval: 1.69 → -0.13 (-1.82), INACCURACY: 6... Bb4+, Eval: -1.35 → -2.45 (-1.10), INACCURACY: 7. Nc3, Eval: 2.45 → 1.49 (-0.96), BLUNDER: 8... Na6, Eval: -1.33 → -4.55 (-3.22), INACCURACY: 9. O-O, Eval: 4.55 → 3.47 (-1.08), MISTAKE: 9... Qg6, Eval: -3.47 → -6.38 (-2.91), MISTAKE: 10... Ne7, Eval: -6.17 → -8.12 (-1.95), BLUNDER: 11. Ba3, Eval: 8.12 → 4.11 (-4.01), BLUNDER: 11... c5, Eval: -4.11 → -7.63 (-3.52), BLUNDER: 12. Re1, Eval: 7.63 → 4.55 (-3.08), MISTAKE: 12... O-O, Eval: -4.55 → -6.33 (-1.78), INACCURACY: 13... Bh3, Eval: -6.29 → -7.67 (-1.38), MISTAKE: 14. g3, Eval: 7.67 → 4.76 (-2.91), MISTAKE: 15... b6, Eval: -4.70 → -7.62 (-2.92), MISTAKE: 16... Bg4, Eval: -7.53 → -9.53 (-2.00), MISTAKE: 17. Bb7, Eval: 9.53 → 7.34 (-2.19), BLUNDER: 18. Bd5, Eval: 7.61 → 4.42 (-3.19), INACCURACY: 18... Rbd8, Eval: -4.42 → -5.10 (-0.68), MISTAKE: 19. Rd1, Eval: 5.10 → 3.00 (-2.10), BLUNDER: 19... Rde8, Eval: -3.00 → -16.40 (-13.40), INACCURACY: 20. Rxe8, Eval: 16.40 → 15.53 (-0.87), INACCURACY: 20... h5, Eval: -15.53 → -17.01 (-1.48), INACCURACY: 21. Bc1, Eval: 17.01 → 15.60 (-1.41), MISTAKE: 21... g5, Eval: -15.60 → -17.71 (-2.11), BLUNDER: 22... Qf5, Eval: -18.61 → -29.97 (-11.36), BLUNDER: 25. Qe8+, Eval: 99.95 → 17.68 (-82.27), BLUNDER: 27. Qc6+, Eval: 99.92 → 12.27 (-87.65), INACCURACY: 27... f6, Eval: -12.27 → -13.28 (-1.01), BLUNDER: 28... Qxc2, Eval: -13.79 → -99.96 (-86.17)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 4. d3
+  https://lichess.org/analysis/rnb1kbnr/ppp2ppp/8/3qp3/8/5N2/PPPP1PPP/RNBQKB1R_w_KQkq_-_0_4
+
+Move 6... Bb4+
+  https://lichess.org/analysis/rnb1kbnr/ppp2ppp/8/8/4q3/5N2/PPP1BPPP/RNBQK2R_b_KQkq_-_1_6
+
+Move 7. Nc3
+  https://lichess.org/analysis/rnb1k1nr/ppp2ppp/8/8/1b2q3/5N2/PPP1BPPP/RNBQK2R_w_KQkq_-_2_7
+
+Move 8... Na6
+  https://lichess.org/analysis/rnb1k1nr/ppp2ppp/8/8/4q3/2P2N2/P1P1BPPP/R1BQK2R_b_KQkq_-_0_8
+
+Move 9. O-O
+  https://lichess.org/analysis/r1b1k1nr/ppp2ppp/n7/8/4q3/2P2N2/P1P1BPPP/R1BQK2R_w_KQkq_-_1_9
+

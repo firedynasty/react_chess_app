@@ -1,0 +1,74 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/18/2025, 3:15:39 PM
+======================================================================
+
+Opening: B30 Sicilian Defense: Old Sicilian
+
+Game: White: TTTstanley (797) vs Black: rorkk2 (795) | rapid (600) | Result: Win | https://www.chess.com/game/live/146889378970
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... c5 2. Nf3 2... Nc6 3. Bc4 3... e5 4. O-O 4... Nf6 5. d3 5... d6 6. Nc3 6... g6 7. Nd5 7... Nxd5 8. Bxd5 8... Bd7 9. Bg5 9... Qc8 10. Bf6 10... Rg8 11. a3 11... Bg7 12. Bh4 12... f6 13. Bxc6 13... Bxc6 14. b4 14... cxb4 15. axb4 15... Qe6 16. c4 16... O-O-O 17. b5 17... Be8 18. Rxa7 18... Kb8 19. Qa1 19... Kc7 20. Rc1 20... Kd7 21. Rxb7+ 21... Kc8 22. Qa8# 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 12
+Mistakes: 6
+Inaccuracies: 5
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+3. Bc4 (book: d4 58.9%)
+  Alternatives: d4 (58.9%), Bb5 (27.6%), Nc3 (8.9%)
+  https://lichess.org/analysis/r1bqkbnr/pp1ppppp/2n5/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R_w_KQkq_-_2_3
+
+MISTAKES, BLUNDERS & INACCURACIES
+----------------------------------------------------------------------
+INACCURACY: 2. Nf3, Eval: 1.40 → 0.35 (-1.05), INACCURACY: 3. Bc4, Eval: 1.33 → 0.39 (-0.94), MISTAKE: 5. d3, Eval: 2.02 → 0.31 (-1.71), BLUNDER: 5... d6, Eval: -0.31 → -3.76 (-3.45), BLUNDER: 6. Nc3, Eval: 3.76 → 0.16 (-3.60), BLUNDER: 6... g6, Eval: -0.16 → -4.01 (-3.85), BLUNDER: 7. Nd5, Eval: 4.01 → 0.70 (-3.31), MISTAKE: 8... Bd7, Eval: -0.67 → -3.40 (-2.73), MISTAKE: 9. Bg5, Eval: 3.40 → 0.76 (-2.64), BLUNDER: 9... Qc8, Eval: -0.76 → -4.29 (-3.53), INACCURACY: 10. Bf6, Eval: 4.29 → 2.99 (-1.30), MISTAKE: 11. a3, Eval: 3.37 → 1.64 (-1.73), MISTAKE: 11... Bg7, Eval: -1.64 → -3.37 (-1.73), MISTAKE: 12. Bh4, Eval: 3.37 → 1.33 (-2.04), BLUNDER: 12... f6, Eval: -1.33 → -6.97 (-5.64), BLUNDER: 13. Bxc6, Eval: 6.97 → -0.53 (-7.50), BLUNDER: 16... O-O-O, Eval: -0.59 → -4.88 (-4.29), INACCURACY: 17. b5, Eval: 4.88 → 4.00 (-0.88), BLUNDER: 18... Kb8, Eval: -3.61 → -6.68 (-3.07), INACCURACY: 19. Qa1, Eval: 6.68 → 5.67 (-1.01), BLUNDER: 19... Kc7, Eval: -5.67 → -99.97 (-94.30), BLUNDER: 20. Rc1, Eval: 99.97 → 6.94 (-93.03), BLUNDER: 20... Kd7, Eval: -6.94 → -99.98 (-93.04)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 2. Nf3
+  https://lichess.org/analysis/rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR_w_KQkq_c6_0_2
+
+Move 3. Bc4
+  https://lichess.org/analysis/r1bqkbnr/pp1ppppp/2n5/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R_w_KQkq_-_2_3
+
+Move 5. d3
+  https://lichess.org/analysis/r1bqkb1r/pp1p1ppp/2n2n2/2p1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1_w_kq_-_2_5
+
+Move 5... d6
+  https://lichess.org/analysis/r1bqkb1r/pp1p1ppp/2n2n2/2p1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1_b_kq_-_0_5
+
+Move 6. Nc3
+  https://lichess.org/analysis/r1bqkb1r/pp3ppp/2np1n2/2p1p3/2B1P3/3P1N2/PPP2PPP/RNBQ1RK1_w_kq_-_0_6
+

@@ -1,0 +1,119 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/18/2025, 12:41:42 PM
+======================================================================
+
+Opening: C41 Philidor Defense
+
+Game: White: TTTstanley (789) vs Black: grouchx (796) | rapid (600) | Result: Loss | https://www.chess.com/game/live/146887863622
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Nf3 2... d6 3. Bc4 3... Bg4 4. d3 4... Nc6 5. c3 5... Nf6 6. Nbd2 6... Nh5 7. h3 7... Bxf3 8. Nxf3 8... Nf4 9. g3 9... Ng6 10. Ng5 10... Qe7 11. h4 11... Na5 12. b3 12... f6 13. h5 13... Nxc4 14. hxg6 14... h6 15. bxc4 15... O-O-O 16. Nf3 16... h5 17. Be3 17... c5 18. d4 18... Kb8 19. g4 19... h4 20. Rxh4 20... Rxh4 21. Nxh4 21... cxd4 22. cxd4 22... Qe6 23. d5 23... Qc8 24. Qa4 24... a6 25. Rc1 25... Qxg4 26. Nf5 26... Qxe4 27. Qc2 27... Qh1+ 28. Ke2 28... Qh5+ 29. Kd2 29... Qxg6 30. Ne7 30... Qxc2+ 31. Rxc2 31... Bxe7 32. c5 32... Rc8 33. cxd6 33... Bxd6 34. Rxc8+ 34... Kxc8 35. Kd3 35... f5 36. Bg5 36... e4+ 37. Kd4 37... b5 0-1
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 16
+Mistakes: 8
+Inaccuracies: 26
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+3... Bg4 (book: Be7 56.7%)
+  Alternatives: Be7 (56.7%), Nf6 (11.9%), Nc6 (8.6%)
+  https://lichess.org/analysis/rnbqkbnr/ppp2ppp/3p4/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R_b_KQkq_-_1_3
+
+MISTAKES, BLUNDERS & INACCURACIES
+----------------------------------------------------------------------
+INACCURACY: 1. e4, Eval: 1.16 → 0.45 (-0.71), INACCURACY: 4. d3, Eval: 1.18 → 0.19 (-0.99), INACCURACY: 7... Bxf3, Eval: -1.31 → -2.15 (-0.84), INACCURACY: 8. Nxf3, Eval: 2.15 → 1.39 (-0.76), INACCURACY: 8... Nf4, Eval: -1.39 → -2.19 (-0.80), INACCURACY: 9. g3, Eval: 2.19 → 1.48 (-0.71), BLUNDER: 9... Ng6, Eval: -1.48 → -6.06 (-4.58), MISTAKE: 10. Ng5, Eval: 6.06 → 4.18 (-1.88), BLUNDER: 10... Qe7, Eval: -4.18 → -9.42 (-5.24), BLUNDER: 11. h4, Eval: 9.42 → 4.45 (-4.97), BLUNDER: 11... Na5, Eval: -4.45 → -9.27 (-4.82), BLUNDER: 12. b3, Eval: 9.27 → 0.68 (-8.59), BLUNDER: 12... f6, Eval: -0.68 → -6.41 (-5.73), BLUNDER: 13. h5, Eval: 6.41 → 1.92 (-4.49), INACCURACY: 13... Nxc4, Eval: -1.92 → -3.08 (-1.16), INACCURACY: 14. hxg6, Eval: 3.08 → 2.45 (-0.63), BLUNDER: 14... h6, Eval: -2.45 → -6.22 (-3.77), BLUNDER: 15. bxc4, Eval: 6.22 → 1.62 (-4.60), BLUNDER: 15... O-O-O, Eval: -1.62 → -8.35 (-6.73), MISTAKE: 16. Nf3, Eval: 8.35 → 5.80 (-2.55), INACCURACY: 16... h5, Eval: -5.80 → -6.58 (-0.78), INACCURACY: 17. Be3, Eval: 6.58 → 6.02 (-0.56), INACCURACY: 17... c5, Eval: -6.02 → -7.00 (-0.98), BLUNDER: 18. d4, Eval: 7.00 → 2.93 (-4.07), BLUNDER: 18... Kb8, Eval: -2.93 → -6.42 (-3.49), MISTAKE: 19. g4, Eval: 6.42 → 3.90 (-2.52), INACCURACY: 19... h4, Eval: -3.90 → -5.08 (-1.18), INACCURACY: 20. Rxh4, Eval: 5.08 → 3.77 (-1.31), MISTAKE: 21... cxd4, Eval: -4.37 → -6.45 (-2.08), INACCURACY: 22... Qe6, Eval: -6.57 → -7.60 (-1.03), INACCURACY: 23. d5, Eval: 7.60 → 6.68 (-0.92), INACCURACY: 23... Qc8, Eval: -6.68 → -7.95 (-1.27), INACCURACY: 24... a6, Eval: -7.87 → -8.90 (-1.03), BLUNDER: 25. Rc1, Eval: 8.90 → 4.86 (-4.04), INACCURACY: 26. Nf5, Eval: 5.17 → 4.23 (-0.94), MISTAKE: 26... Qxe4, Eval: -4.23 → -5.94 (-1.71), MISTAKE: 28. Ke2, Eval: 5.99 → 4.07 (-1.92), INACCURACY: 28... Qh5+, Eval: -4.07 → -4.72 (-0.65), INACCURACY: 29. Kd2, Eval: 4.72 → 4.13 (-0.59), INACCURACY: 29... Qxg6, Eval: -4.13 → -5.02 (-0.89), BLUNDER: 30. Ne7, Eval: 5.02 → -1.86 (-6.88), INACCURACY: 31. Rxc2, Eval: -1.51 → -2.44 (-0.93), MISTAKE: 32. c5, Eval: -2.15 → -4.53 (-2.38), MISTAKE: 32... Rc8, Eval: 4.53 → 2.38 (-2.15), BLUNDER: 33... Bxd6, Eval: 2.56 → -1.33 (-3.89), BLUNDER: 34. Rxc8+, Eval: 1.33 → -2.75 (-4.08), INACCURACY: 35. Kd3, Eval: -2.75 → -3.31 (-0.56), INACCURACY: 36. Bg5, Eval: -2.92 → -3.98 (-1.06), INACCURACY: 36... e4+, Eval: 3.98 → 2.55 (-1.43), INACCURACY: 37. Kd4, Eval: -2.55 → -3.11 (-0.56)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 1. e4
+  https://lichess.org/analysis/rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR_w_KQkq_-_0_1
+
+Move 4. d3
+  https://lichess.org/analysis/rn1qkbnr/ppp2ppp/3p4/4p3/2B1P1b1/5N2/PPPP1PPP/RNBQK2R_w_KQkq_-_2_4
+
+Move 7... Bxf3
+  https://lichess.org/analysis/r2qkb1r/ppp2ppp/2np4/4p2n/2B1P1b1/2PP1N1P/PP1N1PP1/R1BQK2R_b_KQkq_-_0_7
+
+Move 8. Nxf3
+  https://lichess.org/analysis/r2qkb1r/ppp2ppp/2np4/4p2n/2B1P3/2PP1b1P/PP1N1PP1/R1BQK2R_w_KQkq_-_0_8
+
+Move 8... Nf4
+  https://lichess.org/analysis/r2qkb1r/ppp2ppp/2np4/4p2n/2B1P3/2PP1N1P/PP3PP1/R1BQK2R_b_KQkq_-_0_8
+
+should crowd out, there was a move that I should have had made
+
+[Variant "From Position"]
+[FEN "r3kb1r/ppp1qppp/2np2n1/4p1N1/2B1P3/2PP2PP/PP3P2/R1BQK2R w KQkq - 3 11"]
+
+11. Bxf7+ Kd8 12. Qg4 Qd7 a5 13. h4 a4 14. h5 Nf4
+
+knight post
+
+[Variant "From Position"]
+[FEN "r3kb1r/ppp1q1p1/3p1pPp/4p1N1/2n1P3/1PPP2P1/P4P2/R1BQK2R w KQkq - 0 15"]
+
+15. Nf7 Rg8 16. bxc4 Qe6 17. Qa4+ Qd7 18. Qxd7+ Kxd7
+
+knight guards the pawn on the edge
+
+[Variant "From Position"]
+[FEN "2kr1b1r/ppp1q1p1/3p1pP1/4p2p/2P1P3/2PP1NP1/P4P2/R1BQK2R w KQ - 0 17"]
+
+17. Rb1 b6 18. Nh4 Qe8 19. Kf1
+
+because king is in the center, keep everyting guarded
+
+[Variant "From Position"]
+[FEN "1k1r1b1r/pp2q1p1/3p1pP1/2p1p3/2PPP1Pp/2P1BN2/P4P2/R2QK2R w KQ - 0 20"]
+
+20. d5 h3 21. Qa4 Qc7 22. Ke2 h2 23. Rxh2 Be7 24. Rg1 Rxh2 25. Nxh2 Rh8 26. Nf1 Qc8 27. Bd2 Bf8 28. Ne3 Rh6 29. Nf5 Rxg6 30. f3 Rg5 31. Rh1 g6 32. Ng3 Be7 33. Rh7 Qd8 34. Kf2
+
+here you got an attack
+
+[Variant "From Position"]
+[FEN "1kqr1b2/1p4p1/p2p1pP1/3Pp3/Q1P1P1PN/4B3/P4P2/R3K3 w Q - 0 25"]
+
+25. Nf5 Ka8 26. Rb1 Rd7 27. Qb4 b6 28. Qa4 Ra7
+
+
+complicated end game
+
+[Variant "From Position"]
+[FEN "k1q2b2/1p1r2p1/p2p1pP1/3PpN2/1QP1P1P1/4B3/P4P2/1R2K3 b - - 5 27"]
+
+27... Be7 (27... Rc7 28. Qb6 Qb8 29. Rc1 Be7 30. Ke2 Rd7 31. Nxe7 Rxe7 32. c5 Rc7 33. Rc4 Rd7 34. cxd6 Rxd6 35. Rc6 Rd8 36. d6 f5 37. gxf5 Rg8 38. d7 Rd8 39. Rc8 Rxc8 40. dxc8=Q)
+
+
+

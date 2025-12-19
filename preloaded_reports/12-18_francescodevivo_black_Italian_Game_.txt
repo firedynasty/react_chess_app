@@ -1,0 +1,74 @@
+======================================================================
+CHESS GAME ANALYSIS REPORT
+Generated: 12/18/2025, 3:14:26 PM
+======================================================================
+
+Opening: C57 Italian Game: Two Knights Defense, Fried Liver Attack
+
+Game: White: francescodevivo (826) vs Black: TTTstanley (797) | rapid (600) | Result: Loss | https://www.chess.com/game/live/146890115202
+
+GAME PGN
+----------------------------------------------------------------------
+1. e4 1... e5 2. Bc4 2... Nf6 3. Nf3 3... Nc6 4. Ng5 4... d5 5. exd5 5... Nxd5 6. Nxf7 6... Kxf7 7. Qf3+ 7... Qf6 8. Bxd5+ 8... Be6 9. Qb3 9... Bxd5 10. Qxd5+ 10... Kg6 11. O-O 11... Rd8 12. Qb3 12... Bd6 13. Qxb7 13... Nd4 14. Qe4+ 14... Kf7 15. c3 15... Nf5 16. Qd5+ 16... Ke7 17. d4 17... exd4 18. g4 18... Nh6 19. Bg5 1-0
+
+SUMMARY
+----------------------------------------------------------------------
+Blunders: 4
+Mistakes: 6
+Inaccuracies: 9
+Opening deviations: 1
+
+OPENING DEVIATIONS
+----------------------------------------------------------------------
+7... Qf6 (book: Ke6 100.0%)
+  Alternatives: Ke6 (100.0%)
+  https://lichess.org/analysis/r1bq1b1r/ppp2kpp/2n5/3np3/2B5/5Q2/PPPP1PPP/RNB1K2R_b_KQ_-_1_7
+
+MISTAKES, BLUNDERS & INACCURACIES
+----------------------------------------------------------------------
+INACCURACY: 1. e4, Eval: 1.16 → 0.45 (-0.71), MISTAKE: 4. Ng5, Eval: 0.79 → -0.88 (-1.67), BLUNDER: 5... Nxd5, Eval: 0.92 → -2.20 (-3.12), INACCURACY: 6. Nxf7, Eval: 2.20 → 1.34 (-0.86), MISTAKE: 9. Qb3, Eval: 1.76 → 0.00 (-1.76), INACCURACY: 11. O-O, Eval: 1.47 → 0.24 (-1.23), MISTAKE: 12. Qb3, Eval: 0.82 → -1.08 (-1.90), MISTAKE: 12... Bd6, Eval: 1.08 → -1.32 (-2.40), INACCURACY: 13. Qxb7, Eval: 1.32 → 0.50 (-0.82), INACCURACY: 14. Qe4+, Eval: 1.56 → 0.31 (-1.25), MISTAKE: 14... Kf7, Eval: -0.31 → -2.71 (-2.40), INACCURACY: 15... Nf5, Eval: -2.31 → -3.36 (-1.05), INACCURACY: 16. Qd5+, Eval: 3.36 → 2.36 (-1.00), INACCURACY: 16... Ke7, Eval: -2.36 → -3.42 (-1.06), MISTAKE: 17. d4, Eval: 3.42 → 1.12 (-2.30), INACCURACY: 17... exd4, Eval: -1.12 → -2.45 (-1.33), BLUNDER: 18. g4, Eval: 2.45 → -10.48 (-12.93), BLUNDER: 18... Nh6, Eval: 10.48 → -2.12 (-12.60), BLUNDER: 19. Bg5, Eval: 2.12 → -2.21 (-4.33)
+
+======================================================================
+RECOMMENDED PUZZLES TO PRACTICE
+======================================================================
+
+Based on your game, practice these puzzle themes on Lichess:
+
+🎯 Hanging Piece
+   Win material by capturing undefended pieces
+   Practice: https://lichess.org/training/hangingPiece
+
+🎯 Middlegame
+   Tactical puzzles from the middlegame
+   Practice: https://lichess.org/training/middlegame
+
+🎯 Fork
+   Attack two or more pieces simultaneously
+   Practice: https://lichess.org/training/fork
+
+🎯 Daily Puzzle
+   Today's featured puzzle from Lichess
+   Practice: https://lichess.org/training/daily
+   ⭐ Bonus: Today's featured puzzle!
+
+======================================================================
+KEY POSITIONS TO REVIEW
+======================================================================
+
+Review these critical positions:
+
+Move 1. e4
+  https://lichess.org/analysis/rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR_w_KQkq_-_0_1
+
+Move 4. Ng5
+  https://lichess.org/analysis/r1bqkb1r/pppp1ppp/2n2n2/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R_w_KQkq_-_4_4
+
+Move 5... Nxd5
+  https://lichess.org/analysis/r1bqkb1r/ppp2ppp/2n2n2/3Pp1N1/2B5/8/PPPP1PPP/RNBQK2R_b_KQkq_-_0_5
+
+Move 6. Nxf7
+  https://lichess.org/analysis/r1bqkb1r/ppp2ppp/2n5/3np1N1/2B5/8/PPPP1PPP/RNBQK2R_w_KQkq_-_0_6
+
+Move 9. Qb3
+  https://lichess.org/analysis/r4b1r/ppp2kpp/2n1bq2/3Bp3/8/5Q2/PPPP1PPP/RNB1K2R_w_KQ_-_1_9
+
