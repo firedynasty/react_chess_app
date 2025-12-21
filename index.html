@@ -2289,12 +2289,12 @@
             const gameInfoSpan = document.getElementById('currentGameInfo');
             if (!gameInfoSpan) return;
 
-            // Look for "Game: White: ... vs Black: ..." pattern
-            const gameMatch = reportContent.match(/Game:\s*White:\s*(.+?)\s*\((\d+)\)\s*vs\s*Black:\s*(.+?)\s*\((\d+)\)\s*\|\s*(\w+)\s*\(([^)]+)\)\s*\|\s*Result:\s*(\w+)(?:\s*\|\s*(https?:\/\/[^\s\n]+))?/);
+            // Look for "Game: white: ... vs black: ..." pattern (case-insensitive, flexible spacing)
+            const gameMatch = reportContent.match(/Game:\s*white:\s*(.+?)\s*\((\d+)\)\s*vs\s*black:\s*(.+?)\s*\((\d+)\)\s*\|\s*(\w+)\s*\(([^)]+)\)\s*\|\s*Result:\s*(\w+)(?:\s*\|\s*(https?:\/\/[^\s\n]+))?/i);
 
             if (gameMatch) {
                 const [, white, whiteRating, black, blackRating, timeClass, timeControl, result, url] = gameMatch;
-                let info = `Game: ${white} (${whiteRating}) vs ${black} (${blackRating}) | ${timeClass} (${timeControl}) | ${result}`;
+                let info = `Game: ${white.trim()} (${whiteRating}) vs ${black.trim()} (${blackRating}) | ${timeClass} (${timeControl}) | ${result}`;
                 if (url) info += ` | ${url}`;
                 gameInfoSpan.textContent = info;
                 gameInfoSpan.title = info; // Full text on hover
