@@ -2911,6 +2911,10 @@
                 let pendingVariant = false;
                 let variantLineIndex = -1;
 
+                // Track current game info as we scan
+                let currentGameInfo = '';
+                let currentFileName = '';
+
                 // Helper function to get notes from 2 lines before a given index
                 function getNotesFromLinesBefore(lineIndex) {
                     for (let k = lineIndex - 1; k >= Math.max(0, lineIndex - 2); k--) {
@@ -2930,13 +2934,37 @@
                 for (let i = 0; i < lines.length; i++) {
                     const line = lines[i].trim();
 
+                    // Check for FILE: header (from appended reports)
+                    const fileMatch = line.match(/^FILE:\s*(.+\.txt)$/i);
+                    if (fileMatch) {
+                        currentFileName = fileMatch[1];
+                        currentGameInfo = ''; // Reset game info for new file
+                        continue;
+                    }
+
+                    // Check for Game: line (case-insensitive)
+                    const gameMatch = line.match(/^Game:\s*white:\s*(.+?)\s*\((\d+)\)\s*vs\s*black:\s*(.+?)\s*\((\d+)\)\s*\|\s*(\w+)\s*\(([^)]+)\)\s*\|\s*Result:\s*(\w+)(?:\s*\|\s*(https?:\/\/[^\s]+))?/i);
+                    if (gameMatch) {
+                        const [, white, whiteRating, black, blackRating, timeClass, timeControl, result, url] = gameMatch;
+                        currentGameInfo = `${white.trim()} (${whiteRating}) vs ${black.trim()} (${blackRating}) | ${timeClass} (${timeControl}) | ${result}`;
+                        if (url) currentGameInfo += ` | ${url}`;
+                        continue;
+                    }
+
+                    // Fallback: Check for "Loss as White" or "Win as Black" patterns
+                    const resultMatch = line.match(/^(Win|Loss|Draw)\s+as\s+(White|Black)$/i);
+                    if (resultMatch && !currentGameInfo) {
+                        currentGameInfo = `${resultMatch[1]} as ${resultMatch[2]}`;
+                        continue;
+                    }
+
                     // Check for [Variant...][FEN...] on same line (FEN variant)
                     const combinedMatch = line.match(/\[Variant\s+"From\s+Position"\]\s*\[FEN\s+"([^"]+)"\]/);
                     if (combinedMatch) {
                         // Save any pending PGN first
                         if (currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
                             currentPgn = '';
                             inPgn = false;
                         }
@@ -2951,7 +2979,7 @@
                             }
                             if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
                         }
-                        window.allVariants.push({ type: 'fen', fen: combinedMatch[1], moves: moves, notes: notes, lineIndex: i });
+                        window.allVariants.push({ type: 'fen', fen: combinedMatch[1], moves: moves, notes: notes, lineIndex: i, gameInfo: currentGameInfo, fileName: currentFileName });
                         pendingVariant = false;
                         continue;
                     }
@@ -2961,7 +2989,7 @@
                         // Save any pending PGN first
                         if (currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
                             currentPgn = '';
                             inPgn = false;
                         }
@@ -2983,7 +3011,7 @@
                             }
                             if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
                         }
-                        window.allVariants.push({ type: 'fen', fen: fenOnlyMatch[1], moves: moves, notes: notes, lineIndex: variantLineIndex });
+                        window.allVariants.push({ type: 'fen', fen: fenOnlyMatch[1], moves: moves, notes: notes, lineIndex: variantLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
                         pendingVariant = false;
                         continue;
                     }
@@ -3008,7 +3036,7 @@
 
                         if (!inPgn && currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
                             currentPgn = '';
                         }
                         if (!inPgn) {
@@ -3021,7 +3049,7 @@
                     } else if (inPgn && line === '') {
                         if (currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
                         }
                         currentPgn = '';
                         inPgn = false;
@@ -3031,7 +3059,7 @@
                 // Don't forget last PGN
                 if (currentPgn.trim()) {
                     const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                    window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex });
+                    window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
                 }
 
                 // Sort by line index to maintain document order
@@ -3081,6 +3109,20 @@
                 const notesSpan = document.getElementById('variantNotesDisplay');
                 if (notesSpan) {
                     notesSpan.textContent = variant.notes || '';
+                }
+
+                // Update game info display
+                const gameInfoSpan = document.getElementById('currentGameInfo');
+                if (gameInfoSpan) {
+                    let displayText = '';
+                    if (variant.fileName) {
+                        displayText = `[${variant.fileName}] `;
+                    }
+                    if (variant.gameInfo) {
+                        displayText += variant.gameInfo;
+                    }
+                    gameInfoSpan.textContent = displayText;
+                    gameInfoSpan.title = displayText;
                 }
             };
 
