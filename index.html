@@ -758,7 +758,8 @@
           <button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
           <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
           <button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
-          <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN</button>
+          <button id="prevVariant" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
+          <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 600px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;"></span>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px; font-style: italic;"></span>
           <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
@@ -3156,6 +3157,23 @@
                         window.currentPgnVariantIndex = (window.currentPgnVariantIndex + 1) % window.pgnVariants.length;
                     }
                     window.loadCurrentPgnVariant();
+                });
+            }
+
+            // Combined Prev FEN/PGN Variant Button
+            const prevVariantBtn = document.getElementById('prevVariant');
+            if (prevVariantBtn) {
+                prevVariantBtn.addEventListener('click', function() {
+                    if (window.allVariants.length === 0) {
+                        const count = window.scanReportForAllVariants();
+                        if (count === 0) {
+                            alert('No FEN or PGN variants found in report.');
+                            return;
+                        }
+                    } else {
+                        window.currentVariantIndex = (window.currentVariantIndex - 1 + window.allVariants.length) % window.allVariants.length;
+                    }
+                    window.loadCurrentVariant();
                 });
             }
 
