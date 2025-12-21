@@ -706,6 +706,10 @@
       <button id="loadPreloadedReports" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Preloaded Reports</button>
       <span id="reportsCountDisplay" style="color: #51cf66; font-weight: bold;"></span>
       <button id="viewPreloadedReports" style="background: #6f42c1; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📋 View Reports</button>
+      <select id="openingDropdown" style="background: #1a1a2e; color: white; border: 2px solid #9c27b0; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">
+        <option value="">-- Select Opening --</option>
+      </select>
+      <button id="appendByOpeningBtn" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📚 Append Opening Reports</button>
       <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
       <button id="loadMistakesBtn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ Load Mistakes</button>
       <button id="removeMistakesBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">✓ Remove Mistakes</button>
@@ -755,6 +759,7 @@
           <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
           <button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN</button>
+          <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 600px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-block; vertical-align: middle;"></span>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px; font-style: italic;"></span>
           <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
           <button id="reportAppendVariantBtn" style="display: none; background: #20c997; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Report Append Variant</button>
@@ -1465,6 +1470,19 @@
             const reportText = document.getElementById('analysisReportText');
             reportContainer.style.display = 'block';
 
+            // Reset edit mode if active (fixes disconnect when generating new report while editing)
+            const textarea = document.getElementById('reportEditTextarea');
+            const editToggleBtn = document.getElementById('editViewToggleBtn');
+            if (textarea && textarea.style.display !== 'none') {
+                textarea.style.display = 'none';
+                reportText.style.display = 'block';
+                if (editToggleBtn) {
+                    editToggleBtn.textContent = 'Edit';
+                    editToggleBtn.style.background = '#9c27b0';
+                }
+                window.isReportEditMode = false;
+            }
+
             // Count blunders, mistakes, and inaccuracies
             const blunders = mistakes.filter(m => m.severity === 'BLUNDER').length;
             const mistakeCount = mistakes.filter(m => m.severity === 'MISTAKE').length;
@@ -1576,6 +1594,8 @@
 
             // Set the report text
             reportText.textContent = report;
+            // Update game info display
+            updateCurrentGameInfo(report);
 
             // Update filename display in header
             updateReportFilenameDisplay();
@@ -2263,6 +2283,27 @@
         }
 
         /**
+         * Extract and display game info from report content
+         */
+        function updateCurrentGameInfo(reportContent) {
+            const gameInfoSpan = document.getElementById('currentGameInfo');
+            if (!gameInfoSpan) return;
+
+            // Look for "Game: White: ... vs Black: ..." pattern
+            const gameMatch = reportContent.match(/Game:\s*White:\s*(.+?)\s*\((\d+)\)\s*vs\s*Black:\s*(.+?)\s*\((\d+)\)\s*\|\s*(\w+)\s*\(([^)]+)\)\s*\|\s*Result:\s*(\w+)(?:\s*\|\s*(https?:\/\/[^\s\n]+))?/);
+
+            if (gameMatch) {
+                const [, white, whiteRating, black, blackRating, timeClass, timeControl, result, url] = gameMatch;
+                let info = `Game: ${white} (${whiteRating}) vs ${black} (${blackRating}) | ${timeClass} (${timeControl}) | ${result}`;
+                if (url) info += ` | ${url}`;
+                gameInfoSpan.textContent = info;
+                gameInfoSpan.title = info; // Full text on hover
+            } else {
+                gameInfoSpan.textContent = '';
+            }
+        }
+
+        /**
          * Load analysis report from content
          */
         function loadStudyReportFromContent(clipboardText, sourceName = 'clipboard') {
@@ -2280,6 +2321,8 @@
             if (reportContainer && reportText) {
                 reportContainer.style.display = 'block';
                 reportText.textContent = clipboardText;
+                // Update game info display
+                updateCurrentGameInfo(clipboardText);
                 // Update filename display - use source filename if it's a .txt file
                 const filenameDisplay = document.getElementById('reportFilenameDisplay');
                 if (filenameDisplay) {
@@ -2603,7 +2646,7 @@
             window.scanReportForPgnVariants = function() {
                 const reportText = document.getElementById('analysisReportText');
                 const textarea = document.getElementById('reportEditTextarea');
-                const content = isReportEditMode ? textarea.value : reportText.textContent;
+                const content = window.isReportEditMode ? textarea.value : reportText.textContent;
 
                 window.pgnVariants = [];
                 // Match PGN that starts with move number and doesn't have [Variant or [FEN before it
@@ -2721,7 +2764,7 @@
             window.scanReportForFenVariants = function() {
                 const reportText = document.getElementById('analysisReportText');
                 const textarea = document.getElementById('reportEditTextarea');
-                const content = isReportEditMode ? textarea.value : reportText.textContent;
+                const content = window.isReportEditMode ? textarea.value : reportText.textContent;
 
                 window.fenVariants = [];
                 const lines = content.split('\n');
@@ -2861,7 +2904,7 @@
             window.scanReportForAllVariants = function() {
                 const reportText = document.getElementById('analysisReportText');
                 const textarea = document.getElementById('reportEditTextarea');
-                const content = isReportEditMode ? textarea.value : reportText.textContent;
+                const content = window.isReportEditMode ? textarea.value : reportText.textContent;
 
                 window.allVariants = [];
                 const lines = content.split('\n');
@@ -3256,6 +3299,7 @@
                     }
 
                     log(`Loaded ${txtFiles.length} report files`, 'success');
+                    populateOpeningDropdown();
                     openReportFilesModal();
                 });
             }
@@ -3307,6 +3351,7 @@
                         }
 
                         log(`Loaded ${filenames.length} preloaded report files`, 'success');
+                        populateOpeningDropdown();
                         openReportFilesModal();
 
                     } catch (err) {
@@ -3321,6 +3366,133 @@
             const viewReportsBtn = document.getElementById('viewPreloadedReports');
             if (viewReportsBtn) {
                 viewReportsBtn.addEventListener('click', openReportFilesModal);
+            }
+
+            // Parse filename to extract opening (e.g., "12-07_TTTstanley_white_Italian_Game_.txt")
+            function parseReportFilename(filename) {
+                // Skip analysis reports
+                if (filename.startsWith('chess_analysis')) {
+                    return { type: 'report', filename };
+                }
+                // Pattern: DATE_OPPONENT_COLOR_OPENING.txt
+                const match = filename.match(/^(\d+-\d+|\d+_\d+-\d+)_(.+?)_(white|black)_(.+?)\.txt$/i);
+                if (match) {
+                    return {
+                        date: match[1],
+                        opponent: match[2],
+                        color: match[3],
+                        opening: match[4].replace(/_/g, ' ').replace(/,\s*$/, '').trim(),
+                        filename
+                    };
+                }
+                return { type: 'unknown', filename };
+            }
+
+            // Populate opening dropdown from loaded report files
+            function populateOpeningDropdown() {
+                const dropdown = document.getElementById('openingDropdown');
+                const appendBtn = document.getElementById('appendByOpeningBtn');
+                if (!dropdown || !window.loadedReportFiles || window.loadedReportFiles.length === 0) return;
+
+                // Group files by opening
+                const openingGroups = {};
+                window.loadedReportFiles.forEach(file => {
+                    const parsed = parseReportFilename(file.name);
+                    if (parsed.opening) {
+                        if (!openingGroups[parsed.opening]) {
+                            openingGroups[parsed.opening] = [];
+                        }
+                        openingGroups[parsed.opening].push(file);
+                    }
+                });
+
+                // Clear and populate dropdown
+                dropdown.innerHTML = '<option value="">-- Select Opening --</option>';
+                const sortedOpenings = Object.keys(openingGroups).sort();
+                sortedOpenings.forEach(opening => {
+                    const count = openingGroups[opening].length;
+                    const option = document.createElement('option');
+                    option.value = opening;
+                    option.textContent = `${opening} (${count} game${count > 1 ? 's' : ''})`;
+                    dropdown.appendChild(option);
+                });
+
+                // Store groups for later use
+                window.reportsByOpening = openingGroups;
+
+                // Show dropdown and button if we have openings
+                if (sortedOpenings.length > 0) {
+                    dropdown.style.display = 'inline-block';
+                    appendBtn.style.display = 'inline-block';
+                }
+            }
+
+            // Append By Opening Button Handler
+            const appendByOpeningBtn = document.getElementById('appendByOpeningBtn');
+            if (appendByOpeningBtn) {
+                appendByOpeningBtn.addEventListener('click', async function() {
+                    const dropdown = document.getElementById('openingDropdown');
+                    const selectedOpening = dropdown.value;
+
+                    if (!selectedOpening || !window.reportsByOpening || !window.reportsByOpening[selectedOpening]) {
+                        alert('Please select an opening first.');
+                        return;
+                    }
+
+                    const files = window.reportsByOpening[selectedOpening];
+                    const reportContainer = document.getElementById('analysisReportContainer');
+                    const reportText = document.getElementById('analysisReportText');
+
+                    if (!reportContainer || !reportText) return;
+
+                    reportContainer.style.display = 'block';
+
+                    // Append each report
+                    let appendedContent = '';
+                    for (const file of files) {
+                        try {
+                            let content;
+                            if (typeof file.text === 'function') {
+                                content = await file.text();
+                            } else if (file.content) {
+                                content = file.content;
+                            }
+
+                            if (content) {
+                                appendedContent += '\n\n' + '='.repeat(70) + '\n';
+                                appendedContent += `FILE: ${file.name}\n`;
+                                appendedContent += '='.repeat(70) + '\n';
+                                appendedContent += content;
+                            }
+                        } catch (err) {
+                            console.error('Error loading file:', file.name, err);
+                        }
+                    }
+
+                    if (appendedContent) {
+                        // Append to existing content or set new
+                        if (reportText.textContent && reportText.textContent.trim() !== '') {
+                            reportText.textContent += appendedContent;
+                        } else {
+                            reportText.textContent = appendedContent.trim();
+                        }
+
+                        // Also update textarea if in edit mode
+                        const textarea = document.getElementById('reportEditTextarea');
+                        if (window.isReportEditMode && textarea) {
+                            textarea.value += appendedContent;
+                        }
+
+                        // Rescan variants
+                        window.fenVariants = [];
+                        window.pgnVariants = [];
+                        window.allVariants = [];
+                        window.scanReportForFenVariants();
+                        window.scanReportForPgnVariants();
+
+                        log(`Appended ${files.length} ${selectedOpening} reports`, 'success');
+                    }
+                });
             }
 
             // Close Modal Buttons
@@ -3341,7 +3513,7 @@
             }
 
             // Edit/View Toggle for Report
-            let isReportEditMode = false;
+            window.isReportEditMode = false;
             const editViewToggleBtn = document.getElementById('editViewToggleBtn');
             if (editViewToggleBtn) {
                 editViewToggleBtn.addEventListener('click', function() {
@@ -3349,14 +3521,14 @@
                     const textarea = document.getElementById('reportEditTextarea');
                     const toggleBtn = this;
 
-                    if (!isReportEditMode) {
+                    if (!window.isReportEditMode) {
                         // Switch to Edit mode
                         textarea.value = reportDiv.textContent;
                         reportDiv.style.display = 'none';
                         textarea.style.display = 'block';
                         toggleBtn.textContent = 'View only';
                         toggleBtn.style.background = '#6a1b9a';
-                        isReportEditMode = true;
+                        window.isReportEditMode = true;
                         textarea.focus();
                     } else {
                         // Switch to View only mode - apply edits
@@ -3366,7 +3538,7 @@
                         reportDiv.style.display = 'block';
                         toggleBtn.textContent = 'Edit';
                         toggleBtn.style.background = '#9c27b0';
-                        isReportEditMode = false;
+                        window.isReportEditMode = false;
                         // Rescan FEN/PGN variants with updated content
                         window.fenVariants = [];
                         window.pgnVariants = [];
@@ -3394,7 +3566,7 @@
                     const reportDiv = document.getElementById('analysisReportText');
                     const textarea = document.getElementById('reportEditTextarea');
 
-                    if (isReportEditMode) {
+                    if (window.isReportEditMode) {
                         // Append to textarea in edit mode
                         textarea.value += '\n\n' + variantText;
                     } else {
@@ -3421,7 +3593,7 @@
                     const reportText = document.getElementById('analysisReportText');
                     const reportTextarea = document.getElementById('reportEditTextarea');
                     // Get content based on current mode
-                    const content = isReportEditMode ? reportTextarea.value : reportText.textContent;
+                    const content = window.isReportEditMode ? reportTextarea.value : reportText.textContent;
                     if (content && content.trim() && content !== 'Loading report...') {
                         const blob = new Blob([content], { type: 'text/plain' });
                         const url = URL.createObjectURL(blob);
@@ -4367,7 +4539,7 @@ END OF GUIDE
                 copyReportTextBtn.addEventListener('click', function() {
                     const reportText = document.getElementById('analysisReportText');
                     const textarea = document.getElementById('reportEditTextarea');
-                    const content = isReportEditMode ? textarea.value : reportText.textContent;
+                    const content = window.isReportEditMode ? textarea.value : reportText.textContent;
 
                     if (!content || content === 'Loading report...' || content.trim() === '') {
                         alert('No report text to copy.');
