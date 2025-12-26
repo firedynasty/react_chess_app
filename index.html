@@ -761,7 +761,8 @@
           <button id="prevVariant" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4;"></span>
-          <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; margin-left: 10px; font-style: italic;"></span>
+          <br>
+          <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: block;"></span>
           <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
           <button id="reportAppendVariantBtn" style="display: none; background: #20c997; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Report Append Variant</button>
           <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
@@ -2114,6 +2115,68 @@
         };
 
         /**
+         * Parse PGN notation to array of FEN positions WITH comments extracted
+         * Returns { positions: [], comments: {} } where comments is keyed by position index
+         */
+        window.parsePgnToPositionsWithComments = function(pgnString) {
+            const positions = [];
+            const comments = {};  // Map of positionIndex -> comment text
+            try {
+                const chess = new Chess();
+
+                // Check if text has a FEN header
+                const fenMatch = pgnString.match(/\[FEN\s+"([^"]+)"\]/);
+                if (fenMatch) {
+                    const startingFen = fenMatch[1];
+                    try {
+                        chess.load(startingFen);
+                    } catch (fenError) {
+                        console.warn('Failed to load FEN, using standard position:', fenError);
+                        chess.reset();
+                    }
+                }
+
+                positions.push(chess.fen()); // Starting position
+
+                // Remove headers and variations but PRESERVE comments initially
+                let pgnBody = pgnString
+                    .replace(/\[.*?\]/g, '')      // Remove headers
+                    .replace(/\([^)]*\)/g, '')    // Remove variations
+                    .replace(/\$\d+/g, '')        // Remove NAG symbols
+                    .replace(/\d+\.\.\./g, '')    // Remove black move indicators
+                    .trim();
+
+                // Extract moves with their trailing comments
+                // Pattern: move possibly followed by {comment}
+                const tokenRegex = /([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O-O|O-O)(?:\+|#)?(?:\s*\{([^}]*)\})?/g;
+                let match;
+
+                while ((match = tokenRegex.exec(pgnBody)) !== null) {
+                    const move = match[1];
+                    const comment = match[2] ? match[2].trim() : null;
+
+                    try {
+                        const result = chess.move(move, { sloppy: true });
+                        if (result) {
+                            positions.push(chess.fen());
+                            if (comment) {
+                                comments[positions.length - 1] = comment;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Invalid move:', move);
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing PGN with comments:', e);
+            }
+            return { positions, comments };
+        };
+
+        // Global storage for current variant's comments
+        window.studyReportComments = {};
+
+        /**
          * Calculate captured pieces and material advantage from FEN
          */
         function getCapturedPieces(fen) {
@@ -2256,6 +2319,19 @@
             // Update material display
             if (window.studyReportPositions[index]) {
                 updateMaterialDisplay(window.studyReportPositions[index]);
+            }
+
+            // Update variant notes display with PGN comment for current position
+            const variantNotesDisplay = document.getElementById('variantNotesDisplay');
+            if (variantNotesDisplay) {
+                const comment = window.studyReportComments ? window.studyReportComments[index] : null;
+                const dashes = '-----------------------------------';
+                if (comment) {
+                    variantNotesDisplay.textContent = dashes + ' ' + comment;
+                } else {
+                    variantNotesDisplay.textContent = dashes;
+                }
+                variantNotesDisplay.style.color = '#ffd700';
             }
         }
 
@@ -3080,9 +3156,12 @@
                     const pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
                     window.currentVariantType = 'fen';
                     window.studyReportPositions = window.parsePgnToPositions(pgnString);
+                    window.studyReportComments = {};  // FEN variants don't have inline comments
                 } else {
                     window.currentVariantType = 'pgn';
-                    window.studyReportPositions = window.parsePgnToPositions(variant.pgn);
+                    const result = window.parsePgnToPositionsWithComments(variant.pgn);
+                    window.studyReportPositions = result.positions;
+                    window.studyReportComments = result.comments;
                 }
 
                 window.studyReportPositionIndex = 0;
