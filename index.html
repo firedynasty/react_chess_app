@@ -530,6 +530,50 @@
             border-top: 1px solid #444;
             margin: 16px 0;
         }
+        /* Move Table Styles */
+        .move-number {
+            color: #888;
+            margin-right: 2px;
+        }
+        .move-san {
+            color: #eee;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            margin-right: 3px;
+            display: inline;
+        }
+        .move-san:hover {
+            background: #17a2b8;
+            color: #fff;
+        }
+        .move-san.current {
+            background: #00d4ff;
+            color: #1a1a2e;
+        }
+        .move-san.main-line {
+            font-weight: bold;
+        }
+        .variation-container {
+            display: inline;
+            color: #888;
+            margin-left: 4px;
+        }
+        .variation-move {
+            color: #aaa;
+            cursor: pointer;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-size: 12px;
+        }
+        .variation-move:hover {
+            background: #6f42c1;
+            color: #fff;
+        }
+        .variation-move.current {
+            background: #9c27b0;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -775,6 +819,12 @@
                  background: #0f3460; color: #eee; resize: vertical; display: none;"
           placeholder="After clicking 'Set Variant', make moves on the board to build PGN..."
           readonly></textarea>
+        <!-- Clickable Move Table with Variation Support -->
+        <div id="moveTableContainer"
+             style="width: 100%; max-height: 200px; overflow-y: auto; margin-top: 10px;
+                    padding: 10px; background: #0f3460; border-radius: 5px;
+                    font-family: monospace; font-size: 13px; line-height: 1.8; display: none;">
+        </div>
       </div>
     </div>
 
@@ -2042,6 +2092,12 @@
         window.studyReportPositionIndex = 0;
         window.loadedReportFiles = [];
         window.loadedMistakes = {}; // { "12...": "MISTAKE", "13.": "MISTAKE", "17.": "BLUNDER" }
+
+        // Move tree navigation (for variation support)
+        window.moveTree = null;           // Root node of parsed move tree
+        window.currentMoveNode = null;    // Currently selected node in the tree
+        window.moveNodeRegistry = {};     // Map of nodeId -> MoveNode for fast lookup
+
         let refImageLoaded = false;
         let refImageIsEnlarged = false;
         let loadedRefImages = [];
@@ -2175,6 +2231,400 @@
 
         // Global storage for current variant's comments
         window.studyReportComments = {};
+
+        /**
+         * Tokenize PGN text preserving parentheses as tokens
+         */
+        function tokenizePgn(moveText) {
+            const tokens = [];
+            let current = '';
+            let inComment = false;
+
+            for (let i = 0; i < moveText.length; i++) {
+                const char = moveText[i];
+
+                if (char === '{') {
+                    if (current.trim()) tokens.push(current.trim());
+                    current = '{';
+                    inComment = true;
+                } else if (char === '}') {
+                    current += '}';
+                    tokens.push(current);
+                    current = '';
+                    inComment = false;
+                } else if (inComment) {
+                    current += char;
+                } else if (char === '(' || char === ')') {
+                    if (current.trim()) tokens.push(current.trim());
+                    tokens.push(char);
+                    current = '';
+                } else if (/\s/.test(char)) {
+                    if (current.trim()) tokens.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            if (current.trim()) tokens.push(current.trim());
+
+            return tokens;
+        }
+
+        /**
+         * Parse PGN with variations into a tree structure
+         * Returns root node with children array
+         */
+        window.parsePgnWithVariations = function(pgnString) {
+            // Extract starting FEN (if present)
+            const fenMatch = pgnString.match(/\[FEN\s+"([^"]+)"\]/);
+            const startingFen = fenMatch ? fenMatch[1] : 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+
+            // Remove headers, keep move text
+            let moveText = pgnString.replace(/\[.*?\]/g, '').trim();
+
+            // Tokenize the PGN
+            const tokens = tokenizePgn(moveText);
+
+            // Initialize chess from starting position
+            const chess = new Chess();
+            try {
+                chess.load(startingFen);
+            } catch (e) {
+                console.warn('Failed to load starting FEN:', e);
+                chess.reset();
+            }
+
+            // Create root node
+            const rootNode = {
+                san: null,
+                fen: chess.fen(),
+                moveNumber: 0,
+                isBlackMove: false,
+                comment: '',
+                parent: null,
+                children: [],
+                depth: 0,
+                nodeId: 'root'
+            };
+
+            // Reset registry
+            window.moveNodeRegistry = { 'root': rootNode };
+
+            // Parse tokens into tree
+            let nodeCounter = 0;
+            parseTokensIntoTree(tokens, 0, chess, rootNode, 0, { counter: nodeCounter });
+
+            return rootNode;
+        };
+
+        /**
+         * Recursively parse tokens into a move tree
+         */
+        function parseTokensIntoTree(tokens, startIndex, chess, parentNode, depth, counterObj) {
+            let i = startIndex;
+            let lastMoveNode = parentNode;
+            let branchChess = chess; // Chess instance for this branch
+
+            while (i < tokens.length) {
+                const token = tokens[i];
+
+                if (token === '(') {
+                    // Start of variation - branch from the position BEFORE the last move
+                    // Find the correct branching point (parent of last move)
+                    const branchPoint = lastMoveNode.parent || parentNode;
+
+                    // Create a new chess instance from the branch point's position
+                    const variationChess = new Chess();
+                    variationChess.load(branchPoint.fen);
+
+                    // Parse the variation recursively
+                    i = parseTokensIntoTree(tokens, i + 1, variationChess, branchPoint, depth + 1, counterObj);
+                    continue;
+                }
+
+                if (token === ')') {
+                    // End of variation
+                    return i + 1;
+                }
+
+                // Skip comments - they attach to the previous move
+                if (token.startsWith('{')) {
+                    const comment = token.slice(1, -1).trim();
+                    if (lastMoveNode && lastMoveNode !== parentNode) {
+                        lastMoveNode.comment = comment;
+                    }
+                    i++;
+                    continue;
+                }
+
+                // Skip move numbers (1. 2. 1... etc)
+                if (/^\d+\.+$/.test(token)) {
+                    i++;
+                    continue;
+                }
+
+                // Skip NAG symbols ($1, $2, etc.)
+                if (/^\$\d+$/.test(token)) {
+                    i++;
+                    continue;
+                }
+
+                // Skip result markers
+                if (['1-0', '0-1', '1/2-1/2', '*'].includes(token)) {
+                    i++;
+                    continue;
+                }
+
+                // This is a move - try to make it
+                try {
+                    // Determine whose turn it was BEFORE the move
+                    const turnBeforeMove = branchChess.turn();
+                    const move = branchChess.move(token, { sloppy: true });
+                    if (move) {
+                        // Calculate move number based on parent's info
+                        let moveNumber;
+                        const isBlackMove = (turnBeforeMove === 'b');
+
+                        if (lastMoveNode.nodeId === 'root') {
+                            // First move from root - extract from FEN or default to 1
+                            const fenParts = lastMoveNode.fen.split(' ');
+                            moveNumber = fenParts.length >= 6 ? parseInt(fenParts[5]) || 1 : 1;
+                        } else {
+                            // Continue from parent's move number
+                            if (isBlackMove) {
+                                // Black's move - same move number as parent if parent was white
+                                moveNumber = lastMoveNode.moveNumber;
+                            } else {
+                                // White's move - increment from parent
+                                moveNumber = lastMoveNode.moveNumber + (lastMoveNode.isBlackMove ? 1 : 0);
+                            }
+                        }
+
+                        const newNode = {
+                            san: move.san,
+                            fen: branchChess.fen(),
+                            moveNumber: moveNumber,
+                            isBlackMove: isBlackMove,
+                            comment: '',
+                            parent: lastMoveNode,
+                            children: [],
+                            depth: depth,
+                            nodeId: `node-${counterObj.counter++}`
+                        };
+
+                        // Add as child of current node
+                        lastMoveNode.children.push(newNode);
+                        window.moveNodeRegistry[newNode.nodeId] = newNode;
+                        lastMoveNode = newNode;
+                    }
+                } catch (e) {
+                    console.warn('Invalid move:', token, e);
+                }
+
+                i++;
+            }
+
+            return i;
+        }
+
+        /**
+         * Render the move table with clickable moves and variations
+         */
+        function renderMoveTable(rootNode) {
+            const container = document.getElementById('moveTableContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+            container.style.display = 'block';
+
+            // Render from root's children (the actual moves)
+            if (rootNode.children && rootNode.children.length > 0) {
+                renderMoveSequence(rootNode.children[0], container, true);
+            }
+        }
+
+        /**
+         * Render a sequence of moves starting from a node
+         */
+        function renderMoveSequence(startNode, container, isMainLine) {
+            let node = startNode;
+            let lastMoveNumber = 0;
+
+            while (node) {
+                // Add move number if it's white's move or first move in a line
+                if (!node.isBlackMove && node.moveNumber !== lastMoveNumber) {
+                    const numSpan = document.createElement('span');
+                    numSpan.className = 'move-number';
+                    numSpan.textContent = node.moveNumber + '. ';
+                    container.appendChild(numSpan);
+                    lastMoveNumber = node.moveNumber;
+                }
+
+                // The move itself
+                const moveSpan = document.createElement('span');
+                moveSpan.className = isMainLine ? 'move-san main-line' : 'move-san';
+                moveSpan.textContent = node.san;
+                moveSpan.dataset.nodeId = node.nodeId;
+                moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
+                container.appendChild(moveSpan);
+
+                // Check for variations (siblings - other children of parent besides this line)
+                if (node.parent && node.parent.children.length > 1) {
+                    const siblingIndex = node.parent.children.indexOf(node);
+                    // Only show variations after the first child (main line continuation)
+                    if (siblingIndex === 0) {
+                        // Render other variations
+                        for (let v = 1; v < node.parent.children.length; v++) {
+                            const variation = node.parent.children[v];
+                            renderVariation(variation, container);
+                        }
+                    }
+                }
+
+                // Continue with first child (main continuation)
+                if (node.children && node.children.length > 0) {
+                    node = node.children[0];
+                } else {
+                    break;
+                }
+            }
+        }
+
+        /**
+         * Render a variation in parentheses
+         */
+        function renderVariation(startNode, container) {
+            // Opening parenthesis
+            const openParen = document.createElement('span');
+            openParen.className = 'variation-container';
+            openParen.textContent = '(';
+            container.appendChild(openParen);
+
+            // Render variation moves
+            let node = startNode;
+            let isFirst = true;
+
+            while (node) {
+                // Move number for first move in variation
+                if (isFirst) {
+                    const numSpan = document.createElement('span');
+                    numSpan.className = 'move-number';
+                    if (node.isBlackMove) {
+                        numSpan.textContent = node.moveNumber + '... ';
+                    } else {
+                        numSpan.textContent = node.moveNumber + '. ';
+                    }
+                    container.appendChild(numSpan);
+                    isFirst = false;
+                } else if (!node.isBlackMove) {
+                    // Add move number for white moves after first
+                    const numSpan = document.createElement('span');
+                    numSpan.className = 'move-number';
+                    numSpan.textContent = node.moveNumber + '. ';
+                    container.appendChild(numSpan);
+                }
+
+                // The move
+                const moveSpan = document.createElement('span');
+                moveSpan.className = 'variation-move';
+                moveSpan.textContent = node.san;
+                moveSpan.dataset.nodeId = node.nodeId;
+                moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
+                container.appendChild(moveSpan);
+
+                // Space after move
+                container.appendChild(document.createTextNode(' '));
+
+                // Continue with first child
+                if (node.children && node.children.length > 0) {
+                    node = node.children[0];
+                } else {
+                    break;
+                }
+            }
+
+            // Closing parenthesis
+            const closeParen = document.createElement('span');
+            closeParen.className = 'variation-container';
+            closeParen.textContent = ') ';
+            container.appendChild(closeParen);
+        }
+
+        /**
+         * Jump to a specific node in the move tree
+         */
+        function jumpToNode(nodeId) {
+            const node = window.moveNodeRegistry[nodeId];
+            if (!node) return;
+
+            window.currentMoveNode = node;
+
+            // Update board position
+            if (window.board2) {
+                window.board2.position(node.fen);
+            }
+
+            // Update highlighting in move table
+            document.querySelectorAll('.move-san.current, .variation-move.current').forEach(el => {
+                el.classList.remove('current');
+            });
+            const currentEl = document.querySelector(`[data-node-id="${nodeId}"]`);
+            if (currentEl) {
+                currentEl.classList.add('current');
+                currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Update other displays
+            updateMaterialDisplay(node.fen);
+
+            // Update Lichess link
+            const lichessLink = document.getElementById('lichessBoard2Link');
+            if (lichessLink) {
+                const fen = node.fen;
+                lichessLink.href = `https://lichess.org/analysis/${fen.replace(/ /g, '_')}`;
+            }
+
+            // Update variant notes display with comment
+            const variantNotesDisplay = document.getElementById('variantNotesDisplay');
+            if (variantNotesDisplay) {
+                const dashes = '-----------------------------------';
+                if (node.comment) {
+                    variantNotesDisplay.textContent = dashes + ' ' + node.comment;
+                } else {
+                    variantNotesDisplay.textContent = dashes;
+                }
+                variantNotesDisplay.style.color = '#ffd700';
+            }
+        }
+
+        /**
+         * Navigate to the start position (root node)
+         */
+        function jumpToRoot() {
+            if (!window.moveTree) return;
+
+            window.currentMoveNode = null;
+
+            // Update board position
+            if (window.board2) {
+                window.board2.position(window.moveTree.fen);
+            }
+
+            // Clear highlighting
+            document.querySelectorAll('.move-san.current, .variation-move.current').forEach(el => {
+                el.classList.remove('current');
+            });
+
+            // Update other displays
+            updateMaterialDisplay(window.moveTree.fen);
+
+            // Update variant notes display
+            const variantNotesDisplay = document.getElementById('variantNotesDisplay');
+            if (variantNotesDisplay) {
+                variantNotesDisplay.textContent = '-----------------------------------';
+                variantNotesDisplay.style.color = '#ffd700';
+            }
+        }
 
         /**
          * Calculate captured pieces and material advantage from FEN
@@ -2336,6 +2786,22 @@
         }
 
         function board2NextMove() {
+            // Tree-based navigation (if move tree is active)
+            if (window.moveTree) {
+                if (window.currentMoveNode === null) {
+                    // At start position, go to first move
+                    if (window.moveTree.children && window.moveTree.children.length > 0) {
+                        jumpToNode(window.moveTree.children[0].nodeId);
+                    }
+                } else if (window.currentMoveNode.children && window.currentMoveNode.children.length > 0) {
+                    // Go to first child (main continuation)
+                    jumpToNode(window.currentMoveNode.children[0].nodeId);
+                }
+                // If no children, stay at current position (end of line)
+                return;
+            }
+
+            // Fallback: flat array navigation
             if (!window.studyReportPositions || window.studyReportPositions.length === 0) return;
             window.studyReportPositionIndex++;
             if (window.studyReportPositionIndex >= window.studyReportPositions.length) {
@@ -2348,6 +2814,24 @@
         }
 
         function board2PrevMove() {
+            // Tree-based navigation (if move tree is active)
+            if (window.moveTree) {
+                if (window.currentMoveNode === null) {
+                    // Already at start, do nothing
+                    return;
+                } else if (window.currentMoveNode.parent) {
+                    if (window.currentMoveNode.parent.nodeId === 'root') {
+                        // Going back to root (start position)
+                        jumpToRoot();
+                    } else {
+                        // Go to parent node
+                        jumpToNode(window.currentMoveNode.parent.nodeId);
+                    }
+                }
+                return;
+            }
+
+            // Fallback: flat array navigation
             if (!window.studyReportPositions || window.studyReportPositions.length === 0) return;
             window.studyReportPositionIndex--;
             if (window.studyReportPositionIndex < 0) {
@@ -3151,19 +3635,26 @@
                 if (window.allVariants.length === 0) return;
 
                 const variant = window.allVariants[window.currentVariantIndex];
+                let pgnString;
 
                 if (variant.type === 'fen') {
-                    const pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
+                    pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
                     window.currentVariantType = 'fen';
                     const result = window.parsePgnToPositionsWithComments(pgnString);
                     window.studyReportPositions = result.positions;
                     window.studyReportComments = result.comments;
                 } else {
+                    pgnString = variant.pgn;
                     window.currentVariantType = 'pgn';
                     const result = window.parsePgnToPositionsWithComments(variant.pgn);
                     window.studyReportPositions = result.positions;
                     window.studyReportComments = result.comments;
                 }
+
+                // Parse with variation support and render move table
+                window.moveTree = window.parsePgnWithVariations(pgnString);
+                window.currentMoveNode = null; // Start at beginning
+                renderMoveTable(window.moveTree);
 
                 window.studyReportPositionIndex = 0;
                 if (window.studyReportPositions && window.studyReportPositions.length > 0) {
