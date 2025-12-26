@@ -3155,8 +3155,9 @@
                 if (variant.type === 'fen') {
                     const pgnString = `[Variant "From Position"]\n[FEN "${variant.fen}"]\n\n${variant.moves}`;
                     window.currentVariantType = 'fen';
-                    window.studyReportPositions = window.parsePgnToPositions(pgnString);
-                    window.studyReportComments = {};  // FEN variants don't have inline comments
+                    const result = window.parsePgnToPositionsWithComments(pgnString);
+                    window.studyReportPositions = result.positions;
+                    window.studyReportComments = result.comments;
                 } else {
                     window.currentVariantType = 'pgn';
                     const result = window.parsePgnToPositionsWithComments(variant.pgn);
