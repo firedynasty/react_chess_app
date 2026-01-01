@@ -2203,8 +2203,8 @@
                     .trim();
 
                 // Extract moves with their trailing comments
-                // Pattern: move possibly followed by {comment}
-                const tokenRegex = /([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O-O|O-O)(?:\+|#)?(?:\s*\{([^}]*)\})?/g;
+                // Pattern: move possibly followed by annotations (!?!???!) then {comment}
+                const tokenRegex = /([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O-O|O-O)(?:\+|#)?[!?]*(?:\s*\{([^}]*)\})?/g;
                 let match;
 
                 while ((match = tokenRegex.exec(pgnBody)) !== null) {
@@ -2377,9 +2377,21 @@
 
                 // This is a move - try to make it
                 try {
+                    // First, strip any move number prefix (e.g., "12.Bg5" -> "Bg5")
+                    let moveToken = token.replace(/^\d+\.+/, '');
+
+                    // Extract annotation symbols (!, ?, !!, ??, !?, ?!) from the move
+                    const annotationMatch = moveToken.match(/^(.+?)([!?]+)$/);
+                    const cleanMove = annotationMatch ? annotationMatch[1] : moveToken;
+                    const annotation = annotationMatch ? annotationMatch[2] : '';
+
+                    if (annotation) {
+                        console.log('Found annotation:', token, '-> move:', cleanMove, 'annotation:', annotation);
+                    }
+
                     // Determine whose turn it was BEFORE the move
                     const turnBeforeMove = branchChess.turn();
-                    const move = branchChess.move(token, { sloppy: true });
+                    const move = branchChess.move(cleanMove, { sloppy: true });
                     if (move) {
                         // Calculate move number based on parent's info
                         let moveNumber;
@@ -2402,6 +2414,7 @@
 
                         const newNode = {
                             san: move.san,
+                            annotation: annotation,
                             fen: branchChess.fen(),
                             moveNumber: moveNumber,
                             isBlackMove: isBlackMove,
@@ -2460,10 +2473,10 @@
                     lastMoveNumber = node.moveNumber;
                 }
 
-                // The move itself
+                // The move itself (with annotation if present)
                 const moveSpan = document.createElement('span');
                 moveSpan.className = isMainLine ? 'move-san main-line' : 'move-san';
-                moveSpan.textContent = node.san;
+                moveSpan.textContent = node.san + (node.annotation || '');
                 moveSpan.dataset.nodeId = node.nodeId;
                 moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
                 container.appendChild(moveSpan);
@@ -2524,10 +2537,10 @@
                     container.appendChild(numSpan);
                 }
 
-                // The move
+                // The move (with annotation if present)
                 const moveSpan = document.createElement('span');
                 moveSpan.className = 'variation-move';
-                moveSpan.textContent = node.san;
+                moveSpan.textContent = node.san + (node.annotation || '');
                 moveSpan.dataset.nodeId = node.nodeId;
                 moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
                 container.appendChild(moveSpan);
@@ -3652,7 +3665,12 @@
                 }
 
                 // Parse with variation support and render move table
+                console.log('Parsing PGN with variations:', pgnString.substring(0, 100));
                 window.moveTree = window.parsePgnWithVariations(pgnString);
+                console.log('Move tree parsed, root children:', window.moveTree?.children?.length);
+                if (window.moveTree?.children?.[0]) {
+                    console.log('First move:', window.moveTree.children[0].san, 'annotation:', window.moveTree.children[0].annotation);
+                }
                 window.currentMoveNode = null; // Start at beginning
                 renderMoveTable(window.moveTree);
 

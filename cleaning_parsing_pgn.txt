@@ -1,0 +1,97 @@
+PGN Parsing Fixes for Annotations
+==================================
+Date: 2025-12-31
+
+PROBLEM
+-------
+PGN with annotation symbols (?, !, ?!, !?) was not being parsed correctly:
+1. Annotations were not displayed in the move table
+2. Comments in {curly braces} after annotated moves were not captured
+3. Move numbers attached to moves (e.g., "12.Bg5?") caused parsing to fail
+
+Example PGN that failed:
+1.d4 g6 2.c4 Bg7 ... 12.Bg5? exd4 ... 16.Bxf6! Bxf6 ... 18.Qd5+? {Kg5 is the best move}
+
+
+CHANGES MADE
+------------
+
+1. parseTokensIntoTree (index.html ~line 2378-2394)
+   - Added move number prefix stripping: token.replace(/^\d+\.+/, '')
+   - Added annotation extraction regex: moveToken.match(/^(.+?)([!?]+)$/)
+   - Store annotation in move node
+
+   Before:
+     const move = branchChess.move(token, { sloppy: true });
+
+   After:
+     let moveToken = token.replace(/^\d+\.+/, '');
+     const annotationMatch = moveToken.match(/^(.+?)([!?]+)$/);
+     const cleanMove = annotationMatch ? annotationMatch[1] : moveToken;
+     const annotation = annotationMatch ? annotationMatch[2] : '';
+     const move = branchChess.move(cleanMove, { sloppy: true });
+
+
+2. Move node structure (index.html ~line 2408-2419)
+   - Added 'annotation' field to store parsed annotation
+
+   const newNode = {
+       san: move.san,
+       annotation: annotation,  // NEW FIELD
+       fen: branchChess.fen(),
+       ...
+   };
+
+
+3. renderMoveSequence (index.html ~line 2472)
+   - Display annotation with move in main line
+
+   Before:
+     moveSpan.textContent = node.san;
+
+   After:
+     moveSpan.textContent = node.san + (node.annotation || '');
+
+
+4. renderVariation (index.html ~line 2536)
+   - Display annotation with move in variation lines
+
+   Before:
+     moveSpan.textContent = node.san;
+
+   After:
+     moveSpan.textContent = node.san + (node.annotation || '');
+
+
+5. parsePgnToPositionsWithComments tokenRegex (index.html ~line 2207)
+   - Added [!?]* to capture comments after annotation symbols
+
+   Before:
+     /([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O-O|O-O)(?:\+|#)?(?:\s*\{([^}]*)\})?/g
+
+   After:
+     /([KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O-O|O-O)(?:\+|#)?[!?]*(?:\s*\{([^}]*)\})?/g
+
+   This allows comments to be captured after annotations:
+     Qd5+? {comment}  <- now captures "comment"
+
+
+ANNOTATION SYMBOLS SUPPORTED
+----------------------------
+! = good move
+? = mistake
+!! = brilliant move
+?? = blunder
+!? = interesting move
+?! = dubious/inaccuracy
+
+
+DEBUG LOGGING (can be removed later)
+------------------------------------
+- Line ~3661-3666: Logs PGN parsing and move tree info
+- Line ~2388-2390: Logs each annotation found
+
+Console output example:
+  Found annotation: 12.Bg5? -> move: Bg5 annotation: ?
+  Found annotation: 16.Bxf6! -> move: Bxf6 annotation: !
+  Move tree parsed, root children: 1
