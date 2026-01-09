@@ -2171,6 +2171,49 @@
         };
 
         /**
+         * NAG (Numeric Annotation Glyph) to symbol mapping
+         * Converts PGN NAG codes like $1, $2, $4, $6 to their symbolic equivalents
+         */
+        const nagToSymbol = {
+            '$1': '!',    // Good move
+            '$2': '?',    // Mistake
+            '$3': '!!',   // Brilliant move
+            '$4': '??',   // Blunder
+            '$5': '!?',   // Interesting move
+            '$6': '?!',   // Dubious/questionable move
+            '$7': '□',    // Forced move (only move)
+            '$8': '□',    // Singular move
+            '$9': '',     // Unclear position - skip/don't display
+            '$10': '=',   // Equal position
+            '$11': '=',   // Equal, quiet position
+            '$12': '=',   // Equal, active position
+            '$13': '∞',   // Unclear
+            '$14': '+=',  // White slightly better
+            '$15': '=+',  // Black slightly better
+            '$16': '±',   // White clearly better
+            '$17': '∓',   // Black clearly better
+            '$18': '+-',  // White winning
+            '$19': '-+',  // Black winning
+            '$22': '⨀',   // Zugzwang
+            '$32': '⟳',   // Development advantage
+            '$36': '→',   // Initiative
+            '$40': '↑',   // Attack
+            '$132': '⇆',  // Counterplay
+            '$138': '⊕',  // Time pressure
+            '$140': '∆',  // With the idea
+            '$146': 'N',  // Novelty
+        };
+
+        /**
+         * Convert NAG symbols in PGN text to their symbolic equivalents
+         */
+        function convertNagsToSymbols(pgnText) {
+            return pgnText.replace(/\$(\d+)/g, function(match) {
+                return nagToSymbol[match] || '';
+            });
+        }
+
+        /**
          * Parse PGN notation to array of FEN positions WITH comments extracted
          * Returns { positions: [], comments: {} } where comments is keyed by position index
          */
@@ -2363,8 +2406,13 @@
                     continue;
                 }
 
-                // Skip NAG symbols ($1, $2, etc.)
+                // Convert NAG symbols ($1, $2, etc.) and append to previous move's annotation
                 if (/^\$\d+$/.test(token)) {
+                    const nagSymbol = nagToSymbol[token] || '';
+                    if (nagSymbol && lastMoveNode && lastMoveNode.nodeId !== 'root') {
+                        lastMoveNode.annotation = (lastMoveNode.annotation || '') + nagSymbol;
+                        console.log('Converted NAG:', token, '-> symbol:', nagSymbol, 'for move:', lastMoveNode.san);
+                    }
                     i++;
                     continue;
                 }
