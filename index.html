@@ -825,6 +825,12 @@
                     padding: 10px; background: #0f3460; border-radius: 5px;
                     font-family: monospace; font-size: 13px; line-height: 1.8; display: none;">
         </div>
+        <!-- All Comments Display -->
+        <div id="allCommentsContainer"
+             style="width: 100%; max-height: 150px; overflow-y: auto; margin-top: 10px;
+                    padding: 10px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 5px;
+                    font-family: monospace; font-size: 12px; line-height: 1.6; display: none;">
+        </div>
       </div>
     </div>
 
@@ -2489,6 +2495,18 @@
         }
 
         /**
+         * Get color for move based on annotation
+         * ? (mistake) = red, ?! (dubious) = yellow, ?? (blunder) = dark red
+         */
+        function getAnnotationColor(annotation) {
+            if (!annotation) return null;
+            if (annotation.includes('??')) return '#ff4444'; // Blunder - bright red
+            if (annotation.includes('?!')) return '#ffd700'; // Dubious - yellow
+            if (annotation.includes('?') && !annotation.includes('!?')) return '#ff6b6b'; // Mistake - red
+            return null; // No special color for good moves
+        }
+
+        /**
          * Render the move table with clickable moves and variations
          */
         function renderMoveTable(rootNode) {
@@ -2527,6 +2545,11 @@
                 moveSpan.textContent = node.san + (node.annotation || '');
                 moveSpan.dataset.nodeId = node.nodeId;
                 moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
+                // Apply color based on annotation (? = red, ?! = yellow)
+                const annotationColor = getAnnotationColor(node.annotation);
+                if (annotationColor) {
+                    moveSpan.style.color = annotationColor;
+                }
                 container.appendChild(moveSpan);
 
                 // Check for variations (siblings - other children of parent besides this line)
@@ -2591,6 +2614,11 @@
                 moveSpan.textContent = node.san + (node.annotation || '');
                 moveSpan.dataset.nodeId = node.nodeId;
                 moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
+                // Apply color based on annotation (? = red, ?! = yellow)
+                const annotationColor = getAnnotationColor(node.annotation);
+                if (annotationColor) {
+                    moveSpan.style.color = annotationColor;
+                }
                 container.appendChild(moveSpan);
 
                 // Space after move
@@ -2656,6 +2684,147 @@
                 }
                 variantNotesDisplay.style.color = '#ffd700';
             }
+
+            // Update all comments display
+            updateAllCommentsDisplay();
+        }
+
+        /**
+         * Collect all comments from the move tree
+         */
+        function collectAllComments(rootNode) {
+            const comments = [];
+
+            function traverse(node, isMainLine = true) {
+                if (!node) return;
+
+                // Add comment if this node has one
+                if (node.comment && node.san) {
+                    comments.push({
+                        moveNumber: node.moveNumber,
+                        san: node.san,
+                        annotation: node.annotation || '',
+                        comment: node.comment,
+                        nodeId: node.nodeId,
+                        isBlackMove: node.isBlackMove,
+                        isMainLine: isMainLine
+                    });
+                }
+
+                // Traverse children
+                if (node.children && node.children.length > 0) {
+                    // First child is main line
+                    traverse(node.children[0], isMainLine);
+                    // Other children are variations
+                    for (let i = 1; i < node.children.length; i++) {
+                        traverse(node.children[i], false);
+                    }
+                }
+            }
+
+            traverse(rootNode);
+            return comments;
+        }
+
+        /**
+         * Update the all comments display panel
+         */
+        function updateAllCommentsDisplay() {
+            const container = document.getElementById('allCommentsContainer');
+            if (!container) return;
+
+            container.innerHTML = '';
+
+            // Get comments from move tree or flat array
+            let comments = [];
+
+            if (window.moveTree) {
+                comments = collectAllComments(window.moveTree);
+            } else if (window.studyReportComments) {
+                // Fallback to flat comments array
+                Object.keys(window.studyReportComments).forEach(index => {
+                    const comment = window.studyReportComments[index];
+                    if (comment) {
+                        const moveNum = Math.floor(parseInt(index) / 2) + 1;
+                        const isBlack = parseInt(index) % 2 === 1;
+                        comments.push({
+                            moveNumber: moveNum,
+                            san: '',
+                            annotation: '',
+                            comment: comment,
+                            nodeId: null,
+                            isBlackMove: isBlack,
+                            isMainLine: true,
+                            flatIndex: parseInt(index)
+                        });
+                    }
+                });
+            }
+
+            if (comments.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.style.display = 'block';
+
+            // Get current node ID for highlighting
+            const currentNodeId = window.currentMoveNode ? window.currentMoveNode.nodeId : null;
+            const currentFlatIndex = window.studyReportPositionIndex;
+
+            comments.forEach((c, idx) => {
+                const commentDiv = document.createElement('div');
+                commentDiv.style.padding = '4px 8px';
+                commentDiv.style.marginBottom = '4px';
+                commentDiv.style.borderRadius = '3px';
+                commentDiv.style.cursor = 'pointer';
+
+                // Check if this is the current comment
+                const isCurrent = (c.nodeId && c.nodeId === currentNodeId) ||
+                                  (c.flatIndex !== undefined && c.flatIndex === currentFlatIndex);
+
+                if (isCurrent) {
+                    commentDiv.style.background = '#0f3460';
+                    commentDiv.style.borderLeft = '3px solid #ffd700';
+                } else {
+                    commentDiv.style.background = 'transparent';
+                    commentDiv.style.borderLeft = '3px solid transparent';
+                }
+
+                // Build move label: "7... d5" or "8. exd5"
+                let moveLabel = c.moveNumber + (c.isBlackMove ? '... ' : '. ');
+                if (c.san) {
+                    moveLabel += c.san + c.annotation;
+                }
+
+                // Create content - use annotation color if available
+                const labelSpan = document.createElement('span');
+                const annotationColor = getAnnotationColor(c.annotation);
+                labelSpan.style.color = annotationColor || (c.isMainLine ? '#00d4ff' : '#888');
+                labelSpan.style.fontWeight = 'bold';
+                labelSpan.textContent = '{' + moveLabel.trim() + '} ';
+
+                const commentSpan = document.createElement('span');
+                commentSpan.style.color = '#ffd700';
+                commentSpan.textContent = c.comment;
+
+                commentDiv.appendChild(labelSpan);
+                commentDiv.appendChild(commentSpan);
+
+                // Click to jump to this position
+                if (c.nodeId) {
+                    commentDiv.onclick = function() {
+                        jumpToNode(c.nodeId);
+                    };
+                }
+
+                container.appendChild(commentDiv);
+
+                // Scroll current into view
+                if (isCurrent) {
+                    commentDiv.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            });
         }
 
         /**
@@ -2685,6 +2854,9 @@
                 variantNotesDisplay.textContent = '-----------------------------------';
                 variantNotesDisplay.style.color = '#ffd700';
             }
+
+            // Update all comments display
+            updateAllCommentsDisplay();
         }
 
         /**
@@ -2844,6 +3016,9 @@
                 }
                 variantNotesDisplay.style.color = '#ffd700';
             }
+
+            // Update all comments display
+            updateAllCommentsDisplay();
         }
 
         function board2NextMove() {
@@ -3721,6 +3896,7 @@
                 }
                 window.currentMoveNode = null; // Start at beginning
                 renderMoveTable(window.moveTree);
+                updateAllCommentsDisplay();
 
                 window.studyReportPositionIndex = 0;
                 if (window.studyReportPositions && window.studyReportPositions.length > 0) {
