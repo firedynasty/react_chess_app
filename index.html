@@ -780,11 +780,30 @@
         <div id="myBoard2" style="width: 400px;"></div>
       </div>
 
-      <!-- Move Table Container (side by side with board) -->
-      <div id="moveTableContainer"
-           style="flex: 1; min-width: 200px; max-height: 450px; overflow-y: auto;
-                  padding: 10px; background: #0f3460; border-radius: 5px;
-                  font-family: monospace; font-size: 13px; line-height: 1.8; display: none;">
+      <!-- Move Table Container with File Section Header -->
+      <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column;">
+        <!-- File Section Header -->
+        <div id="fileSectionHeader"
+             style="display: none; background: linear-gradient(90deg, #1a1a2e, #16213e);
+                    border: 1px solid #0f3460; border-bottom: none; border-radius: 5px 5px 0 0;
+                    padding: 8px 12px; font-family: monospace;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+            <button id="fileSectionPrev" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff;
+                    width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">◀</button>
+            <div style="flex: 1; text-align: center;">
+              <span id="fileSectionName" style="color: #ffd700; font-size: 13px; font-weight: bold;"></span>
+              <span id="fileSectionCounter" style="color: #888; font-size: 11px; margin-left: 8px;"></span>
+            </div>
+            <button id="fileSectionNext" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff;
+                    width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">▶</button>
+          </div>
+        </div>
+        <!-- Move Table -->
+        <div id="moveTableContainer"
+             style="flex: 1; min-width: 200px; max-height: 450px; overflow-y: auto;
+                    padding: 10px; background: #0f3460; border-radius: 5px;
+                    font-family: monospace; font-size: 13px; line-height: 1.8; display: none;">
+        </div>
       </div>
     </div>
 
@@ -3699,6 +3718,8 @@
             // Combined FEN/PGN variants array (in document order)
             window.allVariants = [];
             window.currentVariantIndex = 0;
+            window.allFileSections = [];  // Track all [filename.txt] sections
+            window.currentFileSectionIndex = 0;
 
             // Scan report for ALL variants (FEN and PGN) in document order
             window.scanReportForAllVariants = function() {
@@ -3707,6 +3728,7 @@
                 const content = window.isReportEditMode ? textarea.value : reportText.textContent;
 
                 window.allVariants = [];
+                window.allFileSections = [];
                 const lines = content.split('\n');
                 let pendingVariant = false;
                 let variantLineIndex = -1;
@@ -3714,6 +3736,7 @@
                 // Track current game info as we scan
                 let currentGameInfo = '';
                 let currentFileName = '';
+                let currentFileSectionIndex = -1;
 
                 // Helper function to get notes from 2 lines before a given index
                 function getNotesFromLinesBefore(lineIndex) {
@@ -3739,6 +3762,26 @@
                     if (fileMatch) {
                         currentFileName = fileMatch[1];
                         currentGameInfo = ''; // Reset game info for new file
+                        currentFileSectionIndex = window.allFileSections.length;
+                        window.allFileSections.push({
+                            fileName: currentFileName,
+                            lineIndex: i,
+                            displayName: currentFileName.replace(/\.txt$/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                        });
+                        continue;
+                    }
+
+                    // Check for [filename.txt] bracket format (study files)
+                    const bracketFileMatch = line.match(/^\[([^\]]+\.txt)\]$/i);
+                    if (bracketFileMatch) {
+                        currentFileName = bracketFileMatch[1];
+                        currentGameInfo = ''; // Reset game info for new file
+                        currentFileSectionIndex = window.allFileSections.length;
+                        window.allFileSections.push({
+                            fileName: currentFileName,
+                            lineIndex: i,
+                            displayName: currentFileName.replace(/\.txt$/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                        });
                         continue;
                     }
 
@@ -3764,7 +3807,7 @@
                         // Save any pending PGN first
                         if (currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                             currentPgn = '';
                             inPgn = false;
                         }
@@ -3779,7 +3822,7 @@
                             }
                             if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
                         }
-                        window.allVariants.push({ type: 'fen', fen: combinedMatch[1], moves: moves, notes: notes, lineIndex: i, gameInfo: currentGameInfo, fileName: currentFileName });
+                        window.allVariants.push({ type: 'fen', fen: combinedMatch[1], moves: moves, notes: notes, lineIndex: i, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                         pendingVariant = false;
                         continue;
                     }
@@ -3789,7 +3832,7 @@
                         // Save any pending PGN first
                         if (currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                             currentPgn = '';
                             inPgn = false;
                         }
@@ -3811,7 +3854,7 @@
                             }
                             if (nextLine.startsWith('[Variant') || nextLine.startsWith('[FEN')) break;
                         }
-                        window.allVariants.push({ type: 'fen', fen: fenOnlyMatch[1], moves: moves, notes: notes, lineIndex: variantLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
+                        window.allVariants.push({ type: 'fen', fen: fenOnlyMatch[1], moves: moves, notes: notes, lineIndex: variantLineIndex, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                         pendingVariant = false;
                         continue;
                     }
@@ -3836,7 +3879,7 @@
 
                         if (!inPgn && currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                             currentPgn = '';
                         }
                         if (!inPgn) {
@@ -3849,7 +3892,7 @@
                     } else if (inPgn && line === '') {
                         if (currentPgn.trim()) {
                             const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
+                            window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                         }
                         currentPgn = '';
                         inPgn = false;
@@ -3859,14 +3902,76 @@
                 // Don't forget last PGN
                 if (currentPgn.trim()) {
                     const notes = getNotesFromLinesBefore(pgnStartLineIndex);
-                    window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName });
+                    window.allVariants.push({ type: 'pgn', pgn: currentPgn.trim(), notes: notes, lineIndex: pgnStartLineIndex, gameInfo: currentGameInfo, fileName: currentFileName, fileSectionIndex: currentFileSectionIndex });
                 }
 
                 // Sort by line index to maintain document order
                 window.allVariants.sort((a, b) => a.lineIndex - b.lineIndex);
                 window.currentVariantIndex = 0;
                 console.log('Total combined variants found:', window.allVariants.length);
+                console.log('Total file sections found:', window.allFileSections.length);
                 return window.allVariants.length;
+            };
+
+            // Update file section header display
+            window.updateFileSectionHeader = function(fileSectionIndex) {
+                const header = document.getElementById('fileSectionHeader');
+                const nameSpan = document.getElementById('fileSectionName');
+                const counterSpan = document.getElementById('fileSectionCounter');
+                const moveTable = document.getElementById('moveTableContainer');
+
+                if (!header || !nameSpan || !counterSpan) return;
+
+                if (window.allFileSections.length === 0 || fileSectionIndex < 0 || fileSectionIndex === undefined) {
+                    header.style.display = 'none';
+                    // Restore full border-radius when no header
+                    if (moveTable) moveTable.style.borderRadius = '5px';
+                    return;
+                }
+
+                // Show header
+                header.style.display = 'block';
+                window.currentFileSectionIndex = fileSectionIndex;
+                // Adjust border-radius when header is visible
+                if (moveTable) moveTable.style.borderRadius = '0 0 5px 5px';
+
+                const section = window.allFileSections[fileSectionIndex];
+                if (section) {
+                    nameSpan.textContent = section.displayName;
+                    counterSpan.textContent = `(${fileSectionIndex + 1}/${window.allFileSections.length})`;
+                }
+            };
+
+            // Navigate to file section
+            window.navigateToFileSection = function(sectionIndex) {
+                if (window.allFileSections.length === 0) return;
+
+                // Wrap around
+                if (sectionIndex < 0) sectionIndex = window.allFileSections.length - 1;
+                if (sectionIndex >= window.allFileSections.length) sectionIndex = 0;
+
+                const section = window.allFileSections[sectionIndex];
+                if (!section) return;
+
+                // Find first variant that belongs to this section
+                const firstVariantIndex = window.allVariants.findIndex(v => v.fileSectionIndex === sectionIndex);
+                if (firstVariantIndex >= 0) {
+                    window.currentVariantIndex = firstVariantIndex;
+                    window.loadCurrentVariant();
+
+                    // Scroll report to this section's line
+                    const reportText = document.getElementById('analysisReportText');
+                    const textarea = document.getElementById('reportEditTextarea');
+                    const content = window.isReportEditMode ? textarea.value : (reportText ? reportText.textContent : '');
+                    const lines = content.split('\n');
+
+                    // Create a marker for scrolling
+                    if (reportText && section.lineIndex < lines.length) {
+                        // Highlight the section in the report
+                        const lineToScrollTo = section.lineIndex;
+                        console.log(`Scrolling to file section: ${section.fileName} at line ${lineToScrollTo}`);
+                    }
+                }
             };
 
             // Load current combined variant
@@ -3941,6 +4046,9 @@
                     gameInfoSpan.textContent = displayText;
                     gameInfoSpan.title = displayText;
                 }
+
+                // Update file section header
+                window.updateFileSectionHeader(variant.fileSectionIndex);
             };
 
             const nextFenVariantBtn = document.getElementById('nextFenVariant');
@@ -4007,6 +4115,31 @@
                         window.currentVariantIndex = (window.currentVariantIndex + 1) % window.allVariants.length;
                     }
                     window.loadCurrentVariant();
+                });
+            }
+
+            // File Section Navigation Buttons
+            const fileSectionPrevBtn = document.getElementById('fileSectionPrev');
+            if (fileSectionPrevBtn) {
+                fileSectionPrevBtn.addEventListener('click', function() {
+                    if (window.allFileSections.length === 0) {
+                        window.scanReportForAllVariants();
+                    }
+                    if (window.allFileSections.length > 0) {
+                        window.navigateToFileSection(window.currentFileSectionIndex - 1);
+                    }
+                });
+            }
+
+            const fileSectionNextBtn = document.getElementById('fileSectionNext');
+            if (fileSectionNextBtn) {
+                fileSectionNextBtn.addEventListener('click', function() {
+                    if (window.allFileSections.length === 0) {
+                        window.scanReportForAllVariants();
+                    }
+                    if (window.allFileSections.length > 0) {
+                        window.navigateToFileSection(window.currentFileSectionIndex + 1);
+                    }
                 });
             }
 
