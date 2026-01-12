@@ -2685,6 +2685,16 @@
                 currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
+            // Reduce board opacity when viewing a variation
+            const boardContainer = document.getElementById('myBoard2');
+            if (boardContainer) {
+                if (currentEl && currentEl.classList.contains('variation-move')) {
+                    boardContainer.style.opacity = '0.6';
+                } else {
+                    boardContainer.style.opacity = '1';
+                }
+            }
+
             // Update other displays
             updateMaterialDisplay(node.fen);
 
@@ -2866,6 +2876,12 @@
             document.querySelectorAll('.move-san.current, .variation-move.current').forEach(el => {
                 el.classList.remove('current');
             });
+
+            // Restore full board opacity when at root
+            const boardContainer = document.getElementById('myBoard2');
+            if (boardContainer) {
+                boardContainer.style.opacity = '1';
+            }
 
             // Update other displays
             updateMaterialDisplay(window.moveTree.fen);
