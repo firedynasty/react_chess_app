@@ -690,6 +690,7 @@
                 <button id="analyzeBtn" onclick="analyzeGame()" disabled>Analyze Game</button>
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
                 <button onclick="clearResults()" style="background: #333; color: #888;">Clear</button>
+                <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
             </div>
 
             <div class="progress-bar" id="progressBar" style="display: none;">
@@ -850,6 +851,7 @@
           <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
           <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee;">Start</span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
+          <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
           <span id="currentFenMoves" style="color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee;">0/0</span>
           <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
@@ -1855,6 +1857,61 @@
             window.analysisReportRawText = null;
         }
 
+        /**
+         * Load PGN from textarea directly to board and move container
+         */
+        function loadPgnToBoard() {
+            const pgnTextarea = document.getElementById('pgnInput');
+            if (!pgnTextarea || !pgnTextarea.value.trim()) {
+                alert('No PGN in textarea');
+                return;
+            }
+
+            const pgnString = pgnTextarea.value.trim();
+
+            // Update analysisReportText with the PGN content
+            const reportContainer = document.getElementById('analysisReportContainer');
+            const reportText = document.getElementById('analysisReportText');
+            if (reportContainer && reportText) {
+                reportContainer.style.display = 'block';
+                reportText.textContent = pgnString;
+            }
+
+            // Reset variants and file sections for simple game
+            window.fenVariants = [];
+            window.pgnVariants = [];
+            window.allVariants = [];
+            window.allFileSections = [];
+            window.updateFileSectionHeader(-1); // Hide file section header
+
+            // Parse with variation support and render move table
+            window.moveTree = window.parsePgnWithVariations(pgnString);
+            window.currentMoveNode = null;
+            renderMoveTable(window.moveTree);
+
+            // Parse positions for navigation
+            const result = window.parsePgnToPositionsWithComments(pgnString);
+            window.studyReportPositions = result.positions;
+            window.studyReportComments = result.comments;
+            window.studyReportPositionIndex = 0;
+
+            // Update board and indicators
+            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                if (window.board2) {
+                    window.board2.position(window.studyReportPositions[0]);
+                }
+                updateBoard2MoveIndicator(0);
+            }
+
+            // Update position count display
+            const posCountSpan = document.getElementById('board2PositionCount');
+            if (posCountSpan && window.studyReportPositions) {
+                posCountSpan.textContent = `1/${window.studyReportPositions.length}`;
+            }
+
+            updateAllCommentsDisplay();
+        }
+
         // =====================================================================
         // STOCKFISH VARIATION ADDER
         // =====================================================================
@@ -1995,6 +2052,9 @@
 
                     // Automatically add variation to PGN
                     addVariationToPgn();
+
+                    // Clear the input field
+                    document.getElementById('variation-move-input').value = '';
                 } else {
                     statusEl.textContent = 'No result from Stockfish';
                     statusEl.style.color = '#ff6b6b';
@@ -3144,6 +3204,15 @@
 
             // Update all comments display
             updateAllCommentsDisplay();
+
+            // Update board2MoveIndicator
+            const indicator = document.getElementById('board2MoveIndicator');
+            if (indicator) {
+                const moveNotation = node.isBlackMove ? `${node.moveNumber}...` : `${node.moveNumber}.`;
+                indicator.textContent = moveNotation;
+                indicator.style.background = 'transparent';
+                indicator.style.color = '#eee';
+            }
         }
 
         /**
@@ -3320,6 +3389,14 @@
 
             // Update all comments display
             updateAllCommentsDisplay();
+
+            // Update board2MoveIndicator to show Start
+            const indicator = document.getElementById('board2MoveIndicator');
+            if (indicator) {
+                indicator.textContent = 'Start';
+                indicator.style.background = 'transparent';
+                indicator.style.color = '#eee';
+            }
         }
 
         /**
@@ -3543,6 +3620,58 @@
         }
 
         /**
+         * Navigate to next variation or exit variation back to main line
+         */
+        function nextVariation() {
+            if (!window.moveTree || !window.currentMoveNode) return;
+
+            const current = window.currentMoveNode;
+
+            // Check if we're on the main line or in a variation
+            const currentEl = document.querySelector(`[data-node-id="${current.nodeId}"]`);
+            const isInVariation = currentEl && currentEl.classList.contains('variation-move');
+
+            if (isInVariation) {
+                // We're in a variation - exit to main line
+                // Find where this variation diverged from main line
+                let node = current;
+                while (node && node.parent) {
+                    const parent = node.parent;
+                    if (parent.children && parent.children.length > 1) {
+                        // Check if current node's path includes a non-first child
+                        const index = parent.children.indexOf(node);
+                        if (index > 0) {
+                            // Found the divergence point
+                            // The main line continuation is parent.children[0]
+                            const mainLineNode = parent.children[0];
+                            // Jump to the continuation of main line (first child of mainLineNode)
+                            if (mainLineNode.children && mainLineNode.children.length > 0) {
+                                jumpToNode(mainLineNode.children[0].nodeId);
+                            } else {
+                                // Main line ends here, just go to main line node
+                                jumpToNode(mainLineNode.nodeId);
+                            }
+                            return;
+                        }
+                    }
+                    node = node.parent;
+                }
+            } else {
+                // We're on main line - enter variation if available
+                const parent = current.parent;
+                if (parent && parent.children && parent.children.length > 1) {
+                    // Check if current is the first child (main line)
+                    const index = parent.children.indexOf(current);
+                    if (index === 0) {
+                        // Jump to first variation (second child of parent)
+                        jumpToNode(parent.children[1].nodeId);
+                        return;
+                    }
+                }
+            }
+        }
+
+        /**
          * Extract and display game info from report content
          */
         function updateCurrentGameInfo(reportContent) {
@@ -3601,6 +3730,12 @@
                 }
                 if (typeof window.scanReportForPgnVariants === 'function') {
                     window.scanReportForPgnVariants();
+                }
+                // Update file section header based on whether sections were found
+                if (window.allFileSections && window.allFileSections.length > 0) {
+                    window.updateFileSectionHeader(0);
+                } else {
+                    window.updateFileSectionHeader(-1); // Hide header for simple games
                 }
                 if (document.getElementById('currentFenMoves')) {
                     document.getElementById('currentFenMoves').textContent = '';
@@ -3809,6 +3944,17 @@
             const board2PrevBtn = document.getElementById('board2PrevMove');
             if (board2PrevBtn) {
                 board2PrevBtn.addEventListener('click', board2PrevMove);
+            }
+
+            const nextVarBtn = document.getElementById('nextVarBtn');
+            if (nextVarBtn) {
+                nextVarBtn.addEventListener('click', nextVariation);
+            }
+
+            // Load PGN to Board from textarea
+            const loadToBoardBtn = document.getElementById('loadToBoard');
+            if (loadToBoardBtn) {
+                loadToBoardBtn.addEventListener('click', loadPgnToBoard);
             }
 
             // Flip Board 2
