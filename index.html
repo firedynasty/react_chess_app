@@ -615,6 +615,42 @@
         <div id="game-details"></div>
     </div>
 
+    <!-- Stockfish Variation Adder -->
+    <div id="variation-adder" style="display: none; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <label style="color: #00d4ff; font-size: 13px;">Add Variation at:</label>
+            <input type="text" id="variation-move-input" placeholder="12. or 12..."
+                style="width: 100px; padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;"
+                onkeydown="if(event.key==='Enter')analyzeForVariation()">
+            <button id="analyze-variation-btn" onclick="analyzeForVariation()"
+                style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
+                Analyze
+            </button>
+            <select id="variation-depth" title="Depth" style="padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;">
+                <option value="12">d12</option>
+                <option value="14">d14</option>
+                <option value="16" selected>d16</option>
+                <option value="18">d18</option>
+            </select>
+            <span id="variation-status" style="color: #888; font-size: 12px;"></span>
+        </div>
+        <div id="variation-result" style="display: none; margin-top: 12px; padding: 12px; background: #0f3460; border-radius: 6px; border-left: 3px solid #27ae60;">
+            <div id="variation-best-move" style="color: #27ae60; font-weight: bold; margin-bottom: 5px;"></div>
+            <div id="variation-line" style="color: #ccc; font-family: monospace; font-size: 13px;"></div>
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                <button id="add-variation-btn" onclick="addVariationToPgn()"
+                    style="display: none; padding: 6px 12px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                    Add to PGN
+                </button>
+                <button onclick="clearVariationResult()"
+                    style="padding: 6px 12px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
+                    Clear
+                </button>
+                <span style="color: #27ae60; font-size: 12px; margin-left: 10px;">added variation to pgn below</span>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="panel">
             <h2>Input</h2>
@@ -1820,6 +1856,342 @@
         }
 
         // =====================================================================
+        // STOCKFISH VARIATION ADDER
+        // =====================================================================
+
+        // Store current variation analysis result
+        window.currentVariationResult = null;
+
+        function parseVariationMoveInput(input) {
+            // Parse "12." or "12..." to get move number and color
+            const match = input.trim().match(/^(\d+)(\.{1,3})$/);
+            if (!match) return null;
+            const moveNumber = parseInt(match[1]);
+            const isBlack = match[2].length === 3; // "..." means black
+            // Calculate ply index (0-indexed): move 1 white = 0, move 1 black = 1, etc.
+            const plyIndex = (moveNumber - 1) * 2 + (isBlack ? 1 : 0);
+            return { moveNumber, isBlack, plyIndex };
+        }
+
+        function getPositionsFromPgn(pgn) {
+            // Use existing parsePgnToPositions if available
+            if (typeof window.parsePgnToPositions === 'function') {
+                let cleanedPgn = pgn;
+                if (typeof AnalysisChess !== 'undefined') {
+                    cleanedPgn = AnalysisChess.cleanPgn(pgn);
+                } else if (typeof cleanPgn === 'function') {
+                    cleanedPgn = cleanPgn(pgn);
+                }
+                return window.parsePgnToPositions(cleanedPgn);
+            }
+            return null;
+        }
+
+        function formatVariationWithMoveNumbers(pv, startMoveNumber, startsWithBlack) {
+            // Format PV with proper move numbers: "10. d5 Ne7 11. h3 h5 12. b3"
+            if (!pv || pv.length === 0) return '';
+
+            let result = [];
+            let currentMoveNum = startMoveNumber;
+            let isBlackMove = startsWithBlack;
+
+            for (let i = 0; i < pv.length; i++) {
+                if (!isBlackMove) {
+                    // White's move - add move number
+                    result.push(`${currentMoveNum}. ${pv[i]}`);
+                } else {
+                    // Black's move - just the move (or with ... if first move)
+                    if (i === 0) {
+                        result.push(`${currentMoveNum}... ${pv[i]}`);
+                    } else {
+                        result.push(pv[i]);
+                    }
+                    currentMoveNum++;
+                }
+                isBlackMove = !isBlackMove;
+            }
+
+            return result.join(' ');
+        }
+
+        async function analyzeForVariation() {
+            const input = document.getElementById('variation-move-input').value;
+            const statusEl = document.getElementById('variation-status');
+            const resultEl = document.getElementById('variation-result');
+            const depth = parseInt(document.getElementById('variation-depth').value);
+
+            // Parse move input
+            const parsed = parseVariationMoveInput(input);
+            if (!parsed) {
+                statusEl.textContent = 'Invalid format. Use 12. or 12...';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Get PGN
+            const pgn = document.getElementById('pgnInput').value.trim();
+            if (!pgn) {
+                statusEl.textContent = 'No PGN loaded';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Get positions
+            const positions = getPositionsFromPgn(pgn);
+            if (!positions || positions.length === 0) {
+                statusEl.textContent = 'Could not parse PGN';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Check if ply index is valid (we need the position BEFORE the move)
+            if (parsed.plyIndex >= positions.length) {
+                statusEl.textContent = `Move ${parsed.moveNumber}${parsed.isBlack ? '...' : '.'} not found`;
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Get FEN at position BEFORE the move (the position where the move was played from)
+            const fen = positions[parsed.plyIndex];
+            statusEl.textContent = `Analyzing at depth ${depth}...`;
+            statusEl.style.color = '#00d4ff';
+
+            // Disable button during analysis
+            document.getElementById('analyze-variation-btn').disabled = true;
+
+            try {
+                // Use existing Stockfish analysis
+                const result = await analyzePositionForVariation(fen, depth);
+
+                if (result && result.bestMove) {
+                    // Store result for adding to PGN
+                    window.currentVariationResult = {
+                        moveNumber: parsed.moveNumber,
+                        isBlack: parsed.isBlack,
+                        plyIndex: parsed.plyIndex,
+                        fen: fen,
+                        bestMove: result.bestMove,
+                        score: result.score,
+                        pv: result.pv || [result.bestMove]
+                    };
+
+                    // Format score
+                    let scoreStr = '';
+                    if (result.score !== undefined) {
+                        if (typeof result.score === 'string' && result.score.startsWith('M')) {
+                            scoreStr = `#${result.score.substring(1)}`;
+                        } else {
+                            scoreStr = (result.score >= 0 ? '+' : '') + (result.score / 100).toFixed(2);
+                        }
+                    }
+
+                    // Format the line with proper move numbers
+                    const formattedLine = formatVariationWithMoveNumbers(result.pv, parsed.moveNumber, parsed.isBlack);
+
+                    document.getElementById('variation-best-move').textContent = `Stockfish: ${scoreStr}`;
+                    document.getElementById('variation-line').textContent = formattedLine;
+                    resultEl.style.display = 'block';
+                    statusEl.textContent = '';
+
+                    // Automatically add variation to PGN
+                    addVariationToPgn();
+                } else {
+                    statusEl.textContent = 'No result from Stockfish';
+                    statusEl.style.color = '#ff6b6b';
+                }
+            } catch (e) {
+                statusEl.textContent = 'Analysis error: ' + e.message;
+                statusEl.style.color = '#ff6b6b';
+            }
+
+            document.getElementById('analyze-variation-btn').disabled = false;
+        }
+
+        function analyzePositionForVariation(fen, depth) {
+            return new Promise((resolve, reject) => {
+                if (!stockfish) {
+                    reject(new Error('Stockfish not ready'));
+                    return;
+                }
+
+                let bestMove = null;
+                let score = null;
+                let pvUci = [];
+
+                const handler = (e) => {
+                    const line = e.data;
+
+                    // Parse info lines for PV and score
+                    if (line.startsWith('info') && line.includes('pv')) {
+                        const pvMatch = line.match(/\spv\s+(.+)/);
+                        if (pvMatch) {
+                            pvUci = pvMatch[1].split(' ');
+                        }
+                        const scoreMatch = line.match(/score (cp|mate) (-?\d+)/);
+                        if (scoreMatch) {
+                            if (scoreMatch[1] === 'mate') {
+                                score = 'M' + scoreMatch[2];
+                            } else {
+                                score = parseInt(scoreMatch[2]);
+                            }
+                        }
+                    }
+
+                    // Parse bestmove
+                    if (line.startsWith('bestmove')) {
+                        const match = line.match(/bestmove\s+(\S+)/);
+                        if (match) {
+                            bestMove = match[1];
+                        }
+                        stockfish.onmessage = handleStockfishMessage;
+
+                        // Convert UCI moves to SAN using AnalysisChess
+                        let pvSan = [];
+                        if (typeof AnalysisChess !== 'undefined' && pvUci.length > 0) {
+                            let currentFen = fen;
+                            for (const uciMove of pvUci.slice(0, 5)) {
+                                const result = AnalysisChess.uciToSan(currentFen, uciMove);
+                                if (result.san) {
+                                    pvSan.push(result.san);
+                                    // Get new FEN after this move
+                                    try {
+                                        const chess = new Chess(currentFen);
+                                        chess.move(result.san);
+                                        currentFen = chess.fen();
+                                    } catch (e) {
+                                        break;
+                                    }
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        resolve({
+                            bestMove: pvSan.length > 0 ? pvSan[0] : bestMove,
+                            score,
+                            pv: pvSan.length > 0 ? pvSan : pvUci.slice(0, 5)
+                        });
+                    }
+                };
+
+                stockfish.onmessage = handler;
+                stockfish.postMessage('position fen ' + fen);
+                stockfish.postMessage('go depth ' + depth);
+            });
+        }
+
+        function addVariationToPgn() {
+            if (!window.currentVariationResult) {
+                return;
+            }
+
+            const result = window.currentVariationResult;
+            const pgnTextarea = document.getElementById('pgnInput');
+            let pgn = pgnTextarea.value;
+
+            // Format score
+            let scoreStr = '';
+            if (result.score !== undefined) {
+                if (typeof result.score === 'string' && result.score.startsWith('M')) {
+                    scoreStr = `#${result.score.substring(1)}`;
+                } else {
+                    scoreStr = (result.score >= 0 ? '+' : '') + (result.score / 100).toFixed(2);
+                }
+            }
+
+            // Format the variation with proper move numbers
+            const formattedPv = formatVariationWithMoveNumbers(result.pv, result.moveNumber, result.isBlack);
+            const variation = `(${formattedPv} {Stockfish: ${scoreStr}})`;
+
+            // Protect existing variations by replacing them temporarily
+            // This prevents matching moves inside existing parentheses
+            const variationPlaceholders = [];
+            let protectedPgn = pgn.replace(/\([^()]*\)/g, (match) => {
+                const placeholder = `__VAR${variationPlaceholders.length}__`;
+                variationPlaceholders.push(match);
+                return placeholder;
+            });
+            // Handle nested variations (repeat until no more matches)
+            while (/\([^()]*\)/.test(protectedPgn)) {
+                protectedPgn = protectedPgn.replace(/\([^()]*\)/g, (match) => {
+                    const placeholder = `__VAR${variationPlaceholders.length}__`;
+                    variationPlaceholders.push(match);
+                    return placeholder;
+                });
+            }
+
+            let inserted = false;
+
+            if (result.isBlack) {
+                // Black's move: find "N. whiteMove N... blackMove" or "N. whiteMove blackMove"
+                const pattern = new RegExp(
+                    `(${result.moveNumber}\\.\\s*\\S+\\s+)(${result.moveNumber}\\.{3}\\s*)?(\\S+)`,
+                    'g'
+                );
+                protectedPgn = protectedPgn.replace(pattern, (match, whitePart, blackNumPart, blackMove) => {
+                    if (!inserted && !blackMove.startsWith('__VAR')) {
+                        inserted = true;
+                        return whitePart + (blackNumPart || '') + blackMove + ' ' + variation;
+                    }
+                    return match;
+                });
+            } else {
+                // White's move: find "N. whiteMove" and insert after
+                const pattern = new RegExp(
+                    `(${result.moveNumber}\\.\\s*)(\\S+)(\\s+)`,
+                    'g'
+                );
+                protectedPgn = protectedPgn.replace(pattern, (match, moveNum, whiteMove, space) => {
+                    if (!inserted && !whiteMove.startsWith('__VAR')) {
+                        inserted = true;
+                        return moveNum + whiteMove + ' ' + variation + space;
+                    }
+                    return match;
+                });
+            }
+
+            // Restore protected variations
+            for (let i = variationPlaceholders.length - 1; i >= 0; i--) {
+                protectedPgn = protectedPgn.replace(`__VAR${i}__`, variationPlaceholders[i]);
+            }
+
+            if (inserted) {
+                pgnTextarea.value = protectedPgn;
+                document.getElementById('variation-status').textContent = '';
+
+                // Flash the button to show feedback
+                const addBtn = document.getElementById('add-variation-btn');
+                const originalText = addBtn.textContent;
+                addBtn.textContent = 'Added var.!';
+                addBtn.style.background = '#2ecc71';
+                setTimeout(() => {
+                    addBtn.textContent = originalText;
+                    addBtn.style.background = '#27ae60';
+                }, 1500);
+
+                // Reload positions
+                if (typeof window.parsePgnToPositions === 'function') {
+                    let cleanedPgn = protectedPgn;
+                    if (typeof AnalysisChess !== 'undefined') {
+                        cleanedPgn = AnalysisChess.cleanPgn(protectedPgn);
+                    }
+                    window.studyReportPositions = window.parsePgnToPositions(cleanedPgn);
+                }
+            } else {
+                document.getElementById('variation-status').textContent = 'Could not insert variation';
+                document.getElementById('variation-status').style.color = '#ff6b6b';
+            }
+        }
+
+        function clearVariationResult() {
+            document.getElementById('variation-result').style.display = 'none';
+            document.getElementById('variation-status').textContent = '';
+            document.getElementById('variation-move-input').value = '';
+            window.currentVariationResult = null;
+        }
+
+        // =====================================================================
         // UI HELPERS
         // =====================================================================
 
@@ -1873,6 +2245,34 @@
             movesText = movesText.replace(/\s+/g, ' ').trim();
 
             return movesText;
+        }
+
+        function extractOpeningFromPgn(pgnText) {
+            // Extract ECO code: [ECO "C68"]
+            const ecoMatch = pgnText.match(/\[ECO\s+"([^"]+)"\]/);
+            const eco = ecoMatch ? ecoMatch[1] : '';
+
+            // Try to get opening name from [Opening "..."] header first
+            const openingMatch = pgnText.match(/\[Opening\s+"([^"]+)"\]/);
+            if (openingMatch && openingMatch[1] !== 'Unknown') {
+                return { eco, opening: openingMatch[1] };
+            }
+
+            // Parse from ECOUrl: https://www.chess.com/openings/Italian-Game-Giuoco-Piano
+            const ecoUrlMatch = pgnText.match(/\[ECOUrl\s+"([^"]+)"\]/);
+            if (ecoUrlMatch && ecoUrlMatch[1].includes('/openings/')) {
+                let openingPart = ecoUrlMatch[1].split('/openings/')[1];
+                // Remove move suffixes like "...4.Be2-O-O-5.O-O"
+                openingPart = openingPart.replace(/\.\.\..*$/, '');
+                openingPart = openingPart.replace(/-\d+\..*$/, '');
+                // Replace hyphens with spaces
+                const openingName = openingPart.replace(/-/g, ' ');
+                if (openingName && openingName !== 'Undefined') {
+                    return { eco, opening: openingName };
+                }
+            }
+
+            return { eco, opening: '' };
         }
 
         function formatGameDate(timestamp) {
@@ -2018,6 +2418,9 @@
 
                     const label = `Game ${idx + 1}: vs ${opponent} (${resultDisplay} as ${playerColor}) - ${timeClass} - ${gameDate}`;
 
+                    // Extract opening info from PGN
+                    const openingInfo = extractOpeningFromPgn(game.pgn);
+
                     fetchedGames[label] = {
                         pgn: extractPgnMoves(game.pgn),
                         fullPgn: game.pgn,
@@ -2030,7 +2433,9 @@
                             time_class: timeClass,
                             time_control: game.time_control || '',
                             url: game.url || '',
-                            end_time: game.end_time
+                            end_time: game.end_time,
+                            eco: openingInfo.eco,
+                            opening: openingInfo.opening
                         }
                     };
                     window.fetchedGames = fetchedGames; // Sync to window for batch analysis
@@ -2077,16 +2482,36 @@
             const game = fetchedGames[selectedLabel];
             const meta = game.metadata;
 
+            // Format opening display
+            let openingDisplay = '';
+            if (meta.eco || meta.opening) {
+                openingDisplay = `<p><strong>Opening:</strong> ${meta.eco ? meta.eco + ' ' : ''}${meta.opening || ''}</p>`;
+            }
+
             gameDetails.innerHTML = `
                 <p><strong>White:</strong> ${meta.white} (${meta.white_rating})</p>
                 <p><strong>Black:</strong> ${meta.black} (${meta.black_rating})</p>
+                ${openingDisplay}
                 <p><strong>Time Control:</strong> ${meta.time_class} (${meta.time_control})</p>
                 <p><strong>Result:</strong> ${meta.result}</p>
                 ${meta.url ? `<p><a href="${meta.url}" target="_blank">View on Chess.com ↗</a></p>` : ''}
             `;
 
-            pgnTextarea.value = game.pgn;
+            // Insert opening as comment after first move
+            let pgnWithOpening = game.pgn;
+            if (meta.eco || meta.opening) {
+                const openingComment = `{${meta.eco ? meta.eco + ' ' : ''}${meta.opening || ''}}`;
+                // Insert after first move: "1. e4" -> "1. e4 {Opening}"
+                pgnWithOpening = pgnWithOpening.replace(
+                    /^(1\.\s*\S+)/,
+                    `$1 ${openingComment}`
+                );
+            }
+            pgnTextarea.value = pgnWithOpening;
             log('Loaded game: ' + selectedLabel, 'info');
+
+            // Show variation adder
+            document.getElementById('variation-adder').style.display = 'block';
 
             // Load PGN into board2 for navigation
             if (game.pgn && typeof window.parsePgnToPositions === 'function') {
@@ -3273,6 +3698,17 @@
                 log('AnalysisChess module loaded', 'success');
             }
             initStockfish();
+
+            // Show variation adder when PGN is pasted
+            const pgnInput = document.getElementById('pgnInput');
+            if (pgnInput) {
+                pgnInput.addEventListener('input', () => {
+                    const variationAdder = document.getElementById('variation-adder');
+                    if (pgnInput.value.trim().length > 10) {
+                        variationAdder.style.display = 'block';
+                    }
+                });
+            }
 
             // =========================================================
             // AUTO-PLAY FUNCTIONALITY

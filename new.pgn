@@ -1,0 +1,14 @@
+[Event "Live Chess"]
+[Site "Chess.com"]
+[Date "2026.01.12"]
+[Round "-"]
+[White "TTTstanley"]
+[Black "elkingil96"]
+[Result "1-0"]
+[ECO "C68"]
+[WhiteElo "529"]
+[BlackElo "498"]
+[TimeControl "300"]
+
+1. e4 1... e5 2. Nf3 2... Nc6 3. Bb5 3... a6 4. Bxc6 4... bxc6 5. O-O 5... d6 6. d4 6... Bb7 7. Re1 7... f6 8. c4 8... Qd7 9. Nc3 9... c5 10. a3 ( 10. dxc5
+{ Stockfish: +1.66 } 10... dxc5 11. Qxd7+ Kxd7 12. Be3 ) 10... O-O-O 11. d5 11... h5 12. b4 12... h4 13. Qb3 13... f5 14. Rb1 14... Re8 15. bxc5 15... c6 16. Na4 16... cxd5 17. Nb6+ 17... Kb8 18. Nxd7+ 1-0
