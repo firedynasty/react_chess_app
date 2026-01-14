@@ -3,8 +3,12 @@
   "buildCommand": "",
   "outputDirectory": ".",
   "functions": {
-    "api/rag-chess.py": {
-      "maxDuration": 60
+    "api/*.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{react-chat-report-viewer,src,documentation,removed_features,repurposeCodeExamples,reducedHtml_chess-study-tool,rag_chess,preloaded_reports,preloaded,img,animatedFlashcards}/**"
+    },
+    "api/*.js": {
+      "excludeFiles": "{react-chat-report-viewer,src,documentation,removed_features,repurposeCodeExamples,reducedHtml_chess-study-tool,rag_chess,preloaded_reports,preloaded,img,animatedFlashcards}/**"
     }
   },
   "rewrites": [
