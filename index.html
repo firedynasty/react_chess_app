@@ -779,8 +779,6 @@
 
     <!-- Report Loading Controls (horizontal layout) -->
     <div id="reportControls" style="margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <button id="loadRefImageBtn" style="background: #17a2b8; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🖼️ Load Reference Images</button>
-      <input type="file" id="refImageFileInput" accept="image/*" multiple style="display: none;">
       <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Load Analysis Report (from clipboard)</button>
       <button id="selectReportFolder" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('reportFolderInput').click()">📂 Select Reports Folder</button>
       <input type="file" id="reportFolderInput" accept=".txt" webkitdirectory style="display: none;">
@@ -792,10 +790,6 @@
       </select>
       <button id="appendByOpeningBtn" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📚 Append Opening Reports</button>
       <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
-      <button id="loadMistakesBtn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ Load Mistakes</button>
-      <button id="removeMistakesBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">✓ Remove Mistakes</button>
-      <button id="loadFromVercelBtn" style="background: #8b5cf6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📥 Load from Vercel</button>
-      <button id="saveToVercelBtn" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📤 Save to Vercel</button>
     </div>
 
     <!-- Board and Move Table (side by side) -->
@@ -853,9 +847,8 @@
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
           <span id="currentFenMoves" style="color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
-          <span id="board2PositionCount" style="font-weight: bold; color: #eee;">0/0</span>
+          <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
           <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
-          <a id="lichessBoard2Link" href="#" target="_blank" style="color: #00d4ff; text-decoration: underline;">Go to Lichess (Analysis)</a>
           <div class="drag-scroll-toggle">
             <label class="switch">
                 <input type="checkbox" id="dragScrollToggle">
@@ -863,17 +856,11 @@
             </label>
             <span class="toggle-label" id="dragScrollLabel">Auto Play</span>
           </div>
-          <button id="resetAutoPlayBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reset</button>
-          <button id="loadPgnFromClipboard" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load PGN from Clipboard</button>
-          <button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
-          <button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
-          <button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
           <button id="prevVariant" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4;"></span>
           <br>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: block;"></span>
-          <button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
           <button id="reportAppendVariantBtn" style="display: none; background: #20c997; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Report Append Variant</button>
           <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
         </div>
@@ -891,23 +878,6 @@
                     padding: 10px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 5px;
                     font-family: monospace; font-size: 12px; line-height: 1.6; display: none;">
         </div>
-      </div>
-    </div>
-
-    <!-- Reference Image Modal -->
-    <div id="refImageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
-      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #16213e; padding: 20px; border-radius: 8px; max-width: 90%; max-height: 90%;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-          <span id="refImageTitle" style="font-weight: bold; color: #00d4ff;">Reference Image</span>
-          <button id="closeRefImageModal" style="background: #dc3545; color: white; border: none; padding: 5px 15px; border-radius: 6px; cursor: pointer;">Close</button>
-        </div>
-        <div id="refImagePlaceholder" style="text-align: center; padding: 40px; color: #888;">No image loaded</div>
-        <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
-          <button id="refImagePrevBtn" style="background: rgba(0,0,0,0.6); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 20px; display: none;">‹</button>
-          <img id="refImagePreview" src="" alt="Reference Image" style="display: none; max-width: 100%; max-height: 70vh; cursor: zoom-in;">
-          <button id="refImageNextBtn" style="background: rgba(0,0,0,0.6); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 20px; display: none;">›</button>
-        </div>
-        <div id="refImageCounter" style="color: #888; font-size: 14px; margin-top: 8px; text-align: center;"></div>
       </div>
     </div>
 
@@ -2611,11 +2581,6 @@
         window.currentMoveNode = null;    // Currently selected node in the tree
         window.moveNodeRegistry = {};     // Map of nodeId -> MoveNode for fast lookup
 
-        let refImageLoaded = false;
-        let refImageIsEnlarged = false;
-        let loadedRefImages = [];
-        let currentRefImageIndex = 0;
-
         // Piece theme path for chess board (local images)
         const pieceThemePath = 'img/chesspieces/wikipedia/{piece}.png';
 
@@ -3871,28 +3836,6 @@
                 }
             });
 
-            // Reset button - turns off auto-play and resets to move #1
-            document.getElementById('resetAutoPlayBtn').addEventListener('click', function() {
-                // Turn off auto-play if it's on
-                if (autoPlayToggle.checked) {
-                    autoPlayToggle.checked = false;
-                    autoPlayLabel.classList.remove('active');
-                    if (autoPlayInterval) {
-                        clearInterval(autoPlayInterval);
-                        autoPlayInterval = null;
-                    }
-                }
-
-                // Reset board to move #1
-                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                    window.studyReportPositionIndex = 0;
-                    if (window.board2) {
-                        window.board2.position(window.studyReportPositions[0]);
-                    }
-                    updateBoard2MoveIndicator(0);
-                }
-            });
-
             // Toggle report button (original)
             document.getElementById('toggleReportBtn').addEventListener('click', function() {
                 const reportText = document.getElementById('analysisReportText');
@@ -3966,93 +3909,7 @@
                 });
             }
 
-            // Load PGN from Clipboard
-            const loadPgnFromClipboardBtn = document.getElementById('loadPgnFromClipboard');
-            if (loadPgnFromClipboardBtn) {
-                loadPgnFromClipboardBtn.addEventListener('click', async function() {
-                    try {
-                        const clipboardText = await navigator.clipboard.readText();
-                        if (!clipboardText || clipboardText.trim() === '') {
-                            alert('Clipboard is empty. Please copy a PGN first.');
-                            return;
-                        }
-
-                        let pgnText = clipboardText.trim();
-                        pgnText = pgnText.split('\n')
-                            .filter(line => !line.trim().startsWith('['))
-                            .join(' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-
-                        if (!/\d+\./.test(pgnText)) {
-                            alert('Clipboard does not contain valid PGN.');
-                            return;
-                        }
-
-                        if (typeof window.parsePgnToPositions === 'function') {
-                            window.studyReportPositions = window.parsePgnToPositions(pgnText);
-                            window.studyReportPositionIndex = 0;
-
-                            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                                window.board2.position(window.studyReportPositions[0]);
-                                updateBoard2MoveIndicator(0);
-                                log(`Loaded ${window.studyReportPositions.length} positions from clipboard`, 'success');
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Failed to read clipboard:', err);
-                        alert('Could not read clipboard. Please check permissions.');
-                    }
-                });
-            }
-
-            // Reload Game from Report Button
-            const reloadGameFromReportBtn = document.getElementById('reloadGameFromReport');
-            if (reloadGameFromReportBtn) {
-                reloadGameFromReportBtn.addEventListener('click', function() {
-                    const pgnTextarea = document.getElementById('pgnInput');
-                    if (!pgnTextarea || !pgnTextarea.value.trim()) {
-                        alert('No game PGN available. Please analyze a game first.');
-                        return;
-                    }
-
-                    let pgnText = pgnTextarea.value.trim();
-
-                    // Clean the PGN
-                    if (typeof cleanPgn === 'function') {
-                        pgnText = cleanPgn(pgnText);
-                    } else {
-                        pgnText = pgnText.split('\n')
-                            .filter(line => !line.trim().startsWith('['))
-                            .join(' ')
-                            .replace(/\s+/g, ' ')
-                            .trim();
-                    }
-
-                    if (typeof window.parsePgnToPositions === 'function') {
-                        window.studyReportPositions = window.parsePgnToPositions(pgnText);
-                        window.studyReportPositionIndex = 0;
-
-                        if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                            if (window.board2) {
-                                window.board2.position(window.studyReportPositions[0]);
-                                updateBoard2MoveIndicator(0);
-                            }
-                            // Reset variant displays
-                            document.getElementById('currentFenMoves').textContent = '';
-                            document.getElementById('variantIndexDisplay').textContent = '';
-                            window.currentVariantType = null;
-                            log(`Reloaded ${window.studyReportPositions.length} positions from original game`, 'success');
-                        } else {
-                            alert('Could not parse positions from the game PGN.');
-                        }
-                    } else {
-                        alert('PGN parser not available.');
-                    }
-                });
-            }
-
-            // Next FEN Variant Button
+            // FEN/PGN Variant Support
             window.fenVariants = [];
             window.currentFenVariantIndex = 0;
             window.pgnVariants = [];
@@ -4649,39 +4506,6 @@
                 window.updateFileSectionHeader(variant.fileSectionIndex);
             };
 
-            const nextFenVariantBtn = document.getElementById('nextFenVariant');
-            if (nextFenVariantBtn) {
-                nextFenVariantBtn.addEventListener('click', function() {
-                    if (window.fenVariants.length === 0) {
-                        const count = window.scanReportForFenVariants();
-                        if (count === 0) {
-                            alert('No [Variant "From Position"][FEN "..."] blocks found in report.');
-                            return;
-                        }
-                    } else {
-                        window.currentFenVariantIndex = (window.currentFenVariantIndex + 1) % window.fenVariants.length;
-                    }
-                    window.loadCurrentFenVariant();
-                });
-            }
-
-            // Next PGN Variant Button
-            const nextPgnVariantBtn = document.getElementById('nextPgnVariant');
-            if (nextPgnVariantBtn) {
-                nextPgnVariantBtn.addEventListener('click', function() {
-                    if (window.pgnVariants.length === 0) {
-                        const count = window.scanReportForPgnVariants();
-                        if (count === 0) {
-                            alert('No PGN blocks found in report.');
-                            return;
-                        }
-                    } else {
-                        window.currentPgnVariantIndex = (window.currentPgnVariantIndex + 1) % window.pgnVariants.length;
-                    }
-                    window.loadCurrentPgnVariant();
-                });
-            }
-
             // Combined Prev FEN/PGN Variant Button
             const prevVariantBtn = document.getElementById('prevVariant');
             if (prevVariantBtn) {
@@ -4738,118 +4562,6 @@
                     if (window.allFileSections.length > 0) {
                         window.navigateToFileSection(window.currentFileSectionIndex + 1);
                     }
-                });
-            }
-
-            // =========================================================
-            // SET VARIANT - Analysis Mode with chess.js
-            // =========================================================
-            window.board2Chess = null;  // chess.js instance for board2
-            window.board2StartingFen = null;  // Starting FEN for variant
-            window.board2VariantMode = false;  // Whether we're in variant/analysis mode
-
-            const setVariantBtn = document.getElementById('setVariantBtn');
-            if (setVariantBtn) {
-                setVariantBtn.addEventListener('click', function() {
-                    // Get current position from board2
-                    const currentPosition = window.board2.position('fen');
-
-                    // Extract move number and turn from board2MoveIndicator
-                    // Format: "12." for white's turn, "12..." for black's turn, "Start" for initial
-                    const indicator = document.getElementById('board2MoveIndicator');
-                    let moveNumber = 1;
-                    let turn = 'w';
-
-                    if (indicator) {
-                        const indicatorText = indicator.textContent.trim();
-                        if (indicatorText !== 'Start') {
-                            // Extract number from "12." or "12..."
-                            const match = indicatorText.match(/(\d+)(\.{1,3})/);
-                            if (match) {
-                                moveNumber = parseInt(match[1]);
-                                // "12." = white just moved → black's turn
-                                // "12..." = black just moved → white's turn (move 13)
-                                if (match[2] === '.') {
-                                    turn = 'b';  // white just moved, black to play
-                                } else {
-                                    turn = 'w';  // black just moved, white to play
-                                    moveNumber++;  // next move number
-                                }
-                            }
-                        }
-                    }
-
-                    // Build full FEN with correct turn and move number
-                    const fullFen = currentPosition + ' ' + turn + ' KQkq - 0 ' + moveNumber;
-
-                    // Initialize chess.js with this position
-                    window.board2Chess = new Chess();
-                    const loaded = window.board2Chess.load(fullFen);
-
-                    if (!loaded) {
-                        alert('Could not load position into chess.js');
-                        return;
-                    }
-
-                    window.board2StartingFen = fullFen;
-                    window.board2VariantMode = true;
-
-                    // Show the move history textarea
-                    const moveHistoryTextArea = document.getElementById('moveHistoryTextArea');
-                    if (moveHistoryTextArea) {
-                        moveHistoryTextArea.style.display = 'block';
-                        moveHistoryTextArea.value = '[Variant "From Position"]\n[FEN "' + fullFen + '"]\n\n';
-                    }
-
-                    // Show the Report Append Variant button
-                    document.getElementById('reportAppendVariantBtn').style.display = 'inline-block';
-
-                    // Reinitialize board2 with onDrop handler for move tracking
-                    window.board2 = Chessboard('myBoard2', {
-                        draggable: true,
-                        dropOffBoard: 'snapback',
-                        position: currentPosition,
-                        snapbackSpeed: 500,
-                        snapSpeed: 100,
-                        pieceTheme: pieceThemePath,
-
-                        onDrop: function(source, target, piece, newPos, oldPos, orientation) {
-                            // Attempt move with chess.js
-                            const move = window.board2Chess.move({
-                                from: source,
-                                to: target,
-                                promotion: 'q'  // auto-promote to queen
-                            });
-
-                            if (move === null) {
-                                // Invalid move - snap back
-                                return 'snapback';
-                            }
-
-                            // Valid move - update PGN display
-                            let pgnMoves = window.board2Chess.pgn();
-                            // Strip any headers chess.js may have added
-                            pgnMoves = pgnMoves.replace(/\[[^\]]*\]\s*/g, '').trim();
-
-                            // Build custom PGN with Variant header
-                            const customPgn = '[Variant "From Position"]\n[FEN "' + window.board2StartingFen + '"]\n\n' + pgnMoves;
-
-                            const moveHistoryTextArea = document.getElementById('moveHistoryTextArea');
-                            if (moveHistoryTextArea) {
-                                moveHistoryTextArea.value = customPgn;
-                            }
-
-                            // Copy to clipboard
-                            navigator.clipboard.writeText(customPgn).catch(function(err) {
-                                console.log('Clipboard write failed:', err);
-                            });
-
-                            log(`Move: ${move.san}`, 'info');
-                        }
-                    });
-
-                    log(`Variant mode enabled. Starting FEN: ${fullFen}`, 'success');
-                    log('Make moves on the board - PGN will be generated automatically', 'info');
                 });
             }
 
@@ -5821,247 +5533,6 @@ END OF GUIDE
                 });
             }
 
-            // Load Mistakes Button
-            const loadMistakesBtn = document.getElementById('loadMistakesBtn');
-            if (loadMistakesBtn) {
-                loadMistakesBtn.addEventListener('click', function() {
-                    const reportText = document.getElementById('analysisReportText');
-                    if (!reportText || !reportText.textContent || reportText.textContent === 'Loading report...') {
-                        alert('No report loaded. Please analyze a game or load a report first.');
-                        return;
-                    }
-
-                    const content = reportText.textContent;
-
-                    // Parse mistakes from the report
-                    // Format: MISTAKE: 12... O-O-O, Eval: ..., BLUNDER: 17. d4, Eval: ..., INACCURACY: 5. Nf3, Eval: ...
-                    window.loadedMistakes = {};
-
-                    // Match patterns like "MISTAKE: 12... O-O-O", "BLUNDER: 17. d4", or "INACCURACY: 5. Nf3"
-                    const mistakeRegex = /(MISTAKE|BLUNDER|INACCURACY):\s*(\d+)(\.{1,3})\s*[A-Za-z0-9+#=-]+/g;
-                    let match;
-
-                    while ((match = mistakeRegex.exec(content)) !== null) {
-                        const severity = match[1]; // MISTAKE, BLUNDER, or INACCURACY
-                        const moveNum = match[2];  // 12, 13, 17, etc.
-                        const dots = match[3];     // . or ...
-
-                        const notation = `${moveNum}${dots}`;
-                        window.loadedMistakes[notation] = severity;
-                    }
-
-                    const mistakeCount = Object.values(window.loadedMistakes).filter(s => s === 'MISTAKE').length;
-                    const blunderCount = Object.values(window.loadedMistakes).filter(s => s === 'BLUNDER').length;
-                    const inaccuracyCount = Object.values(window.loadedMistakes).filter(s => s === 'INACCURACY').length;
-
-                    if (Object.keys(window.loadedMistakes).length > 0) {
-                        log(`Loaded ${mistakeCount} mistakes, ${blunderCount} blunders, and ${inaccuracyCount} inaccuracies`, 'success');
-                        // Refresh the current indicator to show highlighting
-                        updateBoard2MoveIndicator(window.studyReportPositionIndex);
-
-                        // Build list of moves that will be highlighted
-                        const mistakeMoves = [];
-                        const blunderMoves = [];
-                        const inaccuracyMoves = [];
-                        for (const [notation, severity] of Object.entries(window.loadedMistakes)) {
-                            if (severity === 'MISTAKE') {
-                                mistakeMoves.push(notation);
-                            } else if (severity === 'BLUNDER') {
-                                blunderMoves.push(notation);
-                            } else if (severity === 'INACCURACY') {
-                                inaccuracyMoves.push(notation);
-                            }
-                        }
-
-                        let message = `Move #s will be highlighted:\n\n`;
-                        if (blunderMoves.length > 0) {
-                            message += `BLUNDERS (red): ${blunderMoves.join(', ')}\n`;
-                        }
-                        if (mistakeMoves.length > 0) {
-                            message += `MISTAKES (orange): ${mistakeMoves.join(', ')}\n`;
-                        }
-                        if (inaccuracyMoves.length > 0) {
-                            message += `INACCURACIES (green): ${inaccuracyMoves.join(', ')}`;
-                        }
-
-                        alert(message);
-                    } else {
-                        alert('No mistakes, blunders, or inaccuracies found in the report.');
-                    }
-                });
-            }
-
-            // Remove Mistakes Button
-            const removeMistakesBtn = document.getElementById('removeMistakesBtn');
-            if (removeMistakesBtn) {
-                removeMistakesBtn.addEventListener('click', function() {
-                    const mistakeCount = Object.keys(window.loadedMistakes).length;
-                    if (mistakeCount === 0) {
-                        alert('No mistakes are currently loaded.');
-                        return;
-                    }
-
-                    window.loadedMistakes = {};
-                    // Refresh the indicator to remove highlighting
-                    updateBoard2MoveIndicator(window.studyReportPositionIndex);
-                    log('Mistakes cleared - highlighting removed', 'info');
-                    alert('Mistakes removed. Highlighting has been cleared.');
-                });
-            }
-
-            // Vercel Blob Storage Configuration
-            const VERCEL_API_BASE = 'https://react-quick-docs.vercel.app';
-            const VERCEL_FILENAME = 'chess.txt';
-
-            // Helper function to get stored access code
-            function getVercelAccessCode() {
-                return localStorage.getItem('vercelAccessCode') || '';
-            }
-
-            // Helper function to store access code
-            function setVercelAccessCode(code) {
-                localStorage.setItem('vercelAccessCode', code);
-            }
-
-            // Load from Vercel Button
-            const loadFromVercelBtn = document.getElementById('loadFromVercelBtn');
-            if (loadFromVercelBtn) {
-                loadFromVercelBtn.addEventListener('click', async function() {
-                    try {
-                        log('Fetching chess.txt from Vercel...', 'info');
-
-                        const response = await fetch(`${VERCEL_API_BASE}/api/files`);
-                        const responseText = await response.text();
-
-                        // Check if response is HTML (error page) instead of JSON
-                        if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
-                            throw new Error('API endpoint not found. Make sure react-chat-report-viewer is deployed with /api/files endpoint.');
-                        }
-
-                        let data;
-                        try {
-                            data = JSON.parse(responseText);
-                        } catch (parseError) {
-                            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
-                        }
-
-                        if (!response.ok) {
-                            throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
-                        }
-
-                        // Extract chess.txt from the files object
-                        const content = data.files && data.files[VERCEL_FILENAME];
-
-                        if (content) {
-                            // Load content into the report text area
-                            const reportContainer = document.getElementById('analysisReportContainer');
-                            const reportText = document.getElementById('analysisReportText');
-
-                            if (reportContainer && reportText) {
-                                reportContainer.style.display = 'block';
-                                reportText.textContent = content;
-                                window.studyReportRawText = content;
-
-                                // Update filename display
-                                const filenameDisplay = document.getElementById('reportFilenameDisplay');
-                                if (filenameDisplay) {
-                                    filenameDisplay.textContent = '📁 ' + VERCEL_FILENAME + ' (from Vercel)';
-                                }
-
-                                log(`Loaded ${VERCEL_FILENAME} from Vercel (${content.length} characters)`, 'success');
-                                alert(`Successfully loaded ${VERCEL_FILENAME} from Vercel!`);
-                            }
-                        } else {
-                            alert(`File ${VERCEL_FILENAME} does not exist on Vercel yet. Save some content first.`);
-                            log(`File ${VERCEL_FILENAME} not found on Vercel`, 'warning');
-                        }
-                    } catch (error) {
-                        console.error('Error loading from Vercel:', error);
-                        log('Error loading from Vercel: ' + error.message, 'error');
-                        alert('Error loading from Vercel: ' + error.message);
-                    }
-                });
-            }
-
-            // Save to Vercel Button
-            const saveToVercelBtn = document.getElementById('saveToVercelBtn');
-            if (saveToVercelBtn) {
-                saveToVercelBtn.addEventListener('click', async function() {
-                    const reportText = document.getElementById('analysisReportText');
-
-                    if (!reportText || !reportText.textContent || reportText.textContent === 'Loading report...') {
-                        alert('No report content to save. Please analyze a game or load a report first.');
-                        return;
-                    }
-
-                    const content = reportText.textContent;
-
-                    // Ask for access code
-                    let accessCode = getVercelAccessCode();
-                    const inputCode = prompt('Enter ACCESS_CODE for Vercel:', accessCode);
-
-                    if (inputCode === null) {
-                        // User cancelled
-                        return;
-                    }
-
-                    accessCode = inputCode.trim();
-                    if (!accessCode) {
-                        alert('Access code is required.');
-                        return;
-                    }
-
-                    setVercelAccessCode(accessCode);
-
-                    try {
-                        log('Saving to Vercel...', 'info');
-
-                        const response = await fetch(`${VERCEL_API_BASE}/api/files`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                filename: VERCEL_FILENAME,
-                                content: content,
-                                accessCode: accessCode
-                            })
-                        });
-
-                        const responseText = await response.text();
-
-                        // Check if response is HTML (error page) instead of JSON
-                        if (responseText.trim().startsWith('<!') || responseText.trim().startsWith('<html')) {
-                            throw new Error('API endpoint not found. Make sure react-chat-report-viewer is deployed with /api/files endpoint.');
-                        }
-
-                        let data;
-                        try {
-                            data = JSON.parse(responseText);
-                        } catch (parseError) {
-                            throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
-                        }
-
-                        if (!response.ok) {
-                            throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
-                        }
-
-                        log(`Saved ${VERCEL_FILENAME} to Vercel (${content.length} characters)`, 'success');
-                        alert(`Successfully saved to ${VERCEL_FILENAME} on Vercel!`);
-
-                        // Update filename display
-                        const filenameDisplay = document.getElementById('reportFilenameDisplay');
-                        if (filenameDisplay) {
-                            filenameDisplay.textContent = '📁 ' + VERCEL_FILENAME + ' (saved to Vercel)';
-                        }
-                    } catch (error) {
-                        console.error('Error saving to Vercel:', error);
-                        log('Error saving to Vercel: ' + error.message, 'error');
-                        alert('Error saving to Vercel: ' + error.message);
-                    }
-                });
-            }
-
             // Load PGN from Highlight Button
             const loadPgnFromHighlightBtn = document.getElementById('loadPgnFromHighlight');
             if (loadPgnFromHighlightBtn) {
@@ -6162,154 +5633,6 @@ END OF GUIDE
                     }).catch(function(err) {
                         alert('Failed to copy text: ' + err);
                     });
-                });
-            }
-
-            // Load Reference Image Button
-            const loadRefImageBtn = document.getElementById('loadRefImageBtn');
-            if (loadRefImageBtn) {
-                loadRefImageBtn.addEventListener('click', function() {
-                    if (refImageLoaded) {
-                        document.getElementById('refImageModal').style.display = 'block';
-                    } else {
-                        document.getElementById('refImageFileInput').click();
-                    }
-                });
-            }
-
-            // Reference Image File Input (multiple images)
-            const refImageFileInput = document.getElementById('refImageFileInput');
-            if (refImageFileInput) {
-                refImageFileInput.addEventListener('change', function(e) {
-                    const files = Array.from(e.target.files);
-                    if (!files.length) return;
-
-                    // Filter to only image files and sort by name (natural numeric sorting)
-                    const imageFiles = files
-                        .filter(file => file.type.startsWith('image/'))
-                        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-
-                    if (!imageFiles.length) {
-                        alert('Please select image files (PNG, JPG, etc.)');
-                        return;
-                    }
-
-                    // Store all images with their data URLs
-                    loadedRefImages = [];
-                    currentRefImageIndex = 0;
-                    let loadedCount = 0;
-
-                    imageFiles.forEach((file, index) => {
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            loadedRefImages[index] = {
-                                name: file.name,
-                                url: event.target.result
-                            };
-                            loadedCount++;
-
-                            // Once all images are loaded, display the first one
-                            if (loadedCount === imageFiles.length) {
-                                // Show/hide nav buttons based on count
-                                const showNav = loadedRefImages.length > 1;
-                                document.getElementById('refImagePrevBtn').style.display = showNav ? 'block' : 'none';
-                                document.getElementById('refImageNextBtn').style.display = showNav ? 'block' : 'none';
-
-                                // Update button text
-                                document.getElementById('loadRefImageBtn').textContent = '🖼️ ' + loadedRefImages.length + ' images loaded';
-
-                                // Hide placeholder, show image
-                                document.getElementById('refImagePlaceholder').style.display = 'none';
-                                document.getElementById('refImagePreview').style.display = 'block';
-
-                                refImageLoaded = true;
-                                refImageIsEnlarged = false;
-
-                                // Display first image
-                                updateRefImageDisplay();
-
-                                // Show the modal
-                                document.getElementById('refImageModal').style.display = 'block';
-                            }
-                        };
-                        reader.readAsDataURL(file);
-                    });
-                });
-            }
-
-            // Update displayed reference image
-            function updateRefImageDisplay() {
-                if (!loadedRefImages.length) return;
-
-                const item = loadedRefImages[currentRefImageIndex];
-                document.getElementById('refImagePreview').src = item.url;
-                document.getElementById('refImageTitle').textContent = item.name;
-                document.getElementById('refImageCounter').textContent = (currentRefImageIndex + 1) + ' / ' + loadedRefImages.length;
-            }
-
-            // Navigate between reference images
-            function navigateRefImage(direction) {
-                if (!loadedRefImages.length) return;
-
-                currentRefImageIndex += direction;
-
-                // Wrap around
-                if (currentRefImageIndex < 0) {
-                    currentRefImageIndex = loadedRefImages.length - 1;
-                } else if (currentRefImageIndex >= loadedRefImages.length) {
-                    currentRefImageIndex = 0;
-                }
-
-                updateRefImageDisplay();
-            }
-
-            // Nav button event listeners
-            const refImagePrevBtn = document.getElementById('refImagePrevBtn');
-            if (refImagePrevBtn) {
-                refImagePrevBtn.addEventListener('click', function() {
-                    navigateRefImage(-1);
-                });
-            }
-
-            const refImageNextBtn = document.getElementById('refImageNextBtn');
-            if (refImageNextBtn) {
-                refImageNextBtn.addEventListener('click', function() {
-                    navigateRefImage(1);
-                });
-            }
-
-            // Close Reference Image Modal
-            const closeRefImageModalBtn = document.getElementById('closeRefImageModal');
-            if (closeRefImageModalBtn) {
-                closeRefImageModalBtn.addEventListener('click', function() {
-                    document.getElementById('refImageModal').style.display = 'none';
-                });
-            }
-
-            const refImageModal = document.getElementById('refImageModal');
-            if (refImageModal) {
-                refImageModal.addEventListener('click', function(e) {
-                    if (e.target === refImageModal) {
-                        refImageModal.style.display = 'none';
-                    }
-                });
-            }
-
-            // Reference Image Zoom Toggle
-            const refImagePreview = document.getElementById('refImagePreview');
-            if (refImagePreview) {
-                refImagePreview.addEventListener('click', function() {
-                    if (refImageIsEnlarged) {
-                        this.style.maxWidth = '100%';
-                        this.style.maxHeight = '70vh';
-                        this.style.cursor = 'zoom-in';
-                        refImageIsEnlarged = false;
-                    } else {
-                        this.style.maxWidth = 'none';
-                        this.style.maxHeight = 'none';
-                        this.style.cursor = 'zoom-out';
-                        refImageIsEnlarged = true;
-                    }
                 });
             }
 

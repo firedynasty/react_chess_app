@@ -1,0 +1,323 @@
+# Board Controls Features - Removed from index.html
+# This file contains all code needed to reimplement these features
+
+## HOW TO REIMPLEMENT:
+# 1. Add the HTML elements to the board controls section (around line 850-870)
+# 2. Add the event handlers in the DOMContentLoaded section
+# 3. Add any supporting global variables if not present
+
+================================================================================
+## HTML ELEMENTS
+================================================================================
+
+### board2PositionCount (hidden, not removed - just unhide by removing display: none)
+<span id="board2PositionCount" style="font-weight: bold; color: #eee;">0/0</span>
+
+### lichessBoard2Link
+<a id="lichessBoard2Link" href="#" target="_blank" style="color: #00d4ff; text-decoration: underline;">Go to Lichess (Analysis)</a>
+
+### resetAutoPlayBtn
+<button id="resetAutoPlayBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reset</button>
+
+### loadPgnFromClipboard
+<button id="loadPgnFromClipboard" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load PGN from Clipboard</button>
+
+### reloadGameFromReport
+<button id="reloadGameFromReport" style="background: #fd7e14; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Reload Game from Report</button>
+
+### nextFenVariant
+<button id="nextFenVariant" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN</button>
+
+### nextPgnVariant
+<button id="nextPgnVariant" style="background: #9c27b0; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next PGN</button>
+
+### setVariantBtn
+<button id="setVariantBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Set Variant</button>
+
+================================================================================
+## EVENT HANDLERS
+================================================================================
+
+### resetAutoPlayBtn Handler
+// Reset button - turns off auto-play and resets to move #1
+document.getElementById('resetAutoPlayBtn').addEventListener('click', function() {
+    // Turn off auto-play if it's on
+    if (autoPlayToggle.checked) {
+        autoPlayToggle.checked = false;
+        autoPlayLabel.classList.remove('active');
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+        }
+    }
+
+    // Reset board to move #1
+    if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+        window.studyReportPositionIndex = 0;
+        if (window.board2) {
+            window.board2.position(window.studyReportPositions[0]);
+        }
+        updateBoard2MoveIndicator(0);
+    }
+});
+
+### loadPgnFromClipboard Handler
+// Load PGN from Clipboard
+const loadPgnFromClipboardBtn = document.getElementById('loadPgnFromClipboard');
+if (loadPgnFromClipboardBtn) {
+    loadPgnFromClipboardBtn.addEventListener('click', async function() {
+        try {
+            const clipboardText = await navigator.clipboard.readText();
+            if (!clipboardText || clipboardText.trim() === '') {
+                alert('Clipboard is empty. Please copy a PGN first.');
+                return;
+            }
+
+            let pgnText = clipboardText.trim();
+            pgnText = pgnText.split('\n')
+                .filter(line => !line.trim().startsWith('['))
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            if (!/\d+\./.test(pgnText)) {
+                alert('Clipboard does not contain valid PGN.');
+                return;
+            }
+
+            if (typeof window.parsePgnToPositions === 'function') {
+                window.studyReportPositions = window.parsePgnToPositions(pgnText);
+                window.studyReportPositionIndex = 0;
+
+                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                    window.board2.position(window.studyReportPositions[0]);
+                    updateBoard2MoveIndicator(0);
+                    log(`Loaded ${window.studyReportPositions.length} positions from clipboard`, 'success');
+                }
+            }
+        } catch (err) {
+            console.error('Failed to read clipboard:', err);
+            alert('Could not read clipboard. Please check permissions.');
+        }
+    });
+}
+
+### reloadGameFromReport Handler
+// Reload Game from Report Button
+const reloadGameFromReportBtn = document.getElementById('reloadGameFromReport');
+if (reloadGameFromReportBtn) {
+    reloadGameFromReportBtn.addEventListener('click', function() {
+        const pgnTextarea = document.getElementById('pgnInput');
+        if (!pgnTextarea || !pgnTextarea.value.trim()) {
+            alert('No game PGN available. Please analyze a game first.');
+            return;
+        }
+
+        let pgnText = pgnTextarea.value.trim();
+
+        // Clean the PGN
+        if (typeof cleanPgn === 'function') {
+            pgnText = cleanPgn(pgnText);
+        } else {
+            pgnText = pgnText.split('\n')
+                .filter(line => !line.trim().startsWith('['))
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        if (typeof window.parsePgnToPositions === 'function') {
+            window.studyReportPositions = window.parsePgnToPositions(pgnText);
+            window.studyReportPositionIndex = 0;
+
+            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                if (window.board2) {
+                    window.board2.position(window.studyReportPositions[0]);
+                    updateBoard2MoveIndicator(0);
+                }
+                // Reset variant displays
+                document.getElementById('currentFenMoves').textContent = '';
+                document.getElementById('variantIndexDisplay').textContent = '';
+                window.currentVariantType = null;
+                log(`Reloaded ${window.studyReportPositions.length} positions from original game`, 'success');
+            } else {
+                alert('Could not parse positions from the game PGN.');
+            }
+        } else {
+            alert('PGN parser not available.');
+        }
+    });
+}
+
+### nextFenVariant Handler
+const nextFenVariantBtn = document.getElementById('nextFenVariant');
+if (nextFenVariantBtn) {
+    nextFenVariantBtn.addEventListener('click', function() {
+        if (window.fenVariants.length === 0) {
+            const count = window.scanReportForFenVariants();
+            if (count === 0) {
+                alert('No [Variant "From Position"][FEN "..."] blocks found in report.');
+                return;
+            }
+        } else {
+            window.currentFenVariantIndex = (window.currentFenVariantIndex + 1) % window.fenVariants.length;
+        }
+        window.loadCurrentFenVariant();
+    });
+}
+
+### nextPgnVariant Handler
+// Next PGN Variant Button
+const nextPgnVariantBtn = document.getElementById('nextPgnVariant');
+if (nextPgnVariantBtn) {
+    nextPgnVariantBtn.addEventListener('click', function() {
+        if (window.pgnVariants.length === 0) {
+            const count = window.scanReportForPgnVariants();
+            if (count === 0) {
+                alert('No PGN blocks found in report.');
+                return;
+            }
+        } else {
+            window.currentPgnVariantIndex = (window.currentPgnVariantIndex + 1) % window.pgnVariants.length;
+        }
+        window.loadCurrentPgnVariant();
+    });
+}
+
+### setVariantBtn Handler (Full - this is extensive)
+// =========================================================
+// SET VARIANT - Analysis Mode with chess.js
+// =========================================================
+window.board2Chess = null;  // chess.js instance for board2
+window.board2StartingFen = null;  // Starting FEN for variant
+window.board2VariantMode = false;  // Whether we're in variant/analysis mode
+
+const setVariantBtn = document.getElementById('setVariantBtn');
+if (setVariantBtn) {
+    setVariantBtn.addEventListener('click', function() {
+        // Get current position from board2
+        const currentPosition = window.board2.position('fen');
+
+        // Extract move number and turn from board2MoveIndicator
+        const indicator = document.getElementById('board2MoveIndicator');
+        let moveNumber = 1;
+        let turn = 'w';
+
+        if (indicator) {
+            const indicatorText = indicator.textContent.trim();
+            if (indicatorText !== 'Start') {
+                const match = indicatorText.match(/(\d+)(\.{1,3})/);
+                if (match) {
+                    moveNumber = parseInt(match[1]);
+                    if (match[2] === '.') {
+                        turn = 'b';
+                    } else {
+                        turn = 'w';
+                        moveNumber++;
+                    }
+                }
+            }
+        }
+
+        // Build full FEN with correct turn and move number
+        const fullFen = currentPosition + ' ' + turn + ' KQkq - 0 ' + moveNumber;
+
+        // Initialize chess.js with this position
+        window.board2Chess = new Chess();
+        const loaded = window.board2Chess.load(fullFen);
+
+        if (!loaded) {
+            alert('Could not load position into chess.js');
+            return;
+        }
+
+        window.board2StartingFen = fullFen;
+        window.board2VariantMode = true;
+
+        // Show the move history textarea
+        const moveHistoryTextArea = document.getElementById('moveHistoryTextArea');
+        if (moveHistoryTextArea) {
+            moveHistoryTextArea.style.display = 'block';
+            moveHistoryTextArea.value = '[Variant "From Position"]\n[FEN "' + fullFen + '"]\n\n';
+        }
+
+        // Show the Report Append Variant button
+        document.getElementById('reportAppendVariantBtn').style.display = 'inline-block';
+
+        // Reinitialize board2 with onDrop handler for move tracking
+        window.board2 = Chessboard('myBoard2', {
+            draggable: true,
+            dropOffBoard: 'snapback',
+            position: currentPosition,
+            snapbackSpeed: 500,
+            snapSpeed: 100,
+            pieceTheme: pieceThemePath,
+
+            onDrop: function(source, target, piece, newPos, oldPos, orientation) {
+                const move = window.board2Chess.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q'
+                });
+
+                if (move === null) {
+                    return 'snapback';
+                }
+
+                let pgnMoves = window.board2Chess.pgn();
+                pgnMoves = pgnMoves.replace(/\[[^\]]*\]\s*/g, '').trim();
+
+                const customPgn = '[Variant "From Position"]\n[FEN "' + window.board2StartingFen + '"]\n\n' + pgnMoves;
+
+                const moveHistoryTextArea = document.getElementById('moveHistoryTextArea');
+                if (moveHistoryTextArea) {
+                    moveHistoryTextArea.value = customPgn;
+                }
+
+                navigator.clipboard.writeText(customPgn).catch(function(err) {
+                    console.log('Clipboard write failed:', err);
+                });
+
+                log(`Move: ${move.san}`, 'info');
+            }
+        });
+
+        log(`Variant mode enabled. Starting FEN: ${fullFen}`, 'success');
+        log('Make moves on the board - PGN will be generated automatically', 'info');
+    });
+}
+
+================================================================================
+## LICHESS LINK UPDATE CODE (in updateBoard2MoveIndicator function)
+================================================================================
+
+// Update Lichess link with current position
+const lichessLink = document.getElementById('lichessBoard2Link');
+if (lichessLink && window.studyReportPositions[index]) {
+    const position = window.studyReportPositions[index];
+    const colorToMove = (index % 2 === 0) ? 'w' : 'b';
+    let fen = position.includes(' ') ? position : `${position} ${colorToMove} KQkq - 0 1`;
+    lichessLink.href = `https://lichess.org/analysis/${fen.replace(/ /g, '_')}`;
+}
+
+================================================================================
+## POSITION COUNT UPDATE CODE (in updateBoard2MoveIndicator function)
+================================================================================
+
+const positionCount = document.getElementById('board2PositionCount');
+if (positionCount) {
+    positionCount.textContent = `${index + 1}/${total}`;
+}
+
+================================================================================
+## SUPPORTING GLOBAL VARIABLES (if not present)
+================================================================================
+
+window.fenVariants = [];
+window.currentFenVariantIndex = 0;
+window.pgnVariants = [];
+window.currentPgnVariantIndex = 0;
+window.currentVariantType = null; // 'fen' or 'pgn'
+window.board2Chess = null;
+window.board2StartingFen = null;
+window.board2VariantMode = false;

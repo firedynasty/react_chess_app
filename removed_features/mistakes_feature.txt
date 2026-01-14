@@ -1,0 +1,141 @@
+# Mistakes Highlighting Feature - Removed from index.html
+# This file contains all code needed to reimplement this feature
+
+## HOW TO REIMPLEMENT:
+# 1. Add the HTML buttons to the reportControls div (around line 795)
+# 2. Add the state variable declaration (if not already present)
+# 3. Add the event handlers in the DOMContentLoaded section
+# NOTE: The highlighting code in updateBoard2MoveIndicator() already exists and uses window.loadedMistakes
+
+================================================================================
+## HTML BUTTONS (add to reportControls div)
+================================================================================
+
+<button id="loadMistakesBtn" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">⚠️ Load Mistakes</button>
+<button id="removeMistakesBtn" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">✓ Remove Mistakes</button>
+
+================================================================================
+## STATE VARIABLE (should already exist at line 2607 - don't duplicate)
+================================================================================
+
+window.loadedMistakes = {}; // { "12...": "MISTAKE", "13.": "MISTAKE", "17.": "BLUNDER" }
+
+================================================================================
+## EVENT HANDLERS (add in DOMContentLoaded)
+================================================================================
+
+// Load Mistakes Button
+const loadMistakesBtn = document.getElementById('loadMistakesBtn');
+if (loadMistakesBtn) {
+    loadMistakesBtn.addEventListener('click', function() {
+        const reportText = document.getElementById('analysisReportText');
+        if (!reportText || !reportText.textContent || reportText.textContent === 'Loading report...') {
+            alert('No report loaded. Please analyze a game or load a report first.');
+            return;
+        }
+
+        const content = reportText.textContent;
+
+        // Parse mistakes from the report
+        // Format: MISTAKE: 12... O-O-O, Eval: ..., BLUNDER: 17. d4, Eval: ..., INACCURACY: 5. Nf3, Eval: ...
+        window.loadedMistakes = {};
+
+        // Match patterns like "MISTAKE: 12... O-O-O", "BLUNDER: 17. d4", or "INACCURACY: 5. Nf3"
+        const mistakeRegex = /(MISTAKE|BLUNDER|INACCURACY):\s*(\d+)(\.{1,3})\s*[A-Za-z0-9+#=-]+/g;
+        let match;
+
+        while ((match = mistakeRegex.exec(content)) !== null) {
+            const severity = match[1]; // MISTAKE, BLUNDER, or INACCURACY
+            const moveNum = match[2];  // 12, 13, 17, etc.
+            const dots = match[3];     // . or ...
+
+            const notation = `${moveNum}${dots}`;
+            window.loadedMistakes[notation] = severity;
+        }
+
+        const mistakeCount = Object.values(window.loadedMistakes).filter(s => s === 'MISTAKE').length;
+        const blunderCount = Object.values(window.loadedMistakes).filter(s => s === 'BLUNDER').length;
+        const inaccuracyCount = Object.values(window.loadedMistakes).filter(s => s === 'INACCURACY').length;
+
+        if (Object.keys(window.loadedMistakes).length > 0) {
+            log(`Loaded ${mistakeCount} mistakes, ${blunderCount} blunders, and ${inaccuracyCount} inaccuracies`, 'success');
+            // Refresh the current indicator to show highlighting
+            updateBoard2MoveIndicator(window.studyReportPositionIndex);
+
+            // Build list of moves that will be highlighted
+            const mistakeMoves = [];
+            const blunderMoves = [];
+            const inaccuracyMoves = [];
+            for (const [notation, severity] of Object.entries(window.loadedMistakes)) {
+                if (severity === 'MISTAKE') {
+                    mistakeMoves.push(notation);
+                } else if (severity === 'BLUNDER') {
+                    blunderMoves.push(notation);
+                } else if (severity === 'INACCURACY') {
+                    inaccuracyMoves.push(notation);
+                }
+            }
+
+            let message = `Move #s will be highlighted:\n\n`;
+            if (blunderMoves.length > 0) {
+                message += `BLUNDERS (red): ${blunderMoves.join(', ')}\n`;
+            }
+            if (mistakeMoves.length > 0) {
+                message += `MISTAKES (orange): ${mistakeMoves.join(', ')}\n`;
+            }
+            if (inaccuracyMoves.length > 0) {
+                message += `INACCURACIES (green): ${inaccuracyMoves.join(', ')}`;
+            }
+
+            alert(message);
+        } else {
+            alert('No mistakes, blunders, or inaccuracies found in the report.');
+        }
+    });
+}
+
+// Remove Mistakes Button
+const removeMistakesBtn = document.getElementById('removeMistakesBtn');
+if (removeMistakesBtn) {
+    removeMistakesBtn.addEventListener('click', function() {
+        const mistakeCount = Object.keys(window.loadedMistakes).length;
+        if (mistakeCount === 0) {
+            alert('No mistakes are currently loaded.');
+            return;
+        }
+
+        window.loadedMistakes = {};
+        // Refresh the indicator to remove highlighting
+        updateBoard2MoveIndicator(window.studyReportPositionIndex);
+        log('Mistakes cleared - highlighting removed', 'info');
+        alert('Mistakes removed. Highlighting has been cleared.');
+    });
+}
+
+================================================================================
+## HIGHLIGHTING CODE (already in updateBoard2MoveIndicator function - DO NOT REMOVE)
+## This code will remain in the codebase and work if loadedMistakes is populated
+================================================================================
+
+// Check if this move is a mistake/blunder and highlight accordingly
+indicator.style.background = 'transparent';
+indicator.style.padding = '4px 8px';
+indicator.style.borderRadius = '4px';
+
+if (window.loadedMistakes && Object.keys(window.loadedMistakes).length > 0) {
+    const severity = window.loadedMistakes[moveNotation];
+    if (severity === 'BLUNDER') {
+        indicator.style.background = '#ff6b6b'; // Red for blunder
+        indicator.style.color = '#1a1a2e';
+    } else if (severity === 'MISTAKE') {
+        indicator.style.background = '#ffa94d'; // Orange for mistake
+        indicator.style.color = '#1a1a2e';
+    } else if (severity === 'INACCURACY') {
+        indicator.style.background = '#51cf66'; // Green for inaccuracy
+        indicator.style.color = '#1a1a2e';
+    } else {
+        indicator.style.color = '#eee';
+    }
+} else {
+    indicator.style.color = '#eee';
+}

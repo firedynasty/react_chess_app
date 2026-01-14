@@ -1,0 +1,179 @@
+# Reference Images Feature - Removed from index.html
+# This file contains all code needed to reimplement this feature
+
+## HOW TO REIMPLEMENT:
+# 1. Add the HTML buttons to the reportControls div (around line 782)
+# 2. Add the modal HTML after the board section (around line 897)
+# 3. Add the state variables in the script section (around line 2614)
+# 4. Add the event handlers in the DOMContentLoaded section
+
+================================================================================
+## HTML BUTTONS (add to reportControls div)
+================================================================================
+
+<button id="loadRefImageBtn" style="background: #17a2b8; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">🖼️ Load Reference Images</button>
+<input type="file" id="refImageFileInput" accept="image/*" multiple style="display: none;">
+
+================================================================================
+## HTML MODAL (add after main board section)
+================================================================================
+
+<!-- Reference Image Modal -->
+<div id="refImageModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000;">
+  <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #16213e; padding: 20px; border-radius: 8px; max-width: 90%; max-height: 90%;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <span id="refImageTitle" style="font-weight: bold; color: #00d4ff;">Reference Image</span>
+      <button id="closeRefImageModal" style="background: #dc3545; color: white; border: none; padding: 5px 15px; border-radius: 6px; cursor: pointer;">Close</button>
+    </div>
+    <div id="refImagePlaceholder" style="text-align: center; padding: 40px; color: #888;">No image loaded</div>
+    <div style="display: flex; justify-content: center; align-items: center; gap: 15px;">
+      <button id="refImagePrevBtn" style="background: rgba(0,0,0,0.6); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 20px; display: none;">‹</button>
+      <img id="refImagePreview" src="" alt="Reference Image" style="display: none; max-width: 100%; max-height: 70vh; cursor: zoom-in;">
+      <button id="refImageNextBtn" style="background: rgba(0,0,0,0.6); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 20px; display: none;">›</button>
+    </div>
+    <div id="refImageCounter" style="color: #888; font-size: 14px; margin-top: 8px; text-align: center;"></div>
+  </div>
+</div>
+
+================================================================================
+## STATE VARIABLES (add in script section)
+================================================================================
+
+let refImageLoaded = false;
+let refImageIsEnlarged = false;
+let loadedRefImages = [];
+let currentRefImageIndex = 0;
+
+================================================================================
+## EVENT HANDLERS (add in DOMContentLoaded)
+================================================================================
+
+// Load Reference Image Button
+const loadRefImageBtn = document.getElementById('loadRefImageBtn');
+if (loadRefImageBtn) {
+    loadRefImageBtn.addEventListener('click', function() {
+        if (refImageLoaded) {
+            document.getElementById('refImageModal').style.display = 'block';
+        } else {
+            document.getElementById('refImageFileInput').click();
+        }
+    });
+}
+
+// Reference Image File Input (multiple images)
+const refImageFileInput = document.getElementById('refImageFileInput');
+if (refImageFileInput) {
+    refImageFileInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        // Filter to only image files and sort by name (natural numeric sorting)
+        const imageFiles = files
+            .filter(file => file.type.startsWith('image/'))
+            .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+        if (!imageFiles.length) {
+            alert('Please select image files (PNG, JPG, etc.)');
+            return;
+        }
+
+        // Store all images with their data URLs
+        loadedRefImages = [];
+        currentRefImageIndex = 0;
+        let loadedCount = 0;
+
+        imageFiles.forEach((file, index) => {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                loadedRefImages[index] = {
+                    name: file.name,
+                    url: event.target.result
+                };
+                loadedCount++;
+
+                // Once all images are loaded, display the first one
+                if (loadedCount === imageFiles.length) {
+                    // Show/hide nav buttons based on count
+                    const showNav = loadedRefImages.length > 1;
+                    document.getElementById('refImagePrevBtn').style.display = showNav ? 'block' : 'none';
+                    document.getElementById('refImageNextBtn').style.display = showNav ? 'block' : 'none';
+
+                    // Update button text
+                    document.getElementById('loadRefImageBtn').textContent = '🖼️ ' + loadedRefImages.length + ' images loaded';
+
+                    // Hide placeholder, show image
+                    document.getElementById('refImagePlaceholder').style.display = 'none';
+                    document.getElementById('refImagePreview').style.display = 'block';
+
+                    refImageLoaded = true;
+                    refImageIsEnlarged = false;
+
+                    // Display first image
+                    updateRefImageDisplay();
+
+                    // Show the modal
+                    document.getElementById('refImageModal').style.display = 'block';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+}
+
+// Update displayed reference image
+function updateRefImageDisplay() {
+    if (!loadedRefImages.length) return;
+
+    const item = loadedRefImages[currentRefImageIndex];
+    document.getElementById('refImagePreview').src = item.url;
+    document.getElementById('refImageTitle').textContent = item.name;
+    document.getElementById('refImageCounter').textContent = (currentRefImageIndex + 1) + ' / ' + loadedRefImages.length;
+}
+
+// Navigate between reference images
+function navigateRefImage(direction) {
+    if (!loadedRefImages.length) return;
+
+    currentRefImageIndex += direction;
+
+    // Wrap around
+    if (currentRefImageIndex < 0) {
+        currentRefImageIndex = loadedRefImages.length - 1;
+    } else if (currentRefImageIndex >= loadedRefImages.length) {
+        currentRefImageIndex = 0;
+    }
+
+    updateRefImageDisplay();
+}
+
+// Nav button event listeners
+const refImagePrevBtn = document.getElementById('refImagePrevBtn');
+if (refImagePrevBtn) {
+    refImagePrevBtn.addEventListener('click', function() {
+        navigateRefImage(-1);
+    });
+}
+
+const refImageNextBtn = document.getElementById('refImageNextBtn');
+if (refImageNextBtn) {
+    refImageNextBtn.addEventListener('click', function() {
+        navigateRefImage(1);
+    });
+}
+
+// Close Reference Image Modal
+const closeRefImageModalBtn = document.getElementById('closeRefImageModal');
+if (closeRefImageModalBtn) {
+    closeRefImageModalBtn.addEventListener('click', function() {
+        document.getElementById('refImageModal').style.display = 'none';
+    });
+}
+
+const refImageModal = document.getElementById('refImageModal');
+if (refImageModal) {
+    refImageModal.addEventListener('click', function(e) {
+        if (e.target === refImageModal) {
+            refImageModal.style.display = 'none';
+        }
+    });
+}
