@@ -859,7 +859,9 @@
           </div>
           <button id="prevVariant" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
-          <button id="getPgnBtn" onclick="copyAnnotatedPgn()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN/Update</button>
+          <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
+          <button id="updateReportBtn" onclick="updateReportWithPgn()" style="background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
+          <a id="lichessBoard2Link" href="#" target="_blank" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; text-decoration: none; display: inline-block; margin-left: 10px;">Go to Lichess (Analysis)</a>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4;"></span>
           <br>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: block;"></span>
@@ -1177,6 +1179,23 @@
                 log('Please enter a PGN', 'error');
                 return;
             }
+
+            // Reset variant/file section state from previous analysis
+            window.allVariants = [];
+            window.allFileSections = [];
+            window.fenVariants = [];
+            window.pgnVariants = [];
+            window.currentVariantIndex = 0;
+            window.currentFileSectionIndex = 0;
+            window.currentLoadedPgn = null;
+            // Hide file section header
+            const fileSectionHeader = document.getElementById('fileSectionHeader');
+            if (fileSectionHeader) fileSectionHeader.style.display = 'none';
+            // Clear variant displays
+            const currentFenMoves = document.getElementById('currentFenMoves');
+            const variantIndexDisplay = document.getElementById('variantIndexDisplay');
+            if (currentFenMoves) currentFenMoves.textContent = '';
+            if (variantIndexDisplay) variantIndexDisplay.textContent = '';
 
             // Use AnalysisChess module if available, otherwise fallback
             if (typeof AnalysisChess !== 'undefined') {
@@ -1559,83 +1578,95 @@
         }
 
         /**
-         * Copy annotated PGN (with all variations) to clipboard
+         * Copy PGN to clipboard (from moveContainer or annotatedPgnWithVariations)
          */
-        function copyAnnotatedPgn() {
-            const pgn = window.annotatedPgnWithVariations;
+        function copyPgnToClipboard() {
+            // Priority: moveTree (current moveContainer) > annotatedPgnWithVariations
+            let pgn = window.annotatedPgnWithVariations;
+
+            // If we have a moveTree loaded (from nextVariant), use currentLoadedPgn
+            if (window.currentLoadedPgn) {
+                pgn = window.currentLoadedPgn;
+            }
+
             if (!pgn) {
-                log('No annotated PGN available', 'warning');
+                log('No PGN available to copy', 'warning');
                 return;
             }
 
-            // Update the report with the PGN (including variations)
-            const reportText = document.getElementById('analysisReportText');
-            const reportTextarea = document.getElementById('reportEditTextarea');
-
-            // Always read from the div's textContent (most reliable)
-            let report = reportText ? reportText.textContent : '';
-
-            console.log('copyAnnotatedPgn: report length =', report.length);
-            console.log('copyAnnotatedPgn: pgn to insert =', pgn.substring(0, 100));
-
-            if (report && report !== 'Loading report...') {
-                // Check if ANNOTATED PGN section exists (with or without "with variations")
-                const annotatedMatch = report.match(/ANNOTATED PGN[^\n]*\n-{70}\n/);
-
-                if (annotatedMatch) {
-                    // Find start of ANNOTATED PGN section
-                    const annotatedStart = report.indexOf(annotatedMatch[0]);
-                    const afterHeader = annotatedStart + annotatedMatch[0].length;
-
-                    // Find end of section (next double newline followed by section header or end)
-                    const nextSectionMatch = report.substring(afterHeader).match(/\n\n[A-Z]/);
-                    const sectionEnd = nextSectionMatch
-                        ? afterHeader + nextSectionMatch.index
-                        : report.length;
-
-                    // Replace the PGN content
-                    report = report.substring(0, annotatedStart) +
-                             'ANNOTATED PGN (with variations)\n' + '-'.repeat(70) + '\n' +
-                             pgn +
-                             report.substring(sectionEnd);
-                } else {
-                    // Add ANNOTATED PGN section before SUMMARY
-                    const summaryIndex = report.indexOf('\nSUMMARY\n');
-                    if (summaryIndex !== -1) {
-                        report = report.substring(0, summaryIndex) +
-                                 '\nANNOTATED PGN (with variations)\n' + '-'.repeat(70) + '\n' +
-                                 pgn + '\n' +
-                                 report.substring(summaryIndex);
-                    }
-                }
-
-                // Update ALL sources (div, textarea, and stored variable)
-                console.log('copyAnnotatedPgn: updating reportText.textContent');
-                if (reportText) {
-                    reportText.textContent = report;
-                    console.log('copyAnnotatedPgn: reportText updated, new length =', reportText.textContent.length);
-                }
-                if (reportTextarea) reportTextarea.value = report;
-                window.analysisReportRawText = report;
-                log('Report updated with PGN variations', 'success');
-            } else {
-                log('No report found to update', 'warning');
-            }
-
-            // Copy to clipboard
             navigator.clipboard.writeText(pgn).then(() => {
-                const btn = document.getElementById('getPgnBtn');
+                const btn = document.getElementById('copyPgnBtn');
                 const originalText = btn.textContent;
-                btn.textContent = 'Copied & Added!';
+                btn.textContent = 'Copied!';
                 btn.style.background = '#2ecc71';
                 setTimeout(() => {
                     btn.textContent = originalText;
                     btn.style.background = '#27ae60';
                 }, 1500);
-                log('Annotated PGN copied to clipboard', 'success');
+                log('PGN copied to clipboard', 'success');
             }).catch(err => {
                 log('Failed to copy: ' + err.message, 'error');
             });
+        }
+
+        /**
+         * Update report's ANNOTATED PGN section (only if section exists)
+         */
+        function updateReportWithPgn() {
+            const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
+            if (!pgn) {
+                log('No PGN available to update', 'warning');
+                return;
+            }
+
+            const reportText = document.getElementById('analysisReportText');
+            const reportTextarea = document.getElementById('reportEditTextarea');
+
+            let report = reportText ? reportText.textContent : '';
+
+            if (!report || report === 'Loading report...') {
+                log('No report found to update', 'warning');
+                return;
+            }
+
+            // Check if ANNOTATED PGN section exists - REQUIRED
+            const annotatedMatch = report.match(/ANNOTATED PGN[^\n]*\n-{70}\n/);
+
+            if (!annotatedMatch) {
+                log('ANNOTATED PGN section not found in report', 'warning');
+                return;
+            }
+
+            // Find start of ANNOTATED PGN section
+            const annotatedStart = report.indexOf(annotatedMatch[0]);
+            const afterHeader = annotatedStart + annotatedMatch[0].length;
+
+            // Find end of section (next double newline followed by section header or end)
+            const nextSectionMatch = report.substring(afterHeader).match(/\n\n[A-Z]/);
+            const sectionEnd = nextSectionMatch
+                ? afterHeader + nextSectionMatch.index
+                : report.length;
+
+            // Replace the PGN content
+            report = report.substring(0, annotatedStart) +
+                     'ANNOTATED PGN (with variations)\n' + '-'.repeat(70) + '\n' +
+                     pgn +
+                     report.substring(sectionEnd);
+
+            // Update ALL sources (div, textarea, and stored variable)
+            if (reportText) reportText.textContent = report;
+            if (reportTextarea) reportTextarea.value = report;
+            window.analysisReportRawText = report;
+
+            const btn = document.getElementById('updateReportBtn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Updated!';
+            btn.style.background = '#27ae60';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '#e67e22';
+            }, 1500);
+            log('Report updated with PGN', 'success');
         }
 
         /**
@@ -3484,6 +3515,13 @@
             // Update other displays
             updateMaterialDisplay(window.moveTree.fen);
 
+            // Update Lichess link
+            const lichessLink = document.getElementById('lichessBoard2Link');
+            if (lichessLink) {
+                const fen = window.moveTree.fen;
+                lichessLink.href = `https://lichess.org/analysis/${fen.replace(/ /g, '_')}`;
+            }
+
             // Update variant notes display
             const variantNotesDisplay = document.getElementById('variantNotesDisplay');
             if (variantNotesDisplay) {
@@ -3727,7 +3765,16 @@
          * Navigate to next variation or exit variation back to main line
          */
         function nextVariation() {
-            if (!window.moveTree || !window.currentMoveNode) return;
+            if (!window.moveTree) return;
+
+            // Handle case when at root/start position
+            if (!window.currentMoveNode) {
+                // Check if root has children with variations
+                if (window.moveTree.children && window.moveTree.children.length > 1) {
+                    jumpToNode(window.moveTree.children[1].nodeId);
+                }
+                return;
+            }
 
             const current = window.currentMoveNode;
 
@@ -3736,23 +3783,27 @@
             const isInVariation = currentEl && currentEl.classList.contains('variation-move');
 
             if (isInVariation) {
-                // We're in a variation - exit to main line
+                // We're in a variation
+                // If there are more moves in this variation, continue through it
+                if (current.children && current.children.length > 0) {
+                    // Advance to next move in variation (first child)
+                    jumpToNode(current.children[0].nodeId);
+                    return;
+                }
+
+                // At end of variation - exit to main line
                 // Find where this variation diverged from main line
                 let node = current;
                 while (node && node.parent) {
                     const parent = node.parent;
                     if (parent.children && parent.children.length > 1) {
-                        // Check if current node's path includes a non-first child
                         const index = parent.children.indexOf(node);
                         if (index > 0) {
                             // Found the divergence point
-                            // The main line continuation is parent.children[0]
                             const mainLineNode = parent.children[0];
-                            // Jump to the continuation of main line (first child of mainLineNode)
                             if (mainLineNode.children && mainLineNode.children.length > 0) {
                                 jumpToNode(mainLineNode.children[0].nodeId);
                             } else {
-                                // Main line ends here, just go to main line node
                                 jumpToNode(mainLineNode.nodeId);
                             }
                             return;
@@ -3762,13 +3813,22 @@
                 }
             } else {
                 // We're on main line - enter variation if available
+
+                // First check: Does current node have children with variations (alternatives to next move)?
+                if (current.children && current.children.length > 1) {
+                    // Jump to first variation (second child of current)
+                    jumpToNode(current.children[1].nodeId);
+                    return;
+                }
+
+                // Second check: Is there a sibling variation (alternative to current move)?
                 const parent = current.parent;
                 if (parent && parent.children && parent.children.length > 1) {
-                    // Check if current is the first child (main line)
-                    const index = parent.children.indexOf(current);
-                    if (index === 0) {
-                        // Jump to first variation (second child of parent)
-                        jumpToNode(parent.children[1].nodeId);
+                    const currentIndex = parent.children.indexOf(current);
+                    // Find next sibling (cycle through variations)
+                    const nextIndex = (currentIndex + 1) % parent.children.length;
+                    if (nextIndex !== currentIndex) {
+                        jumpToNode(parent.children[nextIndex].nodeId);
                         return;
                     }
                 }
@@ -5000,14 +5060,22 @@
                         toggleBtn.textContent = 'Edit';
                         toggleBtn.style.background = '#9c27b0';
                         window.isReportEditMode = false;
-                        // Rescan FEN/PGN variants with updated content
-                        window.fenVariants = [];
-                        window.pgnVariants = [];
-                        window.allVariants = [];
-                        window.scanReportForFenVariants();
-                        window.scanReportForPgnVariants();
-                        document.getElementById('currentFenMoves').textContent = '';
-                        document.getElementById('variantIndexDisplay').textContent = '';
+                        // Save current variant index before rescan (scanReportForAllVariants resets it to 0)
+                        const savedVariantIndex = window.currentVariantIndex || 0;
+
+                        // Rescan all variants with updated content
+                        window.scanReportForAllVariants();
+
+                        // Restore variant index (clamped to valid range)
+                        if (window.allVariants.length > 0) {
+                            window.currentVariantIndex = Math.min(savedVariantIndex, window.allVariants.length - 1);
+                            // Reload current variant into moveContainer
+                            window.loadCurrentVariant();
+                        } else {
+                            // No variants found, clear displays
+                            document.getElementById('currentFenMoves').textContent = '';
+                            document.getElementById('variantIndexDisplay').textContent = '';
+                        }
                     }
                 });
             }
