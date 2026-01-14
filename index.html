@@ -892,11 +892,6 @@
       </div>
     </div>
 
-    <div class="panel" style="margin-top: 20px;">
-        <h2>Log</h2>
-        <div id="log"></div>
-    </div>
-
     <!-- jQuery (required for chessboard.js) -->
     <script src='https://code.jquery.com/jquery-2.2.4.min.js'></script>
     <!-- Chessboard.js -->
@@ -2130,9 +2125,9 @@
                 }
             }
 
-            // Format the variation with proper move numbers
+            // Format the variation with proper move numbers (without Stockfish eval in brackets)
             const formattedPv = formatVariationWithMoveNumbers(result.pv, result.moveNumber, result.isBlack);
-            const variation = `(${formattedPv} {Stockfish: ${scoreStr}})`;
+            const variation = `(${formattedPv})`;
 
             // Protect existing variations by replacing them temporarily
             // This prevents matching moves inside existing parentheses
@@ -5648,6 +5643,12 @@ END OF GUIDE
 
     <!-- Chess Coach Chat Container -->
     <div class="panel" style="margin-top: 20px;" id="chess-chat-root"></div>
+
+    <!-- Log Panel -->
+    <div class="panel" style="margin-top: 20px;">
+        <h2>Log</h2>
+        <div id="log"></div>
+    </div>
 
     <!-- Chess Coach Chat Component -->
     <script type="text/babel">
