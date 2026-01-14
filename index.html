@@ -2083,8 +2083,8 @@
                 return;
             }
 
-            // Get PGN from hidden variable (or fallback to textarea)
-            const pgn = window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
+            // Get PGN - priority: nextVariant loaded > annotated from analysis > textarea
+            const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
             if (!pgn) {
                 statusEl.textContent = 'No PGN loaded';
                 statusEl.style.color = '#ff6b6b';
@@ -2245,8 +2245,8 @@
             }
 
             const result = window.currentVariationResult;
-            // Use hidden variable instead of textarea
-            let pgn = window.annotatedPgnWithVariations || document.getElementById('pgnInput').value;
+            // Priority: nextVariant loaded > annotated from analysis > textarea
+            let pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value;
 
             // Format score
             let scoreStr = '';
@@ -2315,7 +2315,10 @@
             }
 
             if (inserted) {
-                // Update hidden variable instead of textarea
+                // Update the source that was used
+                if (window.currentLoadedPgn) {
+                    window.currentLoadedPgn = protectedPgn;
+                }
                 window.annotatedPgnWithVariations = protectedPgn;
                 document.getElementById('variation-status').textContent = '';
 
@@ -4585,6 +4588,9 @@
                     window.studyReportPositions = result.positions;
                     window.studyReportComments = result.comments;
                 }
+
+                // Store the current loaded PGN for variation analysis
+                window.currentLoadedPgn = pgnString;
 
                 // Parse with variation support and render move table
                 console.log('Parsing PGN with variations:', pgnString.substring(0, 100));

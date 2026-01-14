@@ -1,0 +1,80 @@
+01/14/2026 Session Updates - Chess Analysis Project
+==================================================
+
+## fetch_and_analyze.py Changes
+
+1. Added classification thresholds:
+   - BLUNDER_THRESHOLD = -200 (2 pawns)
+   - MISTAKE_THRESHOLD = -100 (1 pawn)
+   - OPENING_MOVES = 8 (skip minor errors in first 8 moves)
+
+2. Added classify_move() function:
+   - Classifies moves as BLUNDER or MISTAKE (no inaccuracies)
+   - Applies opening filter (only flags 2+ pawn losses in first 8 moves)
+
+3. Added --auto flag for auto-analysis mode:
+   - Analyzes ALL moves and lists blunders/mistakes
+   - Shows summary at end with all flagged positions
+   - Usage: python fetch_and_analyze.py --user tttstanley -n 5 --auto
+
+4. Enhanced interactive mode:
+   - Now shows classification alongside Stockfish's best line
+
+5. Fixed best move display bug (was showing "e4" for everything)
+
+6. Fixed engine.quit() double-call error
+
+
+## index.html Changes
+
+### Analysis Thresholds
+- Changed BLUNDER_THRESHOLD from 300 to 200 (2 pawns)
+- Changed MISTAKE_THRESHOLD from 150 to 100 (1 pawn)
+- Added OPENING_MOVES = 8 constant
+- Removed INACCURACY_THRESHOLD (no longer tracking inaccuracies)
+
+### Classification Logic
+- Added opening filter: skips minor errors (< 2 pawns) in first 8 moves
+- Removed inaccuracies entirely - only shows BLUNDERS and MISTAKES
+
+### Report Changes
+- Hidden "MISTAKES & BLUNDERS" section (commented out)
+- Hidden "KEY POSITIONS TO REVIEW" section (commented out)
+- Added generateAnnotatedPgn() function with NAG codes:
+  - ? = Mistake
+  - ?? = Blunder
+- Added "ANNOTATED PGN" section to report
+
+### UI Flow Improvements
+1. PGN textarea cleared after "Analyze Game" completes
+2. Annotated PGN stored in hidden variable: window.annotatedPgnWithVariations
+3. Added "Copy PGN/Update" button:
+   - Copies annotated PGN to clipboard
+   - Updates report's ANNOTATED PGN section with all variations
+   - Updates both analysisReportText div and reportEditTextarea
+   - Updates window.analysisReportRawText
+
+### Variation Adder
+- Moved variation-adder div below reportControls for better UI flow
+- Updated analyzeForVariation() to read from hidden variable instead of empty textarea
+- Updated addVariationToPgn() to:
+  - Use window.annotatedPgnWithVariations instead of textarea
+  - Re-render moveTableContainer after adding variation
+
+### copyAnnotatedPgn() Function
+- Reads from correct source (handles edit mode with reportEditTextarea)
+- Updates ALL three sources:
+  - reportText.textContent (visible div)
+  - reportTextarea.value (edit textarea)
+  - window.analysisReportRawText (stored variable)
+- Added console logging for debugging
+
+
+## Files Modified
+- /fetch_and_analyze.py
+- /index.html
+
+
+## Notes
+- The "Analyze with Chess Coach" button requires `vercel dev` to run locally
+  (python -m http.server won't route /api/rag-chess.py)
