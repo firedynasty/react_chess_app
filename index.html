@@ -616,41 +616,6 @@
     </div>
 
     <!-- Stockfish Variation Adder -->
-    <div id="variation-adder" style="display: none; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <label style="color: #00d4ff; font-size: 13px;">Add Variation at:</label>
-            <input type="text" id="variation-move-input" placeholder="12. or 12..."
-                style="width: 100px; padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;"
-                onkeydown="if(event.key==='Enter')analyzeForVariation()">
-            <button id="analyze-variation-btn" onclick="analyzeForVariation()"
-                style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
-                Analyze
-            </button>
-            <select id="variation-depth" title="Depth" style="padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;">
-                <option value="12">d12</option>
-                <option value="14">d14</option>
-                <option value="16" selected>d16</option>
-                <option value="18">d18</option>
-            </select>
-            <span id="variation-status" style="color: #888; font-size: 12px;"></span>
-        </div>
-        <div id="variation-result" style="display: none; margin-top: 12px; padding: 12px; background: #0f3460; border-radius: 6px; border-left: 3px solid #27ae60;">
-            <div id="variation-best-move" style="color: #27ae60; font-weight: bold; margin-bottom: 5px;"></div>
-            <div id="variation-line" style="color: #ccc; font-family: monospace; font-size: 13px;"></div>
-            <div style="margin-top: 10px; display: flex; gap: 10px;">
-                <button id="add-variation-btn" onclick="addVariationToPgn()"
-                    style="display: none; padding: 6px 12px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
-                    Add to PGN
-                </button>
-                <button onclick="clearVariationResult()"
-                    style="padding: 6px 12px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
-                    Clear
-                </button>
-                <span style="color: #27ae60; font-size: 12px; margin-left: 10px;">added variation to pgn below</span>
-            </div>
-        </div>
-    </div>
-
     <div class="container">
         <div class="panel">
             <h2>Input</h2>
@@ -792,6 +757,42 @@
       <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
     </div>
 
+    <!-- Variation Adder (moved below reportControls) -->
+    <div id="variation-adder" style="display: none; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <label style="color: #00d4ff; font-size: 13px;">Add Variation at:</label>
+            <input type="text" id="variation-move-input" placeholder="12. or 12..."
+                style="width: 100px; padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;"
+                onkeydown="if(event.key==='Enter')analyzeForVariation()">
+            <button id="analyze-variation-btn" onclick="analyzeForVariation()"
+                style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
+                Analyze
+            </button>
+            <select id="variation-depth" title="Depth" style="padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;">
+                <option value="12">d12</option>
+                <option value="14">d14</option>
+                <option value="16" selected>d16</option>
+                <option value="18">d18</option>
+            </select>
+            <span id="variation-status" style="color: #888; font-size: 12px;"></span>
+        </div>
+        <div id="variation-result" style="display: none; margin-top: 12px; padding: 12px; background: #0f3460; border-radius: 6px; border-left: 3px solid #27ae60;">
+            <div id="variation-best-move" style="color: #27ae60; font-weight: bold; margin-bottom: 5px;"></div>
+            <div id="variation-line" style="color: #ccc; font-family: monospace; font-size: 13px;"></div>
+            <div style="margin-top: 10px; display: flex; gap: 10px;">
+                <button id="add-variation-btn" onclick="addVariationToPgn()"
+                    style="display: none; padding: 6px 12px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                    Add to PGN
+                </button>
+                <button onclick="clearVariationResult()"
+                    style="padding: 6px 12px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
+                    Clear
+                </button>
+                <span style="color: #27ae60; font-size: 12px; margin-left: 10px;">added variation to pgn below</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Board and Move Table (side by side) -->
     <div style="display: flex; gap: 15px; flex-wrap: nowrap; margin: 20px auto; max-width: 1200px; align-items: flex-start;">
       <!-- Chess Board -->
@@ -858,6 +859,7 @@
           </div>
           <button id="prevVariant" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
+          <button id="getPgnBtn" onclick="copyAnnotatedPgn()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN/Update</button>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4;"></span>
           <br>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: block;"></span>
@@ -912,9 +914,9 @@
         let analysisQueue = [];
 
         // Thresholds (in centipawns) - stricter thresholds
-        const BLUNDER_THRESHOLD = 300;     // 3 pawns
-        const MISTAKE_THRESHOLD = 150;     // 1.5 pawns
-        const INACCURACY_THRESHOLD = 50;   // 0.5 pawns
+        const BLUNDER_THRESHOLD = 200;     // 2 pawns
+        const MISTAKE_THRESHOLD = 100;     // 1 pawn
+        const OPENING_MOVES = 8;           // Skip minor errors in first N full moves
 
         // Initialize Stockfish Web Worker
         function initStockfish() {
@@ -1289,7 +1291,7 @@
                 chess.reset();
 
                 const mistakes = [];
-                let blunders = 0, mistakeCount = 0, inaccuracyCount = 0;
+                let blunders = 0, mistakeCount = 0;
 
                 log('Analyzing all positions...', 'info');
                 const evaluations = [];
@@ -1392,17 +1394,22 @@
                     chess.move(move.san);
 
                     let severity = null;
-                    if (swing <= -BLUNDER_THRESHOLD) {
+
+                    // Opening filter: skip minor errors (< 2 pawns) in first N moves
+                    const isOpening = moveNum <= OPENING_MOVES;
+                    const isMinorError = swing > -BLUNDER_THRESHOLD;
+
+                    if (isOpening && isMinorError) {
+                        // Skip minor errors in opening
+                        severity = null;
+                    } else if (swing <= -BLUNDER_THRESHOLD) {
                         severity = 'BLUNDER';
                         blunders++;
                     } else if (swing <= -MISTAKE_THRESHOLD) {
                         severity = 'MISTAKE';
                         mistakeCount++;
-                    } else if (swing <= -INACCURACY_THRESHOLD && Math.abs(evalBeforeForDisplay) > 100) {
-                        // Only flag inaccuracies when position is already unequal (beyond ±1 pawn)
-                        severity = 'INACCURACY';
-                        inaccuracyCount++;
                     }
+                    // No inaccuracies - only show blunders and mistakes
 
                     if (severity) {
                         mistakes.push({
@@ -1415,7 +1422,7 @@
                             fen: fenBefore
                         });
                         log(`${notation} ${move.san}: ${severity} (${swing} cp)`,
-                            severity === 'BLUNDER' ? 'error' : severity === 'MISTAKE' ? 'warning' : 'info');
+                            severity === 'BLUNDER' ? 'error' : 'warning');
                     }
                 }
 
@@ -1471,13 +1478,20 @@
 
                 document.getElementById('blunderCount').textContent = blunders;
                 document.getElementById('mistakeCount').textContent = mistakeCount;
-                document.getElementById('inaccuracyCount').textContent = inaccuracyCount;
+                document.getElementById('inaccuracyCount').textContent = 0;  // No longer tracking
 
                 log('Generating report...', 'info');
                 displayResults(mistakes, openingInfo, openingDeviations);
 
+                // Store annotated PGN in hidden variable for later retrieval
+                const annotatedPgn = generateAnnotatedPgn(pgn, mistakes);
+                window.annotatedPgnWithVariations = annotatedPgn;
+
+                // Clear the input textarea (PGN is now in moveContainer and hidden variable)
+                document.getElementById('pgnInput').value = '';
+
                 setStatus('ready', 'Analysis complete');
-                log(`Analysis complete: ${blunders} blunders, ${mistakeCount} mistakes, ${inaccuracyCount} inaccuracies`, 'success');
+                log(`Analysis complete: ${blunders} blunders, ${mistakeCount} mistakes`, 'success');
                 log('Report generated successfully', 'success');
 
             } catch (e) {
@@ -1544,6 +1558,121 @@
             document.getElementById('analyzeFenBtn').disabled = false;
         }
 
+        /**
+         * Copy annotated PGN (with all variations) to clipboard
+         */
+        function copyAnnotatedPgn() {
+            const pgn = window.annotatedPgnWithVariations;
+            if (!pgn) {
+                log('No annotated PGN available', 'warning');
+                return;
+            }
+
+            // Update the report with the PGN (including variations)
+            const reportText = document.getElementById('analysisReportText');
+            const reportTextarea = document.getElementById('reportEditTextarea');
+
+            // Always read from the div's textContent (most reliable)
+            let report = reportText ? reportText.textContent : '';
+
+            console.log('copyAnnotatedPgn: report length =', report.length);
+            console.log('copyAnnotatedPgn: pgn to insert =', pgn.substring(0, 100));
+
+            if (report && report !== 'Loading report...') {
+                // Check if ANNOTATED PGN section exists (with or without "with variations")
+                const annotatedMatch = report.match(/ANNOTATED PGN[^\n]*\n-{70}\n/);
+
+                if (annotatedMatch) {
+                    // Find start of ANNOTATED PGN section
+                    const annotatedStart = report.indexOf(annotatedMatch[0]);
+                    const afterHeader = annotatedStart + annotatedMatch[0].length;
+
+                    // Find end of section (next double newline followed by section header or end)
+                    const nextSectionMatch = report.substring(afterHeader).match(/\n\n[A-Z]/);
+                    const sectionEnd = nextSectionMatch
+                        ? afterHeader + nextSectionMatch.index
+                        : report.length;
+
+                    // Replace the PGN content
+                    report = report.substring(0, annotatedStart) +
+                             'ANNOTATED PGN (with variations)\n' + '-'.repeat(70) + '\n' +
+                             pgn +
+                             report.substring(sectionEnd);
+                } else {
+                    // Add ANNOTATED PGN section before SUMMARY
+                    const summaryIndex = report.indexOf('\nSUMMARY\n');
+                    if (summaryIndex !== -1) {
+                        report = report.substring(0, summaryIndex) +
+                                 '\nANNOTATED PGN (with variations)\n' + '-'.repeat(70) + '\n' +
+                                 pgn + '\n' +
+                                 report.substring(summaryIndex);
+                    }
+                }
+
+                // Update ALL sources (div, textarea, and stored variable)
+                console.log('copyAnnotatedPgn: updating reportText.textContent');
+                if (reportText) {
+                    reportText.textContent = report;
+                    console.log('copyAnnotatedPgn: reportText updated, new length =', reportText.textContent.length);
+                }
+                if (reportTextarea) reportTextarea.value = report;
+                window.analysisReportRawText = report;
+                log('Report updated with PGN variations', 'success');
+            } else {
+                log('No report found to update', 'warning');
+            }
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(pgn).then(() => {
+                const btn = document.getElementById('getPgnBtn');
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied & Added!';
+                btn.style.background = '#2ecc71';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#27ae60';
+                }, 1500);
+                log('Annotated PGN copied to clipboard', 'success');
+            }).catch(err => {
+                log('Failed to copy: ' + err.message, 'error');
+            });
+        }
+
+        /**
+         * Generate annotated PGN with NAG codes for mistakes/blunders
+         * NAG codes: ? = mistake, ?? = blunder
+         */
+        function generateAnnotatedPgn(pgn, mistakes) {
+            // Build a map of notation -> annotation
+            const annotationMap = {};
+            for (const m of mistakes) {
+                const annotation = m.severity === 'BLUNDER' ? '??' : '?';
+                annotationMap[m.notation + ' ' + m.move] = annotation;
+            }
+
+            // Clean PGN first
+            let cleanedPgn = pgn;
+            if (typeof AnalysisChess !== 'undefined') {
+                cleanedPgn = AnalysisChess.cleanPgn(pgn);
+            } else if (typeof cleanPgn === 'function') {
+                cleanedPgn = cleanPgn(pgn);
+            }
+
+            // Match move patterns like "1. e4" or "1... e5"
+            const movePattern = /(\d+\.{1,3})\s*([KQRBNP]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O)/g;
+
+            let result = cleanedPgn.replace(movePattern, (match, notation, move) => {
+                const key = notation + ' ' + move;
+                const annotation = annotationMap[key];
+                if (annotation) {
+                    return notation + ' ' + move + annotation;
+                }
+                return match;
+            });
+
+            return result;
+        }
+
         function displayResults(mistakes, openingInfo, openingDeviations) {
             // Hide the old results div - we're using the report container now
             document.getElementById('results').innerHTML = '';
@@ -1566,10 +1695,9 @@
                 window.isReportEditMode = false;
             }
 
-            // Count blunders, mistakes, and inaccuracies
+            // Count blunders and mistakes
             const blunders = mistakes.filter(m => m.severity === 'BLUNDER').length;
             const mistakeCount = mistakes.filter(m => m.severity === 'MISTAKE').length;
-            const inaccuracyCount = mistakes.filter(m => m.severity === 'INACCURACY').length;
 
             // Build the report text (CLI-style format)
             let report = '';
@@ -1600,6 +1728,12 @@
                 report += 'GAME PGN\n';
                 report += '-'.repeat(70) + '\n';
                 report += pgnInput + '\n\n';
+
+                // Annotated PGN with NAG codes
+                const annotatedPgn = generateAnnotatedPgn(pgnInput, mistakes);
+                report += 'ANNOTATED PGN\n';
+                report += '-'.repeat(70) + '\n';
+                report += annotatedPgn + '\n\n';
             }
 
             // Summary
@@ -1607,7 +1741,6 @@
             report += '-' .repeat(70) + '\n';
             report += `Blunders: ${blunders}\n`;
             report += `Mistakes: ${mistakeCount}\n`;
-            report += `Inaccuracies: ${inaccuracyCount}\n`;
             report += `Opening deviations: ${openingDeviations ? openingDeviations.length : 0}\n\n`;
 
             // Opening deviations section
@@ -1622,19 +1755,19 @@
                 }
             }
 
-            // Mistakes, Blunders & Inaccuracies section
-            if (mistakes.length > 0) {
-                report += 'MISTAKES, BLUNDERS & INACCURACIES\n';
-                report += '-' .repeat(70) + '\n';
-                const mistakeLines = [];
-                for (const err of mistakes) {
-                    const evalBeforeStr = (err.evalBefore / 100).toFixed(2);
-                    const evalAfterStr = (err.evalAfter / 100).toFixed(2);
-                    const swingStr = (err.swing / 100).toFixed(2);
-                    mistakeLines.push(`${err.severity}: ${err.notation} ${err.move}, Eval: ${evalBeforeStr} → ${evalAfterStr} (${err.swing > 0 ? '+' : ''}${swingStr})`);
-                }
-                report += mistakeLines.join(', ') + '\n\n';
-            }
+            // Mistakes & Blunders section - hidden (data still in annotated PGN)
+            // if (mistakes.length > 0) {
+            //     report += 'MISTAKES & BLUNDERS\n';
+            //     report += '-' .repeat(70) + '\n';
+            //     const mistakeLines = [];
+            //     for (const err of mistakes) {
+            //         const evalBeforeStr = (err.evalBefore / 100).toFixed(2);
+            //         const evalAfterStr = (err.evalAfter / 100).toFixed(2);
+            //         const swingStr = (err.swing / 100).toFixed(2);
+            //         mistakeLines.push(`${err.severity}: ${err.notation} ${err.move}, Eval: ${evalBeforeStr} → ${evalAfterStr} (${err.swing > 0 ? '+' : ''}${swingStr})`);
+            //     }
+            //     report += mistakeLines.join(', ') + '\n\n';
+            // }
 
             // Recommended puzzles section
             report += '=' .repeat(70) + '\n';
@@ -1660,20 +1793,20 @@
                 report += 'Keep practicing at: https://lichess.org/training\n\n';
             }
 
-            // Key positions section
-            const keyPositions = mistakes.filter(m => m.severity === 'BLUNDER' || m.severity === 'MISTAKE' || m.severity === 'INACCURACY');
-            if (keyPositions.length > 0) {
-                report += '=' .repeat(70) + '\n';
-                report += 'KEY POSITIONS TO REVIEW\n';
-                report += '=' .repeat(70) + '\n\n';
-                report += 'Review these critical positions:\n\n';
-
-                for (const err of keyPositions.slice(0, 5)) {
-                    report += `Move ${err.notation} ${err.move}\n`;
-                    const fenEncoded = err.fen.replace(/ /g, '_');
-                    report += `  https://lichess.org/analysis/${fenEncoded}\n\n`;
-                }
-            }
+            // Key positions section - hidden
+            // const keyPositions = mistakes.filter(m => m.severity === 'BLUNDER' || m.severity === 'MISTAKE');
+            // if (keyPositions.length > 0) {
+            //     report += '=' .repeat(70) + '\n';
+            //     report += 'KEY POSITIONS TO REVIEW\n';
+            //     report += '=' .repeat(70) + '\n\n';
+            //     report += 'Review these critical positions:\n\n';
+            //
+            //     for (const err of keyPositions.slice(0, 5)) {
+            //         report += `Move ${err.notation} ${err.move}\n`;
+            //         const fenEncoded = err.fen.replace(/ /g, '_');
+            //         report += `  https://lichess.org/analysis/${fenEncoded}\n\n`;
+            //     }
+            // }
 
             // Set the report text
             reportText.textContent = report;
@@ -1950,8 +2083,8 @@
                 return;
             }
 
-            // Get PGN
-            const pgn = document.getElementById('pgnInput').value.trim();
+            // Get PGN from hidden variable (or fallback to textarea)
+            const pgn = window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
             if (!pgn) {
                 statusEl.textContent = 'No PGN loaded';
                 statusEl.style.color = '#ff6b6b';
@@ -2112,8 +2245,8 @@
             }
 
             const result = window.currentVariationResult;
-            const pgnTextarea = document.getElementById('pgnInput');
-            let pgn = pgnTextarea.value;
+            // Use hidden variable instead of textarea
+            let pgn = window.annotatedPgnWithVariations || document.getElementById('pgnInput').value;
 
             // Format score
             let scoreStr = '';
@@ -2182,7 +2315,8 @@
             }
 
             if (inserted) {
-                pgnTextarea.value = protectedPgn;
+                // Update hidden variable instead of textarea
+                window.annotatedPgnWithVariations = protectedPgn;
                 document.getElementById('variation-status').textContent = '';
 
                 // Flash the button to show feedback
@@ -2202,6 +2336,13 @@
                         cleanedPgn = AnalysisChess.cleanPgn(protectedPgn);
                     }
                     window.studyReportPositions = window.parsePgnToPositions(cleanedPgn);
+                }
+
+                // Re-render move table with variations
+                if (typeof window.parsePgnWithVariations === 'function') {
+                    window.moveTree = window.parsePgnWithVariations(protectedPgn);
+                    window.currentMoveNode = null;
+                    renderMoveTable(window.moveTree);
                 }
             } else {
                 document.getElementById('variation-status').textContent = 'Could not insert variation';

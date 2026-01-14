@@ -20,6 +20,16 @@ from datetime import datetime
 
 
 # ============================================================================
+# Classification Thresholds
+# ============================================================================
+
+# Thresholds in centipawns (100 cp = 1 pawn)
+BLUNDER_THRESHOLD = -200  # Loss of 2+ pawns
+MISTAKE_THRESHOLD = -100  # Loss of 1+ pawn
+OPENING_MOVES = 8         # Skip minor errors in first N full moves
+
+
+# ============================================================================
 # Chess.com Fetching (from chess_grab_five_games.py)
 # ============================================================================
 
@@ -287,6 +297,37 @@ def clean_pgn_for_output(pgn_text):
     return '\n'.join(output_lines).strip()
 
 
+def classify_move(eval_before_cp, eval_after_cp, move_number, is_black_move):
+    """
+    Classify a move based on centipawn loss.
+
+    Args:
+        eval_before_cp: Evaluation before move (centipawns, from moving side's perspective)
+        eval_after_cp: Evaluation after move (centipawns, from moving side's perspective)
+        move_number: Full move number (1, 2, 3...)
+        is_black_move: Whether this is Black's move
+
+    Returns:
+        tuple: (classification, loss_in_pawns) or (None, 0)
+        classification is 'BLUNDER', 'MISTAKE', or None
+    """
+    swing = eval_after_cp - eval_before_cp  # Negative = lost advantage
+    loss_pawns = abs(swing) / 100.0
+
+    # Opening filter: skip minor errors in first N moves
+    # Only flag blunders (2+ pawns) in opening
+    if move_number <= OPENING_MOVES and swing > BLUNDER_THRESHOLD:
+        return None, 0
+
+    # Classify by centipawn loss
+    if swing <= BLUNDER_THRESHOLD:
+        return 'BLUNDER', loss_pawns
+    elif swing <= MISTAKE_THRESHOLD:
+        return 'MISTAKE', loss_pawns
+
+    return None, 0
+
+
 def add_variation_at_move(game, board, target_node, alt_moves, move_number, is_black_move):
     """Add Stockfish variations to the game tree."""
     parent_node = target_node.parent
@@ -320,6 +361,78 @@ def count_moves(game):
     return count
 
 
+def auto_analyze_game(game, engine, depth=18):
+    """
+    Automatically analyze all moves and return blunders/mistakes.
+
+    Returns:
+        list of dicts with move info and classification
+    """
+    board = game.board()
+    errors = []
+
+    print("\nAnalyzing all moves...")
+
+    for node in game.mainline():
+        move = node.move
+        moving_side = board.turn
+
+        # Calculate move number and notation
+        ply = board.ply()
+        full_move_num = (ply // 2) + 1
+        is_black = (ply % 2 == 1)
+
+        # Get eval and best move BEFORE the move is made
+        info_before = engine.analyse(board, chess.engine.Limit(depth=depth))
+        eval_before = info_before['score'].white().score(mate_score=10000)
+        best_move_uci = info_before.get('pv', [None])[0]
+
+        # Get best move in SAN notation while board is still in pre-move state
+        best_san = board.san(best_move_uci) if best_move_uci else '?'
+
+        # Make move
+        san = board.san(move)
+        board.push(move)
+
+        # Get eval after move
+        info_after = engine.analyse(board, chess.engine.Limit(depth=depth))
+        eval_after = info_after['score'].white().score(mate_score=10000)
+
+        # Flip for Black's perspective
+        if moving_side == chess.BLACK:
+            eval_before_perspective = -eval_before
+            eval_after_perspective = -eval_after
+        else:
+            eval_before_perspective = eval_before
+            eval_after_perspective = eval_after
+
+        # Classify
+        classification, loss = classify_move(
+            eval_before_perspective, eval_after_perspective,
+            full_move_num, is_black
+        )
+
+        if classification:
+            move_notation = f"{full_move_num}{'...' if is_black else '.'}"
+
+            errors.append({
+                'notation': move_notation,
+                'played': san,
+                'classification': classification,
+                'loss': loss,
+                'eval_before': eval_before_perspective / 100,
+                'eval_after': eval_after_perspective / 100,
+                'best_move': best_san
+            })
+
+            color = '\033[91m' if classification == 'BLUNDER' else '\033[93m'
+            reset = '\033[0m'
+            print(f"  {color}{move_notation} {san} - {classification} (lost {loss:.2f} pawns){reset}")
+            print(f"    Stockfish best: {best_san} [{eval_before_perspective/100:+.2f}]")
+
+    return errors
+
+
 # ============================================================================
 # Interactive Main
 # ============================================================================
@@ -334,6 +447,8 @@ def main():
                         help='Stockfish search depth (default: 18)')
     parser.add_argument('--lines', '-l', type=int, default=1,
                         help='Number of alternative lines (default: 1)')
+    parser.add_argument('--auto', '-a', action='store_true',
+                        help='Auto-analyze all moves for blunders/mistakes')
 
     args = parser.parse_args()
 
@@ -412,6 +527,35 @@ def main():
     engine = chess.engine.SimpleEngine.popen_uci(stockfish_path)
 
     try:
+        # Auto-analyze mode
+        if args.auto:
+            print("\n" + "=" * 60)
+            print("AUTO-ANALYSIS MODE")
+            print("=" * 60)
+
+            # Re-parse game
+            pgn_io = io.StringIO(clean_pgn)
+            game = chess.pgn.read_game(pgn_io)
+
+            errors = auto_analyze_game(game, engine, args.depth)
+
+            # Summary
+            print("\n" + "=" * 60)
+            blunders = sum(1 for e in errors if e['classification'] == 'BLUNDER')
+            mistakes = sum(1 for e in errors if e['classification'] == 'MISTAKE')
+            print(f"SUMMARY: {blunders} blunder(s), {mistakes} mistake(s)")
+            print("=" * 60)
+
+            if errors:
+                print("\nErrors found:")
+                for e in errors:
+                    color = '\033[91m' if e['classification'] == 'BLUNDER' else '\033[93m'
+                    reset = '\033[0m'
+                    print(f"  {color}{e['notation']} {e['played']}{reset} - {e['classification']} "
+                          f"(lost {e['loss']:.2f} pawns, best: {e['best_move']})")
+
+            return  # finally block will quit engine
+
         # Interactive loop for adding variations
         while True:
             print("-" * 60)
@@ -435,6 +579,42 @@ def main():
 
                 # Analyze - fetch extra line in case played move is best
                 alternatives = analyze_position(board, engine, args.lines + 1, args.depth)
+
+                # Get eval before (from first alternative)
+                eval_before_str = alternatives[0]['score']
+                try:
+                    if eval_before_str.startswith('#'):
+                        eval_before_cp = 10000 if '+' in eval_before_str else -10000
+                    else:
+                        eval_before_cp = int(float(eval_before_str) * 100)
+                except:
+                    eval_before_cp = 0
+
+                # Get eval after played move
+                board_after = board.copy()
+                board_after.push(target_node.move)
+                info_after = engine.analyse(board_after, chess.engine.Limit(depth=args.depth))
+                eval_after_cp = info_after['score'].white().score(mate_score=10000)
+
+                # Flip for black's perspective
+                if is_black_move:
+                    eval_before_perspective = -eval_before_cp
+                    eval_after_perspective = -eval_after_cp
+                else:
+                    eval_before_perspective = eval_before_cp
+                    eval_after_perspective = eval_after_cp
+
+                # Classify the played move
+                classification, loss = classify_move(
+                    eval_before_perspective, eval_after_perspective,
+                    move_number, is_black_move
+                )
+
+                # Display classification if applicable
+                if classification:
+                    color = '\033[91m' if classification == 'BLUNDER' else '\033[93m'
+                    reset = '\033[0m'
+                    print(f"\n{color}>>> {classification}: lost {loss:.2f} pawns{reset}")
 
                 # Filter to only alternatives (not the played move), limit to args.lines
                 alt_moves = [alt for alt in alternatives if alt['move'] != target_node.move][:args.lines]
