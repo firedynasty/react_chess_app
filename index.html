@@ -5700,12 +5700,7 @@ End with a Socratic question about a specific position to help me learn.`
             const [messages, setMessages] = useState([]);
             const [inputValue, setInputValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
-
-            // Batch analysis state
-            const [batchUsername, setBatchUsername] = useState('');
-            const [isBatchAnalyzing, setIsBatchAnalyzing] = useState(false);
-            const [batchProgress, setBatchProgress] = useState(0);
-            const [batchStatus, setBatchStatus] = useState('');
+            const [chatEnabled, setChatEnabled] = useState(false);
 
             const chatContainerRef = useRef(null);
             const models = aiProvider === 'ChatGPT' ? openaiModels : anthropicModels;
@@ -5726,196 +5721,73 @@ End with a Socratic question about a specific position to help me learn.`
                 }
             }, [messages]);
 
-            // Load analysis report into textarea
-            const loadAnalysisReport = () => {
-                // Check multiple sources for report text:
-                // 1. window.analysisReportRawText - from running analysis
-                // 2. window.studyReportRawText - from loading via clipboard/file
-                // 3. DOM element - the actual displayed report text
-                let reportText = window.analysisReportRawText;
+            // Analyze with Chess Coach (RAG-powered)
+            const analyzeWithChessCoach = async () => {
+                // Priority: Textarea content > Loaded report
+                let contentToAnalyze = inputValue.trim();
 
-                if (!reportText || !reportText.trim()) {
-                    reportText = window.studyReportRawText;
-                }
-
-                if (!reportText || !reportText.trim()) {
-                    const reportElement = document.getElementById('analysisReportText');
-                    if (reportElement && reportElement.textContent && reportElement.textContent !== 'Loading report...') {
-                        reportText = reportElement.textContent;
+                if (!contentToAnalyze) {
+                    // Try loaded reports
+                    contentToAnalyze = window.analysisReportRawText || window.studyReportRawText;
+                    if (!contentToAnalyze) {
+                        const el = document.getElementById('analysisReportText');
+                        if (el && el.textContent !== 'Loading report...') {
+                            contentToAnalyze = el.textContent;
+                        }
                     }
                 }
 
-                if (reportText && reportText.trim()) {
-                    setInputValue(prev => prev + (prev ? '\n\n' : '') + reportText);
-                } else {
-                    alert('No analysis report loaded. Please analyze a game first or load a report from clipboard.');
-                }
-            };
-
-            // Append prompt to textarea
-            const appendPrompt = (promptKey) => {
-                const prompt = CHESS_PROMPTS[promptKey];
-                setInputValue(prev => prev + (prev ? '\n\n' : '') + prompt);
-            };
-
-            // Analyze last 3 games for a username - uses existing analyzeGame() function
-            const analyzeLast3Games = async () => {
-                if (!batchUsername.trim()) {
-                    alert('Please enter a Chess.com username');
+                // If nothing available, show guidance message in chat
+                if (!contentToAnalyze) {
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: '**No game data found.**\n\nPlease either:\n1. Paste a PGN directly into the text box below, then click this button\n2. Analyze a game using the board above\n3. Load an analysis report from clipboard'
+                    }]);
                     return;
                 }
 
-                setIsBatchAnalyzing(true);
-                setBatchProgress(0);
-                setBatchStatus('Fetching games...');
-                let allReports = '';
+                // Clear textarea after using its content
+                setInputValue('');
+
+                // Build the query with pre-defined prompt
+                const query = `What did you think of this game? When referencing chess principles from the knowledge base, explicitly mention them, and talk about the opening, middlegame and endgame please.
+
+Game Data:
+${contentToAnalyze}`;
+
+                // Check API key requirements
+                const needsApiKey = !(aiProvider === 'ChatGPT' && useSharedKey);
+                if (needsApiKey && !apiKey) {
+                    alert(`Please enter your ${aiProvider === 'ChatGPT' ? 'OpenAI' : 'Anthropic'} API key`);
+                    return;
+                }
+
+                // Call RAG API
+                setIsLoading(true);
+                setMessages(prev => [...prev, { role: 'user', content: 'Analyze this game with chess coaching principles...' }]);
 
                 try {
-                    const username = batchUsername.trim().toLowerCase();
-                    const now = new Date();
-                    const year = now.getFullYear();
-                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const response = await fetch('/api/rag-chess', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            query,
+                            provider: aiProvider === 'ChatGPT' ? 'openai' : 'anthropic',
+                            model: selectedModel,
+                            apiKey: apiKey || undefined,
+                            accessCode: useSharedKey ? accessCode : undefined,
+                        })
+                    });
 
-                    setBatchProgress(2);
-                    let response = await fetch(`https://api.chess.com/pub/player/${username}/games/${year}/${month}`);
-                    let gamesData;
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error);
 
-                    if (!response.ok) {
-                        const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
-                        const prevYear = now.getMonth() === 0 ? year - 1 : year;
-                        response = await fetch(`https://api.chess.com/pub/player/${username}/games/${prevYear}/${String(prevMonth).padStart(2, '0')}`);
-                        if (!response.ok) throw new Error('Could not fetch games. Check username.');
-                    }
-                    gamesData = await response.json();
-
-                    if (!gamesData.games || gamesData.games.length === 0) {
-                        throw new Error('No games found.');
-                    }
-
-                    const recentGames = gamesData.games
-                        .filter(g => g.pgn)
-                        .sort((a, b) => (b.end_time || 0) - (a.end_time || 0))
-                        .slice(0, 3);
-
-                    if (recentGames.length === 0) throw new Error('No games with PGN found.');
-
-                    setBatchProgress(5);
-                    setBatchStatus(`Found ${recentGames.length} games. Starting analysis...`);
-                    const totalGames = recentGames.length;
-
-                    // Helper to format game date
-                    const formatDate = (timestamp) => {
-                        if (!timestamp) return '';
-                        const d = new Date(timestamp * 1000);
-                        return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    };
-
-                    // Analyze each game using existing analyzeGame() function
-                    for (let i = 0; i < totalGames; i++) {
-                        const game = recentGames[i];
-                        const gameNum = i + 1;
-
-                        const white = game.white;
-                        const black = game.black;
-                        const whiteUsername = white.username || 'Unknown';
-                        const blackUsername = black.username || 'Unknown';
-                        const isWhite = whiteUsername.toLowerCase() === username;
-                        const opponent = isWhite ? blackUsername : whiteUsername;
-                        const playerColor = isWhite ? 'White' : 'Black';
-                        const timeClass = game.time_class || 'unknown';
-                        const gameDate = formatDate(game.end_time);
-
-                        let result = 'Draw';
-                        if (white.result === 'win') result = isWhite ? 'Win' : 'Loss';
-                        else if (black.result === 'win') result = isWhite ? 'Loss' : 'Win';
-
-                        setBatchStatus(`Analyzing game ${gameNum}/${totalGames}: vs ${opponent}...`);
-                        setBatchProgress(5 + (i * 30));
-
-                        // Extract clean PGN moves
-                        let pgn = game.pgn || '';
-                        const pgnLines = pgn.split('\n');
-                        const moveLines = pgnLines.filter(line => !line.startsWith('[') && line.trim());
-                        pgn = moveLines.join(' ').trim();
-                        pgn = pgn.replace(/\{[^}]*\}/g, '').replace(/\$\d+/g, '').replace(/\s+/g, ' ').trim();
-
-                        // Set up game data for the existing analysis system
-                        const label = `Game ${gameNum}: vs ${opponent} (${result} as ${playerColor}) - ${timeClass} - ${gameDate}`;
-
-                        // Store in fetchedGames for metadata access
-                        window.fetchedGames = window.fetchedGames || {};
-                        window.fetchedGames[label] = {
-                            pgn: pgn,
-                            fullPgn: game.pgn,
-                            metadata: {
-                                white: whiteUsername,
-                                black: blackUsername,
-                                white_rating: white.rating || '?',
-                                black_rating: black.rating || '?',
-                                result: result,
-                                time_class: timeClass,
-                                time_control: game.time_control || '',
-                                url: game.url || '',
-                                end_time: game.end_time
-                            }
-                        };
-
-                        // Update the dropdown and select this game
-                        const gameDropdown = document.getElementById('game-dropdown');
-                        if (gameDropdown) {
-                            // Add option if not exists
-                            let optionExists = Array.from(gameDropdown.options).some(o => o.value === label);
-                            if (!optionExists) {
-                                const option = document.createElement('option');
-                                option.value = label;
-                                option.textContent = label;
-                                gameDropdown.appendChild(option);
-                            }
-                            gameDropdown.value = label;
-                        }
-
-                        // Set PGN in the input
-                        const pgnInput = document.getElementById('pgnInput');
-                        if (pgnInput) {
-                            pgnInput.value = pgn;
-                        }
-
-                        // Clear previous report
-                        window.analysisReportRawText = null;
-
-                        // Run the existing analyzeGame function
-                        await analyzeGame();
-
-                        // Wait a moment for report to be generated
-                        await new Promise(resolve => setTimeout(resolve, 100));
-
-                        // Capture the report
-                        const report = window.analysisReportRawText;
-                        if (report) {
-                            allReports += `\n${'='.repeat(60)}\n`;
-                            allReports += `GAME ${gameNum} of 3\n`;
-                            allReports += `${'='.repeat(60)}\n`;
-                            allReports += report;
-                        }
-
-                        window.batch3GamesReports = allReports;
-                        setBatchProgress(5 + ((i + 1) * 30));
-                    }
-
-                    // Done - load into chat
-                    setBatchProgress(100);
-                    setBatchStatus('Done! Loading into chat...');
-                    const fullPrompt = CHESS_PROMPTS.compare3Games + '\n' + allReports;
-                    setInputValue(fullPrompt);
-
-                } catch (error) {
-                    setBatchStatus(`Error: ${error.message}`);
+                    setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
+                    setChatEnabled(true);  // Enable follow-up chat after first response
+                } catch (err) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
                 } finally {
-                    setTimeout(() => {
-                        setIsBatchAnalyzing(false);
-                        setBatchProgress(0);
-                        setBatchStatus('');
-                    }, 1500);
+                    setIsLoading(false);
                 }
             };
 
@@ -6132,12 +6004,6 @@ End with a Socratic question about a specific position to help me learn.`
                     fontWeight: '500',
                     cursor: 'pointer',
                 },
-                promptButtons: {
-                    display: 'flex',
-                    gap: '8px',
-                    flexWrap: 'wrap',
-                    marginBottom: '12px',
-                },
                 chatMessages: {
                     maxHeight: '400px',
                     overflowY: 'auto',
@@ -6254,12 +6120,13 @@ End with a Socratic question about a specific position to help me learn.`
                             ))}
                         </select>
 
-                        {/* Load Analysis Report */}
+                        {/* Analyze with Chess Coach (RAG-powered) */}
                         <button
-                            onClick={loadAnalysisReport}
-                            style={{ ...styles.button, background: '#fd7e14', color: 'white' }}
+                            onClick={analyzeWithChessCoach}
+                            disabled={isLoading}
+                            style={{ ...styles.button, background: '#9c27b0', color: 'white', opacity: isLoading ? 0.6 : 1 }}
                         >
-                            📋 Load Analysis Report
+                            🤖 Analyze with Chess Coach
                         </button>
 
                         {/* Copy Chat */}
@@ -6272,93 +6139,20 @@ End with a Socratic question about a specific position to help me learn.`
 
                         {/* Clear Chat */}
                         <button
-                            onClick={() => setMessages([])}
+                            onClick={() => { setMessages([]); setChatEnabled(false); }}
                             style={{ ...styles.button, background: '#6c757d', color: 'white' }}
                         >
                             Clear Chat
                         </button>
                     </div>
 
-                    {/* Prompt Buttons */}
-                    <div style={{ marginBottom: '12px' }}>
-                        <div style={{ fontSize: '12px', color: '#888', marginBottom: '6px' }}>
-                            Prompts to attach to chatbox:
-                        </div>
-                        <div style={styles.promptButtons}>
-                            <button
-                                onClick={() => appendPrompt('moveAnalysis')}
-                                style={{ ...styles.button, background: '#17a2b8', color: 'white' }}
-                            >
-                                Move Analysis
-                            </button>
-                            <button
-                                onClick={() => appendPrompt('fullGameReview')}
-                                style={{ ...styles.button, background: '#6f42c1', color: 'white' }}
-                            >
-                                Full Game Review
-                            </button>
-                            <button
-                                onClick={() => appendPrompt('positionAnalysis')}
-                                style={{ ...styles.button, background: '#dc3545', color: 'white' }}
-                            >
-                                Position Analysis
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Batch Analysis Section */}
-                    <div style={{ background: '#0a1628', padding: '12px', borderRadius: '8px', marginBottom: '12px' }}>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <input
-                                type="text"
-                                value={batchUsername}
-                                onChange={(e) => setBatchUsername(e.target.value)}
-                                placeholder="Chess.com username"
-                                style={{ ...styles.input, flex: '1', minWidth: '150px' }}
-                                disabled={isBatchAnalyzing}
-                            />
-                            <button
-                                onClick={analyzeLast3Games}
-                                disabled={isBatchAnalyzing || !batchUsername.trim()}
-                                style={{
-                                    ...styles.button,
-                                    background: isBatchAnalyzing ? '#555' : '#e83e8c',
-                                    color: 'white',
-                                    opacity: isBatchAnalyzing || !batchUsername.trim() ? 0.7 : 1
-                                }}
-                            >
-                                {isBatchAnalyzing ? 'Analyzing...' : 'Analyze Last 3 Games'}
-                            </button>
-                        </div>
-                        {(isBatchAnalyzing || batchStatus) && (
-                            <div style={{ marginTop: '10px' }}>
-                                <div style={{
-                                    background: '#1a1a2e',
-                                    borderRadius: '4px',
-                                    height: '8px',
-                                    overflow: 'hidden'
-                                }}>
-                                    <div style={{
-                                        background: 'linear-gradient(90deg, #e83e8c, #00d4ff)',
-                                        height: '100%',
-                                        width: `${batchProgress}%`,
-                                        transition: 'width 0.3s ease'
-                                    }} />
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#888', marginTop: '6px' }}>
-                                    {batchStatus}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
                     {/* Chat Messages */}
                     <div ref={chatContainerRef} style={styles.chatMessages}>
                         {messages.length === 0 ? (
                             <div style={styles.emptyState}>
-                                <p>Ask your chess coach a question!</p>
+                                <p>Get AI-powered chess coaching!</p>
                                 <p style={{ fontSize: '13px' }}>
-                                    Use the prompt buttons above, or load your analysis report and ask for feedback.
+                                    Click "🤖 Analyze with Chess Coach" to analyze your game with chess principles from the knowledge base.
                                 </p>
                             </div>
                         ) : (
@@ -6402,25 +6196,27 @@ End with a Socratic question about a specific position to help me learn.`
                         <textarea
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
-                            onKeyPress={handleKeyPress}
-                            placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+                            onKeyPress={chatEnabled ? handleKeyPress : undefined}
+                            placeholder={chatEnabled ? "Ask a follow-up question... (Enter to send)" : "Paste a PGN here, or click 'Analyze with Chess Coach' to analyze loaded game"}
                             style={styles.textarea}
                             disabled={isLoading}
                         />
-                        <button
-                            onClick={sendMessage}
-                            disabled={isLoading || !inputValue.trim()}
-                            style={{
-                                ...styles.button,
-                                background: '#00d4ff',
-                                color: '#1a1a2e',
-                                alignSelf: 'flex-end',
-                                padding: '12px 24px',
-                                opacity: isLoading || !inputValue.trim() ? 0.6 : 1,
-                            }}
-                        >
-                            Send
-                        </button>
+                        {chatEnabled && (
+                            <button
+                                onClick={sendMessage}
+                                disabled={isLoading || !inputValue.trim()}
+                                style={{
+                                    ...styles.button,
+                                    background: '#00d4ff',
+                                    color: '#1a1a2e',
+                                    alignSelf: 'flex-end',
+                                    padding: '12px 24px',
+                                    opacity: isLoading || !inputValue.trim() ? 0.6 : 1,
+                                }}
+                            >
+                                Send
+                            </button>
+                        )}
                     </div>
                 </div>
             );
