@@ -3139,7 +3139,7 @@
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 if (currentEl && currentEl.classList.contains('variation-move')) {
-                    boardContainer.style.opacity = '0.6';
+                    boardContainer.style.opacity = '0.75';
                 } else {
                     boardContainer.style.opacity = '1';
                 }
@@ -6109,11 +6109,11 @@ ${contentToAnalyze}`;
                             </button>
                         )}
 
-                        {/* Model Selection */}
+                        {/* Model Selection - hidden but still functional */}
                         <select
                             value={selectedModel}
                             onChange={(e) => setSelectedModel(e.target.value)}
-                            style={styles.select}
+                            style={{ ...styles.select, display: 'none' }}
                         >
                             {Object.entries(models).map(([name, id]) => (
                                 <option key={id} value={id}>{name}</option>
@@ -6197,7 +6197,7 @@ ${contentToAnalyze}`;
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             onKeyPress={chatEnabled ? handleKeyPress : undefined}
-                            placeholder={chatEnabled ? "Ask a follow-up question... (Enter to send)" : "Paste a PGN here, or click 'Analyze with Chess Coach' to analyze loaded game"}
+                            placeholder={chatEnabled ? "Ask a follow-up question (Enter to send). E.g., Which additional resources hyperlinks do you recommend?" : "Paste a PGN here, or click 'Analyze with Chess Coach' to analyze loaded game"}
                             style={styles.textarea}
                             disabled={isLoading}
                         />
