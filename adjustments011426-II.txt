@@ -1,0 +1,235 @@
+# Adjustments 01/14/2026 - Session II
+# Changes made to index.html
+
+================================================================================
+## 1. Added "Go to Lichess (Analysis)" Button
+================================================================================
+
+Location: Line 863 (next to Copy PGN button)
+
+Added:
+```html
+<a id="lichessBoard2Link" href="#" target="_blank" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; text-decoration: none; display: inline-block; margin-left: 10px;">Go to Lichess (Analysis)</a>
+```
+
+- Styled as baby blue button (matches Flip Board)
+- Opens current board position in Lichess Analysis
+- Updates automatically when navigating moves
+
+================================================================================
+## 2. Added Lichess Link Update to jumpToRoot()
+================================================================================
+
+Location: Inside `jumpToRoot()` function (around line 3488-3493)
+
+Added:
+```javascript
+// Update Lichess link
+const lichessLink = document.getElementById('lichessBoard2Link');
+if (lichessLink) {
+    const fen = window.moveTree.fen;
+    lichessLink.href = `https://lichess.org/analysis/${fen.replace(/ /g, '_')}`;
+}
+```
+
+- Ensures Lichess link updates when jumping to start position
+
+================================================================================
+## 3. Fixed nextVariation() - Check Children for Variations
+================================================================================
+
+Location: Inside `nextVariation()` function, else block (lines 3796-3801)
+
+Added first check before sibling check:
+```javascript
+// First check: Does current node have children with variations (alternatives to next move)?
+if (current.children && current.children.length > 1) {
+    // Jump to first variation (second child of current)
+    jumpToNode(current.children[1].nodeId);
+    return;
+}
+```
+
+- Now finds variations in current node's children (alternatives to next move)
+
+================================================================================
+## 4. Fixed nextVariation() - Handle Root/Start Position
+================================================================================
+
+Location: Beginning of `nextVariation()` function (lines 3753-3759)
+
+Changed from:
+```javascript
+if (!window.moveTree || !window.currentMoveNode) return;
+```
+
+To:
+```javascript
+if (!window.moveTree) return;
+
+// Handle case when at root/start position
+if (!window.currentMoveNode) {
+    // Check if root has children with variations
+    if (window.moveTree.children && window.moveTree.children.length > 1) {
+        jumpToNode(window.moveTree.children[1].nodeId);
+    }
+    return;
+}
+```
+
+- Can now find variations even when at start position
+
+================================================================================
+## 5. Fixed nextVariation() - Cycle Through Sibling Variations
+================================================================================
+
+Location: Sibling variation check in `nextVariation()` (lines 3806-3812)
+
+Changed from:
+```javascript
+const index = parent.children.indexOf(current);
+if (index === 0) {
+    jumpToNode(parent.children[1].nodeId);
+    return;
+}
+```
+
+To:
+```javascript
+const currentIndex = parent.children.indexOf(current);
+// Find next sibling (cycle through variations)
+const nextIndex = (currentIndex + 1) % parent.children.length;
+if (nextIndex !== currentIndex) {
+    jumpToNode(parent.children[nextIndex].nodeId);
+    return;
+}
+```
+
+- Now cycles through all sibling variations regardless of current index
+
+================================================================================
+## 6. Edit→View Toggle Now Updates moveContainer
+================================================================================
+
+Location: Edit/View toggle handler (lines 5029-5044)
+
+Replaced old rescan code with:
+```javascript
+// Save current variant index before rescan (scanReportForAllVariants resets it to 0)
+const savedVariantIndex = window.currentVariantIndex || 0;
+
+// Rescan all variants with updated content
+window.scanReportForAllVariants();
+
+// Restore variant index (clamped to valid range)
+if (window.allVariants.length > 0) {
+    window.currentVariantIndex = Math.min(savedVariantIndex, window.allVariants.length - 1);
+    // Reload current variant into moveContainer
+    window.loadCurrentVariant();
+} else {
+    // No variants found, clear displays
+    document.getElementById('currentFenMoves').textContent = '';
+    document.getElementById('variantIndexDisplay').textContent = '';
+}
+```
+
+- When switching from Edit to View mode, moveContainer now updates
+- Preserves current variant index position
+
+================================================================================
+## 7. Split "Copy PGN/Update" into Two Buttons
+================================================================================
+
+Location: Line 862-863
+
+Changed from:
+```html
+<button id="getPgnBtn" onclick="copyAnnotatedPgn()">Copy PGN/Update</button>
+```
+
+To:
+```html
+<button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; ...">Copy PGN</button>
+<button id="updateReportBtn" onclick="updateReportWithPgn()" style="background: #e67e22; ...">Update Report</button>
+```
+
+### New Function: copyPgnToClipboard() (lines 1566-1593)
+- Copies PGN to clipboard only
+- Priority: window.currentLoadedPgn > window.annotatedPgnWithVariations
+
+### New Function: updateReportWithPgn() (lines 1598-1653)
+- Updates ANNOTATED PGN section in report
+- ONLY works if ANNOTATED PGN section already exists (returns early if not found)
+- Shows warning if section not found
+
+================================================================================
+## 8. Modified "Next Var." to Continue Through Variation
+================================================================================
+
+Location: `nextVariation()` function, isInVariation block (lines 3768-3796)
+
+Changed behavior:
+- OLD: When in variation, immediately exit to main line
+- NEW: When in variation, continue through variation moves first
+
+New logic:
+```javascript
+if (isInVariation) {
+    // If there are more moves in this variation, continue through it
+    if (current.children && current.children.length > 0) {
+        // Advance to next move in variation (first child)
+        jumpToNode(current.children[0].nodeId);
+        return;
+    }
+
+    // At end of variation - exit to main line
+    // ... (existing exit logic)
+}
+```
+
+User flow:
+1. On main line → Press "Next Var." → Enters variation
+2. In variation → Press "Next Var." → Advances through variation
+3. At end of variation → Press "Next Var." → Exits to main line
+
+================================================================================
+## 9. Reset Variant State on New Analysis
+================================================================================
+
+Location: Beginning of `analyzeGame()` function (lines 1183-1198)
+
+Added:
+```javascript
+// Reset variant/file section state from previous analysis
+window.allVariants = [];
+window.allFileSections = [];
+window.fenVariants = [];
+window.pgnVariants = [];
+window.currentVariantIndex = 0;
+window.currentFileSectionIndex = 0;
+window.currentLoadedPgn = null;
+// Hide file section header
+const fileSectionHeader = document.getElementById('fileSectionHeader');
+if (fileSectionHeader) fileSectionHeader.style.display = 'none';
+// Clear variant displays
+const currentFenMoves = document.getElementById('currentFenMoves');
+const variantIndexDisplay = document.getElementById('variantIndexDisplay');
+if (currentFenMoves) currentFenMoves.textContent = '';
+if (variantIndexDisplay) variantIndexDisplay.textContent = '';
+```
+
+- Fixes stale data issue when re-analyzing a new game
+- "Next FEN/PGN" button now starts fresh with each analysis
+
+================================================================================
+## Summary of UI Changes
+================================================================================
+
+Board Controls Row:
+- [Flip Board] [← Prev] [Next →] [Next Var.] [← Prev FEN/PGN] [Next FEN/PGN →]
+- [Copy PGN] [Update Report] [Go to Lichess (Analysis)]
+
+Button Colors:
+- Copy PGN: Green (#27ae60)
+- Update Report: Orange (#e67e22)
+- Go to Lichess: Baby Blue (#00d4ff)

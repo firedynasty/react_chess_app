@@ -786,10 +786,40 @@
                 </button>
                 <button onclick="clearVariationResult()"
                     style="padding: 6px 12px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
-                    Clear
+                    Hide
                 </button>
                 <span style="color: #27ae60; font-size: 12px; margin-left: 10px;">added variation to pgn below</span>
             </div>
+        </div>
+    </div>
+
+    <!-- Extend Variation from Lichess -->
+    <div id="extend-variation-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+        <div style="margin-bottom: 10px;">
+            <span style="color: #00d4ff; font-weight: bold; font-size: 14px;">📎 Extend Current Variation from Lichess</span>
+            <span style="color: #888; font-size: 12px; margin-left: 10px;">(Click on a variation move → Go to Lichess → Paste continuation)</span>
+        </div>
+        <textarea id="lichess-pgn-input"
+            placeholder="Paste Lichess PGN here (e.g., from position: 10... a5 11. Be2 a4)"
+            style="width: 100%; height: 80px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical;"></textarea>
+        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button id="extend-variation-btn" onclick="extendCurrentVariation()"
+                style="padding: 8px 15px; background: #e67e22; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                Append to Variation
+            </button>
+            <button onclick="pasteFromClipboard()"
+                style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                📋 Paste from Clipboard
+            </button>
+            <button onclick="document.getElementById('lichess-pgn-input').value = ''"
+                style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
+                Clear
+            </button>
+            <a id="lichessBoard2Link" href="#" target="_blank"
+                style="background: #00d4ff; color: #1a1a2e; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; text-decoration: none; display: inline-block;">
+                Go to Lichess (Analysis)
+            </a>
+            <span id="extend-variation-status" style="color: #888; font-size: 12px;"></span>
         </div>
     </div>
 
@@ -861,7 +891,6 @@
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
           <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
           <button id="updateReportBtn" onclick="updateReportWithPgn()" style="background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
-          <a id="lichessBoard2Link" href="#" target="_blank" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; text-decoration: none; display: inline-block; margin-left: 10px;">Go to Lichess (Analysis)</a>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4;"></span>
           <br>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: block;"></span>
@@ -2389,6 +2418,256 @@
             document.getElementById('variation-status').textContent = '';
             document.getElementById('variation-move-input').value = '';
             window.currentVariationResult = null;
+        }
+
+        // =====================================================================
+        // EXTEND VARIATION FROM LICHESS
+        // =====================================================================
+
+        async function pasteFromClipboard() {
+            const statusEl = document.getElementById('extend-variation-status');
+            const inputEl = document.getElementById('lichess-pgn-input');
+
+            try {
+                const text = await navigator.clipboard.readText();
+                if (text) {
+                    inputEl.value = text;
+                    statusEl.textContent = '✓ Pasted from clipboard';
+                    statusEl.style.color = '#27ae60';
+                    setTimeout(() => {
+                        statusEl.textContent = '';
+                    }, 2000);
+                } else {
+                    statusEl.textContent = 'Clipboard is empty';
+                    statusEl.style.color = '#ff6b6b';
+                }
+            } catch (err) {
+                statusEl.textContent = 'Could not read clipboard. Try Ctrl+V instead.';
+                statusEl.style.color = '#ff6b6b';
+                console.error('Clipboard error:', err);
+            }
+        }
+
+        function parseLichessPgnMoves(pgnText) {
+            // Remove header lines (lines starting with [)
+            let lines = pgnText.split('\n').filter(line => !line.trim().startsWith('['));
+            let moveText = lines.join(' ').trim();
+
+            // Remove move numbers (e.g., "10.", "10...", "11.")
+            // Match patterns like "10." or "10..." followed by space
+            moveText = moveText.replace(/\d+\.{1,3}\s*/g, '');
+
+            // Clean up extra spaces
+            moveText = moveText.replace(/\s+/g, ' ').trim();
+
+            return moveText;
+        }
+
+        function extendCurrentVariation() {
+            const statusEl = document.getElementById('extend-variation-status');
+            const inputEl = document.getElementById('lichess-pgn-input');
+            const lichessPgn = inputEl.value.trim();
+
+            if (!lichessPgn) {
+                statusEl.textContent = 'Please paste Lichess PGN';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Check if we're currently in a variation
+            if (!window.currentMoveNode) {
+                statusEl.textContent = 'No move selected. Click on a variation move first.';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const currentEl = document.querySelector(`[data-node-id="${window.currentMoveNode.nodeId}"]`);
+            const isInVariation = currentEl && currentEl.classList.contains('variation-move');
+
+            if (!isInVariation) {
+                statusEl.textContent = 'Current move is not in a variation. Click on a variation move first.';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Parse moves from Lichess PGN (strip move numbers)
+            const newMovesText = parseLichessPgnMoves(lichessPgn);
+            if (!newMovesText) {
+                statusEl.textContent = 'Could not parse moves from PGN';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Split into individual moves
+            const moveTokens = newMovesText.split(/\s+/).filter(m => m.length > 0);
+            if (moveTokens.length === 0) {
+                statusEl.textContent = 'No moves found in PGN';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Setup chess.js instance from current position
+            const tempChess = new Chess(window.currentMoveNode.fen);
+
+            // Validate and process each move
+            const newNodes = [];
+            let lastNode = window.currentMoveNode;
+
+            for (let i = 0; i < moveTokens.length; i++) {
+                const moveToken = moveTokens[i];
+                try {
+                    const move = tempChess.move(moveToken, { sloppy: true });
+                    if (!move) {
+                        statusEl.textContent = `Invalid move: ${moveToken}`;
+                        statusEl.style.color = '#ff6b6b';
+                        return;
+                    }
+
+                    // Determine move number
+                    const isBlackMove = (move.color === 'b');
+                    let moveNumber;
+                    if (isBlackMove) {
+                        moveNumber = lastNode.moveNumber;
+                    } else {
+                        moveNumber = lastNode.moveNumber + (lastNode.isBlackMove ? 1 : 0);
+                    }
+
+                    // Create new node
+                    const newNode = {
+                        san: move.san,
+                        annotation: '',
+                        fen: tempChess.fen(),
+                        moveNumber: moveNumber,
+                        isBlackMove: isBlackMove,
+                        comment: '',
+                        parent: lastNode,
+                        children: [],
+                        depth: lastNode.depth,
+                        nodeId: `node-${window.moveNodeCounter || 1000}${i}`
+                    };
+
+                    // Add to parent's children and registry
+                    lastNode.children.push(newNode);
+                    window.moveNodeRegistry[newNode.nodeId] = newNode;
+
+                    newNodes.push(newNode);
+                    lastNode = newNode;
+                } catch (e) {
+                    statusEl.textContent = `Error processing move ${moveToken}: ${e.message}`;
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+            }
+
+            // Now insert the spans into the DOM
+            // Find the variation container and closing parenthesis
+            const moveContainer = document.getElementById('moveTableContainer');
+            if (!moveContainer) {
+                statusEl.textContent = 'Move container not found';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Find the closing parenthesis after the current move
+            // We need to traverse siblings until we find the ) span
+            let insertPoint = currentEl.nextSibling;
+            let closingParen = null;
+
+            while (insertPoint) {
+                if (insertPoint.nodeType === Node.ELEMENT_NODE &&
+                    insertPoint.classList &&
+                    insertPoint.classList.contains('variation-container') &&
+                    insertPoint.textContent.includes(')')) {
+                    closingParen = insertPoint;
+                    break;
+                }
+                insertPoint = insertPoint.nextSibling;
+            }
+
+            if (!closingParen) {
+                statusEl.textContent = 'Could not find variation closing parenthesis';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Create and insert spans for each new move
+            const fragment = document.createDocumentFragment();
+
+            for (let i = 0; i < newNodes.length; i++) {
+                const node = newNodes[i];
+
+                // Add space before move
+                fragment.appendChild(document.createTextNode(' '));
+
+                // Add move number if needed (white moves or first black move)
+                if (!node.isBlackMove) {
+                    const numSpan = document.createElement('span');
+                    numSpan.className = 'move-number';
+                    numSpan.textContent = node.moveNumber + '. ';
+                    fragment.appendChild(numSpan);
+                }
+
+                // Create move span
+                const moveSpan = document.createElement('span');
+                moveSpan.className = 'variation-move';
+                moveSpan.textContent = node.san;
+                moveSpan.dataset.nodeId = node.nodeId;
+                moveSpan.onclick = function() { jumpToNode(this.dataset.nodeId); };
+                fragment.appendChild(moveSpan);
+            }
+
+            // Insert before closing parenthesis
+            closingParen.parentNode.insertBefore(fragment, closingParen);
+
+            // Update the PGN strings
+            let pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
+            if (pgn) {
+                const modifiedPgn = updatePgnWithNewMoves(pgn, window.currentMoveNode, newMovesText);
+                if (window.currentLoadedPgn) {
+                    window.currentLoadedPgn = modifiedPgn;
+                }
+                window.annotatedPgnWithVariations = modifiedPgn;
+            }
+
+            // Success feedback
+            statusEl.textContent = `✓ Added ${newNodes.length} move${newNodes.length > 1 ? 's' : ''} to variation`;
+            statusEl.style.color = '#27ae60';
+
+            // Clear input after a delay
+            setTimeout(() => {
+                inputEl.value = '';
+                statusEl.textContent = '';
+            }, 3000);
+        }
+
+        function updatePgnWithNewMoves(pgn, currentNode, newMovesText) {
+            // Find the variation containing current move and append moves before )
+            const variationRegex = /\([^()]+\)/g;
+            let match;
+            let variations = [];
+
+            while ((match = variationRegex.exec(pgn)) !== null) {
+                variations.push({
+                    text: match[0],
+                    index: match.index
+                });
+            }
+
+            // Find variation containing current move
+            const escapedMoveText = currentNode.san.replace(/[+#x]/g, '\\$&');
+            const moveNumPattern = currentNode.isBlackMove ? `${currentNode.moveNumber}\\.{3}` : `${currentNode.moveNumber}\\.`;
+            const searchPattern = new RegExp(`${moveNumPattern}\\s+${escapedMoveText}`, 'i');
+
+            for (let i = variations.length - 1; i >= 0; i--) {
+                if (searchPattern.test(variations[i].text)) {
+                    const startPos = pgn.indexOf(variations[i].text);
+                    const variationContent = variations[i].text.slice(1, -1);
+                    const insertPos = startPos + 1 + variationContent.length;
+                    return pgn.slice(0, insertPos) + ' ' + newMovesText + pgn.slice(insertPos);
+                }
+            }
+
+            return pgn;
         }
 
         // =====================================================================
