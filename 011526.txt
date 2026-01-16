@@ -1,0 +1,341 @@
+# Changes Made - January 15, 2026
+
+## 1. ANALYZE BUTTON - Jump to Current Variation Move
+**File:** index.html
+**Function:** `analyzeForVariation()`
+
+When clicking "Analyze" button, it now jumps to the current variation move position.
+
+```
+Before: User clicks Analyze -> Board stays at current position
+After:  User clicks Analyze -> Board jumps to highlighted variation move
+
+Flow:
+┌─────────────────────────────────────────────────────────┐
+│  User clicks on variation move (e.g., Be2)              │
+│  -> .variation-move.current class added                 │
+│                                                         │
+│  User clicks "Analyze" button                           │
+│  -> analyzeForVariation() called                        │
+│  -> Finds element with .variation-move.current          │
+│  -> Calls jumpToNode(nodeId)                            │
+│  -> Board position updated                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Variables:**
+- `currentVariationMove` - DOM element with `.variation-move.current` class
+- `dataset.nodeId` - The node ID stored on the element
+
+
+## 2. NAVIGATE TO VARIATION AFTER ADDING
+**File:** index.html
+**Function:** `analyzeForVariation()`
+
+After adding a variation, navigates to one move before the variation starts.
+
+```
+Flow after addVariationToPgn():
+┌─────────────────────────────────────────────────────────┐
+│  addVariationToPgn() completes                          │
+│  -> Re-parses PGN into moveTree                         │
+│  -> window.currentMoveNode = null (reset)               │
+│                                                         │
+│  Navigate to position before variation:                 │
+│  -> targetPly = parsed.plyIndex                         │
+│  -> Traverse moveTree to find node at targetPly         │
+│  -> jumpToNode(targetNode.nodeId)                       │
+│  -> User can now click "Next Var." to enter variation   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Variables:**
+- `parsed.plyIndex` - The ply index where variation starts
+- `targetNode` - The node found by traversing the tree
+- `window.moveTree` - Root of the parsed move tree
+
+
+## 3. ANNOTATION COLORS FOR MOVE CONTAINER
+**File:** index.html
+**Function:** `getAnnotationColor()`
+
+Updated colors for better visibility against blue:
+```
+?? (blunder)  -> #ff4444 (bright red)
+?  (mistake)  -> #ff69b4 (hot pink)
+?! (dubious)  -> #ffd700 (yellow)
+```
+
+
+## 4. BOARD2 MOVE INDICATOR HIGHLIGHTING
+**File:** index.html
+**Functions:** `updateBoard2MoveIndicator()`, `jumpToNode()`
+
+The board2MoveIndicator now shows annotation colors matching moveContainer.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Navigation via Next/Prev buttons                       │
+│                                                         │
+│  jumpToNode(nodeId) called:                             │
+│  -> Gets node from window.moveNodeRegistry[nodeId]      │
+│  -> Updates indicator.textContent (e.g., "12...")       │
+│  -> Checks node.annotation for ?, ??, ?!                │
+│  -> Applies matching background color                   │
+│                                                         │
+│  In variation (gray background):                        │
+│  -> Checks if currentEl has .variation-move class       │
+│  -> If yes, indicator.style.background = '#555'         │
+│  -> Annotation colors override gray if present          │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Variables:**
+- `window.currentMoveNode` - Currently selected node in tree
+- `node.annotation` - Annotation string (?, ??, ?!, etc.)
+- `indicator` - DOM element #board2MoveIndicator
+
+
+## 5. NEW SPAN: board2MovePlayedSan
+**File:** index.html
+**Location:** Next to board2MoveIndicator
+
+Shows the move that was played (e.g., "Nf3", "e4??").
+
+```
+HTML Structure:
+┌──────────────────────────────────────────────────────────────────┐
+│ [← Prev] [12...] [Bxe4??] [(] [Next →] [Next Var.]               │
+│           ↑        ↑       ↑                                     │
+│           │        │       └── board2VariationIndicator          │
+│           │        └────────── board2MovePlayedSan               │
+│           └─────────────────── board2MoveIndicator               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Variables:**
+- `sanSpan` - DOM element #board2MovePlayedSan
+- `node.san` - The move in SAN notation
+- Color matches annotation color or #00d4ff (cyan) for normal moves
+
+
+## 6. NEW SPAN: board2VariationIndicator
+**File:** index.html
+**Location:** Next to board2MovePlayedSan
+
+Shows "(" when variations exist at current position.
+
+```
+Logic:
+┌─────────────────────────────────────────────────────────┐
+│  hasChildVariations = node.children.length > 1          │
+│  hasSiblingVariations = node.parent.children.length > 1 │
+│                                                         │
+│  If either is true:                                     │
+│  -> varIndicator.textContent = '('                      │
+│  -> Color: #4a4a4a (charcoal)                           │
+│                                                         │
+│  This indicates "Next Var." button will do something    │
+└─────────────────────────────────────────────────────────┘
+```
+
+
+## 7. KEYBOARD NAVIGATION IMPROVEMENTS
+**File:** index.html
+**Location:** DOMContentLoaded event listener
+
+```
+Key Bindings:
+┌─────────────────────────────────────────────────────────┐
+│  ArrowLeft  -> board2PrevMove() + focus Prev button     │
+│  ArrowRight -> board2NextMove() + focus Next button     │
+│  Spacebar   -> nextVariation() + focus Next button      │
+│               (only when focused on Prev/Next buttons)  │
+└─────────────────────────────────────────────────────────┘
+```
+
+After analyzeForVariation() completes, Next button gets focus.
+
+
+## 8. OPENING NAME FROM LICHESS
+**File:** index.html
+**Function:** `generateAnnotatedPgn(pgn, mistakes, openingInfo)`
+
+Opening is now fetched from lichess and added to annotated PGN.
+
+```
+Flow Diagram:
+┌─────────────────────────────────────────────────────────┐
+│  FETCHED FROM CHESS.COM                                 │
+│  ───────────────────────                                │
+│  loadSelectedGame()                                     │
+│  -> meta.eco, meta.opening from chess.com API           │
+│  -> Inserts {ECO Opening} after first move              │
+│  -> PGN in textarea has opening                         │
+│                                                         │
+│  analyzeGame()                                          │
+│  -> generateAnnotatedPgn(pgn, mistakes, openingInfo)    │
+│  -> Opening already in PGN (hasEcoCode = true)          │
+│  -> Preserved in annotated PGN                          │
+├─────────────────────────────────────────────────────────┤
+│  PASTED PGN (no opening)                                │
+│  ───────────────────────                                │
+│  analyzeGame()                                          │
+│  -> Loop through first 10 moves                         │
+│  -> getOpeningName(fen) -> lichess API                  │
+│  -> openingInfo = { eco: "B30", name: "Sicilian..." }   │
+│                                                         │
+│  generateAnnotatedPgn(pgn, mistakes, openingInfo)       │
+│  -> No ECO in PGN (hasEcoCode = false)                  │
+│  -> Creates openingComment from openingInfo             │
+│  -> Adds after first move                               │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Variables:**
+- `openingInfo` - { eco: string, name: string } from lichess
+- `existingFirstComment` - First comment after move 1 (if any)
+- `hasEcoCode` - Boolean, true if comment has pattern like {D00...}
+- `openingComment` - Generated comment like {B30 Sicilian Defense}
+
+
+## 9. PRESERVE PERSONAL COMMENTS + ADD OPENING
+**File:** index.html
+**Function:** `generateAnnotatedPgn()`
+
+If PGN has personal comment like `{me as white}` (no ECO code),
+both are preserved:
+
+```
+Input:  1. e4 {me as white} 1... c5 ...
+Output: 1. e4 {me as white} {B30 Sicilian Defense} 1... c5 ...
+
+Logic:
+┌─────────────────────────────────────────────────────────┐
+│  existingFirstComment = "{me as white}"                 │
+│  hasEcoCode = false (no A-E + 2 digits pattern)         │
+│  openingInfo from lichess = { eco: "B30", name: "..." } │
+│  openingComment = "{B30 Sicilian Defense}"              │
+│                                                         │
+│  Result: both comments added after first move           │
+└─────────────────────────────────────────────────────────┘
+```
+
+
+## 10. COMMENTS PRESERVED AT END OF PGN
+**File:** index.html
+**Function:** `generateAnnotatedPgn()`
+
+Other comments from original PGN are appended at end with move context.
+
+```
+Input PGN:
+7. Nd5 (7. Ng5 Bd7 8. Nxf7) {threat because bishop} 7... Nxd5
+20. Rc1 (20. Qa5+ Kc8) {forcing line} 20... Kd7
+
+Output ANNOTATED PGN:
+1. e4 {me as white} {B30 Sicilian} ... 22. Qa8# {7. Nd5: threat because bishop | 20. Rc1: forcing line}
+
+Algorithm (works backwards from each comment):
+┌─────────────────────────────────────────────────────────┐
+│  1. Find each {comment} in PGN                          │
+│  2. Get text before comment                             │
+│  3. Remove all variations (...) from that text          │
+│  4. Find last move in remaining text                    │
+│  5. Associate comment with that move                    │
+│                                                         │
+│  Example:                                               │
+│  "7. Nd5 (7. Ng5 Bd7) {threat}"                         │
+│  -> Text before: "7. Nd5 (7. Ng5 Bd7) "                 │
+│  -> Remove variations: "7. Nd5  "                       │
+│  -> Last move: "7. Nd5"                                 │
+│  -> Result: "7. Nd5: threat"                            │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Variables:**
+- `commentsWithContext` - Array of { move: string, comment: string }
+- `textWithoutVariations` - PGN text with (...) removed
+
+
+## 11. OPENING DETECTION LIMIT REDUCED
+**File:** index.html
+**Function:** `analyzeGame()`
+
+Changed from 30 moves to 10 moves for faster analysis.
+
+```
+Before: for (let i = 0; i < Math.min(history.length, 30); i++)
+After:  for (let i = 0; i < Math.min(history.length, 10); i++)
+
+API calls reduced from max 60 to max 20:
+- getOpeningName(fen) - 10 calls
+- getOpeningMoves(fen) - 10 calls
+```
+
+
+## 12. HIDDEN ELEMENTS
+**File:** index.html
+
+Hidden `#currentFenMoves` span (display: none).
+
+
+## 13. PERSONAL COMMENT MOVED TO END (NOT AFTER FIRST MOVE)
+**File:** index.html
+**Function:** `generateAnnotatedPgn()`
+
+Personal comments (without ECO code) are now moved to the end instead of
+staying after the first move. Only the opening remains after move 1.
+
+```
+Before:
+1. e4 {me as white} {B30 Sicilian Defense} 1... c5 ... 22. Qa8#
+
+After:
+1. e4 {B30 Sicilian Defense} 1... c5 ... 22. Qa8# {1. e4: me as white | 7. Nd5: threat}
+
+Logic:
+┌─────────────────────────────────────────────────────────┐
+│  If existingFirstComment has no ECO code:               │
+│  -> Add to commentsWithContext array (at start)         │
+│  -> Include move context: "1. e4: me as white"          │
+│                                                         │
+│  Only openingComment goes after first move              │
+│  All personal/other comments collected at end           │
+└─────────────────────────────────────────────────────────┘
+
+Result: Clean opening after move 1, all notes at end with context
+```
+
+
+## SUMMARY OF KEY VARIABLES
+
+```
+Window Variables:
+─────────────────
+window.moveTree              - Root node of parsed move tree
+window.currentMoveNode       - Currently selected node
+window.moveNodeRegistry      - Map of nodeId -> node for fast lookup
+window.currentLoadedPgn      - PGN loaded via nextVariant
+window.annotatedPgnWithVariations - Annotated PGN with added variations
+
+Node Properties:
+────────────────
+node.nodeId      - Unique identifier (e.g., "node-28")
+node.san         - Move in SAN notation (e.g., "Nf3")
+node.annotation  - Annotation string (?, ??, ?!, etc.)
+node.fen         - Position after this move
+node.children    - Array of child nodes (variations)
+node.parent      - Parent node
+node.moveNumber  - Move number (1, 2, 3, ...)
+node.isBlackMove - Boolean
+
+DOM Elements:
+─────────────
+#board2MoveIndicator     - Shows move notation (e.g., "12...")
+#board2MovePlayedSan     - Shows move played (e.g., "Bxe4??")
+#board2VariationIndicator - Shows "(" if variations exist
+#board2NextMove          - Next button
+#board2PrevMove          - Prev button
+#nextVarBtn              - Next Variation button
+```

@@ -875,9 +875,11 @@
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
           <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee;">Start</span>
+          <span id="board2MovePlayedSan" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace;"></span>
+          <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace;"></span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
-          <span id="currentFenMoves" style="color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
+          <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
           <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
           <div class="drag-scroll-toggle">
@@ -1279,7 +1281,7 @@
                 let leftBookAtMove = null;
 
                 const tempChess = new Chess();
-                for (let i = 0; i < Math.min(history.length, 30); i++) {
+                for (let i = 0; i < Math.min(history.length, 10); i++) {
                     const fenBefore = tempChess.fen();
                     const movePlayed = history[i].san;
                     const moveNum = Math.floor(i / 2) + 1;
@@ -1532,7 +1534,7 @@
                 displayResults(mistakes, openingInfo, openingDeviations);
 
                 // Store annotated PGN in hidden variable for later retrieval
-                const annotatedPgn = generateAnnotatedPgn(pgn, mistakes);
+                const annotatedPgn = generateAnnotatedPgn(pgn, mistakes, openingInfo);
                 window.annotatedPgnWithVariations = annotatedPgn;
 
                 // Clear the input textarea (PGN is now in moveContainer and hidden variable)
@@ -1702,7 +1704,7 @@
          * Generate annotated PGN with NAG codes for mistakes/blunders
          * NAG codes: ? = mistake, ?? = blunder
          */
-        function generateAnnotatedPgn(pgn, mistakes) {
+        function generateAnnotatedPgn(pgn, mistakes, openingInfo = null) {
             // Build a map of notation -> annotation
             const annotationMap = {};
             for (const m of mistakes) {
@@ -1710,7 +1712,50 @@
                 annotationMap[m.notation + ' ' + m.move] = annotation;
             }
 
-            // Clean PGN first
+            // Extract all comments with their preceding move context (for appending at end)
+            // Work backwards from each comment to find the main line move (skip variations)
+            const commentsWithContext = [];
+            const allComments = pgn.matchAll(/\{([^}]+)\}/g);
+            for (const commentMatch of allComments) {
+                const comment = commentMatch[1];
+                const commentIndex = commentMatch.index;
+
+                // Get text before this comment
+                const textBefore = pgn.substring(0, commentIndex);
+
+                // Remove variations (text in parentheses) to find main line move
+                let textWithoutVariations = textBefore.replace(/\([^)]*\)/g, '');
+                // Handle nested variations
+                while (/\([^)]*\)/.test(textWithoutVariations)) {
+                    textWithoutVariations = textWithoutVariations.replace(/\([^)]*\)/g, '');
+                }
+
+                // Find the last move before this comment (on main line)
+                const moveMatches = [...textWithoutVariations.matchAll(/(\d+\.{1,3})\s*(\S+)/g)];
+                if (moveMatches.length > 0) {
+                    const lastMove = moveMatches[moveMatches.length - 1];
+                    const moveContext = lastMove[1] + ' ' + lastMove[2];
+
+                    // Skip if it's the first move comment (handled separately for opening)
+                    if (!moveContext.startsWith('1. ') && !moveContext.startsWith('1.') || moveContext.startsWith('1...')) {
+                        commentsWithContext.push({ move: moveContext.trim(), comment: comment });
+                    }
+                }
+            }
+
+            // Check if first comment after move 1 has ECO code
+            const firstCommentMatch = pgn.match(/1\.\s*\S+\s*(\{[^}]+\})/);
+            let existingFirstComment = firstCommentMatch ? firstCommentMatch[1] : null;
+            const hasEcoCode = existingFirstComment && /\{[A-E]\d{2}\s/.test(existingFirstComment);
+
+            // If no ECO opening in PGN but we have openingInfo from lichess, create opening comment
+            let openingComment = null;
+            if (!hasEcoCode && openingInfo && (openingInfo.eco || openingInfo.name)) {
+                openingComment = `{${openingInfo.eco || ''} ${openingInfo.name || ''}}`.replace(/\s+/g, ' ').trim();
+                openingComment = openingComment.replace('{ ', '{').replace(' }', '}');
+            }
+
+            // Clean PGN
             let cleanedPgn = pgn;
             if (typeof AnalysisChess !== 'undefined') {
                 cleanedPgn = AnalysisChess.cleanPgn(pgn);
@@ -1729,6 +1774,31 @@
                 }
                 return match;
             });
+
+            // Add opening comment after first move (only opening, not personal comments)
+            if (openingComment) {
+                // Add opening from lichess
+                result = result.replace(/^(1\.\s*\S+)/, '$1 ' + openingComment);
+            } else if (existingFirstComment && hasEcoCode) {
+                // Original already had ECO opening - keep it
+                result = result.replace(/^(1\.\s*\S+)/, '$1 ' + existingFirstComment);
+            }
+
+            // If first comment was personal (no ECO), add it to comments for end
+            if (existingFirstComment && !hasEcoCode) {
+                // Get the first move for context
+                const firstMoveMatch = pgn.match(/^(1\.\s*\S+)/);
+                const firstMove = firstMoveMatch ? firstMoveMatch[1].trim() : '1.';
+                commentsWithContext.unshift({ move: firstMove, comment: existingFirstComment.slice(1, -1) });
+            }
+
+            // Append all comments at the end with move context
+            if (commentsWithContext.length > 0) {
+                const commentsSummary = commentsWithContext
+                    .map(c => `${c.move}: ${c.comment}`)
+                    .join(' | ');
+                result = result.trim() + ` {${commentsSummary}}`;
+            }
 
             return result;
         }
@@ -1790,7 +1860,7 @@
                 report += pgnInput + '\n\n';
 
                 // Annotated PGN with NAG codes
-                const annotatedPgn = generateAnnotatedPgn(pgnInput, mistakes);
+                const annotatedPgn = generateAnnotatedPgn(pgnInput, mistakes, openingInfo);
                 report += 'ANNOTATED PGN\n';
                 report += '-'.repeat(70) + '\n';
                 report += annotatedPgn + '\n\n';
@@ -2130,6 +2200,12 @@
         }
 
         async function analyzeForVariation() {
+            // Jump to current variation move if one is highlighted
+            const currentVariationMove = document.querySelector('.variation-move.current');
+            if (currentVariationMove && currentVariationMove.dataset.nodeId) {
+                jumpToNode(currentVariationMove.dataset.nodeId);
+            }
+
             const input = document.getElementById('variation-move-input').value;
             const statusEl = document.getElementById('variation-status');
             const resultEl = document.getElementById('variation-result');
@@ -2211,8 +2287,28 @@
                     // Automatically add variation to PGN
                     addVariationToPgn();
 
+                    // Navigate to one move before the variation (so user can click "Next Var." to enter it)
+                    const targetPly = parsed.plyIndex;
+                    if (window.moveTree && targetPly > 0) {
+                        let targetNode = window.moveTree;
+                        for (let i = 0; i <= targetPly && targetNode; i++) {
+                            if (targetNode.children && targetNode.children.length > 0) {
+                                targetNode = targetNode.children[0];
+                            } else {
+                                targetNode = null;
+                            }
+                        }
+                        if (targetNode && targetNode.nodeId && targetNode.nodeId !== 'root') {
+                            jumpToNode(targetNode.nodeId);
+                        }
+                    }
+
                     // Clear the input field
                     document.getElementById('variation-move-input').value = '';
+
+                    // Focus Next button for keyboard navigation
+                    const nextBtn = document.getElementById('board2NextMove');
+                    if (nextBtn) nextBtn.focus();
                 } else {
                     statusEl.textContent = 'No result from Stockfish';
                     statusEl.style.color = '#ff6b6b';
@@ -3423,7 +3519,7 @@
             if (!annotation) return null;
             if (annotation.includes('??')) return '#ff4444'; // Blunder - bright red
             if (annotation.includes('?!')) return '#ffd700'; // Dubious - yellow
-            if (annotation.includes('?') && !annotation.includes('!?')) return '#ff6b6b'; // Mistake - red
+            if (annotation.includes('?') && !annotation.includes('!?')) return '#ff69b4'; // Mistake - hot pink
             return null; // No special color for good moves
         }
 
@@ -3619,13 +3715,69 @@
             // Update all comments display
             updateAllCommentsDisplay();
 
-            // Update board2MoveIndicator
+            // Update board2MoveIndicator with annotation highlighting
             const indicator = document.getElementById('board2MoveIndicator');
             if (indicator) {
                 const moveNotation = node.isBlackMove ? `${node.moveNumber}...` : `${node.moveNumber}.`;
                 indicator.textContent = moveNotation;
+                indicator.style.padding = '4px 8px';
+                indicator.style.borderRadius = '4px';
                 indicator.style.background = 'transparent';
                 indicator.style.color = '#eee';
+
+                // Check if we're in a variation (gray background)
+                const isInVariation = currentEl && currentEl.classList.contains('variation-move');
+                if (isInVariation) {
+                    indicator.style.background = '#555'; // Gray for variation
+                    indicator.style.color = '#eee';
+                }
+
+                // Apply annotation colors (overrides variation gray)
+                if (node.annotation) {
+                    if (node.annotation.includes('??')) {
+                        indicator.style.background = '#ff4444'; // Blunder - bright red
+                        indicator.style.color = '#1a1a2e';
+                    } else if (node.annotation.includes('?') && !node.annotation.includes('!?')) {
+                        indicator.style.background = '#ff69b4'; // Mistake - hot pink
+                        indicator.style.color = '#1a1a2e';
+                    } else if (node.annotation.includes('?!')) {
+                        indicator.style.background = '#ffd700'; // Dubious - yellow
+                        indicator.style.color = '#1a1a2e';
+                    }
+                }
+            }
+
+            // Update board2MovePlayedSan with the move played
+            const sanSpan = document.getElementById('board2MovePlayedSan');
+            if (sanSpan) {
+                sanSpan.textContent = node.san + (node.annotation || '');
+                // Match annotation color if present
+                if (node.annotation) {
+                    if (node.annotation.includes('??')) {
+                        sanSpan.style.color = '#ff4444';
+                    } else if (node.annotation.includes('?') && !node.annotation.includes('!?')) {
+                        sanSpan.style.color = '#ff69b4';
+                    } else if (node.annotation.includes('?!')) {
+                        sanSpan.style.color = '#ffd700';
+                    } else {
+                        sanSpan.style.color = '#00d4ff';
+                    }
+                } else {
+                    sanSpan.style.color = '#00d4ff';
+                }
+            }
+
+            // Update variation indicator - show "(" if variations exist at this position
+            // or if current move has sibling variations (can use Next Var. to jump to them)
+            const varIndicator = document.getElementById('board2VariationIndicator');
+            if (varIndicator) {
+                const hasChildVariations = node.children && node.children.length > 1;
+                const hasSiblingVariations = node.parent && node.parent.children && node.parent.children.length > 1;
+                if (hasChildVariations || hasSiblingVariations) {
+                    varIndicator.textContent = '(';
+                } else {
+                    varIndicator.textContent = '';
+                }
             }
         }
 
@@ -3818,6 +3970,22 @@
                 indicator.style.background = 'transparent';
                 indicator.style.color = '#eee';
             }
+
+            // Clear the move played san
+            const sanSpan = document.getElementById('board2MovePlayedSan');
+            if (sanSpan) {
+                sanSpan.textContent = '';
+            }
+
+            // Update variation indicator at root
+            const varIndicator = document.getElementById('board2VariationIndicator');
+            if (varIndicator) {
+                if (window.moveTree.children && window.moveTree.children.length > 1) {
+                    varIndicator.textContent = '(';
+                } else {
+                    varIndicator.textContent = '';
+                }
+            }
         }
 
         /**
@@ -3933,23 +4101,38 @@
             indicator.style.background = 'transparent';
             indicator.style.padding = '4px 8px';
             indicator.style.borderRadius = '4px';
+            indicator.style.color = '#eee';
 
-            if (window.loadedMistakes && Object.keys(window.loadedMistakes).length > 0) {
-                const severity = window.loadedMistakes[moveNotation];
-                if (severity === 'BLUNDER') {
-                    indicator.style.background = '#ff6b6b'; // Red for blunder
-                    indicator.style.color = '#1a1a2e';
-                } else if (severity === 'MISTAKE') {
-                    indicator.style.background = '#ffa94d'; // Orange for mistake
-                    indicator.style.color = '#1a1a2e';
-                } else if (severity === 'INACCURACY') {
-                    indicator.style.background = '#51cf66'; // Green for inaccuracy
-                    indicator.style.color = '#1a1a2e';
-                } else {
-                    indicator.style.color = '#eee';
+            // Get annotation from moveTree (matches moveContainer coloring)
+            let annotation = null;
+            if (window.currentMoveNode && window.currentMoveNode.annotation) {
+                annotation = window.currentMoveNode.annotation;
+            } else if (window.moveTree && index > 0) {
+                let node = window.moveTree;
+                for (let i = 0; i < index && node; i++) {
+                    if (node.children && node.children.length > 0) {
+                        node = node.children[0];
+                    } else {
+                        node = null;
+                    }
                 }
-            } else {
-                indicator.style.color = '#eee';
+                if (node && node.annotation) {
+                    annotation = node.annotation;
+                }
+            }
+
+            // Apply annotation colors (same as moveContainer)
+            if (annotation) {
+                if (annotation.includes('??')) {
+                    indicator.style.background = '#ff4444'; // Blunder - bright red
+                    indicator.style.color = '#1a1a2e';
+                } else if (annotation.includes('?') && !annotation.includes('!?')) {
+                    indicator.style.background = '#ff69b4'; // Mistake - hot pink
+                    indicator.style.color = '#1a1a2e';
+                } else if (annotation.includes('?!')) {
+                    indicator.style.background = '#ffd700'; // Dubious - yellow
+                    indicator.style.color = '#1a1a2e';
+                }
             }
 
             // Update Lichess link
@@ -5050,11 +5233,21 @@
             document.addEventListener('keydown', function(e) {
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
+                const prevBtn = document.getElementById('board2PrevMove');
+                const nextBtn = document.getElementById('board2NextMove');
+
                 if (e.key === 'ArrowLeft') {
                     board2PrevMove();
+                    if (prevBtn) prevBtn.focus();
                     e.preventDefault();
                 } else if (e.key === 'ArrowRight') {
                     board2NextMove();
+                    if (nextBtn) nextBtn.focus();
+                    e.preventDefault();
+                } else if (e.key === ' ' && (document.activeElement === prevBtn || document.activeElement === nextBtn)) {
+                    // Spacebar when focused on nav buttons triggers variation
+                    nextVariation();
+                    if (nextBtn) nextBtn.focus();
                     e.preventDefault();
                 }
             });
