@@ -761,8 +761,8 @@
     <div id="variation-adder" style="display: block; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
             <label style="color: #00d4ff; font-size: 13px;">Add Variation at:</label>
-            <input type="text" id="variation-move-input" placeholder="12. or 12..."
-                style="width: 100px; padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;"
+            <input type="text" id="variation-move-input" placeholder="12. or paste moves"
+                style="width: 150px; padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;"
                 onkeydown="if(event.key==='Enter')analyzeForVariation()">
             <button id="analyze-variation-btn" onclick="analyzeForVariation()"
                 style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
@@ -2206,46 +2206,83 @@
                 jumpToNode(currentVariationMove.dataset.nodeId);
             }
 
-            const input = document.getElementById('variation-move-input').value;
+            const input = document.getElementById('variation-move-input').value.trim();
             const statusEl = document.getElementById('variation-status');
             const resultEl = document.getElementById('variation-result');
             const depth = parseInt(document.getElementById('variation-depth').value);
 
-            // Parse move input
-            const parsed = parseVariationMoveInput(input);
+            // Check if input contains chess moves (not just move number format)
+            // Detect patterns like "a5", "Be2", "Nxf3", "O-O", etc.
+            const chessMovePattern = /[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O/;
+            const containsChessMoves = chessMovePattern.test(input);
+
+            // If input contains chess moves, add them directly as a variation
+            if (containsChessMoves && input.length > 3) {
+                await addMovesAsVariation(input, statusEl, resultEl);
+                return;
+            }
+
+            // Parse move input - if format doesn't match, use current board position
+            let parsed = parseVariationMoveInput(input);
+            let fen;
+            let useCurrentPosition = false;
+
             if (!parsed) {
-                statusEl.textContent = 'Invalid format. Use 12. or 12...';
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
+                // No valid "12." or "12..." format - use current board position
+                if (!window.currentMoveNode || !window.currentMoveNode.fen) {
+                    statusEl.textContent = 'No position selected. Navigate to a move or use format: 12. or 12...';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
 
-            // Get PGN - priority: nextVariant loaded > annotated from analysis > textarea
-            const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
-            if (!pgn) {
-                statusEl.textContent = 'No PGN loaded';
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
+                // Use current position for analysis
+                fen = window.currentMoveNode.fen;
+                const moveNumber = window.currentMoveNode.moveNumber || 1;
+                // After a move is played, it's the opponent's turn
+                // If current node is black's move, next to play is white (new move number)
+                // If current node is white's move, next to play is black (same move number)
+                const isBlack = !window.currentMoveNode.isBlackMove;
+                const nextMoveNumber = window.currentMoveNode.isBlackMove ? moveNumber + 1 : moveNumber;
 
-            // Get positions
-            const positions = getPositionsFromPgn(pgn);
-            if (!positions || positions.length === 0) {
-                statusEl.textContent = 'Could not parse PGN';
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
+                parsed = {
+                    moveNumber: nextMoveNumber,
+                    isBlack: isBlack,
+                    plyIndex: null  // Not used when using current position
+                };
+                useCurrentPosition = true;
 
-            // Check if ply index is valid (we need the position BEFORE the move)
-            if (parsed.plyIndex >= positions.length) {
-                statusEl.textContent = `Move ${parsed.moveNumber}${parsed.isBlack ? '...' : '.'} not found`;
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
+                statusEl.textContent = `Analyzing current position at depth ${depth}...`;
+                statusEl.style.color = '#00d4ff';
+            } else {
+                // Standard flow with move number input
+                // Get PGN - priority: nextVariant loaded > annotated from analysis > textarea
+                const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
+                if (!pgn) {
+                    statusEl.textContent = 'No PGN loaded';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
 
-            // Get FEN at position BEFORE the move (the position where the move was played from)
-            const fen = positions[parsed.plyIndex];
-            statusEl.textContent = `Analyzing at depth ${depth}...`;
-            statusEl.style.color = '#00d4ff';
+                // Get positions
+                const positions = getPositionsFromPgn(pgn);
+                if (!positions || positions.length === 0) {
+                    statusEl.textContent = 'Could not parse PGN';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+
+                // Check if ply index is valid (we need the position BEFORE the move)
+                if (parsed.plyIndex >= positions.length) {
+                    statusEl.textContent = `Move ${parsed.moveNumber}${parsed.isBlack ? '...' : '.'} not found`;
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+
+                // Get FEN at position BEFORE the move (the position where the move was played from)
+                fen = positions[parsed.plyIndex];
+                statusEl.textContent = `Analyzing at depth ${depth}...`;
+                statusEl.style.color = '#00d4ff';
+            }
 
             // Disable button during analysis
             document.getElementById('analyze-variation-btn').disabled = true;
@@ -2287,19 +2324,25 @@
                     // Automatically add variation to PGN
                     addVariationToPgn();
 
+                    // Automatically update the report so variations are saved
+                    updateReportWithPgn();
+
                     // Navigate to one move before the variation (so user can click "Next Var." to enter it)
-                    const targetPly = parsed.plyIndex;
-                    if (window.moveTree && targetPly > 0) {
-                        let targetNode = window.moveTree;
-                        for (let i = 0; i <= targetPly && targetNode; i++) {
-                            if (targetNode.children && targetNode.children.length > 0) {
-                                targetNode = targetNode.children[0];
-                            } else {
-                                targetNode = null;
+                    // Skip if using current position (plyIndex is null)
+                    if (!useCurrentPosition) {
+                        const targetPly = parsed.plyIndex;
+                        if (window.moveTree && targetPly > 0) {
+                            let targetNode = window.moveTree;
+                            for (let i = 0; i <= targetPly && targetNode; i++) {
+                                if (targetNode.children && targetNode.children.length > 0) {
+                                    targetNode = targetNode.children[0];
+                                } else {
+                                    targetNode = null;
+                                }
                             }
-                        }
-                        if (targetNode && targetNode.nodeId && targetNode.nodeId !== 'root') {
-                            jumpToNode(targetNode.nodeId);
+                            if (targetNode && targetNode.nodeId && targetNode.nodeId !== 'root') {
+                                jumpToNode(targetNode.nodeId);
+                            }
                         }
                     }
 
@@ -2319,6 +2362,166 @@
             }
 
             document.getElementById('analyze-variation-btn').disabled = false;
+        }
+
+        /**
+         * Add pasted moves directly as a variation (without Stockfish analysis)
+         * Supports formats:
+         *   - Full PGN: [Variant "From Position"] [FEN "..."] 33. Qf3 Rg4...
+         *   - Just moves: 33. Qf3 Rg4 34. Kh1 Ke7...
+         *   - Moves without numbers: Qf3 Rg4 Kh1 Ke7...
+         */
+        async function addMovesAsVariation(input, statusEl, resultEl) {
+            let movesText = input;
+
+            // Remove PGN headers (lines/sections starting with [)
+            movesText = movesText.replace(/\[[^\]]*\]/g, '').trim();
+
+            // Remove quotes if the whole thing is quoted
+            if (movesText.startsWith('"') && movesText.endsWith('"')) {
+                movesText = movesText.slice(1, -1).trim();
+            }
+
+            // Extract starting move number from input (e.g., "33." or "33...")
+            const moveNumMatch = movesText.match(/^(\d+)(\.{1,3})/);
+            let startMoveNumber = null;
+            let startsWithBlack = false;
+
+            if (moveNumMatch) {
+                startMoveNumber = parseInt(moveNumMatch[1]);
+                startsWithBlack = moveNumMatch[2].length === 3; // "..." means black's move
+            }
+
+            // Parse moves - strip move numbers and get just the moves
+            const movesOnly = movesText.replace(/\d+\.{1,3}\s*/g, '').trim();
+
+            // Split into individual moves
+            const moveTokens = movesOnly.split(/\s+/).filter(m => m.length > 0 && m !== '1-0' && m !== '0-1' && m !== '1/2-1/2');
+
+            if (moveTokens.length === 0) {
+                statusEl.textContent = 'No valid moves found in input';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Determine starting position
+            let startFen;
+            let insertMoveNumber;
+            let insertIsBlack;
+
+            if (startMoveNumber !== null) {
+                // Use move number from input to find position in PGN
+                const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
+                if (!pgn) {
+                    statusEl.textContent = 'No PGN loaded';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+
+                const positions = getPositionsFromPgn(pgn);
+                if (!positions || positions.length === 0) {
+                    statusEl.textContent = 'Could not parse PGN';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+
+                // Calculate ply index for the position BEFORE the first move in the variation
+                // If variation starts with "33. Qf3", we need position before white's 33rd move
+                // If variation starts with "33... Rg4", we need position before black's 33rd move
+                const plyIndex = (startMoveNumber - 1) * 2 + (startsWithBlack ? 1 : 0);
+
+                if (plyIndex >= positions.length) {
+                    statusEl.textContent = `Move ${startMoveNumber}${startsWithBlack ? '...' : '.'} not found in PGN`;
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+
+                startFen = positions[plyIndex];
+                insertMoveNumber = startMoveNumber;
+                insertIsBlack = startsWithBlack;
+            } else if (window.currentMoveNode && window.currentMoveNode.fen) {
+                // No move number in input - use current board position
+                startFen = window.currentMoveNode.fen;
+                const moveNumber = window.currentMoveNode.moveNumber || 1;
+                insertIsBlack = !window.currentMoveNode.isBlackMove;
+                insertMoveNumber = window.currentMoveNode.isBlackMove ? moveNumber + 1 : moveNumber;
+            } else {
+                statusEl.textContent = 'Include move number (e.g., 33. Qf3) or navigate to a position first';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const tempChess = new Chess(startFen);
+
+            // Validate each move
+            const validMoves = [];
+            for (const moveToken of moveTokens) {
+                try {
+                    const move = tempChess.move(moveToken, { sloppy: true });
+                    if (!move) {
+                        statusEl.textContent = `Invalid move: ${moveToken}`;
+                        statusEl.style.color = '#ff6b6b';
+                        return;
+                    }
+                    validMoves.push(move.san);
+                } catch (e) {
+                    statusEl.textContent = `Error: ${moveToken} - ${e.message}`;
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+            }
+
+            // Use the determined move number and color
+            const nextMoveNumber = insertMoveNumber;
+            const isBlack = insertIsBlack;
+
+            // Store as currentVariationResult for addVariationToPgn
+            window.currentVariationResult = {
+                moveNumber: nextMoveNumber,
+                isBlack: isBlack,
+                plyIndex: null,
+                fen: startFen,
+                bestMove: validMoves[0],
+                score: undefined,  // No score for manual moves
+                pv: validMoves
+            };
+
+            // Format the line for display
+            const formattedLine = formatVariationWithMoveNumbers(validMoves, nextMoveNumber, isBlack);
+
+            document.getElementById('variation-best-move').textContent = `Manual variation:`;
+            document.getElementById('variation-line').textContent = formattedLine;
+            resultEl.style.display = 'block';
+            statusEl.textContent = '';
+
+            // Add variation to PGN
+            addVariationToPgn();
+
+            // Navigate to the move before the variation (so user can click "Next Var." to enter it)
+            const targetPly = (nextMoveNumber - 1) * 2 + (isBlack ? 1 : 0);
+            if (window.moveTree && targetPly > 0) {
+                let targetNode = window.moveTree;
+                for (let i = 0; i <= targetPly && targetNode; i++) {
+                    if (targetNode.children && targetNode.children.length > 0) {
+                        targetNode = targetNode.children[0];
+                    } else {
+                        targetNode = null;
+                    }
+                }
+                if (targetNode && targetNode.nodeId && targetNode.nodeId !== 'root') {
+                    jumpToNode(targetNode.nodeId);
+                }
+            }
+
+            // Automatically update the report so variations are saved
+            updateReportWithPgn();
+
+            // Clear the input field
+            document.getElementById('variation-move-input').value = '';
+
+            // Focus Next button for keyboard navigation
+            const nextBtn = document.getElementById('board2NextMove');
+            if (nextBtn) nextBtn.focus();
         }
 
         function analyzePositionForVariation(fen, depth) {
@@ -5519,7 +5722,7 @@
                         textarea.value = reportDiv.textContent;
                         reportDiv.style.display = 'none';
                         textarea.style.display = 'block';
-                        toggleBtn.textContent = 'View only';
+                        toggleBtn.textContent = 'Go back to View Only';
                         toggleBtn.style.background = '#6a1b9a';
                         window.isReportEditMode = true;
                         textarea.focus();
