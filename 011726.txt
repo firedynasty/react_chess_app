@@ -1,0 +1,11 @@
+011726 Updates
+
+1. Added navigation after pasting moves as variation
+   - File: index.html (lines 2500-2514)
+   - After using addMovesAsVariation() to paste moves like "33. Qf3 Rg4 34. Kh1", the board now automatically navigates to the move where the variation starts
+   - Matches the behavior of the Stockfish variation adder
+   - Uses jumpToNode() to navigate to the target move so user can click "Next Var." to enter the variation
+
+2. UI improvement: Edit/View toggle button text
+   - File: index.html (line 5725)
+   - Changed button text from "View only" to "Go back to View Only" for better clarity
