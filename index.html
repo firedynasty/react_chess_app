@@ -760,7 +760,7 @@
     <!-- Variation Adder (moved below reportControls) -->
     <div id="variation-adder" style="display: block; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <label style="color: #00d4ff; font-size: 13px;">Add Variation at:</label>
+            <label style="color: #00d4ff; font-size: 13px;">Add Variation at (if blank will go from board):</label>
             <input type="text" id="variation-move-input" placeholder="12. or paste moves"
                 style="width: 150px; padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;"
                 onkeydown="if(event.key==='Enter')analyzeForVariation()">
@@ -2200,10 +2200,10 @@
         }
 
         async function analyzeForVariation() {
-            // Jump to current variation move if one is highlighted
-            const currentVariationMove = document.querySelector('.variation-move.current');
-            if (currentVariationMove && currentVariationMove.dataset.nodeId) {
-                jumpToNode(currentVariationMove.dataset.nodeId);
+            // Jump to current move if one is highlighted (main-line or variation)
+            const currentMove = document.querySelector('.move-san.current[data-node-id]');
+            if (currentMove && currentMove.dataset.nodeId) {
+                jumpToNode(currentMove.dataset.nodeId);
             }
 
             const input = document.getElementById('variation-move-input').value.trim();
@@ -2251,7 +2251,11 @@
                 };
                 useCurrentPosition = true;
 
-                statusEl.textContent = `Analyzing current position at depth ${depth}...`;
+                // Show which move we're analyzing from
+                const currentSan = window.currentMoveNode.san || '';
+                const currentMoveNum = window.currentMoveNode.moveNumber || 1;
+                const moveLabel = window.currentMoveNode.isBlackMove ? `${currentMoveNum}...${currentSan}` : `${currentMoveNum}.${currentSan}`;
+                statusEl.textContent = `Analyzing after ${moveLabel} at depth ${depth}...`;
                 statusEl.style.color = '#00d4ff';
             } else {
                 // Standard flow with move number input
@@ -2321,28 +2325,31 @@
                     resultEl.style.display = 'block';
                     statusEl.textContent = '';
 
+                    // Save the current node info before re-parsing (for navigation back)
+                    const savedMoveNumber = parsed.moveNumber;
+                    const savedIsBlack = parsed.isBlack;
+
                     // Automatically add variation to PGN
                     addVariationToPgn();
 
                     // Automatically update the report so variations are saved
                     updateReportWithPgn();
 
-                    // Navigate to one move before the variation (so user can click "Next Var." to enter it)
-                    // Skip if using current position (plyIndex is null)
-                    if (!useCurrentPosition) {
-                        const targetPly = parsed.plyIndex;
-                        if (window.moveTree && targetPly > 0) {
-                            let targetNode = window.moveTree;
-                            for (let i = 0; i <= targetPly && targetNode; i++) {
-                                if (targetNode.children && targetNode.children.length > 0) {
-                                    targetNode = targetNode.children[0];
-                                } else {
-                                    targetNode = null;
-                                }
+                    // Navigate back to the move where variation was added
+                    // Find the node by move number and color after tree is re-parsed
+                    if (window.moveTree) {
+                        let targetNode = window.moveTree;
+                        // Calculate target ply: (moveNumber - 1) * 2 + (isBlack ? 1 : 0)
+                        const targetPly = (savedMoveNumber - 1) * 2 + (savedIsBlack ? 1 : 0);
+                        for (let i = 0; i < targetPly && targetNode; i++) {
+                            if (targetNode.children && targetNode.children.length > 0) {
+                                targetNode = targetNode.children[0];
+                            } else {
+                                targetNode = null;
                             }
-                            if (targetNode && targetNode.nodeId && targetNode.nodeId !== 'root') {
-                                jumpToNode(targetNode.nodeId);
-                            }
+                        }
+                        if (targetNode && targetNode.nodeId && targetNode.nodeId !== 'root') {
+                            jumpToNode(targetNode.nodeId);
                         }
                     }
 
