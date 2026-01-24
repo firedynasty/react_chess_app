@@ -3890,13 +3890,15 @@
                 currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            // Reduce board opacity when viewing a variation
+            // Reduce board opacity and add border when viewing a variation
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 if (currentEl && currentEl.classList.contains('variation-move')) {
                     boardContainer.style.opacity = '0.75';
+                    boardContainer.style.border = '3px solid #555';
                 } else {
                     boardContainer.style.opacity = '1';
+                    boardContainer.style.border = 'none';
                 }
             }
 
@@ -4151,10 +4153,11 @@
                 el.classList.remove('current');
             });
 
-            // Restore full board opacity when at root
+            // Restore full board opacity and remove border when at root
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 boardContainer.style.opacity = '1';
+                boardContainer.style.border = 'none';
             }
 
             // Update other displays
