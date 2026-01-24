@@ -840,6 +840,7 @@
         </div>
         <p style="color: #888; font-size: 12px; margin: 0 0 8px 0; font-style: italic;">Note: Chess piece images will load fully when choosing 'Next'</p>
         <div id="myBoard2" style="width: 400px;"></div>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -5452,12 +5453,22 @@
 
                 const prevBtn = document.getElementById('board2PrevMove');
                 const nextBtn = document.getElementById('board2NextMove');
+                const boardContainer = document.getElementById('myBoard2');
+
+                // Command+[ = Previous move (prevents browser back)
+                if ((e.metaKey || e.ctrlKey) && e.key === '[') {
+                    board2PrevMove();
+                    if (prevBtn) prevBtn.focus();
+                    e.preventDefault();
+                    return;
+                }
 
                 if (e.key === 'ArrowLeft') {
                     board2PrevMove();
                     if (prevBtn) prevBtn.focus();
                     e.preventDefault();
-                } else if (e.key === 'ArrowRight') {
+                } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+                    // ArrowRight or PageDown = Next move
                     board2NextMove();
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
