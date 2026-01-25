@@ -99,10 +99,29 @@ IMPORTANT:
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Sidebar collapse state for mobile
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   // Refs
   const chatContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const literatureContentRef = useRef(null);
+
+  // Auto-collapse sidebar on narrow screens
+  useEffect(() => {
+    const checkWidth = () => {
+      if (window.innerWidth < 600) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    // Check on mount
+    checkWidth();
+
+    // Listen for resize
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
 
   // Available models
   const anthropicModels = {
@@ -749,9 +768,28 @@ ${content}
 
   return (
     <div style={styles.container}>
+      {/* Mobile backdrop */}
+      {!sidebarCollapsed && window.innerWidth < 600 && (
+        <div
+          style={styles.sidebarBackdrop}
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Header / Sidebar */}
-      <div style={styles.sidebar}>
-        <h2 style={styles.sidebarTitle}>Report Chat</h2>
+      {!sidebarCollapsed && (
+        <div style={{
+          ...styles.sidebar,
+          ...(window.innerWidth < 600 ? styles.sidebarMobile : {}),
+        }}>
+          {/* Close button for mobile */}
+          <button
+            onClick={() => setSidebarCollapsed(true)}
+            style={styles.sidebarCloseBtn}
+          >
+            ×
+          </button>
+          <h2 style={styles.sidebarTitle}>Report Chat</h2>
 
         {/* AI Provider Toggle */}
         <div style={styles.section}>
@@ -968,7 +1006,8 @@ ${content}
             </p>
           </div>
         )}
-      </div>
+        </div>
+      )}
 
       {/* Literature Viewer Mode */}
       {viewMode === 'literature' && literatureFile ? (
@@ -1226,6 +1265,37 @@ ${content}
       ) : (
         /* Main Chat Area */
         <div style={styles.mainArea}>
+          {/* Collapsed header with menu button and Stanley's key */}
+          {sidebarCollapsed && (
+            <div style={styles.collapsedHeader}>
+              <button
+                onClick={() => setSidebarCollapsed(false)}
+                style={styles.hamburgerBtn}
+              >
+                ☰
+              </button>
+              <span style={styles.collapsedTitle}>Report Chat</span>
+              {aiProvider === 'ChatGPT' && (
+                <button
+                  onClick={() => {
+                    const code = prompt("Enter access code for Stanley's key:");
+                    if (code) {
+                      setAccessCode(code);
+                      setUseSharedKey(true);
+                      setApiKey('');
+                    }
+                  }}
+                  style={{
+                    ...styles.collapsedKeyBtn,
+                    background: useSharedKey ? '#28a745' : '#4da6ff',
+                  }}
+                >
+                  {useSharedKey ? "✓ Stanley's Key" : "Use Stanley's Key"}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Info banner when reports loaded */}
           {Object.keys(loadedReports).length > 0 && (
             <div style={styles.infoBanner}>
@@ -1374,12 +1444,76 @@ const styles = {
     flexDirection: 'column',
     gap: '16px',
     overflowY: 'auto',
+    position: 'relative',
+    zIndex: 100,
   },
   sidebarTitle: {
     margin: '0 0 10px 0',
     fontSize: '24px',
     fontWeight: '600',
     color: '#4da6ff',
+  },
+  sidebarCloseBtn: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    background: 'none',
+    border: 'none',
+    color: '#888',
+    fontSize: '28px',
+    cursor: 'pointer',
+    padding: '0 8px',
+    lineHeight: 1,
+  },
+  sidebarMobile: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    height: '100vh',
+    width: '85%',
+    maxWidth: '320px',
+    boxShadow: '2px 0 10px rgba(0,0,0,0.3)',
+  },
+  sidebarBackdrop: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.5)',
+    zIndex: 99,
+  },
+  collapsedHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '12px 16px',
+    background: '#1a1a2e',
+    borderBottom: '1px solid #333',
+  },
+  hamburgerBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#fff',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '4px 8px',
+  },
+  collapsedTitle: {
+    color: '#4da6ff',
+    fontSize: '18px',
+    fontWeight: '600',
+    flex: 1,
+  },
+  collapsedKeyBtn: {
+    padding: '8px 14px',
+    borderRadius: '6px',
+    border: 'none',
+    fontSize: '13px',
+    fontWeight: '500',
+    color: '#fff',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
   },
   section: {
     display: 'flex',
