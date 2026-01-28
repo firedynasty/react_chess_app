@@ -253,13 +253,32 @@ window.parsePgnToPositions = function(pgnString) {
   const positions = [];
 
   try {
-    const chess = new Chess();
-    positions.push(chess.fen()); // Starting position
+    let chess = new Chess();
 
-    // Clean PGN
+    // Check for FEN header in PGN (handles "From Position" variant)
+    const fenMatch = pgnString.match(/\[FEN\s+"([^"]+)"\]/);
+    if (fenMatch) {
+      const startingFen = fenMatch[1];
+      console.log('Found FEN header:', startingFen);
+
+      try {
+        chess.load(startingFen);
+        console.log('Successfully loaded custom FEN position');
+      } catch (fenError) {
+        console.error('Failed to load FEN position:', fenError);
+        chess = new Chess(); // Fall back to standard starting position
+      }
+    }
+
+    positions.push(chess.fen()); // Starting position (custom FEN or standard)
+
+    // Clean PGN - remove headers and annotations
     let cleanPgn = pgnString
+      .replace(/\[.*?\]/g, '') // Remove all PGN headers including [FEN "..."]
       .replace(/\{[^}]*\}/g, '') // Remove comments
       .replace(/\([^)]*\)/g, '') // Remove variations
+      .replace(/\$\d+/g, '') // Remove NAG symbols like $6, $2
+      .replace(/[!?]{1,2}/g, '') // Remove move annotations like !, ?, !!
       .replace(/\d+\.\.\./g, '') // Remove black move indicators
       .replace(/\s+/g, ' ')
       .trim();
