@@ -3358,6 +3358,15 @@
         window.parsePgnToPositions = function(pgnString) {
             const positions = [];
             try {
+                // Check for multiple FEN positions (e.g. comma-separated Variant/FEN entries)
+                const allFenMatches = [...pgnString.matchAll(/\[FEN\s+"([^"]+)"\]/g)];
+                if (allFenMatches.length > 1) {
+                    for (const m of allFenMatches) {
+                        positions.push(m[1]);
+                    }
+                    return positions;
+                }
+
                 const chess = new Chess();
 
                 // Check if text has a FEN header (from Variant format or standard PGN)
