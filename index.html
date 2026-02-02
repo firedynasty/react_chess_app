@@ -4862,6 +4862,15 @@
                         window.cycleVarIndex = -1;
                     }
                     if (window.cycleVarSequence.length === 0) return; // no variations
+
+                    // Sync index to current position if user navigated elsewhere
+                    if (window.currentMoveNode) {
+                        const currentIdx = window.cycleVarSequence.findIndex(n => n.nodeId === window.currentMoveNode.nodeId);
+                        if (currentIdx !== -1) {
+                            window.cycleVarIndex = currentIdx;
+                        }
+                    }
+
                     window.cycleVarIndex = (window.cycleVarIndex + 1) % window.cycleVarSequence.length;
                     jumpToNode(window.cycleVarSequence[window.cycleVarIndex].nodeId);
                 });
