@@ -1,0 +1,102 @@
+Summary: Cycle Var. and Restart Var. Buttons Implementation (2026-02-02)
+=========================================================================
+
+ORIGINAL REQUEST
+----------------
+"With the button 'Cycle Clipboard' I can cycle through from start to finish.
+I am wondering can you provide the same thing with a button after Next Var.
+that would cycle through the variants, so it will start at 7. Nc3 then go
+into the variant like as if I had clicked at the start of variant where
+Next Var. button works."
+
+REFINED FEATURE SPECIFICATION
+-----------------------------
+Feature: "Cycle Var." button
+
+Add a button next to "Next Var." that auto-cycles through all variations
+in the game, one move per click (similar to how "Cycle Clipboard" steps
+through FEN positions).
+
+Behavior per click:
+1. Jump to the main-line move just before the first variation (e.g., 7. Nc3)
+2. Then on subsequent clicks, step through that variation move-by-move
+   (7. Nbd2 → Nc6 → 8. c3 → Bc5)
+3. When the variation ends, jump to the main-line move before the next
+   variation (19. Rd1)
+4. Step through that variation move-by-move
+   (19. h3 → Bh5 → 20. Bb7 → Qxc3 → 21. Qe5 → Qxe5 → 22. Rxe5)
+5. Continue for all remaining variations (the 27. Qf8+ line, etc.)
+6. After the last variation is exhausted, wrap back to the beginning
+
+WHAT WAS IMPLEMENTED
+--------------------
+
+1. "Cycle Var." Button (teal #17a2b8)
+   - Steps through ALL variations one move at a time per click
+   - At each branch point in the main line, collects:
+     a) The main-line move (branch point, e.g. 7. Nc3)
+     b) All moves inside children[1] (the variation)
+   - Returns a flat sequence that cycles through
+   - Syncs with current position - if you navigate elsewhere manually,
+     Cycle Var. continues from where you are
+
+2. "Back Var." Button (teal #17a2b8)
+   - Goes back one step in the variation sequence
+   - Opposite of Cycle Var. - steps backward through variations
+   - Wraps to the end of the sequence if at the beginning
+
+3. "Restart Var." Button (purple #6f42c1)
+   - When inside a variation, jumps back to the main-line move at the
+     branch point of that variation
+   - E.g., if you're on 8. c3 inside a variation, clicking Restart Var.
+     takes you to 7. Nc3 (the main-line move where the variation branched)
+   - Does nothing if already on the main line
+
+4. Button Layout with Separator
+   - Order: Next Var. | Cycle Var. | Back Var. | ·—· | Restart Var.
+   - Separator (·—·) visually groups related buttons
+
+5. State Management
+   - window.cycleVarSequence = [] - flat array of nodes to cycle through
+   - window.cycleVarIndex = -1 - current position in sequence
+   - Both reset when a new game/PGN is loaded
+   - Index syncs to current position before advancing (respects manual navigation)
+
+KEY FIX
+-------
+Initially, Cycle Var. ignored manual navigation (clicking Restart Var. or
+clicking moves directly). Fixed so that each click first checks if the
+current position is in the sequence, syncs the index to that position,
+then advances. This means:
+- Click Restart Var. to go back to 7. Nc3
+- Click Cycle Var. → goes to 7. Nbd2 (first variation move)
+- NOT to wherever the internal index was pointing
+
+HELPER FUNCTION: collectVariationSequence()
+-------------------------------------------
+Walks window.moveTree depth-first along the main line (children[0]).
+At each node where children.length > 1 (a branch point):
+- Push children[0] (the main-line move)
+- Push all moves in children[1] linearly (the variation)
+
+Returns flat array like:
+[7.Nc3, 7.Nbd2, 7...Nc6, 8.c3, 8...Bc5, 19.Rd1, 19.h3, 19...Bh5, ...]
+
+ADDITIONAL CHANGES
+------------------
+- Added inline help text for Copy PGN, Update Report, and Extend Variation sections
+- Small gray font (#666, 11px) explaining button functions
+
+COMMITS
+-------
+1. 85bc91b - add Cycle Var. and Restart Var. buttons for variation navigation
+2. e750f9f - add inline help text for Copy PGN, Update Report, and Extend Variation sections
+3. c4f4506 - fix Cycle Var. to sync with current position before advancing
+4. (pending) - add Back Var. button, remove debug console.log statements
+
+VERIFIED WORKING
+----------------
+Tested with PGN containing 3 variations at moves 7, 19, and 27.
+- Cycle Var. correctly steps through branch points and all variation moves
+- Restart Var. correctly returns to the main-line branch point
+- After Restart Var., Cycle Var. continues from that position as expected

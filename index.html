@@ -882,6 +882,7 @@
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
           <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
+          <button id="backVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Back Var.</button>
           <span style="color: #555; font-size: 14px; user-select: none;">&#183;&#8212;&#183;</span>
           <button id="rootVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Restart Var.</button>
           <button id="cycleClipboardBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Clipboard</button>
@@ -4872,6 +4873,32 @@
                     }
 
                     window.cycleVarIndex = (window.cycleVarIndex + 1) % window.cycleVarSequence.length;
+                    jumpToNode(window.cycleVarSequence[window.cycleVarIndex].nodeId);
+                });
+            }
+
+            // Back Var. button - goes back one step in the variation sequence
+            const backVarBtn = document.getElementById('backVarBtn');
+            if (backVarBtn) {
+                backVarBtn.addEventListener('click', function() {
+                    if (!window.moveTree) return;
+                    // Rebuild sequence if empty
+                    if (window.cycleVarSequence.length === 0) {
+                        window.cycleVarSequence = collectVariationSequence();
+                        window.cycleVarIndex = -1;
+                    }
+                    if (window.cycleVarSequence.length === 0) return; // no variations
+
+                    // Sync index to current position if user navigated elsewhere
+                    if (window.currentMoveNode) {
+                        const currentIdx = window.cycleVarSequence.findIndex(n => n.nodeId === window.currentMoveNode.nodeId);
+                        if (currentIdx !== -1) {
+                            window.cycleVarIndex = currentIdx;
+                        }
+                    }
+
+                    // Go back one (wrap to end if at start)
+                    window.cycleVarIndex = (window.cycleVarIndex - 1 + window.cycleVarSequence.length) % window.cycleVarSequence.length;
                     jumpToNode(window.cycleVarSequence[window.cycleVarIndex].nodeId);
                 });
             }
