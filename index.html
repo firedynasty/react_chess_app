@@ -880,6 +880,9 @@
           <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace;"></span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
+          <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
+          <span style="color: #555; font-size: 14px; user-select: none;">&#183;&#8212;&#183;</span>
+          <button id="rootVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Restart Var.</button>
           <button id="cycleClipboardBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Clipboard</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
@@ -2117,6 +2120,8 @@
             // Parse with variation support and render move table
             window.moveTree = window.parsePgnWithVariations(pgnString);
             window.currentMoveNode = null;
+            window.cycleVarSequence = [];
+            window.cycleVarIndex = -1;
             renderMoveTable(window.moveTree);
 
             // Parse positions for navigation
@@ -2713,6 +2718,8 @@
                 if (typeof window.parsePgnWithVariations === 'function') {
                     window.moveTree = window.parsePgnWithVariations(protectedPgn);
                     window.currentMoveNode = null;
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
                     renderMoveTable(window.moveTree);
                 }
             } else {
@@ -3337,6 +3344,10 @@
         window.moveTree = null;           // Root node of parsed move tree
         window.currentMoveNode = null;    // Currently selected node in the tree
         window.moveNodeRegistry = {};     // Map of nodeId -> MoveNode for fast lookup
+
+        // Cycle Var. state
+        window.cycleVarSequence = [];     // Flat array of nodes to cycle through
+        window.cycleVarIndex = -1;        // Current position in the sequence
 
         // Piece theme path for chess board (local images)
         const pieceThemePath = 'img/chesspieces/wikipedia/{piece}.png';
@@ -4526,6 +4537,56 @@
         }
 
         /**
+         * Jump to the main-line move at the branch point of the current variation.
+         * If already on the main line, does nothing.
+         */
+        function rootVariation() {
+            if (!window.moveTree || !window.currentMoveNode) return;
+
+            // Walk up from current node to find where we branched off the main line
+            let node = window.currentMoveNode;
+            while (node && node.parent) {
+                const parent = node.parent;
+                if (parent.children && parent.children.length > 1) {
+                    const index = parent.children.indexOf(node);
+                    if (index > 0) {
+                        // Found the divergence - jump to the main-line move
+                        jumpToNode(parent.children[0].nodeId);
+                        return;
+                    }
+                }
+                node = node.parent;
+            }
+        }
+
+        /**
+         * Collect a flat sequence of nodes for Cycle Var.
+         * Walks the main line; at each branch point (children.length > 1),
+         * appends the branch-point node then all moves in children[1].
+         */
+        function collectVariationSequence() {
+            const seq = [];
+            if (!window.moveTree) return seq;
+
+            // Walk the main line (children[0] at each step)
+            let node = window.moveTree;
+            while (node) {
+                if (node.children && node.children.length > 1) {
+                    // This is a branch point - add it, then the full variation
+                    seq.push(node.children[0]); // the main-line move at the branch
+                    let varNode = node.children[1];
+                    while (varNode) {
+                        seq.push(varNode);
+                        varNode = (varNode.children && varNode.children.length > 0) ? varNode.children[0] : null;
+                    }
+                }
+                // Advance along the main line
+                node = (node.children && node.children.length > 0) ? node.children[0] : null;
+            }
+            return seq;
+        }
+
+        /**
          * Extract and display game info from report content
          */
         function updateCurrentGameInfo(reportContent) {
@@ -4781,6 +4842,27 @@
             const nextVarBtn = document.getElementById('nextVarBtn');
             if (nextVarBtn) {
                 nextVarBtn.addEventListener('click', nextVariation);
+            }
+
+            const rootVarBtn = document.getElementById('rootVarBtn');
+            if (rootVarBtn) {
+                rootVarBtn.addEventListener('click', rootVariation);
+            }
+
+            // Cycle Var. button - steps through all variations one move at a time
+            const cycleVarBtn = document.getElementById('cycleVarBtn');
+            if (cycleVarBtn) {
+                cycleVarBtn.addEventListener('click', function() {
+                    if (!window.moveTree) return;
+                    // Rebuild sequence if empty (first click or after new game load)
+                    if (window.cycleVarSequence.length === 0) {
+                        window.cycleVarSequence = collectVariationSequence();
+                        window.cycleVarIndex = -1;
+                    }
+                    if (window.cycleVarSequence.length === 0) return; // no variations
+                    window.cycleVarIndex = (window.cycleVarIndex + 1) % window.cycleVarSequence.length;
+                    jumpToNode(window.cycleVarSequence[window.cycleVarIndex].nodeId);
+                });
             }
 
             // Cycle Clipboard button - loads from clipboard or cycles through positions
@@ -5400,6 +5482,8 @@
                 // Parse with variation support and render move table
                 console.log('Parsing PGN with variations:', pgnString.substring(0, 100));
                 window.moveTree = window.parsePgnWithVariations(pgnString);
+                window.cycleVarSequence = [];
+                window.cycleVarIndex = -1;
                 console.log('Move tree parsed, root children:', window.moveTree?.children?.length);
                 if (window.moveTree?.children?.[0]) {
                     console.log('First move:', window.moveTree.children[0].san, 'annotation:', window.moveTree.children[0].annotation);
