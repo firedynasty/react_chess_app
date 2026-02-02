@@ -821,6 +821,7 @@
             </a>
             <span id="extend-variation-status" style="color: #888; font-size: 12px;"></span>
         </div>
+        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Click a variation move → Go to Lichess to explore the line → paste the continuation here → Append to Variation adds the moves to the current variation and PGN</p>
     </div>
 
     <!-- Board and Move Table (side by side) -->
@@ -898,6 +899,7 @@
           <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
           <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
           <button id="updateReportBtn" onclick="updateReportWithPgn()" style="background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
+          <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">Copy PGN = copy current PGN (with variations) to clipboard | Update Report = write PGN back into the ANNOTATED PGN section of the report | Analyze from the variation input will add variants to the PGN</p>
           <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4;"></span>
           <br>
           <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: block;"></span>
