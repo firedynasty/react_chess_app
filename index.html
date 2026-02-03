@@ -884,6 +884,7 @@
           <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
           <button id="backVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Back Var.</button>
           <button id="cycleClipboardBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Clipboard</button>
+          <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
           <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
@@ -4920,6 +4921,44 @@
                     } catch (err) {
                         console.error('Clipboard read error:', err);
                         log('Could not read clipboard', 'error');
+                    }
+                });
+            }
+
+            // Load Annotated PGN from clipboard into move container
+            const loadClipboardPgnBtn = document.getElementById('loadClipboardPgnBtn');
+            if (loadClipboardPgnBtn) {
+                loadClipboardPgnBtn.addEventListener('click', async function() {
+                    try {
+                        const clipboardText = await navigator.clipboard.readText();
+                        const pgnString = clipboardText ? clipboardText.trim() : '';
+                        if (!pgnString) {
+                            alert('Clipboard is empty.');
+                            return;
+                        }
+
+                        // Parse positions and comments
+                        const result = window.parsePgnToPositionsWithComments(pgnString);
+                        window.studyReportPositions = result.positions;
+                        window.studyReportComments = result.comments;
+                        window.currentLoadedPgn = pgnString;
+
+                        // Parse with variation support and render move table
+                        window.moveTree = window.parsePgnWithVariations(pgnString);
+                        window.cycleVarSequence = [];
+                        window.cycleVarIndex = -1;
+                        window.currentMoveNode = null;
+                        renderMoveTable(window.moveTree);
+                        updateAllCommentsDisplay();
+
+                        window.studyReportPositionIndex = 0;
+                        if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                            window.board2.position(window.studyReportPositions[0]);
+                            updateBoard2MoveIndicator(0);
+                        }
+                    } catch (err) {
+                        console.error('Clipboard read error:', err);
+                        alert('Could not read clipboard.');
                     }
                 });
             }
