@@ -824,6 +824,33 @@
         <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Click a variation move → Go to Lichess to explore the line → paste the continuation here → Append to Variation adds the moves to the current variation and PGN</p>
     </div>
 
+    <!-- Insert Variation from Paste -->
+    <div id="insert-variation-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+        <div style="margin-bottom: 10px;">
+            <span style="color: #e67e22; font-weight: bold; font-size: 14px;">📌 Insert Variation into PGN</span>
+            <span style="color: #888; font-size: 12px; margin-left: 10px;">(Paste a variation with move numbers — it will be inserted at the correct mainline position)</span>
+        </div>
+        <textarea id="insert-variation-input"
+            placeholder="Paste variation e.g. (13. Nxe5 Nxe5 14. Bf4 f6 15. Bxe5 fxe5 16. Qh5+ Bf7 17. Rxe5+ Kf8 18. Qe2)"
+            style="width: 100%; height: 80px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical;"></textarea>
+        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button id="insert-variation-btn" onclick="insertPastedVariation()"
+                style="padding: 8px 15px; background: #e67e22; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                Insert as Variation
+            </button>
+            <button onclick="navigator.clipboard.readText().then(t => document.getElementById('insert-variation-input').value = t)"
+                style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                📋 Paste from Clipboard
+            </button>
+            <button onclick="document.getElementById('insert-variation-input').value = ''"
+                style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
+                Clear
+            </button>
+            <span id="insert-variation-status" style="color: #888; font-size: 12px;"></span>
+        </div>
+        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Paste a full variation (with or without parentheses) — the move number determines where it branches from the mainline. Uses the same insertion logic as Analyze.</p>
+    </div>
+
     <!-- Board and Move Table (side by side) -->
     <div style="display: flex; gap: 15px; flex-wrap: nowrap; margin: 20px auto; max-width: 1200px; align-items: flex-start;">
       <!-- Chess Board -->
@@ -2538,6 +2565,43 @@
             // Focus Next button for keyboard navigation
             const nextBtn = document.getElementById('board2NextMove');
             if (nextBtn) nextBtn.focus();
+        }
+
+        function insertPastedVariation() {
+            const inputEl = document.getElementById('insert-variation-input');
+            const statusEl = document.getElementById('insert-variation-status');
+            let text = inputEl.value.trim();
+
+            if (!text) {
+                statusEl.textContent = 'Please paste a variation';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Strip outer parentheses if present
+            if (text.startsWith('(') && text.endsWith(')')) {
+                text = text.slice(1, -1).trim();
+            }
+
+            // Reuse the Analyze input + analyzeForVariation flow which handles
+            // both move-number detection and addMovesAsVariation
+            const analyzeInput = document.getElementById('variation-move-input');
+            const origValue = analyzeInput.value;
+            analyzeInput.value = text;
+
+            // Call analyzeForVariation — it detects chess moves and routes to addMovesAsVariation
+            analyzeForVariation().then(() => {
+                statusEl.textContent = '✓ Variation inserted into PGN';
+                statusEl.style.color = '#27ae60';
+                inputEl.value = '';
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            }).catch(() => {
+                // Errors are shown in variation-status by analyzeForVariation
+                statusEl.textContent = 'See status above for error details';
+                statusEl.style.color = '#ff6b6b';
+            }).finally(() => {
+                // Don't restore — analyzeForVariation already clears it on success
+            });
         }
 
         function analyzePositionForVariation(fen, depth) {
@@ -5663,6 +5727,20 @@
                     // ArrowRight or PageDown = Next move
                     board2NextMove();
                     if (nextBtn) nextBtn.focus();
+                    e.preventDefault();
+                } else if (e.key === 'ArrowUp') {
+                    // ArrowUp = Cycle Var (same as Cycle Var. button)
+                    if (window.moveTree) {
+                        const localSeq = collectLocalVariationSequence();
+                        if (localSeq.length > 0) {
+                            let currentIdx = -1;
+                            if (window.currentMoveNode) {
+                                currentIdx = localSeq.findIndex(n => n.nodeId === window.currentMoveNode.nodeId);
+                            }
+                            const nextIdx = (currentIdx + 1) % localSeq.length;
+                            jumpToNode(localSeq[nextIdx].nodeId);
+                        }
+                    }
                     e.preventDefault();
                 } else if (e.key === ' ' && (document.activeElement === prevBtn || document.activeElement === nextBtn)) {
                     // Spacebar when focused on nav buttons triggers variation
