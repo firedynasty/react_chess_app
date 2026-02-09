@@ -1673,13 +1673,54 @@
         /**
          * Copy PGN to clipboard (from moveContainer or annotatedPgnWithVariations)
          */
-        function copyPgnToClipboard() {
-            // Priority: moveTree (current moveContainer) > annotatedPgnWithVariations
-            let pgn = window.annotatedPgnWithVariations;
+        function moveTreeToPgn(rootNode) {
+            let parts = [];
 
-            // If we have a moveTree loaded (from nextVariant), use currentLoadedPgn
-            if (window.currentLoadedPgn) {
-                pgn = window.currentLoadedPgn;
+            function serializeNode(node, needsMoveNumber) {
+                if (!node || !node.san) return;
+
+                // Write move number
+                if (!node.isBlackMove) {
+                    parts.push(node.moveNumber + '.');
+                } else if (needsMoveNumber) {
+                    parts.push(node.moveNumber + '...');
+                }
+
+                // Write SAN + annotation
+                parts.push(node.san + (node.annotation || ''));
+
+                // Write comment
+                if (node.comment) {
+                    parts.push('{' + node.comment + '}');
+                }
+
+                if (node.children && node.children.length > 0) {
+                    // Serialize variations (children[1..n]) before continuing mainline
+                    for (let v = 1; v < node.children.length; v++) {
+                        parts.push('(');
+                        serializeNode(node.children[v], true);
+                        parts.push(')');
+                    }
+                    // Continue with mainline child
+                    serializeNode(node.children[0], false);
+                }
+            }
+
+            // Root node has no san; start from its children
+            if (rootNode.children && rootNode.children.length > 0) {
+                serializeNode(rootNode.children[0], true);
+            }
+
+            return parts.join(' ');
+        }
+
+        function copyPgnToClipboard() {
+            // If we have a live move tree, serialize it (picks up inserted comments)
+            let pgn;
+            if (window.moveTree) {
+                pgn = moveTreeToPgn(window.moveTree);
+            } else {
+                pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
             }
 
             if (!pgn) {
@@ -1706,7 +1747,7 @@
          * Update report's ANNOTATED PGN section (only if section exists)
          */
         function updateReportWithPgn() {
-            const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
+            const pgn = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
             if (!pgn) {
                 log('No PGN available to update', 'warning');
                 return;
