@@ -851,6 +851,33 @@
         <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Paste a full variation (with or without parentheses) — the move number determines where it branches from the mainline. Uses the same insertion logic as Analyze.</p>
     </div>
 
+    <!-- Insert Comment -->
+    <div id="insert-comment-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+        <div style="margin-bottom: 10px;">
+            <span style="color: #2ecc71; font-weight: bold; font-size: 14px;">💬 Insert Comment at Move</span>
+            <span style="color: #888; font-size: 12px; margin-left: 10px;">(Attach a comment to a specific mainline move)</span>
+        </div>
+        <input id="insert-comment-input" type="text"
+            placeholder="e.g. 10, this is a great move by black, leads to checkmate"
+            style="width: 100%; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; box-sizing: border-box;">
+        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button onclick="insertPastedComment()"
+                style="padding: 8px 15px; background: #2ecc71; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                Insert Comment
+            </button>
+            <button onclick="navigator.clipboard.readText().then(t => document.getElementById('insert-comment-input').value = t)"
+                style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                📋 Paste from Clipboard
+            </button>
+            <button onclick="document.getElementById('insert-comment-input').value = ''"
+                style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
+                Clear
+            </button>
+            <span id="insert-comment-status" style="color: #888; font-size: 12px;"></span>
+        </div>
+        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Format: move number, comment text — e.g. "5, great move" attaches the comment to white's 5th move on the mainline.</p>
+    </div>
+
     <!-- All Comments Display -->
     <div id="allCommentsContainer"
          style="max-width: 1200px; margin: 10px auto; max-height: 150px; overflow-y: auto;
@@ -2603,6 +2630,81 @@
             }).finally(() => {
                 // Don't restore — analyzeForVariation already clears it on success
             });
+        }
+
+        function insertPastedComment() {
+            const inputEl = document.getElementById('insert-comment-input');
+            const statusEl = document.getElementById('insert-comment-status');
+            const text = inputEl.value.trim();
+
+            if (!text) {
+                statusEl.textContent = 'Please enter a comment in the format: move number, comment';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const commaIdx = text.indexOf(',');
+            if (commaIdx === -1) {
+                statusEl.textContent = 'Invalid format — use: move number, comment text';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const moveNumStr = text.substring(0, commaIdx).replace(/\./g, '').trim();
+            const targetMoveNumber = parseInt(moveNumStr, 10);
+            if (isNaN(targetMoveNumber) || targetMoveNumber < 1) {
+                statusEl.textContent = 'Invalid move number: ' + moveNumStr;
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const commentText = text.substring(commaIdx + 1).trim();
+            if (!commentText) {
+                statusEl.textContent = 'Comment text is empty';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            if (!window.moveTree) {
+                statusEl.textContent = 'No PGN loaded';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            // Walk mainline to find white's move at targetMoveNumber
+            let node = window.moveTree;
+            let found = null;
+            while (node) {
+                if (node.moveNumber === targetMoveNumber && !node.isBlackMove && node.san) {
+                    found = node;
+                    break;
+                }
+                node = (node.children && node.children.length > 0) ? node.children[0] : null;
+            }
+
+            if (!found) {
+                statusEl.textContent = 'Could not find white move ' + targetMoveNumber + ' on the mainline';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            found.comment = commentText;
+            updateAllCommentsDisplay();
+
+            // If user is currently viewing this node, update variantNotesDisplay
+            if (window.currentMoveNode === found) {
+                const variantNotesDisplay = document.getElementById('variantNotesDisplay');
+                if (variantNotesDisplay) {
+                    const dashes = '-----------------------------------';
+                    variantNotesDisplay.textContent = dashes + ' ' + commentText;
+                    variantNotesDisplay.style.color = '#ffd700';
+                }
+            }
+
+            statusEl.textContent = '✓ Comment added to ' + targetMoveNumber + '. ' + found.san;
+            statusEl.style.color = '#2ecc71';
+            inputEl.value = '';
+            setTimeout(() => { statusEl.textContent = ''; }, 3000);
         }
 
         function analyzePositionForVariation(fen, depth) {
