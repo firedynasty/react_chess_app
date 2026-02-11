@@ -993,6 +993,13 @@
           <input type="text" id="dropboxSearchInput" placeholder="Search folders..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e; color: white; font-size: 13px;">
           <button id="dropboxSearchBtn" style="background: #0061fe; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">Search</button>
         </div>
+        <div id="dropboxSaveRow" style="display: none; margin-bottom: 12px; padding: 10px; background: #1a2744; border-radius: 6px; border: 1px solid #0061fe;">
+          <div style="color: #0061fe; font-size: 12px; font-weight: bold; margin-bottom: 6px;">Save Report As:</div>
+          <div style="display: flex; gap: 6px;">
+            <input type="text" id="dropboxSaveInput" placeholder="filename.txt" style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e; color: white; font-size: 13px;">
+            <button id="dropboxSaveConfirmBtn" style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save</button>
+          </div>
+        </div>
         <div id="dropboxNavBar" style="display: none; margin-bottom: 10px;">
           <button id="dropboxBackBtn" style="background: none; color: #00d4ff; border: none; cursor: pointer; font-size: 13px; padding: 0;">&larr; Back to results</button>
           <div id="dropboxFolderPath" style="color: #888; font-size: 11px; margin-top: 4px; word-break: break-all;"></div>
@@ -1259,8 +1266,8 @@
             }
         }
 
-        // Save current report to Dropbox
-        async function dropboxSaveReport() {
+        // Open sidebar in save mode
+        function dropboxSaveReport() {
             if (!window.dropboxAccessToken) {
                 alert('Not signed in to Dropbox.');
                 return;
@@ -1273,23 +1280,40 @@
                 return;
             }
 
-            // Determine save path
-            let savePath = window.dropboxCurrentFilePath;
-            if (!savePath) {
-                // No Dropbox file loaded - prompt for path
-                const filenameDisplay = document.getElementById('reportFilenameDisplay');
-                let filename = 'chess_report.txt';
-                if (filenameDisplay && filenameDisplay.textContent) {
-                    filename = filenameDisplay.textContent.replace(/^📁\s*/, '').trim();
-                    if (!filename.endsWith('.txt')) filename += '.txt';
-                }
-                if (!filename || filename === '.txt') {
-                    filename = 'chess_report.txt';
-                }
-                const userPath = prompt('Enter Dropbox path to save to:', '/' + filename);
-                if (!userPath) return;
-                savePath = userPath;
+            // Pre-fill filename from current report display
+            const saveInput = document.getElementById('dropboxSaveInput');
+            const filenameDisplay = document.getElementById('reportFilenameDisplay');
+            let filename = 'chess_report.txt';
+            if (filenameDisplay && filenameDisplay.textContent) {
+                filename = filenameDisplay.textContent.replace(/^📁\s*/, '').trim();
+                if (!filename.endsWith('.txt')) filename += '.txt';
             }
+            if (!filename || filename === '.txt') filename = 'chess_report.txt';
+            saveInput.value = filename;
+
+            // Show save row and open sidebar
+            document.getElementById('dropboxSaveRow').style.display = 'block';
+            document.getElementById('dropboxSaveRow').dataset.keepOpen = '1';
+            openDropboxSidebar();
+        }
+
+        // Actually upload to Dropbox from sidebar save input
+        async function dropboxConfirmSave() {
+            const saveInput = document.getElementById('dropboxSaveInput');
+            let filename = saveInput.value.trim();
+            if (!filename) {
+                setDropboxStatus('Enter a filename to save.');
+                return;
+            }
+            if (!filename.endsWith('.txt')) filename += '.txt';
+
+            // Build full path from current folder
+            const folder = window.dropboxFolderPath || '';
+            const savePath = folder + '/' + filename;
+
+            const reportText = document.getElementById('analysisReportText');
+            const reportTextarea = document.getElementById('reportEditTextarea');
+            const content = window.isReportEditMode ? reportTextarea.value : reportText.textContent;
 
             setDropboxStatus(`Saving to ${savePath}...`);
             try {
@@ -1313,15 +1337,23 @@
                 window.dropboxCurrentFilePath = savePath;
                 setDropboxStatus(`Saved to ${savePath}`);
                 if (typeof log === 'function') log(`Saved report to Dropbox: ${savePath}`, 'success');
+                // Refresh folder listing to show the new/updated file
+                if (window.dropboxFolderPath) {
+                    await dropboxLoadFolder(window.dropboxFolderPath);
+                }
             } catch (err) {
                 setDropboxStatus('Save error: ' + err.message);
-                alert('Dropbox save failed: ' + err.message);
             }
         }
 
         // Sidebar helpers
         function openDropboxSidebar() {
             document.getElementById('dropboxSidebar').style.display = 'block';
+            // Hide save row unless explicitly shown by dropboxSaveReport()
+            if (!document.getElementById('dropboxSaveRow').dataset.keepOpen) {
+                document.getElementById('dropboxSaveRow').style.display = 'none';
+            }
+            delete document.getElementById('dropboxSaveRow').dataset.keepOpen;
             // Show current folder or root
             if (window.dropboxFolderPath) {
                 renderDropboxSidebar(window.dropboxFolderFiles, true);
@@ -1406,6 +1438,10 @@
             document.getElementById('dbLogoutBtn').addEventListener('click', dropboxSignOut);
             document.getElementById('dbSaveBtn').addEventListener('click', dropboxSaveReport);
             document.getElementById('closeDropboxSidebar').addEventListener('click', closeDropboxSidebar);
+            document.getElementById('dropboxSaveConfirmBtn').addEventListener('click', dropboxConfirmSave);
+            document.getElementById('dropboxSaveInput').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') dropboxConfirmSave();
+            });
 
             document.getElementById('dropboxSearchBtn').addEventListener('click', function() {
                 const query = document.getElementById('dropboxSearchInput').value;
