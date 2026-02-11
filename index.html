@@ -1364,11 +1364,20 @@
                 div.onmouseleave = () => div.style.background = '';
                 const icon = document.createElement('span');
                 icon.textContent = item.isFolder ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
-                const name = document.createElement('span');
+                const textWrap = document.createElement('div');
+                textWrap.style.cssText = 'overflow: hidden; min-width: 0;';
+                const name = document.createElement('div');
                 name.textContent = item.name;
                 name.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                textWrap.appendChild(name);
+                if (item.isFolder && !isFolder) {
+                    const pathLine = document.createElement('div');
+                    pathLine.textContent = item.path;
+                    pathLine.style.cssText = 'font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                    textWrap.appendChild(pathLine);
+                }
                 div.appendChild(icon);
-                div.appendChild(name);
+                div.appendChild(textWrap);
 
                 div.addEventListener('click', () => {
                     if (item.isFolder) {
