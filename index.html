@@ -990,7 +990,7 @@
           <button id="closeDropboxSidebar" style="background: #dc3545; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;">&times;</button>
         </div>
         <div style="display: flex; gap: 6px; margin-bottom: 12px;">
-          <input type="text" id="dropboxSearchInput" placeholder="Search files..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e; color: white; font-size: 13px;">
+          <input type="text" id="dropboxSearchInput" placeholder="Search folders..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e; color: white; font-size: 13px;">
           <button id="dropboxSearchBtn" style="background: #0061fe; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">Search</button>
         </div>
         <div id="dropboxNavBar" style="display: none; margin-bottom: 10px;">
@@ -1173,22 +1173,30 @@
                         Authorization: `Bearer ${window.dropboxAccessToken}`,
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ query, options: { max_results: 20 } }),
+                    body: JSON.stringify({
+                        query,
+                        options: {
+                            max_results: 20,
+                            file_categories: [{ '.tag': 'folder' }],
+                        },
+                    }),
                 });
                 if (!res.ok) throw new Error('Search failed');
                 const data = await res.json();
-                const matches = (data.matches || []).map(m => {
-                    const meta = m.metadata?.metadata || m.metadata;
-                    return {
-                        name: meta.name,
-                        path: meta.path_lower || meta.path_display,
-                        isFolder: meta['.tag'] === 'folder',
-                    };
-                });
+                const matches = (data.matches || [])
+                    .map(m => {
+                        const meta = m.metadata?.metadata || m.metadata;
+                        return {
+                            name: meta.name,
+                            path: meta.path_lower || meta.path_display,
+                            isFolder: meta['.tag'] === 'folder',
+                        };
+                    })
+                    .filter(m => m.isFolder);
                 window.dropboxSearchResults = matches;
                 window.dropboxFolderPath = '';
                 window.dropboxFolderFiles = [];
-                setDropboxStatus(`Found ${matches.length} results`);
+                setDropboxStatus(`Found ${matches.length} folders`);
                 renderDropboxSidebar(matches, false);
             } catch (err) {
                 setDropboxStatus('Error: ' + err.message);
