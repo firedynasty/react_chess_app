@@ -736,6 +736,7 @@
                     <button id="loadFenVariantFromHighlight" style="display: none; background: #6f42c1; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Load [Fen Variant] from Highlight</button>
                     <button id="copyReportText" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Copy Text</button>
                     <button id="saveReportBtn" style="background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">💾 Save Report</button>
+                    <button id="dbSaveBtn" style="display: none; background: #0061fe; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">💾 DB Save</button>
                     <button id="editViewToggleBtn" style="background: #9c27b0; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Edit</button>
                 </div>
             </div>
@@ -745,6 +746,9 @@
     <!-- Report Loading Controls (horizontal layout) -->
     <div id="reportControls" style="margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Load Analysis Report (from clipboard)</button>
+      <button id="dbLoginBtn" style="background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">DB Login</button>
+      <button id="dbFilesBtn" style="display: none; background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">DB Files</button>
+      <button id="dbLogoutBtn" style="display: none; background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">DB Logout</button>
       <button id="selectReportFolder" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('reportFolderInput').click()">📂 Select Reports Folder</button>
       <input type="file" id="reportFolderInput" accept=".txt" webkitdirectory style="display: none;">
       <button id="loadPreloadedReports" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Preloaded Reports</button>
@@ -978,6 +982,26 @@
       </div>
     </div>
 
+    <!-- Dropbox File Browser Sidebar -->
+    <div id="dropboxSidebar" style="display: none; position: fixed; top: 0; right: 0; width: 380px; height: 100%; background: #0d1b2a; border-left: 2px solid #0061fe; z-index: 1001; box-shadow: -4px 0 20px rgba(0,0,0,0.5); overflow-y: auto;">
+      <div style="padding: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="margin: 0; color: #0061fe; font-size: 16px;">Dropbox Files</h3>
+          <button id="closeDropboxSidebar" style="background: #dc3545; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;">&times;</button>
+        </div>
+        <div style="display: flex; gap: 6px; margin-bottom: 12px;">
+          <input type="text" id="dropboxSearchInput" placeholder="Search files..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e; color: white; font-size: 13px;">
+          <button id="dropboxSearchBtn" style="background: #0061fe; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">Search</button>
+        </div>
+        <div id="dropboxNavBar" style="display: none; margin-bottom: 10px;">
+          <button id="dropboxBackBtn" style="background: none; color: #00d4ff; border: none; cursor: pointer; font-size: 13px; padding: 0;">&larr; Back to results</button>
+          <div id="dropboxFolderPath" style="color: #888; font-size: 11px; margin-top: 4px; word-break: break-all;"></div>
+        </div>
+        <div id="dropboxStatus" style="color: #51cf66; font-size: 12px; margin-bottom: 8px;"></div>
+        <div id="dropboxFileList" style="color: #eee;"></div>
+      </div>
+    </div>
+
     <!-- Report Files Modal -->
     <div id="reportFilesModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
       <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #16213e; padding: 20px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80%; overflow-y: auto;">
@@ -999,6 +1023,403 @@
     <script src="analysis_chess.js"></script>
 
     <script>
+        // =====================================================================
+        // DROPBOX INTEGRATION (OAuth PKCE + File Operations)
+        // =====================================================================
+
+        window.dropboxAccessToken = null;
+        window.dropboxAppKey = null;
+        window.dropboxCurrentFilePath = null;
+        window.dropboxFolderPath = '';
+        window.dropboxFolderFiles = [];
+        window.dropboxSearchResults = [];
+
+        // PKCE helpers
+        function generateCodeVerifier() {
+            const array = new Uint8Array(64);
+            crypto.getRandomValues(array);
+            return btoa(String.fromCharCode(...array))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        }
+
+        async function generateCodeChallenge(verifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(verifier);
+            const digest = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/\+/g, '-')
+                .replace(/\//g, '_')
+                .replace(/=+$/, '');
+        }
+
+        // Fetch APP_KEY from serverless endpoint
+        async function dropboxFetchAppKey() {
+            if (window.dropboxAppKey) return window.dropboxAppKey;
+            try {
+                const res = await fetch('/api/dropbox-config');
+                const data = await res.json();
+                if (data.appKey) {
+                    window.dropboxAppKey = data.appKey;
+                    return data.appKey;
+                }
+                throw new Error(data.error || 'No app key returned');
+            } catch (err) {
+                alert('Failed to fetch Dropbox config: ' + err.message);
+                return null;
+            }
+        }
+
+        // Initiate OAuth PKCE redirect
+        async function dropboxSignIn() {
+            const appKey = await dropboxFetchAppKey();
+            if (!appKey) return;
+            const verifier = generateCodeVerifier();
+            const challenge = await generateCodeChallenge(verifier);
+            sessionStorage.setItem('dropbox_code_verifier', verifier);
+            const redirectUri = window.location.origin + window.location.pathname;
+            const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&redirect_uri=${encodeURIComponent(redirectUri)}&token_access_type=online`;
+            window.location.href = authUrl;
+        }
+
+        // Handle OAuth redirect on page load
+        async function handleDropboxOAuthRedirect() {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            if (!code) return;
+
+            const verifier = sessionStorage.getItem('dropbox_code_verifier');
+            if (!verifier) return;
+
+            const appKey = await dropboxFetchAppKey();
+            if (!appKey) return;
+
+            const redirectUri = window.location.origin + window.location.pathname;
+            const body = new URLSearchParams({
+                code,
+                grant_type: 'authorization_code',
+                client_id: appKey,
+                redirect_uri: redirectUri,
+                code_verifier: verifier,
+            });
+
+            try {
+                const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                });
+                const data = await res.json();
+                if (data.access_token) {
+                    window.dropboxAccessToken = data.access_token;
+                    sessionStorage.removeItem('dropbox_code_verifier');
+                    window.history.replaceState({}, document.title, redirectUri);
+                    updateDropboxButtons();
+                } else {
+                    console.error('Dropbox auth failed:', data.error_description || data.error);
+                }
+            } catch (err) {
+                console.error('Dropbox auth error:', err.message);
+            }
+        }
+
+        // Sign out
+        async function dropboxSignOut() {
+            if (window.dropboxAccessToken) {
+                try {
+                    await fetch('https://api.dropboxapi.com/2/auth/token/revoke', {
+                        method: 'POST',
+                        headers: { Authorization: `Bearer ${window.dropboxAccessToken}` },
+                    });
+                } catch { /* ignore */ }
+            }
+            window.dropboxAccessToken = null;
+            window.dropboxCurrentFilePath = null;
+            window.dropboxFolderPath = '';
+            window.dropboxFolderFiles = [];
+            window.dropboxSearchResults = [];
+            updateDropboxButtons();
+            closeDropboxSidebar();
+        }
+
+        // Update button visibility based on login state
+        function updateDropboxButtons() {
+            const loginBtn = document.getElementById('dbLoginBtn');
+            const filesBtn = document.getElementById('dbFilesBtn');
+            const logoutBtn = document.getElementById('dbLogoutBtn');
+            const saveBtn = document.getElementById('dbSaveBtn');
+            if (window.dropboxAccessToken) {
+                loginBtn.style.display = 'none';
+                filesBtn.style.display = '';
+                logoutBtn.style.display = '';
+                saveBtn.style.display = '';
+            } else {
+                loginBtn.style.display = '';
+                filesBtn.style.display = 'none';
+                logoutBtn.style.display = 'none';
+                saveBtn.style.display = 'none';
+            }
+        }
+
+        // Search files
+        async function dropboxSearch(query) {
+            if (!query.trim() || !window.dropboxAccessToken) return;
+            setDropboxStatus('Searching...');
+            try {
+                const res = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${window.dropboxAccessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query, options: { max_results: 20 } }),
+                });
+                if (!res.ok) throw new Error('Search failed');
+                const data = await res.json();
+                const matches = (data.matches || []).map(m => {
+                    const meta = m.metadata?.metadata || m.metadata;
+                    return {
+                        name: meta.name,
+                        path: meta.path_lower || meta.path_display,
+                        isFolder: meta['.tag'] === 'folder',
+                    };
+                });
+                window.dropboxSearchResults = matches;
+                window.dropboxFolderPath = '';
+                window.dropboxFolderFiles = [];
+                setDropboxStatus(`Found ${matches.length} results`);
+                renderDropboxSidebar(matches, false);
+            } catch (err) {
+                setDropboxStatus('Error: ' + err.message);
+            }
+        }
+
+        // List folder contents
+        async function dropboxLoadFolder(path) {
+            if (!window.dropboxAccessToken) return;
+            setDropboxStatus('Loading folder...');
+            try {
+                const res = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${window.dropboxAccessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ path }),
+                });
+                if (!res.ok) throw new Error('Failed to list folder');
+                const data = await res.json();
+                const entries = (data.entries || []).map(entry => ({
+                    name: entry.name,
+                    path: entry.path_lower || entry.path_display,
+                    isFolder: entry['.tag'] === 'folder',
+                }));
+                entries.sort((a, b) => {
+                    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+                    return a.name.localeCompare(b.name);
+                });
+                window.dropboxFolderPath = path;
+                window.dropboxFolderFiles = entries;
+                setDropboxStatus(`${entries.length} items in ${path}`);
+                renderDropboxSidebar(entries, true);
+            } catch (err) {
+                setDropboxStatus('Error: ' + err.message);
+            }
+        }
+
+        // Download and load a file
+        async function dropboxLoadFile(path, fileName) {
+            if (!window.dropboxAccessToken) return;
+            setDropboxStatus(`Loading ${fileName}...`);
+            try {
+                const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${window.dropboxAccessToken}`,
+                        'Dropbox-API-Arg': JSON.stringify({ path }),
+                    },
+                });
+                if (!res.ok) throw new Error('Download failed');
+                const content = await res.text();
+                window.dropboxCurrentFilePath = path;
+                loadStudyReportFromContent(content, fileName);
+                setDropboxStatus(`Loaded ${fileName}`);
+                closeDropboxSidebar();
+            } catch (err) {
+                setDropboxStatus('Error: ' + err.message);
+            }
+        }
+
+        // Save current report to Dropbox
+        async function dropboxSaveReport() {
+            if (!window.dropboxAccessToken) {
+                alert('Not signed in to Dropbox.');
+                return;
+            }
+            const reportText = document.getElementById('analysisReportText');
+            const reportTextarea = document.getElementById('reportEditTextarea');
+            const content = window.isReportEditMode ? reportTextarea.value : reportText.textContent;
+            if (!content || !content.trim() || content === 'Loading report...') {
+                alert('No report content to save.');
+                return;
+            }
+
+            // Determine save path
+            let savePath = window.dropboxCurrentFilePath;
+            if (!savePath) {
+                // No Dropbox file loaded - prompt for path
+                const filenameDisplay = document.getElementById('reportFilenameDisplay');
+                let filename = 'chess_report.txt';
+                if (filenameDisplay && filenameDisplay.textContent) {
+                    filename = filenameDisplay.textContent.replace(/^📁\s*/, '').trim();
+                    if (!filename.endsWith('.txt')) filename += '.txt';
+                }
+                if (!filename || filename === '.txt') {
+                    filename = 'chess_report.txt';
+                }
+                const userPath = prompt('Enter Dropbox path to save to:', '/' + filename);
+                if (!userPath) return;
+                savePath = userPath;
+            }
+
+            setDropboxStatus(`Saving to ${savePath}...`);
+            try {
+                const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${window.dropboxAccessToken}`,
+                        'Dropbox-API-Arg': JSON.stringify({
+                            path: savePath,
+                            mode: 'overwrite',
+                            mute: true,
+                        }),
+                        'Content-Type': 'application/octet-stream',
+                    },
+                    body: content,
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    throw new Error(errData.error_summary || `HTTP ${res.status}`);
+                }
+                window.dropboxCurrentFilePath = savePath;
+                setDropboxStatus(`Saved to ${savePath}`);
+                if (typeof log === 'function') log(`Saved report to Dropbox: ${savePath}`, 'success');
+            } catch (err) {
+                setDropboxStatus('Save error: ' + err.message);
+                alert('Dropbox save failed: ' + err.message);
+            }
+        }
+
+        // Sidebar helpers
+        function openDropboxSidebar() {
+            document.getElementById('dropboxSidebar').style.display = 'block';
+            // Show current folder or root
+            if (window.dropboxFolderPath) {
+                renderDropboxSidebar(window.dropboxFolderFiles, true);
+            } else if (window.dropboxSearchResults.length > 0) {
+                renderDropboxSidebar(window.dropboxSearchResults, false);
+            } else {
+                // Load root folder by default
+                dropboxLoadFolder('');
+            }
+        }
+
+        function closeDropboxSidebar() {
+            document.getElementById('dropboxSidebar').style.display = 'none';
+        }
+
+        function setDropboxStatus(msg) {
+            const el = document.getElementById('dropboxStatus');
+            if (el) el.textContent = msg;
+        }
+
+        function renderDropboxSidebar(items, isFolder) {
+            const list = document.getElementById('dropboxFileList');
+            const navBar = document.getElementById('dropboxNavBar');
+            const folderPathEl = document.getElementById('dropboxFolderPath');
+
+            // Show/hide navigation
+            if (isFolder && window.dropboxFolderPath) {
+                navBar.style.display = 'block';
+                folderPathEl.textContent = window.dropboxFolderPath;
+            } else {
+                navBar.style.display = 'none';
+                folderPathEl.textContent = '';
+            }
+
+            list.innerHTML = '';
+            items.forEach(item => {
+                const div = document.createElement('div');
+                div.style.cssText = 'padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #1a1a2e; display: flex; align-items: center; gap: 8px; font-size: 13px;';
+                div.onmouseenter = () => div.style.background = '#16213e';
+                div.onmouseleave = () => div.style.background = '';
+                const icon = document.createElement('span');
+                icon.textContent = item.isFolder ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+                const name = document.createElement('span');
+                name.textContent = item.name;
+                name.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                div.appendChild(icon);
+                div.appendChild(name);
+
+                div.addEventListener('click', () => {
+                    if (item.isFolder) {
+                        dropboxLoadFolder(item.path);
+                    } else if (item.name.endsWith('.txt')) {
+                        dropboxLoadFile(item.path, item.name);
+                    } else {
+                        setDropboxStatus(`Cannot open "${item.name}" — only .txt files supported`);
+                    }
+                });
+                list.appendChild(div);
+            });
+
+            if (items.length === 0) {
+                list.innerHTML = '<div style="color: #888; padding: 10px; font-size: 13px;">No items found</div>';
+            }
+        }
+
+        // Wire up Dropbox buttons on DOM ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle OAuth redirect if returning from Dropbox
+            handleDropboxOAuthRedirect();
+
+            document.getElementById('dbLoginBtn').addEventListener('click', dropboxSignIn);
+            document.getElementById('dbFilesBtn').addEventListener('click', openDropboxSidebar);
+            document.getElementById('dbLogoutBtn').addEventListener('click', dropboxSignOut);
+            document.getElementById('dbSaveBtn').addEventListener('click', dropboxSaveReport);
+            document.getElementById('closeDropboxSidebar').addEventListener('click', closeDropboxSidebar);
+
+            document.getElementById('dropboxSearchBtn').addEventListener('click', function() {
+                const query = document.getElementById('dropboxSearchInput').value;
+                dropboxSearch(query);
+            });
+            document.getElementById('dropboxSearchInput').addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    dropboxSearch(this.value);
+                }
+            });
+            document.getElementById('dropboxBackBtn').addEventListener('click', function() {
+                // Go up one folder level, or back to search results
+                if (window.dropboxFolderPath) {
+                    const parentPath = window.dropboxFolderPath.substring(0, window.dropboxFolderPath.lastIndexOf('/'));
+                    if (parentPath) {
+                        dropboxLoadFolder(parentPath);
+                    } else {
+                        // At root level, show search results
+                        window.dropboxFolderPath = '';
+                        window.dropboxFolderFiles = [];
+                        if (window.dropboxSearchResults.length > 0) {
+                            renderDropboxSidebar(window.dropboxSearchResults, false);
+                            setDropboxStatus(`${window.dropboxSearchResults.length} search results`);
+                        } else {
+                            dropboxLoadFolder('');
+                        }
+                    }
+                }
+            });
+        });
+
         // =====================================================================
         // STOCKFISH.JS CLIENT-SIDE ENGINE
         // =====================================================================
