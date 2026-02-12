@@ -743,6 +743,33 @@
         </div>
     </div>
 
+    <!-- Paste into Report -->
+    <div id="paste-into-report-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+        <div style="margin-bottom: 10px;">
+            <span style="color: #e91e63; font-weight: bold; font-size: 14px;">📝 Paste into Report</span>
+            <span style="color: #888; font-size: 12px; margin-left: 10px;">(Paste text directly into the analysis report without entering Edit mode)</span>
+        </div>
+        <textarea id="paste-into-report-input" rows="2"
+            placeholder="Paste your analysis report text here..."
+            style="width: 100%; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; box-sizing: border-box; overflow-y: auto; resize: vertical;"></textarea>
+        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <button onclick="pasteIntoReport('append')"
+                style="padding: 8px 15px; background: #9c27b0; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                Append to Report
+            </button>
+            <button onclick="navigator.clipboard.readText().then(t => document.getElementById('paste-into-report-input').value = t)"
+                style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                📋 Paste from Clipboard
+            </button>
+            <button onclick="document.getElementById('paste-into-report-input').value = ''"
+                style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
+                Clear
+            </button>
+            <span id="paste-into-report-status" style="color: #888; font-size: 12px;"></span>
+        </div>
+        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Appends pasted text to the end of the current report and updates variants automatically.</p>
+    </div>
+
     <!-- Report Loading Controls (horizontal layout) -->
     <div id="reportControls" style="margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
       <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Load Analysis Report (from clipboard)</button>
@@ -3145,6 +3172,41 @@
             }).finally(() => {
                 // Don't restore — analyzeForVariation already clears it on success
             });
+        }
+
+        function pasteIntoReport(mode) {
+            const inputEl = document.getElementById('paste-into-report-input');
+            const statusEl = document.getElementById('paste-into-report-status');
+            const text = inputEl.value.trim();
+
+            if (!text) {
+                statusEl.textContent = 'Nothing to paste.';
+                statusEl.style.color = '#e74c3c';
+                return;
+            }
+
+            const reportDiv = document.getElementById('analysisReportText');
+            const textarea = document.getElementById('reportEditTextarea');
+
+            if (mode === 'append') {
+                const current = reportDiv.textContent || '';
+                const newContent = current + '\n' + text;
+                reportDiv.textContent = newContent;
+                window.analysisReportRawText = newContent;
+            }
+
+            // If in edit mode, sync the textarea too
+            if (window.isReportEditMode && textarea) {
+                textarea.value = reportDiv.textContent;
+            }
+
+            // Show the report container if hidden
+            const reportContainer = document.getElementById('analysisReportContainer');
+            if (reportContainer) reportContainer.style.display = 'block';
+
+            statusEl.textContent = 'Appended to report.';
+            statusEl.style.color = '#2ecc71';
+            inputEl.value = '';
         }
 
         function insertPastedComment() {
