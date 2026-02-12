@@ -4841,14 +4841,29 @@
 
             if (comments.length === 0) {
                 container.style.display = 'none';
+                // Also remove inline comments from moveTableContainer
+                const existingInline = document.getElementById('moveTableCommentsContainer');
+                if (existingInline) existingInline.remove();
                 return;
             }
 
-            container.style.display = 'block';
+            // Keep original allCommentsContainer hidden; comments shown inline in moveTableContainer
+            container.style.display = 'none';
 
             // Get current node ID for highlighting
             const currentNodeId = window.currentMoveNode ? window.currentMoveNode.nodeId : null;
             const currentFlatIndex = window.studyReportPositionIndex;
+
+            // Also build an inline comments section inside moveTableContainer
+            const moveTableEl = document.getElementById('moveTableContainer');
+            let inlineContainer = document.getElementById('moveTableCommentsContainer');
+            if (moveTableEl) {
+                if (inlineContainer) inlineContainer.remove();
+                inlineContainer = document.createElement('div');
+                inlineContainer.id = 'moveTableCommentsContainer';
+                inlineContainer.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid #1a1a2e; font-size: 12px; line-height: 1.6;';
+                moveTableEl.appendChild(inlineContainer);
+            }
 
             comments.forEach((c, idx) => {
                 const commentDiv = document.createElement('div');
@@ -4897,6 +4912,40 @@
                 }
 
                 container.appendChild(commentDiv);
+
+                // Also append an inline entry to the moveTable comments container
+                if (inlineContainer) {
+                    // Add comma separator between entries
+                    if (idx > 0) {
+                        const sep = document.createElement('span');
+                        sep.style.color = '#555';
+                        sep.textContent = ', ';
+                        inlineContainer.appendChild(sep);
+                    }
+                    const inlineEntry = document.createElement('span');
+                    inlineEntry.style.cursor = 'pointer';
+                    inlineEntry.style.padding = '2px 4px';
+                    inlineEntry.style.borderRadius = '3px';
+                    if (isCurrent) {
+                        inlineEntry.style.background = '#0f3460';
+                    }
+                    const inlineLabel = document.createElement('span');
+                    const inlineAnnotationColor = getAnnotationColor(c.annotation);
+                    inlineLabel.style.color = inlineAnnotationColor || (c.isMainLine ? '#00d4ff' : '#888');
+                    inlineLabel.style.fontWeight = 'bold';
+                    inlineLabel.textContent = '{' + moveLabel.trim() + '} ';
+                    const inlineComment = document.createElement('span');
+                    inlineComment.style.color = '#ffd700';
+                    inlineComment.textContent = c.comment;
+                    inlineEntry.appendChild(inlineLabel);
+                    inlineEntry.appendChild(inlineComment);
+                    if (c.nodeId) {
+                        inlineEntry.onclick = function() {
+                            jumpToNode(c.nodeId);
+                        };
+                    }
+                    inlineContainer.appendChild(inlineEntry);
+                }
 
                 // Scroll current into view
                 if (isCurrent) {
