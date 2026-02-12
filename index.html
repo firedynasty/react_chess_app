@@ -1199,6 +1199,12 @@
         // Search files
         async function dropboxSearch(query) {
             if (!query.trim() || !window.dropboxAccessToken) return;
+            const q = query.trim();
+            if (q.startsWith('/')) {
+                // Direct path navigation — open the folder directly
+                dropboxLoadFolder(q.replace(/\/+$/, '') || '');
+                return;
+            }
             setDropboxStatus('Searching...');
             try {
                 const res = await fetch('https://api.dropboxapi.com/2/files/search_v2', {
