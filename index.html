@@ -4827,6 +4827,75 @@
         }
 
         /**
+         * Get context for the currently selected move for AI coaching.
+         * Returns an object with move details, variations, and annotated PGN.
+         */
+        window.getMoveContext = function() {
+            const node = window.currentMoveNode;
+            if (!node || !node.san) return null;
+
+            const moveLabel = node.isBlackMove
+                ? `${node.moveNumber}...${node.san}`
+                : `${node.moveNumber}. ${node.san}`;
+
+            // Get FEN before this move (parent's position)
+            const fenBefore = node.parent ? node.parent.fen : null;
+            const fenAfter = node.fen;
+
+            // Get variations (sibling lines from the same parent)
+            const variations = [];
+            if (node.parent && node.parent.children.length > 1) {
+                const myIndex = node.parent.children.indexOf(node);
+                for (let v = 0; v < node.parent.children.length; v++) {
+                    if (v === myIndex) continue;
+                    const varNode = node.parent.children[v];
+                    // Serialize the variation line
+                    const varMoves = [];
+                    let n = varNode;
+                    while (n) {
+                        const label = n.isBlackMove
+                            ? (varMoves.length === 0 ? `${n.moveNumber}...` : '')
+                            : `${n.moveNumber}.`;
+                        varMoves.push(`${label} ${n.san}${n.annotation || ''}`);
+                        n = (n.children && n.children.length > 0) ? n.children[0] : null;
+                    }
+                    variations.push(varMoves.join(' ').replace(/\s+/g, ' ').trim());
+                }
+            }
+
+            // Get the main line continuation (what actually happened next)
+            const mainContinuation = [];
+            let next = (node.children && node.children.length > 0) ? node.children[0] : null;
+            let count = 0;
+            while (next && count < 6) {
+                const label = next.isBlackMove
+                    ? (count === 0 ? `${next.moveNumber}...` : '')
+                    : `${next.moveNumber}.`;
+                mainContinuation.push(`${label} ${next.san}${next.annotation || ''}`);
+                next = (next.children && next.children.length > 0) ? next.children[0] : null;
+                count++;
+            }
+
+            // Get annotated PGN from move tree
+            const annotatedPgn = window.moveTree ? moveTreeToPgn(window.moveTree) : null;
+
+            return {
+                move: moveLabel,
+                san: node.san,
+                annotation: node.annotation || '',
+                comment: node.comment || '',
+                fenBefore: fenBefore,
+                fenAfter: fenAfter,
+                moveNumber: node.moveNumber,
+                isBlackMove: node.isBlackMove,
+                isVariation: node.depth > 0,
+                variations: variations,
+                mainContinuation: mainContinuation.join(' ').replace(/\s+/g, ' ').trim(),
+                annotatedPgn: annotatedPgn
+            };
+        };
+
+        /**
          * Update the all comments display panel
          */
         function updateAllCommentsDisplay() {
@@ -7733,7 +7802,87 @@ ${contentToAnalyze}`;
                 }
             };
 
-            // Send message
+            // Analyze the currently selected move with coaching context
+            const analyzeCurrentMove = async () => {
+                const ctx = window.getMoveContext ? window.getMoveContext() : null;
+                if (!ctx) {
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: '**No move selected.** Click on a move in the move table above, then click this button to get coaching on that specific position.'
+                    }]);
+                    return;
+                }
+
+                // Check API key
+                const needsApiKey = !(aiProvider === 'ChatGPT' && useSharedKey);
+                if (needsApiKey && !apiKey) {
+                    alert(`Please enter your ${aiProvider === 'ChatGPT' ? 'OpenAI' : 'Anthropic'} API key`);
+                    return;
+                }
+
+                // Build the query
+                let query = `Analyze this specific move: **${ctx.move}${ctx.annotation}**\n`;
+                query += `Position before (FEN): ${ctx.fenBefore}\n`;
+                query += `Position after (FEN): ${ctx.fenAfter}\n`;
+
+                if (ctx.comment) {
+                    query += `\nMy note on this move: "${ctx.comment}"\n`;
+                }
+
+                if (ctx.annotation) {
+                    const labels = { '??': 'blunder', '?': 'mistake', '?!': 'dubious', '!': 'good move', '!!': 'brilliant' };
+                    query += `This move was marked as a ${labels[ctx.annotation] || ctx.annotation}.\n`;
+                }
+
+                if (ctx.variations.length > 0) {
+                    query += `\nAlternative variation(s) to compare:\n`;
+                    ctx.variations.forEach((v, i) => {
+                        query += `  Variation ${i + 1}: ${v}\n`;
+                    });
+                    query += `\nCompare the game move with the variation(s). Why is one line better? What does each accomplish strategically?\n`;
+                }
+
+                if (ctx.mainContinuation) {
+                    query += `\nThe game continued: ${ctx.mainContinuation}\n`;
+                }
+
+                query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
+                query += `\nPlease analyze this move in depth. Reference chess principles from your knowledge base. If there are variations, compare them and explain the strategic differences.`;
+
+                // Show user message in chat
+                const displayMsg = ctx.variations.length > 0
+                    ? `Analyze ${ctx.move}${ctx.annotation} and compare with variation(s)...`
+                    : `Analyze ${ctx.move}${ctx.annotation}...`;
+
+                setIsLoading(true);
+                setMessages(prev => [...prev, { role: 'user', content: displayMsg }]);
+
+                try {
+                    const response = await fetch('/api/rag-chess', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            query,
+                            provider: aiProvider === 'ChatGPT' ? 'openai' : 'anthropic',
+                            model: selectedModel,
+                            apiKey: apiKey || undefined,
+                            accessCode: useSharedKey ? accessCode : undefined,
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error);
+
+                    setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
+                    setChatEnabled(true);
+                } catch (err) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Send message — routes through /api/rag-chess so knowledge base stays in context
             const sendMessage = async () => {
                 const needsApiKey = !(aiProvider === 'ChatGPT' && useSharedKey);
                 if (!inputValue.trim()) return;
@@ -7749,110 +7898,24 @@ ${contentToAnalyze}`;
                 setIsLoading(true);
 
                 try {
-                    let assistantMessage;
+                    const chatMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
 
-                    if (aiProvider === 'ChatGPT') {
-                        const openaiMessages = newMessages.map(m => ({ role: m.role, content: m.content }));
-                        const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                    const response = await fetch('/api/rag-chess', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            messages: chatMessages,
+                            provider: aiProvider === 'ChatGPT' ? 'openai' : 'anthropic',
+                            model: selectedModel,
+                            apiKey: apiKey || undefined,
+                            accessCode: useSharedKey ? accessCode : undefined,
+                        })
+                    });
 
-                        if (isLocalhost && !useSharedKey) {
-                            // Local development: call OpenAI directly
-                            const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${apiKey}`,
-                                },
-                                body: JSON.stringify({
-                                    model: selectedModel,
-                                    max_tokens: 4096,
-                                    messages: openaiMessages,
-                                }),
-                            });
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error);
 
-                            if (!response.ok) {
-                                const errorData = await response.json();
-                                throw new Error(errorData.error?.message || 'API request failed');
-                            }
-
-                            const data = await response.json();
-                            assistantMessage = {
-                                role: 'assistant',
-                                content: data.choices[0].message.content,
-                            };
-                        } else {
-                            // Production (Vercel): use backend API
-                            console.log('Calling /api/chat with:', { useSharedKey, hasAccessCode: !!accessCode, model: selectedModel });
-                            const response = await fetch('/api/chat', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    messages: openaiMessages,
-                                    model: selectedModel,
-                                    userApiKey: useSharedKey ? null : apiKey,
-                                    accessCode: useSharedKey ? accessCode : null,
-                                }),
-                            });
-
-                            console.log('Response status:', response.status);
-                            const responseText = await response.text();
-                            console.log('Response text:', responseText);
-
-                            if (!response.ok) {
-                                let errorMsg = 'API request failed';
-                                // Check if running locally without Vercel API
-                                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                                if (isLocalhost && (response.status === 404 || responseText.includes('File not found'))) {
-                                    errorMsg = "Stanley's shared key requires Vercel deployment. Use your own API key for local testing, or deploy to Vercel.";
-                                } else {
-                                    try {
-                                        const errorData = JSON.parse(responseText);
-                                        errorMsg = errorData.error || errorMsg;
-                                    } catch (e) {
-                                        errorMsg = responseText || `HTTP ${response.status}`;
-                                    }
-                                }
-                                throw new Error(errorMsg);
-                            }
-
-                            const data = JSON.parse(responseText);
-                            assistantMessage = {
-                                role: 'assistant',
-                                content: data.content,
-                            };
-                        }
-                    } else {
-                        // Anthropic API call
-                        const response = await fetch('https://api.anthropic.com/v1/messages', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'x-api-key': apiKey,
-                                'anthropic-version': '2023-06-01',
-                                'anthropic-dangerous-direct-browser-access': 'true',
-                            },
-                            body: JSON.stringify({
-                                model: selectedModel,
-                                max_tokens: 4096,
-                                messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-                            }),
-                        });
-
-                        if (!response.ok) {
-                            const errorData = await response.json();
-                            throw new Error(errorData.error?.message || 'API request failed');
-                        }
-
-                        const data = await response.json();
-                        assistantMessage = {
-                            role: 'assistant',
-                            content: data.content[0].text,
-                        };
-                    }
-
-                    setMessages([...newMessages, assistantMessage]);
+                    setMessages([...newMessages, { role: 'assistant', content: data.content }]);
                 } catch (error) {
                     console.error('Error:', error);
                     setMessages([...newMessages, {
@@ -8062,13 +8125,22 @@ ${contentToAnalyze}`;
                             ))}
                         </select>
 
-                        {/* Analyze with Chess Coach (RAG-powered) */}
+                        {/* Analyze full game with Chess Coach */}
                         <button
                             onClick={analyzeWithChessCoach}
                             disabled={isLoading}
                             style={{ ...styles.button, background: '#9c27b0', color: 'white', opacity: isLoading ? 0.6 : 1 }}
                         >
                             🤖 Analyze with Chess Coach
+                        </button>
+
+                        {/* Analyze current move */}
+                        <button
+                            onClick={analyzeCurrentMove}
+                            disabled={isLoading}
+                            style={{ ...styles.button, background: '#e91e63', color: 'white', opacity: isLoading ? 0.6 : 1 }}
+                        >
+                            🎯 Ask Coach About Move
                         </button>
 
                         {/* Copy Chat */}
@@ -8094,7 +8166,8 @@ ${contentToAnalyze}`;
                             <div style={styles.emptyState}>
                                 <p>Get AI-powered chess coaching!</p>
                                 <p style={{ fontSize: '13px' }}>
-                                    Click "🤖 Analyze with Chess Coach" to analyze your game with chess principles from the knowledge base.
+                                    🤖 <strong>Analyze with Chess Coach</strong> — analyze your full game with chess principles.<br/>
+                                    🎯 <strong>Ask Coach About Move</strong> — click a move in the table above, then ask about that specific position and its variations.
                                 </p>
                             </div>
                         ) : (

@@ -878,6 +878,58 @@ Timing pawn breaks:
 3. Consider opponent's counter-break
 4. Sometimes delay is best
 
+### Preparing and Supporting Central Pawn Pushes
+Central pawn breaks (d4-d5 or e4-e5) are among the most powerful middlegame ideas, but they require proper preparation.
+
+Before pushing, ask yourself:
+1. Is my queen supporting the push or the resulting square?
+2. Are my bishops aligned with the new diagonals that will open?
+3. Can my rooks use the files that will open?
+4. Will my opponent's king become exposed?
+
+The d4-d5 push pattern (White):
+- Best when bishop is on c4, b5, or f3 (controlling d5 or beyond)
+- Queen on d1, e2, f3, or c2 supports the advance
+- Rook on d1 ready to use the d-file
+- Black's pieces are passive or misplaced
+- d5 attacks e6 pawn, creating threats
+
+Example preparation for d5:
+1. Place queen on f3 (controls d5, supports d-file)
+2. Rook on c1 or d1 (ready for open file)
+3. Bishop active on diagonal (b5, c6, or f3)
+4. Play d5! with tempo against e6
+
+The e4-e5 push pattern (White):
+- Attacks Black's knight on f6
+- Opens e-file for rooks
+- Creates space advantage
+- Bishop on c4 or d3 supports
+- Often combined with kingside attack
+
+Signs you should push:
+- Your pieces are developed and coordinated
+- Opponent's pieces are passive or on wrong squares
+- The push creates multiple threats (attacks pawn + opens lines)
+- Your king is safe
+
+Signs you should NOT push:
+- Your pieces don't support the resulting position
+- Opponent can capture favorably
+- Your king is exposed
+- The push leaves weaknesses behind
+
+Common mistake: Having a central pawn that could push but not asking "can I advance this?" every move. A sitting d4 or e4 pawn might be ready to break through. Always consider "what is my next pawn break?"
+
+Piece coordination before the push:
+In the game example (move 33), the better plan was:
+- 33. Qf3 (queen supports d5 push and d-file)
+- 34. Kh1 (tucks king away safely)
+- 35. d5! (central break with full piece support)
+- After dxe6, White has a passed pawn and open lines
+
+The key insight: Don't move your queen aimlessly. Ask "does my queen help my central pawn advance?" Position pieces to support the break BEFORE playing it.
+
 ## Common Mistakes and How to Avoid Them
 
 ### Opening Mistakes

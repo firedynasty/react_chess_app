@@ -1,5 +1,5 @@
-# Vercel Serverless Function for Chess RAG (Retrieval-Augmented Generation)
-# Uses Pinecone for vector search + OpenAI embeddings
+# Vercel Serverless Function for Chess Coach
+# Reads chess_knowledge.txt directly into system prompt (no vector DB needed)
 
 from http.server import BaseHTTPRequestHandler
 import json
@@ -7,87 +7,13 @@ import os
 import urllib.request
 
 
-def get_pinecone_host() -> str:
-    """Get the Pinecone host for the chess index."""
-    return os.environ.get("PINECONE_HOST_RAG_CHESS", "")
-
-
-def get_embedding(text: str, api_key: str) -> list:
-    """Get embedding from OpenAI API."""
-    request_body = {
-        "model": "text-embedding-3-small",
-        "input": text
-    }
-
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/embeddings",
-        data=json.dumps(request_body).encode('utf-8'),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key}"
-        }
-    )
-
-    with urllib.request.urlopen(req) as response:
-        data = json.loads(response.read().decode('utf-8'))
-        return data["data"][0]["embedding"]
-
-
-def search_pinecone(query_vector: list, pinecone_key: str, n_results: int = 5) -> list:
-    """Search Pinecone for similar vectors."""
-    pinecone_host = get_pinecone_host()
-    if not pinecone_host:
-        raise ValueError("PINECONE_HOST_RAG_CHESS not configured")
-
-    request_body = {
-        "vector": query_vector,
-        "topK": n_results,
-        "includeMetadata": True
-    }
-
-    req = urllib.request.Request(
-        f"https://{pinecone_host}/query",
-        data=json.dumps(request_body).encode('utf-8'),
-        headers={
-            "Content-Type": "application/json",
-            "Api-Key": pinecone_key
-        }
-    )
-
-    with urllib.request.urlopen(req) as response:
-        data = json.loads(response.read().decode('utf-8'))
-        return data.get("matches", [])
-
-
-def search_docs(query: str, openai_key: str, pinecone_key: str, n_results: int = 5) -> list:
-    """Search chess knowledge base using vector similarity."""
-    query_vector = get_embedding(query, openai_key)
-    matches = search_pinecone(query_vector, pinecone_key, n_results)
-
-    results = []
-    for match in matches:
-        metadata = match.get("metadata", {})
-        results.append({
-            "text": metadata.get("text", ""),
-            "title": metadata.get("title", "Chess Principle"),
-            "score": match.get("score", 0)
-        })
-
-    return results
-
-
-def format_context(results: list) -> str:
-    """Format search results into context string."""
-    if not results:
-        return "No relevant chess principles found in knowledge base."
-
-    context_parts = []
-    for i, doc in enumerate(results, 1):
-        title = doc.get("title", "Chess Principle")
-        text = doc.get("text", "")
-        context_parts.append(f"{i}. {title}:\n{text}")
-
-    return "\n\n".join(context_parts)
+# Read chess knowledge base once at module load time
+_knowledge_path = os.path.join(os.path.dirname(__file__), '..', 'chess_knowledge.txt')
+try:
+    with open(_knowledge_path) as f:
+        CHESS_KNOWLEDGE = f.read()
+except FileNotFoundError:
+    CHESS_KNOWLEDGE = ""
 
 
 def call_llm(messages: list, system_prompt: str, api_key: str, model: str = "gpt-4o-mini", provider: str = "openai") -> str:
@@ -138,17 +64,21 @@ def call_llm(messages: list, system_prompt: str, api_key: str, model: str = "gpt
             return data["choices"][0]["message"]["content"]
 
 
-# Chess-specific system prompt
-CHESS_RAG_SYSTEM_PROMPT = """You are a chess coach with access to a knowledge base of chess principles and strategies.
+# System prompt with full chess knowledge base baked in
+CHESS_SYSTEM_PROMPT = f"""You are a chess coach with deep knowledge of chess principles and strategies.
 
-When analyzing games:
-1. Reference specific principles from the knowledge base when applicable - cite them explicitly
-2. Analyze the opening, middlegame, and endgame phases separately
-3. Identify key mistakes and missed opportunities
-4. Provide actionable improvement suggestions
-5. Be specific about the chess concepts you're applying
+When analyzing games or positions:
+1. Reference specific chess principles when applicable - cite them explicitly
+2. If analyzing a full game, cover the opening, middlegame, and endgame phases
+3. If analyzing a specific move, compare it with alternatives/variations when provided
+4. Explain strategic and tactical implications clearly
+5. When variations are provided, explain why one line is better than another
+6. Provide actionable improvement suggestions
+7. Use a Socratic approach - ask thought-provoking questions to help the player discover insights
+8. Recommend specific practice resources (lichess puzzles, opening explorers) when relevant
 
-The game analysis will be provided along with relevant context from the chess knowledge base. Use the knowledge base context to ground your analysis in established chess principles."""
+CHESS KNOWLEDGE BASE:
+{CHESS_KNOWLEDGE}"""
 
 
 class handler(BaseHTTPRequestHandler):
@@ -170,8 +100,8 @@ class handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({
             "status": "ok",
-            "backend": "pinecone",
-            "message": "Chess RAG API (Pinecone + OpenAI embeddings)"
+            "backend": "direct",
+            "message": "Chess Coach API (full knowledge base in context)"
         }).encode())
 
     def do_POST(self):
@@ -196,48 +126,41 @@ class handler(BaseHTTPRequestHandler):
         model = body.get("model", "gpt-4o-mini")
         api_key = body.get("apiKey")
         access_code = body.get("accessCode")
-        n_results = body.get("nResults", 5)
 
-        # Get API keys
-        openai_key = None
-        pinecone_key = os.environ.get("PINECONE_API_KEY")
-
-        if not pinecone_key:
-            send_json_response(500, {"error": "PINECONE_API_KEY not configured"})
-            return
+        # Resolve API key
+        llm_key = None
 
         if api_key:
-            openai_key = api_key
+            llm_key = api_key
         elif access_code:
             valid_code = os.environ.get("ACCESS_CODE")
             if access_code != valid_code:
                 send_json_response(401, {"error": "Invalid access code"})
                 return
-            openai_key = os.environ.get("OPENAI_API_KEY")
+            # Use the appropriate shared key based on provider
+            if provider == "anthropic":
+                llm_key = os.environ.get("ANTHROPIC_API_KEY")
+            else:
+                llm_key = os.environ.get("OPENAI_API_KEY")
         else:
             send_json_response(400, {"error": "No API key provided"})
             return
 
+        if not llm_key:
+            send_json_response(500, {"error": f"API key not configured for {provider}"})
+            return
+
         try:
-            # Search for relevant chess principles
-            results = search_docs(query, openai_key, pinecone_key, n_results)
-            context = format_context(results)
+            # Build messages — append query as user message
+            augmented_messages = list(messages)
+            if query:
+                augmented_messages.append({"role": "user", "content": query})
 
-            # Build augmented message with RAG context
-            user_message = f"""[Chess Knowledge Base Context]
-{context}
-[End Chess Knowledge Base Context]
-
-{query}"""
-
-            augmented_messages = messages + [{"role": "user", "content": user_message}]
-
-            # Call LLM
-            response_text = call_llm(augmented_messages, CHESS_RAG_SYSTEM_PROMPT, openai_key, model, provider)
+            # Call LLM with full knowledge base in system prompt
+            response_text = call_llm(augmented_messages, CHESS_SYSTEM_PROMPT, llm_key, model, provider)
 
             send_json_response(200, {
                 "content": response_text,
-                "context": context,
                 "query": query
             })
 
