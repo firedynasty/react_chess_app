@@ -3370,8 +3370,13 @@
             }
 
             const result = window.currentVariationResult;
-            // Priority: nextVariant loaded > annotated from analysis > textarea
-            let pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value;
+            // Serialize current moveTree first so in-memory comments are preserved
+            let pgn;
+            if (window.moveTree) {
+                pgn = moveTreeToPgn(window.moveTree);
+            } else {
+                pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value;
+            }
 
             // Format score
             let scoreStr = '';
@@ -3387,10 +3392,18 @@
             const formattedPv = formatVariationWithMoveNumbers(result.pv, result.moveNumber, result.isBlack);
             const variation = `(${formattedPv})`;
 
+            // Protect comments {…} so they don't break move-matching regexes
+            const commentPlaceholders = [];
+            let protectedPgn = pgn.replace(/\{[^}]*\}/g, (match) => {
+                const placeholder = `__COM${commentPlaceholders.length}__`;
+                commentPlaceholders.push(match);
+                return placeholder;
+            });
+
             // Protect existing variations by replacing them temporarily
             // This prevents matching moves inside existing parentheses
             const variationPlaceholders = [];
-            let protectedPgn = pgn.replace(/\([^()]*\)/g, (match) => {
+            protectedPgn = protectedPgn.replace(/\([^()]*\)/g, (match) => {
                 const placeholder = `__VAR${variationPlaceholders.length}__`;
                 variationPlaceholders.push(match);
                 return placeholder;
@@ -3434,9 +3447,12 @@
                 });
             }
 
-            // Restore protected variations
+            // Restore protected variations, then comments
             for (let i = variationPlaceholders.length - 1; i >= 0; i--) {
                 protectedPgn = protectedPgn.replace(`__VAR${i}__`, variationPlaceholders[i]);
+            }
+            for (let i = commentPlaceholders.length - 1; i >= 0; i--) {
+                protectedPgn = protectedPgn.replace(`__COM${i}__`, commentPlaceholders[i]);
             }
 
             if (inserted) {
