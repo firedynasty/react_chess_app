@@ -3422,32 +3422,48 @@
 
             let inserted = false;
 
+            // Strip comment placeholders for regex matching (they interfere with move detection)
+            // We'll find the insertion point in the clean string, then insert into protectedPgn
+            const cleanForMatch = protectedPgn.replace(/__COM\d+__\s*/g, '');
+
             if (result.isBlack) {
                 // Black's move: find "N. whiteMove N... blackMove" or "N. whiteMove blackMove"
                 const pattern = new RegExp(
-                    `(${result.moveNumber}\\.\\s*\\S+\\s+)(${result.moveNumber}\\.{3}\\s*)?(\\S+)`,
-                    'g'
+                    `(${result.moveNumber}\\.\\s*\\S+\\s+)(${result.moveNumber}\\.{3}\\s*)?(\\S+)`
                 );
-                protectedPgn = protectedPgn.replace(pattern, (match, whitePart, blackNumPart, blackMove) => {
-                    if (!inserted && !blackMove.startsWith('__VAR')) {
-                        inserted = true;
-                        return whitePart + (blackNumPart || '') + blackMove + ' ' + variation;
+                const m = cleanForMatch.match(pattern);
+                if (m && !m[3].startsWith('__VAR')) {
+                    const blackMove = m[3];
+                    // Find this black move in the original protectedPgn after the white move
+                    const whitePattern = new RegExp(`${result.moveNumber}\\.\\s*\\S+`);
+                    const whiteMatch = protectedPgn.match(whitePattern);
+                    if (whiteMatch) {
+                        const searchStart = whiteMatch.index + whiteMatch[0].length;
+                        const blackIdx = protectedPgn.indexOf(blackMove, searchStart);
+                        if (blackIdx !== -1) {
+                            const insertAt = blackIdx + blackMove.length;
+                            protectedPgn = protectedPgn.slice(0, insertAt) + ' ' + variation + protectedPgn.slice(insertAt);
+                            inserted = true;
+                        }
                     }
-                    return match;
-                });
+                }
             } else {
                 // White's move: find "N. whiteMove" and insert after
                 const pattern = new RegExp(
-                    `(${result.moveNumber}\\.\\s*)(\\S+)(\\s+)`,
-                    'g'
+                    `(${result.moveNumber}\\.\\s*)(\\S+)(\\s+)`
                 );
-                protectedPgn = protectedPgn.replace(pattern, (match, moveNum, whiteMove, space) => {
-                    if (!inserted && !whiteMove.startsWith('__VAR')) {
+                const m = cleanForMatch.match(pattern);
+                if (m && !m[2].startsWith('__VAR')) {
+                    const whiteMove = m[2];
+                    // Find this white move in the original protectedPgn
+                    const fullPattern = new RegExp(`${result.moveNumber}\\.\\s*${whiteMove.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+                    const whiteMatch = protectedPgn.match(fullPattern);
+                    if (whiteMatch) {
+                        const insertAt = whiteMatch.index + whiteMatch[0].length;
+                        protectedPgn = protectedPgn.slice(0, insertAt) + ' ' + variation + protectedPgn.slice(insertAt);
                         inserted = true;
-                        return moveNum + whiteMove + ' ' + variation + space;
                     }
-                    return match;
-                });
+                }
             }
 
             // Restore protected variations, then comments
