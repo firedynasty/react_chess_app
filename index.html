@@ -2995,6 +2995,9 @@
             // Remove PGN headers (lines/sections starting with [)
             movesText = movesText.replace(/\[[^\]]*\]/g, '').trim();
 
+            // Remove inline comments {text} and NAGs ($1, $6, etc.)
+            movesText = movesText.replace(/\{[^}]*\}/g, '').replace(/\$\d+/g, '').trim();
+
             // Remove quotes if the whole thing is quoted
             if (movesText.startsWith('"') && movesText.endsWith('"')) {
                 movesText = movesText.slice(1, -1).trim();
