@@ -1779,6 +1779,20 @@
                 return;
             }
 
+            // Reset move tree and container (fresh state like a page refresh)
+            window.moveTree = null;
+            window.currentMoveNode = null;
+            window.moveNodeRegistry = {};
+            window.cycleVarSequence = [];
+            window.cycleVarIndex = -1;
+            window.currentVariationResult = null;
+            window.annotatedPgnWithVariations = null;
+            const moveTableContainer = document.getElementById('moveTableContainer');
+            if (moveTableContainer) {
+                moveTableContainer.innerHTML = '';
+                moveTableContainer.style.display = 'none';
+            }
+
             // Reset variant/file section state from previous analysis
             window.allVariants = [];
             window.allFileSections = [];
