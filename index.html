@@ -3029,40 +3029,80 @@
             let startFen;
             let insertMoveNumber;
             let insertIsBlack;
+            let treeParent = null;
 
             if (startMoveNumber !== null) {
-                // Use move number from input to find position in PGN
-                const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
-                if (!pgn) {
-                    statusEl.textContent = 'No PGN loaded';
-                    statusEl.style.color = '#ff6b6b';
-                    return;
+                // Try to find the parent node from the move tree first (supports sub-variations).
+                // Walk up from currentMoveNode to find a node that matches the expected parent:
+                //   For "19..." (black), parent is the white move 19 node
+                //   For "19." (white), parent is the node before white's 19th move
+                if (window.moveTree && window.currentMoveNode) {
+                    let node = window.currentMoveNode;
+                    while (node) {
+                        if (startsWithBlack) {
+                            if (!node.isBlackMove && node.moveNumber === startMoveNumber) {
+                                treeParent = node;
+                                break;
+                            }
+                        } else {
+                            // Parent for white's Nth move is the preceding black move
+                            if (node.isBlackMove && node.moveNumber === startMoveNumber - 1) {
+                                treeParent = node;
+                                break;
+                            }
+                            // Or if at root and move 1
+                            if (node.nodeId === 'root' && startMoveNumber === 1) {
+                                treeParent = node;
+                                break;
+                            }
+                        }
+                        node = node.parent;
+                    }
                 }
 
-                const positions = getPositionsFromPgn(pgn);
-                if (!positions || positions.length === 0) {
-                    statusEl.textContent = 'Could not parse PGN';
-                    statusEl.style.color = '#ff6b6b';
-                    return;
+                // Fall back to mainline walk if current position didn't match
+                if (!treeParent && window.moveTree) {
+                    const targetPly = (startMoveNumber - 1) * 2 + (startsWithBlack ? 1 : 0);
+                    let walkNode = window.moveTree;
+                    for (let i = 0; i < targetPly && walkNode; i++) {
+                        walkNode = (walkNode.children && walkNode.children.length > 0) ? walkNode.children[0] : null;
+                    }
+                    treeParent = walkNode;
                 }
 
-                // Calculate ply index for the position BEFORE the first move in the variation
-                // If variation starts with "33. Qf3", we need position before white's 33rd move
-                // If variation starts with "33... Rg4", we need position before black's 33rd move
-                const plyIndex = (startMoveNumber - 1) * 2 + (startsWithBlack ? 1 : 0);
+                if (treeParent) {
+                    startFen = treeParent.fen;
+                } else {
+                    // Last resort: use positions array from PGN (mainline only)
+                    const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
+                    if (!pgn) {
+                        statusEl.textContent = 'No PGN loaded';
+                        statusEl.style.color = '#ff6b6b';
+                        return;
+                    }
 
-                if (plyIndex >= positions.length) {
-                    statusEl.textContent = `Move ${startMoveNumber}${startsWithBlack ? '...' : '.'} not found in PGN`;
-                    statusEl.style.color = '#ff6b6b';
-                    return;
+                    const positions = getPositionsFromPgn(pgn);
+                    if (!positions || positions.length === 0) {
+                        statusEl.textContent = 'Could not parse PGN';
+                        statusEl.style.color = '#ff6b6b';
+                        return;
+                    }
+
+                    const plyIndex = (startMoveNumber - 1) * 2 + (startsWithBlack ? 1 : 0);
+                    if (plyIndex >= positions.length) {
+                        statusEl.textContent = `Move ${startMoveNumber}${startsWithBlack ? '...' : '.'} not found in PGN`;
+                        statusEl.style.color = '#ff6b6b';
+                        return;
+                    }
+                    startFen = positions[plyIndex];
                 }
 
-                startFen = positions[plyIndex];
                 insertMoveNumber = startMoveNumber;
                 insertIsBlack = startsWithBlack;
             } else if (window.currentMoveNode && window.currentMoveNode.fen) {
                 // No move number in input - use current board position
                 startFen = window.currentMoveNode.fen;
+                treeParent = window.currentMoveNode;
                 const moveNumber = window.currentMoveNode.moveNumber || 1;
                 insertIsBlack = !window.currentMoveNode.isBlackMove;
                 insertMoveNumber = window.currentMoveNode.isBlackMove ? moveNumber + 1 : moveNumber;
@@ -3104,7 +3144,8 @@
                 fen: startFen,
                 bestMove: validMoves[0],
                 score: undefined,  // No score for manual moves
-                pv: validMoves
+                pv: validMoves,
+                parentNode: treeParent || null  // tree node for sub-variation support
             };
 
             // Format the line for display
@@ -3380,14 +3421,15 @@
 
             // ---- Tree-based insertion (preserves all comments and existing variations) ----
             if (window.moveTree) {
-                // Find the parent node where the variation branches from.
-                // The variation replaces the move at (moveNumber, isBlack), so its
-                // parent is the node BEFORE that move on the mainline.
-                const targetPly = (result.moveNumber - 1) * 2 + (result.isBlack ? 1 : 0);
-                let parentNode = window.moveTree;
-                for (let i = 0; i < targetPly && parentNode; i++) {
-                    parentNode = (parentNode.children && parentNode.children.length > 0)
-                        ? parentNode.children[0] : null;
+                // Use pre-found parent node (supports sub-variations), or fall back to mainline walk
+                let parentNode = result.parentNode || null;
+                if (!parentNode) {
+                    const targetPly = (result.moveNumber - 1) * 2 + (result.isBlack ? 1 : 0);
+                    parentNode = window.moveTree;
+                    for (let i = 0; i < targetPly && parentNode; i++) {
+                        parentNode = (parentNode.children && parentNode.children.length > 0)
+                            ? parentNode.children[0] : null;
+                    }
                 }
 
                 if (parentNode) {
