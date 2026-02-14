@@ -889,7 +889,7 @@
             <span style="color: #888; font-size: 12px; margin-left: 10px;">(Attach a comment to a specific mainline move)</span>
         </div>
         <input id="insert-comment-input" type="text"
-            placeholder="e.g. 10, this is a great move by black, leads to checkmate"
+            placeholder="White: 10, comment text | Black: 10..., comment text"
             style="width: 100%; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; box-sizing: border-box;">
         <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button onclick="insertPastedComment()"
@@ -906,7 +906,7 @@
             </button>
             <span id="insert-comment-status" style="color: #888; font-size: 12px;"></span>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Format: move number, comment text — e.g. "5, great move" attaches the comment to white's 5th move on the mainline.</p>
+        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Format: move number, comment text — e.g. "5, great move" for white's 5th move, "5..., great move" for black's 5th move.</p>
     </div>
 
     <!-- All Comments Display -->
@@ -3232,7 +3232,9 @@
                 return;
             }
 
-            const moveNumStr = text.substring(0, commaIdx).replace(/\./g, '').trim();
+            const rawBefore = text.substring(0, commaIdx).trim();
+            const wantsBlack = rawBefore.includes('...');
+            const moveNumStr = rawBefore.replace(/\./g, '').trim();
             const targetMoveNumber = parseInt(moveNumStr, 10);
             if (isNaN(targetMoveNumber) || targetMoveNumber < 1) {
                 statusEl.textContent = 'Invalid move number: ' + moveNumStr;
@@ -3253,11 +3255,11 @@
                 return;
             }
 
-            // Walk mainline to find white's move at targetMoveNumber
+            // Walk mainline to find the move at targetMoveNumber (white or black)
             let node = window.moveTree;
             let found = null;
             while (node) {
-                if (node.moveNumber === targetMoveNumber && !node.isBlackMove && node.san) {
+                if (node.moveNumber === targetMoveNumber && node.isBlackMove === wantsBlack && node.san) {
                     found = node;
                     break;
                 }
@@ -3265,7 +3267,8 @@
             }
 
             if (!found) {
-                statusEl.textContent = 'Could not find white move ' + targetMoveNumber + ' on the mainline';
+                const sideLabel = wantsBlack ? 'black move ' + targetMoveNumber + '...' : 'white move ' + targetMoveNumber;
+                statusEl.textContent = 'Could not find ' + sideLabel + ' on the mainline';
                 statusEl.style.color = '#ff6b6b';
                 return;
             }
@@ -3283,7 +3286,8 @@
                 }
             }
 
-            statusEl.textContent = '✓ Comment added to ' + targetMoveNumber + '. ' + found.san;
+            const moveLabel = wantsBlack ? targetMoveNumber + '... ' + found.san : targetMoveNumber + '. ' + found.san;
+            statusEl.textContent = '✓ Comment added to ' + moveLabel;
             statusEl.style.color = '#2ecc71';
             inputEl.value = '';
             setTimeout(() => { statusEl.textContent = ''; }, 3000);
