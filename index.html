@@ -3373,113 +3373,84 @@
             }
 
             const result = window.currentVariationResult;
-            // Serialize current moveTree first so in-memory comments are preserved
-            let pgn;
-            if (window.moveTree) {
-                pgn = moveTreeToPgn(window.moveTree);
-            } else {
-                pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value;
-            }
-
-            // Format score
-            let scoreStr = '';
-            if (result.score !== undefined) {
-                if (typeof result.score === 'string' && result.score.startsWith('M')) {
-                    scoreStr = `#${result.score.substring(1)}`;
-                } else {
-                    scoreStr = (result.score >= 0 ? '+' : '') + (result.score / 100).toFixed(2);
-                }
-            }
-
-            // Format the variation with proper move numbers (without Stockfish eval in brackets)
-            const formattedPv = formatVariationWithMoveNumbers(result.pv, result.moveNumber, result.isBlack);
-            const variation = `(${formattedPv})`;
-
-            // Protect comments {…} so they don't break move-matching regexes
-            const commentPlaceholders = [];
-            let protectedPgn = pgn.replace(/\{[^}]*\}/g, (match) => {
-                const placeholder = `__COM${commentPlaceholders.length}__`;
-                commentPlaceholders.push(match);
-                return placeholder;
-            });
-
-            // Protect existing variations by replacing them temporarily
-            // This prevents matching moves inside existing parentheses
-            const variationPlaceholders = [];
-            protectedPgn = protectedPgn.replace(/\([^()]*\)/g, (match) => {
-                const placeholder = `__VAR${variationPlaceholders.length}__`;
-                variationPlaceholders.push(match);
-                return placeholder;
-            });
-            // Handle nested variations (repeat until no more matches)
-            while (/\([^()]*\)/.test(protectedPgn)) {
-                protectedPgn = protectedPgn.replace(/\([^()]*\)/g, (match) => {
-                    const placeholder = `__VAR${variationPlaceholders.length}__`;
-                    variationPlaceholders.push(match);
-                    return placeholder;
-                });
-            }
-
             let inserted = false;
 
-            // Strip comment placeholders for regex matching (they interfere with move detection)
-            // We'll find the insertion point in the clean string, then insert into protectedPgn
-            const cleanForMatch = protectedPgn.replace(/__COM\d+__\s*/g, '');
-
-            if (result.isBlack) {
-                // Black's move: find "N. whiteMove N... blackMove" or "N. whiteMove blackMove"
-                const pattern = new RegExp(
-                    `(${result.moveNumber}\\.\\s*\\S+\\s+)(${result.moveNumber}\\.{3}\\s*)?(\\S+)`
-                );
-                const m = cleanForMatch.match(pattern);
-                if (m && !m[3].startsWith('__VAR')) {
-                    const blackMove = m[3];
-                    // Find this black move in the original protectedPgn after the white move
-                    const whitePattern = new RegExp(`${result.moveNumber}\\.\\s*\\S+`);
-                    const whiteMatch = protectedPgn.match(whitePattern);
-                    if (whiteMatch) {
-                        const searchStart = whiteMatch.index + whiteMatch[0].length;
-                        const blackIdx = protectedPgn.indexOf(blackMove, searchStart);
-                        if (blackIdx !== -1) {
-                            const insertAt = blackIdx + blackMove.length;
-                            protectedPgn = protectedPgn.slice(0, insertAt) + ' ' + variation + protectedPgn.slice(insertAt);
-                            inserted = true;
-                        }
-                    }
+            // ---- Tree-based insertion (preserves all comments and existing variations) ----
+            if (window.moveTree) {
+                // Find the parent node where the variation branches from.
+                // The variation replaces the move at (moveNumber, isBlack), so its
+                // parent is the node BEFORE that move on the mainline.
+                const targetPly = (result.moveNumber - 1) * 2 + (result.isBlack ? 1 : 0);
+                let parentNode = window.moveTree;
+                for (let i = 0; i < targetPly && parentNode; i++) {
+                    parentNode = (parentNode.children && parentNode.children.length > 0)
+                        ? parentNode.children[0] : null;
                 }
-            } else {
-                // White's move: find "N. whiteMove" and insert after
-                const pattern = new RegExp(
-                    `(${result.moveNumber}\\.\\s*)(\\S+)(\\s+)`
-                );
-                const m = cleanForMatch.match(pattern);
-                if (m && !m[2].startsWith('__VAR')) {
-                    const whiteMove = m[2];
-                    // Find this white move in the original protectedPgn
-                    const fullPattern = new RegExp(`${result.moveNumber}\\.\\s*${whiteMove.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
-                    const whiteMatch = protectedPgn.match(fullPattern);
-                    if (whiteMatch) {
-                        const insertAt = whiteMatch.index + whiteMatch[0].length;
-                        protectedPgn = protectedPgn.slice(0, insertAt) + ' ' + variation + protectedPgn.slice(insertAt);
+
+                if (parentNode) {
+                    // Build variation nodes using Chess.js for validation
+                    const varChess = new Chess();
+                    varChess.load(parentNode.fen);
+
+                    let prevNode = parentNode;
+                    let firstVarNode = null;
+                    const counterBase = Object.keys(window.moveNodeRegistry).length;
+                    let ci = 0;
+
+                    for (const moveSan of result.pv) {
+                        const turnBefore = varChess.turn();
+                        const move = varChess.move(moveSan, { sloppy: true });
+                        if (!move) break;
+
+                        const isBlack = (turnBefore === 'b');
+                        let moveNumber;
+                        if (prevNode.nodeId === 'root') {
+                            const fenParts = prevNode.fen.split(' ');
+                            moveNumber = fenParts.length >= 6 ? parseInt(fenParts[5]) || 1 : 1;
+                        } else if (isBlack) {
+                            moveNumber = prevNode.moveNumber;
+                        } else {
+                            moveNumber = prevNode.moveNumber + (prevNode.isBlackMove ? 1 : 0);
+                        }
+
+                        const newNode = {
+                            san: move.san,
+                            annotation: '',
+                            fen: varChess.fen(),
+                            moveNumber: moveNumber,
+                            isBlackMove: isBlack,
+                            comment: '',
+                            parent: prevNode,
+                            children: [],
+                            depth: (prevNode === parentNode) ? (parentNode.depth || 0) + 1 : prevNode.depth,
+                            nodeId: `node-var-${counterBase + ci}`
+                        };
+                        ci++;
+
+                        if (!firstVarNode) {
+                            // Add as a new child branch of parentNode
+                            parentNode.children.push(newNode);
+                            firstVarNode = newNode;
+                        } else {
+                            prevNode.children.push(newNode);
+                        }
+                        window.moveNodeRegistry[newNode.nodeId] = newNode;
+                        prevNode = newNode;
+                    }
+
+                    if (firstVarNode) {
                         inserted = true;
                     }
                 }
             }
 
-            // Restore protected variations, then comments
-            for (let i = variationPlaceholders.length - 1; i >= 0; i--) {
-                protectedPgn = protectedPgn.replace(`__VAR${i}__`, variationPlaceholders[i]);
-            }
-            for (let i = commentPlaceholders.length - 1; i >= 0; i--) {
-                protectedPgn = protectedPgn.replace(`__COM${i}__`, commentPlaceholders[i]);
-            }
-
             if (inserted) {
-                // Update the source that was used
+                // Sync PGN strings from the (now modified) tree
+                const pgn = moveTreeToPgn(window.moveTree);
                 if (window.currentLoadedPgn) {
-                    window.currentLoadedPgn = protectedPgn;
+                    window.currentLoadedPgn = pgn;
                 }
-                window.annotatedPgnWithVariations = protectedPgn;
+                window.annotatedPgnWithVariations = pgn;
                 document.getElementById('variation-status').textContent = '';
 
                 // Flash the button to show feedback
@@ -3494,21 +3465,18 @@
 
                 // Reload positions
                 if (typeof window.parsePgnToPositions === 'function') {
-                    let cleanedPgn = protectedPgn;
+                    let cleanedPgn = pgn;
                     if (typeof AnalysisChess !== 'undefined') {
-                        cleanedPgn = AnalysisChess.cleanPgn(protectedPgn);
+                        cleanedPgn = AnalysisChess.cleanPgn(pgn);
                     }
                     window.studyReportPositions = window.parsePgnToPositions(cleanedPgn);
                 }
 
-                // Re-render move table with variations
-                if (typeof window.parsePgnWithVariations === 'function') {
-                    window.moveTree = window.parsePgnWithVariations(protectedPgn);
-                    window.currentMoveNode = null;
-                    window.cycleVarSequence = [];
-                    window.cycleVarIndex = -1;
-                    renderMoveTable(window.moveTree);
-                }
+                // Re-render move table directly from the existing tree (no re-parse needed)
+                window.currentMoveNode = null;
+                window.cycleVarSequence = [];
+                window.cycleVarIndex = -1;
+                renderMoveTable(window.moveTree);
             } else {
                 document.getElementById('variation-status').textContent = 'Could not insert variation';
                 document.getElementById('variation-status').style.color = '#ff6b6b';
