@@ -3032,62 +3032,80 @@
             let treeParent = null;
 
             if (startMoveNumber !== null) {
-                // Try to find the parent node from the move tree first (supports sub-variations).
-                // Walk up from currentMoveNode to find a node that matches the expected parent:
-                //   For "19..." (black), parent is the white move 19 node
-                //   For "19." (white), parent is the node before white's 19th move
+                // Collect candidate parent nodes, then pick the one where the first
+                // move is actually legal. This handles sub-variations: e.g. "19... Rxg8"
+                // might be invalid from the mainline but valid inside a variation.
+                const candidates = [];
+                const firstMoveToken = moveTokens[0];
+
+                // Helper: does this node match as a parent for the variation?
+                function isParentCandidate(node) {
+                    if (!node || node.nodeId === undefined) return false;
+                    if (startsWithBlack) {
+                        return !node.isBlackMove && node.moveNumber === startMoveNumber;
+                    } else {
+                        if (node.nodeId === 'root' && startMoveNumber === 1) return true;
+                        return node.isBlackMove && node.moveNumber === startMoveNumber - 1;
+                    }
+                }
+
+                // 1. Walk up from currentMoveNode (prioritise current context)
                 if (window.moveTree && window.currentMoveNode) {
                     let node = window.currentMoveNode;
                     while (node) {
-                        if (startsWithBlack) {
-                            if (!node.isBlackMove && node.moveNumber === startMoveNumber) {
-                                treeParent = node;
-                                break;
-                            }
-                        } else {
-                            // Parent for white's Nth move is the preceding black move
-                            if (node.isBlackMove && node.moveNumber === startMoveNumber - 1) {
-                                treeParent = node;
-                                break;
-                            }
-                            // Or if at root and move 1
-                            if (node.nodeId === 'root' && startMoveNumber === 1) {
-                                treeParent = node;
-                                break;
-                            }
-                        }
+                        if (isParentCandidate(node)) { candidates.push(node); break; }
                         node = node.parent;
                     }
                 }
 
-                // Fall back to mainline walk if current position didn't match
-                if (!treeParent && window.moveTree) {
+                // 2. Mainline walk
+                if (window.moveTree) {
                     const targetPly = (startMoveNumber - 1) * 2 + (startsWithBlack ? 1 : 0);
                     let walkNode = window.moveTree;
                     for (let i = 0; i < targetPly && walkNode; i++) {
                         walkNode = (walkNode.children && walkNode.children.length > 0) ? walkNode.children[0] : null;
                     }
-                    treeParent = walkNode;
+                    if (walkNode && !candidates.includes(walkNode)) {
+                        candidates.push(walkNode);
+                    }
                 }
 
-                if (treeParent) {
-                    startFen = treeParent.fen;
-                } else {
-                    // Last resort: use positions array from PGN (mainline only)
+                // 3. Search entire tree for matching nodes (finds variation parents)
+                if (window.moveNodeRegistry) {
+                    for (const nodeId of Object.keys(window.moveNodeRegistry)) {
+                        const node = window.moveNodeRegistry[nodeId];
+                        if (isParentCandidate(node) && !candidates.includes(node)) {
+                            candidates.push(node);
+                        }
+                    }
+                }
+
+                // Pick the first candidate where the first move is legal
+                for (const candidate of candidates) {
+                    try {
+                        const test = new Chess(candidate.fen);
+                        if (test.move(firstMoveToken, { sloppy: true })) {
+                            treeParent = candidate;
+                            startFen = candidate.fen;
+                            break;
+                        }
+                    } catch (e) { /* skip invalid */ }
+                }
+
+                if (!startFen) {
+                    // No tree node worked — last resort: positions array (mainline only)
                     const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
                     if (!pgn) {
                         statusEl.textContent = 'No PGN loaded';
                         statusEl.style.color = '#ff6b6b';
                         return;
                     }
-
                     const positions = getPositionsFromPgn(pgn);
                     if (!positions || positions.length === 0) {
                         statusEl.textContent = 'Could not parse PGN';
                         statusEl.style.color = '#ff6b6b';
                         return;
                     }
-
                     const plyIndex = (startMoveNumber - 1) * 2 + (startsWithBlack ? 1 : 0);
                     if (plyIndex >= positions.length) {
                         statusEl.textContent = `Move ${startMoveNumber}${startsWithBlack ? '...' : '.'} not found in PGN`;
@@ -3210,6 +3228,15 @@
 
             // Call analyzeForVariation — it detects chess moves and routes to addMovesAsVariation
             analyzeForVariation().then(() => {
+                // Check if the variation was actually inserted
+                // On success, addMovesAsVariation clears variation-status text
+                // On failure, it sets error text (e.g., "Invalid move: ...")
+                const varStatus = document.getElementById('variation-status');
+                if (varStatus && varStatus.textContent) {
+                    statusEl.textContent = varStatus.textContent;
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
                 statusEl.textContent = '✓ Variation inserted into PGN';
                 statusEl.style.color = '#27ae60';
                 inputEl.value = '';
@@ -4673,7 +4700,14 @@
                 // Space after move
                 container.appendChild(document.createTextNode(' '));
 
-                // Continue with first child
+                // Render sub-variations (children[1+] are alternative branches)
+                if (node.children && node.children.length > 1) {
+                    for (let v = 1; v < node.children.length; v++) {
+                        renderVariation(node.children[v], container);
+                    }
+                }
+
+                // Continue with first child (main continuation of this variation)
                 if (node.children && node.children.length > 0) {
                     node = node.children[0];
                 } else {
