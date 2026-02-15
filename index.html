@@ -967,6 +967,10 @@
     <div style="margin: 0 auto; max-width: 1200px;">
       <button id="toggleChatBtn" onclick="document.getElementById('chatNotesPanel').style.display = document.getElementById('chatNotesPanel').style.display === 'none' ? 'block' : 'none'"
         style="background: #6f42c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px;">Toggle Chat</button>
+      <button onclick="document.getElementById('chatNotesContent').innerHTML = ''; document.getElementById('chatNotesPanel').style.display = 'none';"
+        style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Clear Chat</button>
+      <button onclick="navigator.clipboard.readText().then(function(text) { if (text) { var el = document.getElementById('chatNotesContent'); var div = document.createElement('div'); div.style.borderTop = '1px solid #444'; div.style.marginTop = '12px'; div.style.paddingTop = '10px'; div.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/&lt;/g,'&amp;lt;').replace(/\n/g,'<br>'); el.appendChild(div); document.getElementById('chatNotesPanel').style.display = 'block'; } }).catch(function() { alert('Clipboard access denied'); });"
+        style="background: #17a2b8; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Paste from Clipboard</button>
       <div id="chatNotesPanel" style="display: none; background: #1a1a2e; border: 1px solid #6f42c1; border-radius: 8px; max-height: 250px; overflow-y: auto; padding: 12px; margin-bottom: 8px;">
         <div id="chatNotesContent" contenteditable="true"
           style="min-height: 60px; color: #eee; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; line-height: 1.6; outline: none;"
@@ -7911,6 +7915,10 @@ ${contentToAnalyze}`;
                     return;
                 }
 
+                // Prompt user for optional additional notes/questions
+                const userNotes = prompt('Any additional notes or questions for the coach? (Leave blank to skip)');
+                if (userNotes === null) return; // user clicked Cancel — abort
+
                 // Build the query
                 let query = `Analyze this specific move: **${ctx.move}${ctx.annotation}**\n`;
                 query += `Position before (FEN): ${ctx.fenBefore}\n`;
@@ -7940,10 +7948,17 @@ ${contentToAnalyze}`;
                 query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
                 query += `\nPlease analyze this move in depth. Reference chess principles from your knowledge base. If there are variations, compare them and explain the strategic differences.`;
 
+                // Append user's additional notes/questions if provided
+                const trimmedNotes = userNotes ? userNotes.trim() : '';
+                if (trimmedNotes) {
+                    query += `\n\nAdditional question from the player: "${trimmedNotes}"`;
+                }
+
                 // Show user message in chat
+                const noteSuffix = trimmedNotes ? ` — "${trimmedNotes}"` : '';
                 const displayMsg = ctx.variations.length > 0
-                    ? `Analyze ${ctx.move}${ctx.annotation} and compare with variation(s)...`
-                    : `Analyze ${ctx.move}${ctx.annotation}...`;
+                    ? `Analyze ${ctx.move}${ctx.annotation} and compare with variation(s)...${noteSuffix}`
+                    : `Analyze ${ctx.move}${ctx.annotation}...${noteSuffix}`;
 
                 setIsLoading(true);
                 setMessages(prev => [...prev, { role: 'user', content: displayMsg }]);
@@ -8015,6 +8030,21 @@ ${contentToAnalyze}`;
                     if (data.error) throw new Error(data.error);
 
                     setMessages([...newMessages, { role: 'assistant', content: data.content }]);
+
+                    // Append the follow-up Q&A to chatNotesPanel near the board
+                    const chatNotesContent = document.getElementById('chatNotesContent');
+                    const chatNotesPanel = document.getElementById('chatNotesPanel');
+                    if (chatNotesContent && chatNotesPanel) {
+                        const followUp = document.createElement('div');
+                        followUp.style.borderTop = '1px solid #444';
+                        followUp.style.marginTop = '12px';
+                        followUp.style.paddingTop = '10px';
+                        followUp.innerHTML =
+                            `<p style="color:#00d4ff;font-weight:600;margin:0 0 6px;">You: ${userMessage.content.replace(/</g, '&lt;')}</p>` +
+                            marked.parse(data.content);
+                        chatNotesContent.appendChild(followUp);
+                        chatNotesPanel.style.display = 'block';
+                    }
                 } catch (error) {
                     console.error('Error:', error);
                     setMessages([...newMessages, {
