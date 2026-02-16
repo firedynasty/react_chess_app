@@ -4478,14 +4478,66 @@
             let i = startIndex;
             let lastMoveNode = parentNode;
             let branchChess = chess; // Chess instance for this branch
+            let mainlineNeedsReorder = false; // Track continuation-style variations
 
             while (i < tokens.length) {
                 const token = tokens[i];
 
                 if (token === '(') {
-                    // Start of variation - branch from the position BEFORE the last move
-                    // Find the correct branching point (parent of last move)
-                    const branchPoint = lastMoveNode.parent || parentNode;
+                    // Default: branch from parent position (standard PGN alternative)
+                    let branchPoint = lastMoveNode.parent || parentNode;
+
+                    // Look ahead to find first move token and its number indicator
+                    let firstMoveToken = null;
+                    let firstMoveIsBlack = null;
+                    for (let j = i + 1; j < tokens.length; j++) {
+                        const t = tokens[j];
+                        if (t === ')' || t === '(') break;
+                        if (t.startsWith('{')) continue;
+                        if (/^\$\d+$/.test(t)) continue;
+                        if (['1-0', '0-1', '1/2-1/2', '*'].includes(t)) continue;
+                        if (/^\d+\.+$/.test(t)) {
+                            firstMoveIsBlack = t.includes('...');
+                            continue;
+                        }
+                        // Strip move number prefix and annotations
+                        firstMoveToken = t.replace(/^\d+\.+/, '').replace(/[!?]+$/, '');
+                        break;
+                    }
+
+                    // Detect continuation-style variations (e.g., b6?? (8. Nxd6 cxd6))
+                    // In standard PGN, variation replaces lastMoveNode (same side to move).
+                    // In continuation format, variation is a response (opposite side).
+                    if (firstMoveToken && lastMoveNode !== parentNode) {
+                        if (firstMoveIsBlack !== null) {
+                            // Use move number hint to determine side
+                            const currentTurn = lastMoveNode.fen.split(' ')[1];
+                            const currentTurnIsBlack = (currentTurn === 'b');
+                            if (firstMoveIsBlack === currentTurnIsBlack) {
+                                // Variation plays from current position → continuation
+                                branchPoint = lastMoveNode;
+                                mainlineNeedsReorder = true;
+                            }
+                        } else {
+                            // No move number hint - try move from both positions
+                            const testChessCurrent = new Chess();
+                            testChessCurrent.load(lastMoveNode.fen);
+                            const currentWorks = !!testChessCurrent.move(firstMoveToken, { sloppy: true });
+
+                            if (currentWorks) {
+                                const parentBranch = lastMoveNode.parent || parentNode;
+                                const testChessParent = new Chess();
+                                testChessParent.load(parentBranch.fen);
+                                const parentWorks = !!testChessParent.move(firstMoveToken, { sloppy: true });
+
+                                if (!parentWorks) {
+                                    // Only works from current position → continuation
+                                    branchPoint = lastMoveNode;
+                                    mainlineNeedsReorder = true;
+                                }
+                            }
+                        }
+                    }
 
                     // Create a new chess instance from the branch point's position
                     const variationChess = new Chess();
@@ -4585,7 +4637,13 @@
                         };
 
                         // Add as child of current node
-                        lastMoveNode.children.push(newNode);
+                        // If continuation variations were added first, insert mainline at beginning
+                        if (mainlineNeedsReorder && lastMoveNode.children.length > 0) {
+                            lastMoveNode.children.unshift(newNode);
+                        } else {
+                            lastMoveNode.children.push(newNode);
+                        }
+                        mainlineNeedsReorder = false;
                         window.moveNodeRegistry[newNode.nodeId] = newNode;
                         lastMoveNode = newNode;
                     }
@@ -6028,7 +6086,7 @@
                         }
                         inPgn = true;
                         currentPgn += line + ' ';
-                    } else if (inPgn && /^[A-Za-z0-9]/.test(line) && !line.startsWith('*') && !line.startsWith('[')) {
+                    } else if (inPgn && /^[A-Za-z0-9({]/.test(line) && !line.startsWith('*') && !line.startsWith('[')) {
                         // Continue PGN on next line
                         currentPgn += line + ' ';
                     } else if (inPgn && line === '') {
@@ -6395,7 +6453,7 @@
                         }
                         inPgn = true;
                         currentPgn += line + ' ';
-                    } else if (inPgn && /^[A-Za-z0-9]/.test(line) && !line.startsWith('*') && !line.startsWith('[')) {
+                    } else if (inPgn && /^[A-Za-z0-9({]/.test(line) && !line.startsWith('*') && !line.startsWith('[')) {
                         currentPgn += line + ' ';
                     } else if (inPgn && line === '') {
                         if (currentPgn.trim()) {
