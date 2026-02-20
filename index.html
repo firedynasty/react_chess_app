@@ -5456,9 +5456,26 @@
                     if (window.moveTree.children && window.moveTree.children.length > 0) {
                         jumpToNode(window.moveTree.children[0].nodeId);
                     }
-                } else if (window.currentMoveNode.children && window.currentMoveNode.children.length > 0) {
-                    // Go to first child (main continuation)
-                    jumpToNode(window.currentMoveNode.children[0].nodeId);
+                } else {
+                    // Check if we're on the main line by walking up the tree
+                    let onMainLine = true;
+                    let topmostBranch = null;
+                    let walk = window.currentMoveNode;
+                    while (walk && walk.parent) {
+                        if (walk.parent.children[0] !== walk) {
+                            onMainLine = false;
+                            topmostBranch = walk.parent;
+                        }
+                        walk = walk.parent;
+                    }
+
+                    if (!onMainLine && topmostBranch) {
+                        // In a variation - jump to the main line continuation at the branch point
+                        jumpToNode(topmostBranch.children[0].nodeId);
+                    } else if (window.currentMoveNode.children && window.currentMoveNode.children.length > 0) {
+                        // On main line - go to first child (main continuation)
+                        jumpToNode(window.currentMoveNode.children[0].nodeId);
+                    }
                 }
                 // If no children, stay at current position (end of line)
                 return;
