@@ -1418,13 +1418,20 @@
             // Handle OAuth redirect if returning from Dropbox
             handleDropboxOAuthRedirect();
 
-            document.getElementById('dbLoginBtn').addEventListener('click', dropboxSignIn);
-            document.getElementById('dbFilesBtn').addEventListener('click', openDropboxSidebar);
-            document.getElementById('dbLogoutBtn').addEventListener('click', dropboxSignOut);
-            document.getElementById('dbSaveBtn').addEventListener('click', dropboxSaveReport);
-            document.getElementById('closeDropboxSidebar').addEventListener('click', closeDropboxSidebar);
-            document.getElementById('dropboxSaveConfirmBtn').addEventListener('click', dropboxConfirmSave);
-            document.getElementById('dropboxSaveInput').addEventListener('keydown', function(e) {
+            const _dbLogin = document.getElementById('dbLoginBtn');
+            if (_dbLogin) _dbLogin.addEventListener('click', dropboxSignIn);
+            const _dbFiles = document.getElementById('dbFilesBtn');
+            if (_dbFiles) _dbFiles.addEventListener('click', openDropboxSidebar);
+            const _dbLogout = document.getElementById('dbLogoutBtn');
+            if (_dbLogout) _dbLogout.addEventListener('click', dropboxSignOut);
+            const _dbSave = document.getElementById('dbSaveBtn');
+            if (_dbSave) _dbSave.addEventListener('click', dropboxSaveReport);
+            const _closeSidebar = document.getElementById('closeDropboxSidebar');
+            if (_closeSidebar) _closeSidebar.addEventListener('click', closeDropboxSidebar);
+            const _saveConfirm = document.getElementById('dropboxSaveConfirmBtn');
+            if (_saveConfirm) _saveConfirm.addEventListener('click', dropboxConfirmSave);
+            const _saveInput = document.getElementById('dropboxSaveInput');
+            if (_saveInput) _saveInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') dropboxConfirmSave();
             });
 
@@ -5796,12 +5803,15 @@
                 }
             });
 
-            // Enter key triggers Chess.com fetch
-            document.getElementById('chesscom-username').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    fetchChesscomGames();
-                }
-            });
+            // Enter key triggers Chess.com fetch (element may not exist on looker page)
+            const _chesscomUser = document.getElementById('chesscom-username');
+            if (_chesscomUser) {
+                _chesscomUser.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        fetchChesscomGames();
+                    }
+                });
+            }
 
             // =========================================================
             // STUDY TOOL INITIALIZATION
