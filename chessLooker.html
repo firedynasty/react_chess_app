@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chess Analyzer - Stockfish.js</title>
+    <title>Chess Looker</title>
     <!-- Chessboard.js CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
     <style>
@@ -590,30 +590,6 @@
 
     <div class="status-bar">
         <a href="https://youtu.be/fwPcoDfQwyo" target="_blank" style="background: #0f3460; color: #00d4ff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">Tutorial ↗</a>
-        <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
-    </div>
-
-    <!-- Chess.com Import Section -->
-    <div class="chesscom-import-bar" id="chesscom-import-bar">
-        <label for="chesscom-username">Chess.com:</label>
-        <input type="text" id="chesscom-username" placeholder="Enter username" autocomplete="username">
-        <button type="button" id="fetch-games-btn" onclick="fetchChesscomGames()">
-            📥 Fetch Games
-        </button>
-        <select id="num-games" class="num-games-select">
-            <option value="5" selected>5 games</option>
-            <option value="10">10 games</option>
-            <option value="15">15 games</option>
-            <option value="20">20 games</option>
-        </select>
-    </div>
-
-    <div class="game-selection-container" id="game-selection-container" style="display: none;">
-        <label for="game-dropdown">Select a game to analyze:</label>
-        <select id="game-dropdown" onchange="loadSelectedGame()">
-            <option value="">-- Select a game --</option>
-        </select>
-        <div id="game-details"></div>
     </div>
 
     <!-- Stockfish Variation Adder -->
@@ -771,23 +747,6 @@
         <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Appends pasted text to the end of the current report and updates variants automatically.</p>
     </div>
 
-    <!-- Report Loading Controls (horizontal layout) -->
-    <div id="reportControls" style="margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-      <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Load Analysis Report (from clipboard)</button>
-      <button id="dbLoginBtn" style="background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">DB Login</button>
-      <button id="dbFilesBtn" style="display: none; background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">DB Files</button>
-      <button id="dbLogoutBtn" style="display: none; background: #6c757d; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">DB Logout</button>
-      <button id="selectReportFolder" style="background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('reportFolderInput').click()">📂 Select Reports Folder</button>
-      <input type="file" id="reportFolderInput" accept=".txt" webkitdirectory style="display: none;">
-      <button id="loadPreloadedReports" style="background: #007bff; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Preloaded Reports</button>
-      <span id="reportsCountDisplay" style="color: #51cf66; font-weight: bold;"></span>
-      <button id="viewPreloadedReports" style="background: #6f42c1; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📋 View Reports</button>
-      <select id="openingDropdown" style="background: #1a1a2e; color: white; border: 2px solid #9c27b0; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">
-        <option value="">-- Select Opening --</option>
-      </select>
-      <button id="appendByOpeningBtn" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; display: none;">📚 Append Opening Reports</button>
-      <button id="saveSocraticBtn" style="background: #fd7e14; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">📚 Save Socratic Method</button>
-    </div>
 
     <!-- Variation Adder (moved below reportControls) -->
     <div id="variation-adder" style="display: block; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
@@ -856,32 +815,6 @@
         <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Click a variation move → Go to Lichess to explore the line → paste the continuation here → Append to Variation adds the moves to the current variation and PGN</p>
     </div>
 
-    <!-- Insert Variation from Paste -->
-    <div id="insert-variation-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
-        <div style="margin-bottom: 10px;">
-            <span style="color: #e67e22; font-weight: bold; font-size: 14px;">📌 Insert Variation into PGN</span>
-            <span style="color: #888; font-size: 12px; margin-left: 10px;">(Paste a variation with move numbers — it will be inserted at the correct mainline position)</span>
-        </div>
-        <textarea id="insert-variation-input"
-            placeholder="Paste variation e.g. (13. Nxe5 Nxe5 14. Bf4 f6 15. Bxe5 fxe5 16. Qh5+ Bf7 17. Rxe5+ Kf8 18. Qe2)"
-            style="width: 100%; height: 80px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical;"></textarea>
-        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button id="insert-variation-btn" onclick="insertPastedVariation()"
-                style="padding: 8px 15px; background: #e67e22; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                Insert as Variation
-            </button>
-            <button onclick="navigator.clipboard.readText().then(t => document.getElementById('insert-variation-input').value = t)"
-                style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                📋 Paste from Clipboard
-            </button>
-            <button onclick="document.getElementById('insert-variation-input').value = ''"
-                style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
-                Clear
-            </button>
-            <span id="insert-variation-status" style="color: #888; font-size: 12px;"></span>
-        </div>
-        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Paste a full variation (with or without parentheses) — the move number determines where it branches from the mainline. Uses the same insertion logic as Analyze.</p>
-    </div>
 
     <!-- Insert Comment -->
     <div id="insert-comment-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
@@ -991,7 +924,7 @@
           <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
           <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
           <button id="backVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Back Var.</button>
-          <button id="cycleClipboardBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Clipboard</button>
+          <button id="clearIndexBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear</button>
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
@@ -5934,111 +5867,15 @@
                 backVarBtn.addEventListener('click', backVariation);
             }
 
-            // Cycle Clipboard button - loads from clipboard or cycles through positions
-            window.lastCycleClipboardContent = null;
-            const cycleClipboardBtn = document.getElementById('cycleClipboardBtn');
-            if (cycleClipboardBtn) {
-                cycleClipboardBtn.addEventListener('click', async function() {
-                    try {
-                        const clipboardText = await navigator.clipboard.readText();
-                        const trimmedClipboard = clipboardText ? clipboardText.trim() : '';
+            // Looker index: array of loaded PGN/FEN strings navigated by prevVariant/nextVariant
+            window.lookerIndex = [];
+            window.lookerIndexPos = -1;
 
-                        // Check if clipboard is same as last loaded content
-                        if (window.lastCycleClipboardContent && trimmedClipboard === window.lastCycleClipboardContent) {
-                            // Same content - cycle to next position (loop to start)
-                            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                                window.studyReportPositionIndex++;
-                                if (window.studyReportPositionIndex >= window.studyReportPositions.length) {
-                                    window.studyReportPositionIndex = 0; // Loop back to start
-                                }
-                                if (window.board2) {
-                                    window.board2.position(window.studyReportPositions[window.studyReportPositionIndex]);
-                                }
-                                updateBoard2MoveIndicator(window.studyReportPositionIndex);
-                            }
-                        } else {
-                            // New content - load it
-                            if (!trimmedClipboard) {
-                                log('Clipboard is empty', 'warn');
-                                return;
-                            }
-
-                            // Store the new clipboard content
-                            window.lastCycleClipboardContent = trimmedClipboard;
-
-                            // Parse the PGN (handles FEN headers automatically)
-                            if (typeof window.parsePgnToPositions === 'function') {
-                                window.studyReportPositions = window.parsePgnToPositions(trimmedClipboard);
-                                window.studyReportPositionIndex = 0;
-
-                                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                                    if (window.board2) {
-                                        window.board2.position(window.studyReportPositions[0]);
-                                    }
-                                    updateBoard2MoveIndicator(0);
-                                    log(`Loaded ${window.studyReportPositions.length} positions from clipboard`, 'success');
-                                } else {
-                                    log('No valid positions found in clipboard', 'warn');
-                                }
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Clipboard read error:', err);
-                        log('Could not read clipboard', 'error');
-                    }
-                });
-            }
-
-            // Load Annotated PGN from clipboard into move container
-            const loadClipboardPgnBtn = document.getElementById('loadClipboardPgnBtn');
-            if (loadClipboardPgnBtn) {
-                loadClipboardPgnBtn.addEventListener('click', async function() {
-                    try {
-                        const clipboardText = await navigator.clipboard.readText();
-                        const pgnString = clipboardText ? clipboardText.trim() : '';
-                        if (!pgnString) {
-                            alert('Clipboard is empty.');
-                            return;
-                        }
-
-                        // Parse positions and comments
-                        const result = window.parsePgnToPositionsWithComments(pgnString);
-                        window.studyReportPositions = result.positions;
-                        window.studyReportComments = result.comments;
-                        window.currentLoadedPgn = pgnString;
-
-                        // Parse with variation support and render move table
-                        window.moveTree = window.parsePgnWithVariations(pgnString);
-                        window.cycleVarSequence = [];
-                        window.cycleVarIndex = -1;
-                        window.currentMoveNode = null;
-                        renderMoveTable(window.moveTree);
-                        updateAllCommentsDisplay();
-
-                        window.studyReportPositionIndex = 0;
-                        if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                            window.board2.position(window.studyReportPositions[0]);
-                            updateBoard2MoveIndicator(0);
-                        }
-                    } catch (err) {
-                        console.error('Clipboard read error:', err);
-                        alert('Could not read clipboard.');
-                    }
-                });
-            }
-
-            // Load FEN button - loads bare FEN or PGN-with-FEN-headers from clipboard
-            // Each entry is a PGN string (with headers) so move tree + positions work
-            window.loadedFenVariants = [];
-            window.loadedFenVariantIndex = 0;
-
-            // Helper: load a specific FEN variant by index onto board2 with move tree
-            window.loadFenVariantByIndex = function(idx) {
-                const variants = window.loadedFenVariants;
-                if (!variants || variants.length === 0 || idx < 0 || idx >= variants.length) return;
-
-                window.loadedFenVariantIndex = idx;
-                const pgnString = variants[idx];
+            // Helper: load a specific looker index entry onto board2
+            window.loadLookerEntry = function(idx) {
+                if (!window.lookerIndex.length || idx < 0 || idx >= window.lookerIndex.length) return;
+                window.lookerIndexPos = idx;
+                const pgnString = window.lookerIndex[idx];
 
                 // Parse positions and comments
                 const result = window.parsePgnToPositionsWithComments(pgnString);
@@ -6060,14 +5897,49 @@
                     updateBoard2MoveIndicator(0);
                 }
 
-                const indicator = document.getElementById('fenCycleIndicator');
-                if (indicator) {
-                    indicator.textContent = variants.length > 1
-                        ? `FEN ${idx + 1}/${variants.length}`
-                        : 'FEN loaded';
+                const variantDisplay = document.getElementById('variantIndexDisplay');
+                if (variantDisplay) {
+                    variantDisplay.textContent = `${idx + 1}/${window.lookerIndex.length}`;
                 }
+                log(`Loaded entry ${idx + 1}/${window.lookerIndex.length}`, 'success');
             };
 
+            // Clear button - clears the looker index
+            const clearIndexBtn = document.getElementById('clearIndexBtn');
+            if (clearIndexBtn) {
+                clearIndexBtn.addEventListener('click', function() {
+                    window.lookerIndex = [];
+                    window.lookerIndexPos = -1;
+                    const variantDisplay = document.getElementById('variantIndexDisplay');
+                    if (variantDisplay) variantDisplay.textContent = '';
+                    log('Index cleared', 'success');
+                });
+            }
+
+            // Load Annotated PGN from clipboard - push to looker index
+            const loadClipboardPgnBtn = document.getElementById('loadClipboardPgnBtn');
+            if (loadClipboardPgnBtn) {
+                loadClipboardPgnBtn.addEventListener('click', async function() {
+                    try {
+                        const clipboardText = await navigator.clipboard.readText();
+                        const pgnString = clipboardText ? clipboardText.trim() : '';
+                        if (!pgnString) {
+                            alert('Clipboard is empty.');
+                            return;
+                        }
+
+                        // Push to looker index and navigate to it
+                        window.lookerIndex.push(pgnString);
+                        window.loadLookerEntry(window.lookerIndex.length - 1);
+                        log(`Appended PGN to index (${window.lookerIndex.length} total)`, 'success');
+                    } catch (err) {
+                        console.error('Clipboard read error:', err);
+                        alert('Could not read clipboard.');
+                    }
+                });
+            }
+
+            // Load FEN button - parses FEN/PGN-with-FEN-headers and pushes each to looker index
             const loadFenBtn = document.getElementById('loadFenBtn');
             if (loadFenBtn) {
                 loadFenBtn.addEventListener('click', async function() {
@@ -6085,7 +5957,6 @@
                         // Check for [FEN "..."] headers - split into separate blocks
                         const fenHeaderMatches = [...trimmed.matchAll(/\[FEN\s+"([^"]+)"\]/g)];
                         if (fenHeaderMatches.length > 0) {
-                            // Split text by [Variant ...] or [FEN ...] blocks
                             const blocks = trimmed.split(/(?=\[(?:Variant|FEN)\s+")/);
                             let currentFen = null;
                             let currentMoves = '';
@@ -6095,22 +5966,17 @@
                                 if (!bt) continue;
                                 const fenMatch = bt.match(/\[FEN\s+"([^"]+)"\]/);
                                 if (fenMatch) {
-                                    // Save previous block if we had one
                                     if (currentFen) {
                                         variants.push(`[Variant "From Position"]\n[FEN "${currentFen}"]\n\n${currentMoves.trim()}`);
                                     }
                                     currentFen = fenMatch[1];
-                                    // Extract moves: everything after the last header line
                                     currentMoves = bt.replace(/\[.*?\]/g, '').trim();
                                 } else if (bt.match(/\[Variant/)) {
-                                    // Variant header without FEN - skip, FEN will follow
                                     continue;
                                 } else if (currentFen) {
-                                    // Continuation lines (moves after headers)
                                     currentMoves += ' ' + bt;
                                 }
                             }
-                            // Push last block
                             if (currentFen) {
                                 variants.push(`[Variant "From Position"]\n[FEN "${currentFen}"]\n\n${currentMoves.trim()}`);
                             }
@@ -6119,7 +5985,6 @@
                             try {
                                 const testChess = new Chess();
                                 testChess.load(trimmed);
-                                // Wrap bare FEN as a PGN with header (no moves)
                                 variants.push(`[Variant "From Position"]\n[FEN "${trimmed}"]\n\n`);
                             } catch (e) {
                                 alert('Clipboard does not contain a valid FEN or FEN headers.');
@@ -6132,9 +5997,13 @@
                             return;
                         }
 
-                        window.loadedFenVariants = variants;
-                        window.loadFenVariantByIndex(0);
-                        log(`Loaded ${variants.length} FEN variant(s) from clipboard`, 'success');
+                        // Push each variant to the looker index
+                        for (const v of variants) {
+                            window.lookerIndex.push(v);
+                        }
+                        // Navigate to the first newly added entry
+                        window.loadLookerEntry(window.lookerIndex.length - variants.length);
+                        log(`Appended ${variants.length} FEN(s) to index (${window.lookerIndex.length} total)`, 'success');
                     } catch (err) {
                         console.error('Clipboard read error:', err);
                         alert('Could not read clipboard.');
@@ -6810,37 +6679,29 @@
                 window.updateFileSectionHeader(variant.fileSectionIndex);
             };
 
-            // Combined Prev FEN/PGN Variant Button
+            // Prev FEN/PGN - navigate looker index backward
             const prevVariantBtn = document.getElementById('prevVariant');
             if (prevVariantBtn) {
                 prevVariantBtn.addEventListener('click', function() {
-                    if (window.allVariants.length === 0) {
-                        const count = window.scanReportForAllVariants();
-                        if (count === 0) {
-                            alert('No FEN or PGN variants found in report.');
-                            return;
-                        }
-                    } else {
-                        window.currentVariantIndex = (window.currentVariantIndex - 1 + window.allVariants.length) % window.allVariants.length;
+                    if (window.lookerIndex.length === 0) {
+                        alert('Index is empty. Load PGN or FEN first.');
+                        return;
                     }
-                    window.loadCurrentVariant();
+                    const newIdx = (window.lookerIndexPos - 1 + window.lookerIndex.length) % window.lookerIndex.length;
+                    window.loadLookerEntry(newIdx);
                 });
             }
 
-            // Combined Next FEN/PGN Variant Button
+            // Next FEN/PGN - navigate looker index forward
             const nextVariantBtn = document.getElementById('nextVariant');
             if (nextVariantBtn) {
                 nextVariantBtn.addEventListener('click', function() {
-                    if (window.allVariants.length === 0) {
-                        const count = window.scanReportForAllVariants();
-                        if (count === 0) {
-                            alert('No FEN or PGN variants found in report.');
-                            return;
-                        }
-                    } else {
-                        window.currentVariantIndex = (window.currentVariantIndex + 1) % window.allVariants.length;
+                    if (window.lookerIndex.length === 0) {
+                        alert('Index is empty. Load PGN or FEN first.');
+                        return;
                     }
-                    window.loadCurrentVariant();
+                    const newIdx = (window.lookerIndexPos + 1) % window.lookerIndex.length;
+                    window.loadLookerEntry(newIdx);
                 });
             }
 

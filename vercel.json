@@ -13,6 +13,10 @@
   },
   "rewrites": [
     {
+      "source": "/looker",
+      "destination": "/chessLooker.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
