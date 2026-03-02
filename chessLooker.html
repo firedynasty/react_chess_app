@@ -4656,15 +4656,13 @@
                 currentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            // Reduce board opacity and add border when viewing a variation
+            // Reduce board opacity when viewing a variation
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 if (currentEl && currentEl.classList.contains('variation-move')) {
                     boardContainer.style.opacity = '0.75';
-                    boardContainer.style.border = '3px solid #555';
                 } else {
                     boardContainer.style.opacity = '1';
-                    boardContainer.style.border = 'none';
                 }
             }
 
@@ -4755,9 +4753,11 @@
                 if (hasChildVariations || hasSiblingVariations) {
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
+                    if (boardContainer) boardContainer.style.border = '4px solid #ffd700';
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
+                    if (boardContainer) boardContainer.style.border = 'none';
                 }
             }
 
@@ -5039,11 +5039,10 @@
                 el.classList.remove('current');
             });
 
-            // Restore full board opacity and remove border when at root
+            // Restore full board opacity when at root
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 boardContainer.style.opacity = '1';
-                boardContainer.style.border = 'none';
             }
 
             // Update other displays
@@ -5087,9 +5086,11 @@
                 if (window.moveTree.children && window.moveTree.children.length > 1) {
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
+                    if (boardContainer) boardContainer.style.border = '4px solid #ffd700';
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
+                    if (boardContainer) boardContainer.style.border = 'none';
                 }
             }
         }
