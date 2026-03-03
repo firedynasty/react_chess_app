@@ -874,7 +874,7 @@
                 style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
                 📋 Paste from Clipboard
             </button>
-            <button onclick="document.getElementById('insert-variation-input').value = ''"
+            <button onclick="document.getElementById('insert-variation-input').value = ''; resetDragBuild();"
                 style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
                 Clear
             </button>
@@ -3274,6 +3274,7 @@
                 statusEl.textContent = '✓ Variation inserted into PGN';
                 statusEl.style.color = '#27ae60';
                 inputEl.value = '';
+                window._dragBuild = null;
                 setTimeout(() => { statusEl.textContent = ''; }, 3000);
             }).catch(() => {
                 // Errors are shown in variation-status by analyzeForVariation
@@ -4821,6 +4822,9 @@
             const node = window.moveNodeRegistry[nodeId];
             if (!node) return;
 
+            // Reset drag-build state when navigating the move tree
+            window._dragBuild = null;
+
             window.currentMoveNode = node;
 
             // Update board position
@@ -5209,6 +5213,7 @@
         function jumpToRoot() {
             if (!window.moveTree) return;
 
+            window._dragBuild = null;
             window.currentMoveNode = null;
 
             // Update board position
@@ -5875,6 +5880,98 @@
             // STUDY TOOL INITIALIZATION
             // =========================================================
 
+            // Drag-build state: tracks position while user builds a variation by dragging pieces
+            window._dragBuild = null; // { fen, startNodeId, moveCount }
+
+            function resetDragBuild() {
+                if (window._dragBuild) {
+                    const savedNode = window._dragBuild.startNodeId;
+                    window._dragBuild = null;
+                    // Restore board to the navigated position
+                    if (window.currentMoveNode && window.board2) {
+                        window.board2.position(window.currentMoveNode.fen);
+                    }
+                    const statusEl = document.getElementById('insert-variation-status');
+                    if (statusEl) statusEl.textContent = '';
+                }
+            }
+
+            function handleBoardDrop(source, target, piece) {
+                // Need a loaded game with a current position
+                if (!window.currentMoveNode && !window.moveTree) return 'snapback';
+
+                // Determine the FEN to validate from
+                let baseFen;
+                if (window._dragBuild) {
+                    baseFen = window._dragBuild.fen;
+                } else {
+                    const node = window.currentMoveNode || window.moveTree;
+                    baseFen = node.fen;
+                }
+
+                const chess = new Chess(baseFen);
+
+                // Validate the move
+                const move = chess.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q' // auto-promote to queen
+                });
+
+                if (!move) return 'snapback';
+
+                // Initialize drag-build state on first drop
+                if (!window._dragBuild) {
+                    const node = window.currentMoveNode || window.moveTree;
+                    window._dragBuild = {
+                        fen: chess.fen(),
+                        startNodeId: node.nodeId,
+                        moveCount: 1
+                    };
+                } else {
+                    window._dragBuild.fen = chess.fen();
+                    window._dragBuild.moveCount++;
+                }
+
+                // Build the SAN text with move number
+                const fenParts = baseFen.split(' ');
+                const turnBefore = fenParts[1]; // 'w' or 'b'
+                const fullMoveNum = parseInt(fenParts[5]);
+                let moveText = '';
+
+                if (turnBefore === 'w') {
+                    moveText = fullMoveNum + '. ' + move.san;
+                } else {
+                    // For the first black move, include "N..." prefix
+                    const textarea = document.getElementById('insert-variation-input');
+                    const existing = textarea ? textarea.value.trim() : '';
+                    if (!existing) {
+                        moveText = fullMoveNum + '... ' + move.san;
+                    } else {
+                        moveText = move.san;
+                    }
+                }
+
+                // Append to the insert-variation textarea
+                const textarea = document.getElementById('insert-variation-input');
+                if (textarea) {
+                    const existing = textarea.value.trim();
+                    textarea.value = existing ? existing + ' ' + moveText : moveText;
+                    // Scroll textarea to bottom
+                    textarea.scrollTop = textarea.scrollHeight;
+                }
+
+                // Update status
+                const statusEl = document.getElementById('insert-variation-status');
+                if (statusEl) {
+                    statusEl.textContent = 'Building variation... (' + window._dragBuild.moveCount + ' move' + (window._dragBuild.moveCount > 1 ? 's' : '') + ')';
+                    statusEl.style.color = '#e67e22';
+                }
+
+                // Update board to new position (return undefined to let chessboard.js update)
+                window.board2.position(chess.fen());
+            }
+
             // Initialize Board2
             window.board2 = Chessboard('myBoard2', {
                 draggable: true,
@@ -5882,7 +5979,8 @@
                 position: 'start',
                 snapbackSpeed: 500,
                 snapSpeed: 100,
-                pieceTheme: pieceThemePath
+                pieceTheme: pieceThemePath,
+                onDrop: handleBoardDrop
             });
 
             // Force refresh board images after short delay (fixes Vercel deployment image loading)
