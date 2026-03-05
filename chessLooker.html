@@ -4502,6 +4502,8 @@
             container.innerHTML = '';
             container.style.display = 'block';
 
+            if (!rootNode) return;
+
             // Render from root's children (the actual moves)
             if (rootNode.children && rootNode.children.length > 0) {
                 renderMoveSequence(rootNode.children[0], container, true);
@@ -5763,26 +5765,47 @@
             window.loadLookerEntry = function(idx) {
                 if (!window.lookerIndex.length || idx < 0 || idx >= window.lookerIndex.length) return;
                 window.lookerIndexPos = idx;
-                const pgnString = window.lookerIndex[idx];
+                const entry = window.lookerIndex[idx];
 
-                // Parse positions and comments
-                const result = window.parsePgnToPositionsWithComments(pgnString);
-                window.studyReportPositions = result.positions;
-                window.studyReportComments = result.comments;
-                window.currentLoadedPgn = pgnString;
+                // Detect bare FEN: has slash-separated ranks and side-to-move indicator
+                const isFen = /^\S+\/\S+\/\S+\/\S+\/\S+\/\S+\/\S+\/\S+\s+[bw]\s/.test(entry);
 
-                // Parse with variation support and render move table
-                window.moveTree = window.parsePgnWithVariations(pgnString);
-                window.cycleVarSequence = [];
-                window.cycleVarIndex = -1;
-                window.currentMoveNode = null;
-                renderMoveTable(window.moveTree);
-                updateAllCommentsDisplay();
+                if (isFen) {
+                    // Load FEN directly onto the board
+                    window.studyReportPositions = [entry.split(' ').slice(0, 6).join(' ')];
+                    window.studyReportComments = {};
+                    window.currentLoadedPgn = '';
+                    window.moveTree = null;
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    window.currentMoveNode = null;
+                    renderMoveTable(null);
+                    updateAllCommentsDisplay();
+                    window.studyReportPositionIndex = 0;
+                    if (window.board2) {
+                        window.board2.position(window.studyReportPositions[0]);
+                        updateBoard2MoveIndicator(0);
+                    }
+                } else {
+                    // Parse as PGN
+                    const result = window.parsePgnToPositionsWithComments(entry);
+                    window.studyReportPositions = result.positions;
+                    window.studyReportComments = result.comments;
+                    window.currentLoadedPgn = entry;
 
-                window.studyReportPositionIndex = 0;
-                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                    window.board2.position(window.studyReportPositions[0]);
-                    updateBoard2MoveIndicator(0);
+                    // Parse with variation support and render move table
+                    window.moveTree = window.parsePgnWithVariations(entry);
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    window.currentMoveNode = null;
+                    renderMoveTable(window.moveTree);
+                    updateAllCommentsDisplay();
+
+                    window.studyReportPositionIndex = 0;
+                    if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                        window.board2.position(window.studyReportPositions[0]);
+                        updateBoard2MoveIndicator(0);
+                    }
                 }
 
                 const variantDisplay = document.getElementById('variantIndexDisplay');
@@ -5810,16 +5833,23 @@
                 loadClipboardPgnBtn.addEventListener('click', async function() {
                     try {
                         const clipboardText = await navigator.clipboard.readText();
-                        const pgnString = clipboardText ? clipboardText.trim() : '';
-                        if (!pgnString) {
+                        const trimmed = clipboardText ? clipboardText.trim() : '';
+                        if (!trimmed) {
                             alert('Clipboard is empty.');
                             return;
                         }
 
-                        // Push to looker index and navigate to it
-                        window.lookerIndex.push(pgnString);
-                        window.loadLookerEntry(window.lookerIndex.length - 1);
-                        log(`Appended PGN to index (${window.lookerIndex.length} total)`, 'success');
+                        // Split by newlines to support multiple rows from Google Sheets
+                        const rows = trimmed.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+
+                        for (const row of rows) {
+                            window.lookerIndex.push(row);
+                        }
+
+                        // Navigate to the first newly added entry
+                        const firstNewIdx = window.lookerIndex.length - rows.length;
+                        window.loadLookerEntry(firstNewIdx);
+                        log(`Loaded ${rows.length} row(s) to index (${window.lookerIndex.length} total)`, 'success');
                     } catch (err) {
                         console.error('Clipboard read error:', err);
                         alert('Could not read clipboard.');
