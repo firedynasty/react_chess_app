@@ -4749,8 +4749,7 @@
             const nextBtn = document.getElementById('board2NextMove');
             if (varIndicator) {
                 const hasChildVariations = node.children && node.children.length > 1;
-                const hasSiblingVariations = node.parent && node.parent.children && node.parent.children.length > 1;
-                if (hasChildVariations || hasSiblingVariations) {
+                if (hasChildVariations) {
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
                     if (boardContainer) boardContainer.style.border = '4px solid #ffd700';
