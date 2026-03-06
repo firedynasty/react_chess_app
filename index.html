@@ -5919,6 +5919,21 @@
 
                 if (!move) return 'snapback';
 
+                // If not in drag-build mode, check if this move is the next mainline move
+                // If so, just advance forward instead of starting a variation
+                if (!window._dragBuild) {
+                    const node = window.currentMoveNode || window.moveTree;
+                    if (node && node.children && node.children.length > 0) {
+                        const nextMainMove = node.children[0];
+                        if (nextMainMove.san === move.san) {
+                            // It's the next move in the game — just advance
+                            board2NextMove();
+                            // Return the new position so the board updates
+                            return;
+                        }
+                    }
+                }
+
                 // Initialize drag-build state on first drop
                 if (!window._dragBuild) {
                     const node = window.currentMoveNode || window.moveTree;
