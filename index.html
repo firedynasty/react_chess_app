@@ -8161,6 +8161,7 @@ End with a Socratic question about a specific position to help me learn.`
             const [apiKey, setApiKey] = useState('');
             const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
             const [useSharedKey, setUseSharedKey] = useState(false);
+            const [webSearchEnabled, setWebSearchEnabled] = useState(false);
             const [accessCode, setAccessCode] = useState('');
             const [messages, setMessages] = useState([]);
             const [inputValue, setInputValue] = useState('');
@@ -8241,6 +8242,7 @@ ${contentToAnalyze}`;
                             model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
+                            webSearch: webSearchEnabled,
                         })
                     });
 
@@ -8332,6 +8334,7 @@ ${contentToAnalyze}`;
                             model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
+                            webSearch: webSearchEnabled,
                         })
                     });
 
@@ -8382,6 +8385,7 @@ ${contentToAnalyze}`;
                             model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
+                            webSearch: webSearchEnabled,
                         })
                     });
 
@@ -8612,6 +8616,19 @@ ${contentToAnalyze}`;
                                 <option key={id} value={id}>{name}</option>
                             ))}
                         </select>
+
+                        {/* Web Search Toggle */}
+                        {aiProvider === 'ChatGPT' && (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#fff', cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={webSearchEnabled}
+                                    onChange={(e) => setWebSearchEnabled(e.target.checked)}
+                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                />
+                                Enable Web Search
+                            </label>
+                        )}
 
                         {/* Analyze full game with Chess Coach */}
                         <button

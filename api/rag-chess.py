@@ -16,7 +16,7 @@ except FileNotFoundError:
     CHESS_KNOWLEDGE = ""
 
 
-def call_llm(messages: list, system_prompt: str, api_key: str, model: str = "gpt-4o-mini", provider: str = "openai") -> str:
+def call_llm(messages: list, system_prompt: str, api_key: str, model: str = "gpt-4o-mini", provider: str = "openai", web_search: bool = False) -> str:
     """Call LLM API (OpenAI or Anthropic)."""
 
     if provider == "anthropic":
@@ -40,8 +40,40 @@ def call_llm(messages: list, system_prompt: str, api_key: str, model: str = "gpt
         with urllib.request.urlopen(req) as response:
             data = json.loads(response.read().decode('utf-8'))
             return data["content"][0]["text"]
+    elif web_search and provider == "openai":
+        # OpenAI Responses API with web_search tool
+        openai_messages = [{"role": "system", "content": system_prompt}] + messages
+
+        request_body = {
+            "model": model,
+            "tools": [{"type": "web_search"}],
+            "tool_choice": "auto",
+            "input": openai_messages,
+        }
+
+        req = urllib.request.Request(
+            "https://api.openai.com/v1/responses",
+            data=json.dumps(request_body).encode('utf-8'),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            }
+        )
+
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            # Extract text from response
+            if data.get("output_text"):
+                return data["output_text"]
+            if data.get("output"):
+                for item in data["output"]:
+                    if item.get("type") == "message" and item.get("content"):
+                        for content in item["content"]:
+                            if content.get("type") == "output_text" and content.get("text"):
+                                return content["text"]
+            raise Exception("No response from web search")
     else:
-        # OpenAI
+        # OpenAI Chat Completions API
         openai_messages = [{"role": "system", "content": system_prompt}] + messages
 
         request_body = {
@@ -126,6 +158,7 @@ class handler(BaseHTTPRequestHandler):
         model = body.get("model", "gpt-4o-mini")
         api_key = body.get("apiKey")
         access_code = body.get("accessCode")
+        web_search = body.get("webSearch", False)
 
         # Resolve API key
         llm_key = None
@@ -157,7 +190,7 @@ class handler(BaseHTTPRequestHandler):
                 augmented_messages.append({"role": "user", "content": query})
 
             # Call LLM with full knowledge base in system prompt
-            response_text = call_llm(augmented_messages, CHESS_SYSTEM_PROMPT, llm_key, model, provider)
+            response_text = call_llm(augmented_messages, CHESS_SYSTEM_PROMPT, llm_key, model, provider, web_search)
 
             send_json_response(200, {
                 "content": response_text,
