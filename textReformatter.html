@@ -88,6 +88,10 @@
     </style>
 </head>
 <body>
+    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 12px;">
+        <a href="/" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Analyzer</a>
+        <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
+    </div>
     <h1>Text Reformatter</h1>
     <p class="subtitle">Paste coach responses or any text — view formatted, or copy as one line for Google Sheets</p>
 
@@ -136,6 +140,16 @@
 
             // Lines that end with colon — treat as section headers
             s = s.replace(/^(.+:)\s*$/gm, '<span class="section-header">$1</span>');
+
+            // Insert line break every two sentences (after every 2nd period followed by a space)
+            let sentenceCount = 0;
+            s = s.replace(/(\.)(\s)/g, function(match, dot, space) {
+                sentenceCount++;
+                if (sentenceCount % 2 === 0) {
+                    return dot + '\n\n';
+                }
+                return match;
+            });
 
             // Preserve paragraph breaks
             s = s.replace(/\n{2,}/g, '\n\n');
