@@ -17,6 +17,10 @@
       "destination": "/chessLooker.html"
     },
     {
+      "source": "/reformatter",
+      "destination": "/textReformatter.html"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
