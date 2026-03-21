@@ -827,35 +827,6 @@
     </div>
 
     <!-- Extend Variation from Lichess -->
-    <div id="extend-variation-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
-        <div style="margin-bottom: 10px;">
-            <span style="color: #00d4ff; font-weight: bold; font-size: 14px;">📎 Extend Current Variation from Lichess</span>
-            <span style="color: #888; font-size: 12px; margin-left: 10px;">(Click on a variation move → Go to Lichess → Paste continuation)</span>
-        </div>
-        <textarea id="lichess-pgn-input"
-            placeholder="Paste Lichess PGN here (e.g., from position: 10... a5 11. Be2 a4)"
-            style="width: 100%; height: 80px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical;"></textarea>
-        <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button id="extend-variation-btn" onclick="extendCurrentVariation()"
-                style="padding: 8px 15px; background: #e67e22; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                Append to Variation
-            </button>
-            <button onclick="pasteFromClipboard()"
-                style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
-                📋 Paste from Clipboard
-            </button>
-            <button onclick="document.getElementById('lichess-pgn-input').value = ''"
-                style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">
-                Clear
-            </button>
-            <a id="lichessBoard2Link" href="#" target="_blank"
-                style="background: #00d4ff; color: #1a1a2e; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; text-decoration: none; display: inline-block;">
-                Go to Lichess (Analysis)
-            </a>
-            <span id="extend-variation-status" style="color: #888; font-size: 12px;"></span>
-        </div>
-        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Click a variation move → Go to Lichess to explore the line → paste the continuation here → Append to Variation adds the moves to the current variation and PGN</p>
-    </div>
 
     <!-- Insert Variation from Paste -->
     <div id="insert-variation-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
