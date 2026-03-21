@@ -574,7 +574,28 @@
             background: #9c27b0;
             color: #fff;
         }
+        .gdrive-csv-table-wrapper { max-height: 500px; overflow: auto; margin-top: 10px; }
+        .gdrive-csv-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: monospace; }
+        .gdrive-csv-table th { background: #1a1a3e; color: #61dafb; padding: 8px 12px; text-align: left; border: 1px solid #333; position: sticky; top: 0; z-index: 1; }
+        .gdrive-csv-table td { padding: 6px 12px; border: 1px solid #333; color: #eee; }
+        .gdrive-csv-table tbody tr { cursor: pointer; }
+        .gdrive-csv-table tbody tr:hover { background: #1a1a2e; }
+        .gdrive-csv-table tbody tr.gdrive-selected-row { background: #2a2a5e; outline: 1px solid #61dafb; }
+        .gdrive-cell-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #0f3460;
+            color: #eee;
+            border: 1px solid #1a1a2e;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+        .gdrive-cell-input:focus { outline: none; border-color: #00d4ff; }
     </style>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <h1>Chess Game Analyzer</h1>
@@ -591,7 +612,7 @@
     <div class="status-bar">
         <a href="https://youtu.be/fwPcoDfQwyo" target="_blank" style="background: #0f3460; color: #00d4ff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">Tutorial ↗</a>
         <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
-        <a href="/reformatter" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Text Reformatter</a>
+        <a href="/reformatter" target="_blank" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Text Reformatter</a>
     </div>
 
     <!-- Chess.com Import Section -->
@@ -998,6 +1019,32 @@
           placeholder="After clicking 'Set Variant', make moves on the board to build PGN..."
           readonly></textarea>
       </div>
+    </div>
+
+    <!-- Google Drive Sheets Loader -->
+    <div id="gdrive-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="color: #34a853; font-weight: bold; font-size: 14px;">Google Drive</span>
+            <select id="gdrive-sheet-select" style="padding: 6px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; font-size: 13px; min-width: 160px;" disabled>
+                <option value="">Sign in to load sheets</option>
+            </select>
+            <button onclick="gdriveCopyAll()" style="padding: 5px 12px; background: #8e44ad; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Copy</button>
+            <button onclick="gdriveClear()" style="padding: 5px 12px; background: #333; color: #888; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Clear</button>
+            <button id="gdrive-auth-btn" onclick="gdriveSignIn()" style="padding: 6px 14px; background: #333; color: #eee; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; margin-left: auto;">Sign In</button>
+        </div>
+        <div id="gdrive-status" style="margin-top: 6px; color: #888; font-size: 12px;"></div>
+        <!-- Two inputs: Column 1 (title) and Column 2 (PGN) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+            <div>
+                <label style="color: #888; font-size: 11px;">Column 1</label>
+                <input type="text" id="gdrive-cell1-input" class="gdrive-cell-input" placeholder="Row title will appear here..." readonly>
+            </div>
+            <div>
+                <label style="color: #888; font-size: 11px;">Column 2 (PGN)</label>
+                <input type="text" id="gdrive-cell2-input" class="gdrive-cell-input" placeholder="Annotated PGN will appear here..." readonly>
+            </div>
+        </div>
+        <div id="gdrive-table-area"></div>
     </div>
 
     <!-- Dropbox File Browser Sidebar -->
@@ -8717,6 +8764,253 @@ ${contentToAnalyze}`;
         // Render the component
         const root = ReactDOM.createRoot(document.getElementById('chess-chat-root'));
         root.render(<ChessChat />);
+    </script>
+
+    <!-- Google Drive Sheets Integration -->
+    <script>
+    (function() {
+        const GDRIVE_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
+        const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const GDRIVE_FILE_SEARCH = 'chessable';
+
+        let gdriveAccessToken = null;
+        let gdriveTokenClient = null;
+        let gdriveWorkbook = null;
+        let gdriveSelectedRow = null;
+
+        function gdriveParseCsvRows(text) {
+            const rows = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                if (inQuotes) {
+                    if (ch === '"' && text[i + 1] === '"') { current += '"'; i++; }
+                    else if (ch === '"') { inQuotes = false; }
+                    else { current += ch; }
+                } else {
+                    if (ch === '"') { inQuotes = true; }
+                    else if (ch === ',') { rows.push(current); current = ''; }
+                    else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+                        rows.push(current); current = '';
+                        if (ch === '\r') i++;
+                        return { cells: rows, rest: text.slice(i + 1) };
+                    } else { current += ch; }
+                }
+            }
+            rows.push(current);
+            return { cells: rows, rest: '' };
+        }
+
+        function gdriveParseCsv(text) {
+            const result = [];
+            let remaining = text.trim();
+            while (remaining.length > 0) {
+                const { cells, rest } = gdriveParseCsvRows(remaining);
+                result.push(cells);
+                remaining = rest;
+            }
+            return result;
+        }
+
+        function gdriveSetStatus(msg) {
+            document.getElementById('gdrive-status').textContent = msg;
+        }
+
+        function gdriveEscapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // Google OAuth
+        function gdriveInitClient() {
+            if (window.google && window.google.accounts) {
+                gdriveTokenClient = window.google.accounts.oauth2.initTokenClient({
+                    client_id: GDRIVE_CLIENT_ID,
+                    scope: GDRIVE_SCOPES,
+                    callback: function(response) {
+                        if (response.access_token) {
+                            gdriveAccessToken = response.access_token;
+                            document.getElementById('gdrive-auth-btn').textContent = 'Sign Out';
+                            gdriveSetStatus('Signed in. Loading ' + GDRIVE_FILE_SEARCH + '...');
+                            gdriveLoadChessable();
+                        }
+                    },
+                });
+            }
+        }
+
+        const checkGoogle = setInterval(function() {
+            if (window.google && window.google.accounts) {
+                clearInterval(checkGoogle);
+                gdriveInitClient();
+            }
+        }, 200);
+
+        window.gdriveSignIn = function() {
+            if (gdriveAccessToken) {
+                gdriveAccessToken = null;
+                gdriveWorkbook = null;
+                document.getElementById('gdrive-auth-btn').textContent = 'Sign In';
+                var sel = document.getElementById('gdrive-sheet-select');
+                sel.innerHTML = '<option value="">Sign in to load sheets</option>';
+                sel.disabled = true;
+                document.getElementById('gdrive-table-area').innerHTML = '';
+                document.getElementById('gdrive-cell1-input').value = '';
+                document.getElementById('gdrive-cell2-input').value = '';
+                gdriveSetStatus('Signed out');
+                return;
+            }
+            if (gdriveTokenClient) {
+                gdriveTokenClient.requestAccessToken();
+            } else {
+                gdriveSetStatus('Google API not loaded yet. Try again.');
+            }
+        };
+
+        async function gdriveLoadChessable() {
+            try {
+                var query = encodeURIComponent("name contains '" + GDRIVE_FILE_SEARCH + "' and trashed=false and mimeType='application/vnd.google-apps.spreadsheet'");
+                var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name,mimeType)&orderBy=name', {
+                    headers: { Authorization: 'Bearer ' + gdriveAccessToken }
+                });
+                if (!resp.ok) throw new Error('Search failed');
+                var data = await resp.json();
+                if (!data.files || data.files.length === 0) {
+                    gdriveSetStatus('No "' + GDRIVE_FILE_SEARCH + '" spreadsheet found');
+                    return;
+                }
+                var file = data.files[0];
+                gdriveSetStatus('Loading "' + file.name + '"...');
+                await gdriveLoadSpreadsheet(file.id, file.name);
+            } catch (err) {
+                gdriveSetStatus('Error: ' + err.message);
+            }
+        }
+
+        async function gdriveLoadSpreadsheet(fileId, fileName) {
+            try {
+                var exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=' + encodeURIComponent(exportMime), {
+                    headers: { Authorization: 'Bearer ' + gdriveAccessToken }
+                });
+                if (!resp.ok) throw new Error('Export failed');
+                var arrayBuffer = await resp.arrayBuffer();
+                gdriveWorkbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+
+                var sel = document.getElementById('gdrive-sheet-select');
+                sel.innerHTML = '<option value="">-- select sheet --</option>';
+                gdriveWorkbook.SheetNames.forEach(function(name) {
+                    var opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    sel.appendChild(opt);
+                });
+                sel.disabled = false;
+                gdriveSetStatus('Loaded "' + fileName + '" — ' + gdriveWorkbook.SheetNames.length + ' sheets');
+            } catch (err) {
+                gdriveSetStatus('Error: ' + err.message);
+            }
+        }
+
+        // Render sheet — row click populates two inputs and loads PGN
+        function gdriveRenderSheet(sheetName) {
+            if (!gdriveWorkbook) return;
+            var sheet = gdriveWorkbook.Sheets[sheetName];
+            var csv = XLSX.utils.sheet_to_csv(sheet);
+            var rows = gdriveParseCsv(csv);
+            if (rows.length === 0) {
+                document.getElementById('gdrive-table-area').innerHTML = '';
+                gdriveSetStatus('Sheet "' + sheetName + '" is empty');
+                return;
+            }
+
+            var header = rows[0];
+            var html = '<div class="gdrive-csv-table-wrapper"><table class="gdrive-csv-table"><thead><tr>';
+            header.forEach(function(h) { html += '<th>' + gdriveEscapeHtml(h) + '</th>'; });
+            html += '</tr></thead><tbody>';
+            rows.slice(1).forEach(function(row, ri) {
+                html += '<tr data-row-index="' + ri + '">';
+                row.forEach(function(cell) { html += '<td>' + gdriveEscapeHtml(cell) + '</td>'; });
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            document.getElementById('gdrive-table-area').innerHTML = html;
+            gdriveSelectedRow = null;
+
+            // Row click — populate Column 1 + Column 2 inputs, paste PGN into pgnInput
+            document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(tr) {
+                tr.addEventListener('click', function() {
+                    var ri = parseInt(tr.dataset.rowIndex);
+                    var dataRows = rows.slice(1);
+                    var col1 = (dataRows[ri] && dataRows[ri][0]) || '';
+                    var col2 = (dataRows[ri] && dataRows[ri][1]) || '';
+
+                    // Highlight row
+                    document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(r) { r.classList.remove('gdrive-selected-row'); });
+                    tr.classList.add('gdrive-selected-row');
+                    gdriveSelectedRow = ri;
+
+                    // Populate the two inputs
+                    document.getElementById('gdrive-cell1-input').value = col1;
+                    document.getElementById('gdrive-cell2-input').value = col2;
+
+                    // Paste annotated PGN into the main PGN input
+                    var pgnInput = document.getElementById('pgnInput');
+                    if (pgnInput && col2.trim()) {
+                        pgnInput.value = col2;
+                        pgnInput.dispatchEvent(new Event('input'));
+                    }
+
+                    gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → PGN pasted');
+                });
+            });
+
+            gdriveSetStatus('Loaded sheet "' + sheetName + '" — ' + (rows.length - 1) + ' rows');
+        }
+
+        // Dropdown change
+        document.getElementById('gdrive-sheet-select').addEventListener('change', function() {
+            if (this.value) gdriveRenderSheet(this.value);
+            else document.getElementById('gdrive-table-area').innerHTML = '';
+        });
+
+        // Copy entire sheet as CSV
+        window.gdriveCopyAll = function() {
+            if (!gdriveWorkbook) return;
+            var sel = document.getElementById('gdrive-sheet-select').value;
+            if (!sel) return;
+            var sheet = gdriveWorkbook.Sheets[sel];
+            var csv = XLSX.utils.sheet_to_csv(sheet);
+            navigator.clipboard.writeText(csv).then(function() {
+                gdriveSetStatus('Copied sheet "' + sel + '" to clipboard');
+            });
+        };
+
+        // Clear
+        window.gdriveClear = function() {
+            document.getElementById('gdrive-table-area').innerHTML = '';
+            document.getElementById('gdrive-sheet-select').selectedIndex = 0;
+            document.getElementById('gdrive-cell1-input').value = '';
+            document.getElementById('gdrive-cell2-input').value = '';
+            gdriveSetStatus('');
+        };
+
+        // Hook into Copy PGN — also populate the Column 2 input
+        var origCopyPgnToClipboard = window.copyPgnToClipboard;
+        window.copyPgnToClipboard = function() {
+            origCopyPgnToClipboard();
+            // After copying, also update the Column 2 input with the copied PGN
+            var pgn;
+            if (window.moveTree) {
+                pgn = typeof moveTreeToPgn === 'function' ? moveTreeToPgn(window.moveTree) : null;
+            } else {
+                pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
+            }
+            if (pgn) {
+                document.getElementById('gdrive-cell2-input').value = pgn;
+            }
+        };
+    })();
     </script>
 </body>
 </html>

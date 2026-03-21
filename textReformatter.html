@@ -78,6 +78,57 @@
             margin-bottom: 4px;
         }
 
+        .clipboard-history {
+            margin-top: 20px;
+        }
+        .clipboard-history h3 {
+            color: #ffd43b;
+            margin-bottom: 10px;
+            font-size: 15px;
+        }
+        .clipboard-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            border-radius: 0.25rem;
+            background-color: rgb(255, 212, 59);
+            transition: background-color 0.2s;
+            font-weight: bold;
+            box-shadow: rgba(255, 212, 59, 0.5) 0px 0px 5px;
+            color: #1a1a2e;
+            font-size: 14px;
+            word-wrap: break-word;
+        }
+        .clipboard-item:hover {
+            background-color: rgb(255, 225, 100);
+        }
+
+        .font-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .font-controls button {
+            width: 34px;
+            height: 34px;
+            padding: 0;
+            font-size: 18px;
+            font-weight: bold;
+            background: #0f3460;
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .font-controls span {
+            color: #888;
+            font-size: 13px;
+            min-width: 38px;
+            text-align: center;
+        }
+
         .stats {
             display: flex;
             gap: 20px;
@@ -100,6 +151,11 @@
         <button class="btn-copy-plain" onclick="copyFormatted()">Copy Formatted</button>
         <button class="btn-copy-oneline" onclick="copyOneLine()">Copy One-Line (Sheets)</button>
         <button class="btn-clear" onclick="clearAll()">Clear</button>
+        <div class="font-controls">
+            <button onclick="changeFontSize(-1)">−</button>
+            <span id="fontSizeLabel">15px</span>
+            <button onclick="changeFontSize(1)">+</button>
+        </div>
     </div>
 
     <textarea class="input-area" id="inputArea" placeholder="Paste or type raw text here..."></textarea>
@@ -109,6 +165,11 @@
     <div class="stats">
         <span id="charCount">0 chars</span>
         <span id="wordCount">0 words</span>
+    </div>
+
+    <div class="clipboard-history" id="clipboardHistory" style="display:none;">
+        <h3>Clipboard History (click to re-copy)</h3>
+        <div id="clipboardItems"></div>
     </div>
 
     <script>
@@ -176,14 +237,20 @@
         function copyFormatted() {
             const text = inputArea.value.trim();
             if (!text) return;
-            navigator.clipboard.writeText(text).then(() => flash('btn-copy-plain', 'Copied!'));
+            navigator.clipboard.writeText(text).then(() => {
+                flash('btn-copy-plain', 'Copied!');
+                addToClipboardHistory(text);
+            });
         }
 
         function copyOneLine() {
             const text = inputArea.value.trim();
             if (!text) return;
             const oneLine = text.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
-            navigator.clipboard.writeText(oneLine).then(() => flash('btn-copy-oneline', 'Copied!'));
+            navigator.clipboard.writeText(oneLine).then(() => {
+                flash('btn-copy-oneline', 'Copied!');
+                addToClipboardHistory(oneLine);
+            });
         }
 
         function clearAll() {
@@ -197,6 +264,51 @@
             const orig = btn.textContent;
             btn.textContent = msg;
             setTimeout(() => btn.textContent = orig, 1500);
+        }
+
+        // Font size controls
+        let currentFontSize = 15;
+        function changeFontSize(delta) {
+            currentFontSize = Math.max(10, Math.min(28, currentFontSize + delta));
+            outputPanel.style.fontSize = currentFontSize + 'px';
+            inputArea.style.fontSize = currentFontSize + 'px';
+            document.getElementById('fontSizeLabel').textContent = currentFontSize + 'px';
+        }
+
+        // Clipboard history
+        const clipboardItems = [];
+        function addToClipboardHistory(text) {
+            const preview = text.length > 200 ? text.substring(0, 200) + '...' : text;
+            clipboardItems.unshift({ full: text, preview: preview });
+            if (clipboardItems.length > 20) clipboardItems.pop();
+            renderClipboardHistory();
+        }
+
+        function renderClipboardHistory() {
+            const container = document.getElementById('clipboardItems');
+            const historySection = document.getElementById('clipboardHistory');
+            if (clipboardItems.length === 0) {
+                historySection.style.display = 'none';
+                return;
+            }
+            historySection.style.display = 'block';
+            container.innerHTML = clipboardItems.map((item, i) =>
+                `<div class="clipboard-item" onclick="reCopy(${i})" title="Click to copy">${item.preview.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>`
+            ).join('');
+        }
+
+        function reCopy(index) {
+            navigator.clipboard.writeText(clipboardItems[index].full).then(() => {
+                const items = document.querySelectorAll('.clipboard-item');
+                if (items[index]) {
+                    items[index].style.backgroundColor = '#28a745';
+                    items[index].style.color = 'white';
+                    setTimeout(() => {
+                        items[index].style.backgroundColor = 'rgb(255, 212, 59)';
+                        items[index].style.color = '#1a1a2e';
+                    }, 800);
+                }
+            });
         }
     </script>
 </body>
