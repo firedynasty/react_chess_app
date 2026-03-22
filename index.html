@@ -1033,7 +1033,7 @@
             <button id="gdrive-auth-btn" onclick="gdriveSignIn()" style="padding: 6px 14px; background: #333; color: #eee; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; margin-left: auto;">Sign In</button>
         </div>
         <div id="gdrive-status" style="margin-top: 6px; color: #888; font-size: 12px;"></div>
-        <!-- Two inputs: Column 1 (title) and Column 2 (PGN) -->
+        <!-- Three inputs: Column 1 (title), Column 2 (PGN), Column 3 (PGN/custom) -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
             <div>
                 <label style="color: #888; font-size: 11px;">Column 1</label>
@@ -1043,6 +1043,13 @@
                 <label style="color: #888; font-size: 11px;">Column 2 (PGN)</label>
                 <input type="text" id="gdrive-cell2-input" class="gdrive-cell-input" placeholder="Annotated PGN will appear here..." readonly>
             </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 10px; align-items: flex-end;">
+            <div style="flex: 1;">
+                <label style="color: #888; font-size: 11px;">Column 3 (PGN to save — auto-filled from Copy PGN, or type your own)</label>
+                <input type="text" id="gdrive-cell3-input" class="gdrive-cell-input" placeholder="PGN will appear here when you click Copy PGN...">
+            </div>
+            <button onclick="gdriveSaveRow()" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px;">Save Row</button>
         </div>
         <div id="gdrive-table-area"></div>
     </div>
@@ -8770,13 +8777,14 @@ ${contentToAnalyze}`;
     <script>
     (function() {
         const GDRIVE_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
-        const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
         const GDRIVE_FILE_SEARCH = 'chessable';
 
         let gdriveAccessToken = null;
         let gdriveTokenClient = null;
         let gdriveWorkbook = null;
         let gdriveSelectedRow = null;
+        let gdriveFileId = null;
 
         function gdriveParseCsvRows(text) {
             const rows = [];
@@ -8850,6 +8858,7 @@ ${contentToAnalyze}`;
             if (gdriveAccessToken) {
                 gdriveAccessToken = null;
                 gdriveWorkbook = null;
+                gdriveFileId = null;
                 document.getElementById('gdrive-auth-btn').textContent = 'Sign In';
                 var sel = document.getElementById('gdrive-sheet-select');
                 sel.innerHTML = '<option value="">Sign in to load sheets</option>';
@@ -8857,6 +8866,7 @@ ${contentToAnalyze}`;
                 document.getElementById('gdrive-table-area').innerHTML = '';
                 document.getElementById('gdrive-cell1-input').value = '';
                 document.getElementById('gdrive-cell2-input').value = '';
+                document.getElementById('gdrive-cell3-input').value = '';
                 gdriveSetStatus('Signed out');
                 return;
             }
@@ -8889,6 +8899,7 @@ ${contentToAnalyze}`;
 
         async function gdriveLoadSpreadsheet(fileId, fileName) {
             try {
+                gdriveFileId = fileId;
                 var exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=' + encodeURIComponent(exportMime), {
                     headers: { Authorization: 'Bearer ' + gdriveAccessToken }
@@ -8986,20 +8997,60 @@ ${contentToAnalyze}`;
             });
         };
 
+        // Save row — append [col1, col2, col3] to current sheet
+        window.gdriveSaveRow = async function() {
+            if (!gdriveAccessToken) { gdriveSetStatus('Error: not signed in'); return; }
+            if (!gdriveFileId) { gdriveSetStatus('Error: no spreadsheet loaded'); return; }
+            var sheetName = document.getElementById('gdrive-sheet-select').value;
+            if (!sheetName) { gdriveSetStatus('Error: select a sheet first'); return; }
+
+            var col1 = document.getElementById('gdrive-cell1-input').value;
+            var col2 = document.getElementById('gdrive-cell2-input').value;
+            var col3Input = document.getElementById('gdrive-cell3-input').value;
+            // Use col3 input if filled, otherwise fall back to PGN from Copy PGN
+            var col3 = col3Input.trim() || col2;
+            if (!col1 && !col2 && !col3) { gdriveSetStatus('Error: nothing to save'); return; }
+
+            gdriveSetStatus('Saving row...');
+            try {
+                var encodedSheet = encodeURIComponent(sheetName);
+                var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + gdriveFileId + '/values/' + encodedSheet + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+                var resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + gdriveAccessToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ values: [[col1, col2, col3]] }),
+                });
+                if (!resp.ok) {
+                    var errData = await resp.json().catch(function() { return {}; });
+                    throw new Error(errData.error?.message || 'HTTP ' + resp.status);
+                }
+                gdriveSetStatus('Row appended to "' + sheetName + '" successfully!');
+                // Reload the sheet to show the new row
+                await gdriveLoadSpreadsheet(gdriveFileId, '');
+                gdriveRenderSheet(sheetName);
+                document.getElementById('gdrive-sheet-select').value = sheetName;
+            } catch (err) {
+                gdriveSetStatus('Error saving: ' + err.message);
+            }
+        };
+
         // Clear
         window.gdriveClear = function() {
             document.getElementById('gdrive-table-area').innerHTML = '';
             document.getElementById('gdrive-sheet-select').selectedIndex = 0;
             document.getElementById('gdrive-cell1-input').value = '';
             document.getElementById('gdrive-cell2-input').value = '';
+            document.getElementById('gdrive-cell3-input').value = '';
             gdriveSetStatus('');
         };
 
-        // Hook into Copy PGN — also populate the Column 2 input
+        // Hook into Copy PGN — also populate Column 2 and Column 3 inputs
         var origCopyPgnToClipboard = window.copyPgnToClipboard;
         window.copyPgnToClipboard = function() {
             origCopyPgnToClipboard();
-            // After copying, also update the Column 2 input with the copied PGN
             var pgn;
             if (window.moveTree) {
                 pgn = typeof moveTreeToPgn === 'function' ? moveTreeToPgn(window.moveTree) : null;
@@ -9008,6 +9059,11 @@ ${contentToAnalyze}`;
             }
             if (pgn) {
                 document.getElementById('gdrive-cell2-input').value = pgn;
+                // Also fill Column 3 if it's empty
+                var cell3 = document.getElementById('gdrive-cell3-input');
+                if (!cell3.value.trim()) {
+                    cell3.value = pgn;
+                }
             }
         };
     })();
