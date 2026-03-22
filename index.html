@@ -8956,12 +8956,13 @@ ${contentToAnalyze}`;
 
             // Row click — populate inputs, copy selected cell to cell3, load PGN or copy to clipboard
             document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(tr) {
-                tr.addEventListener('click', function() {
+                tr.addEventListener('click', async function() {
                     var ri = parseInt(tr.dataset.rowIndex);
                     var dataRows = rows.slice(1);
-                    var col1 = (dataRows[ri] && dataRows[ri][0]) || '';
-                    var col2 = (dataRows[ri] && dataRows[ri][1]) || '';
-                    var col3 = (dataRows[ri] && dataRows[ri][2]) || '';
+                    var row = dataRows[ri] || [];
+                    var col1 = row[0] || '';
+                    var col2 = row[1] || '';
+                    var label = col1.length > 50 ? col1.substring(0, 50) + '...' : col1;
 
                     // Highlight row
                     document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(r) { r.classList.remove('gdrive-selected-row'); });
@@ -8974,8 +8975,8 @@ ${contentToAnalyze}`;
 
                     // Determine which cell to use based on radio toggle
                     var copyCellRadio = document.querySelector('input[name="gdriveCopyCell"]:checked');
-                    var copyCellIndex = copyCellRadio ? parseInt(copyCellRadio.value) : 2;
-                    var cellText = (dataRows[ri] && dataRows[ri][copyCellIndex]) || '';
+                    var copyCellIndex = copyCellRadio ? parseInt(copyCellRadio.value) : 1;
+                    var cellText = row[copyCellIndex] || '';
 
                     // Put selected cell value into Column 3 input
                     document.getElementById('gdrive-cell3-input').value = cellText;
@@ -9003,18 +9004,17 @@ ${contentToAnalyze}`;
                                 window.board2.position(window.studyReportPositions[0]);
                                 if (typeof updateBoard2MoveIndicator === 'function') updateBoard2MoveIndicator(0);
                             }
-                            gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → PGN loaded');
+                            gdriveSetStatus('Loaded row: "' + label + '" → PGN loaded');
                         } catch (err) {
-                            // Fallback: copy to clipboard if PGN parsing fails
-                            navigator.clipboard.writeText(cellText);
-                            gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → copied to clipboard');
+                            await navigator.clipboard.writeText(cellText).catch(function(){});
+                            gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard (PGN parse failed)');
                         }
                     } else if (cellText.trim()) {
                         // Not PGN — copy to clipboard
-                        navigator.clipboard.writeText(cellText);
-                        gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → copied to clipboard');
+                        await navigator.clipboard.writeText(cellText).catch(function(){});
+                        gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard');
                     } else {
-                        gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → cell empty');
+                        gdriveSetStatus('Loaded row: "' + label + '" → selected cell (col ' + (copyCellIndex + 1) + ') is empty');
                     }
                 });
             });
