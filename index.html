@@ -8981,38 +8981,39 @@ ${contentToAnalyze}`;
                     // Put selected cell value into Column 3 input
                     document.getElementById('gdrive-cell3-input').value = cellText;
 
-                    // Check if it looks like PGN (contains move numbers like "1." or "1...")
-                    var isPgn = /\b1\.\s*[A-Za-z]/.test(cellText.trim());
+                    // Check if it looks like PGN — must start with "1." (possibly after [headers])
+                    var pgnTest = cellText.trim().replace(/\[[^\]]*\]\s*/g, '');
+                    var isPgn = /^1\.\s*[A-Za-z]/.test(pgnTest);
 
-                    if (isPgn && cellText.trim()) {
-                        // Load as annotated PGN (same as Load Annotated PGN button)
-                        try {
-                            var result = window.parsePgnToPositionsWithComments(cellText.trim());
-                            window.studyReportPositions = result.positions;
-                            window.studyReportComments = result.comments;
-                            window.currentLoadedPgn = cellText.trim();
+                    if (cellText.trim()) {
+                        if (isPgn) {
+                            // Load as annotated PGN into the board (no clipboard copy)
+                            try {
+                                var result = window.parsePgnToPositionsWithComments(cellText.trim());
+                                window.studyReportPositions = result.positions;
+                                window.studyReportComments = result.comments;
+                                window.currentLoadedPgn = cellText.trim();
 
-                            window.moveTree = window.parsePgnWithVariations(cellText.trim());
-                            window.cycleVarSequence = [];
-                            window.cycleVarIndex = -1;
-                            window.currentMoveNode = null;
-                            if (typeof renderMoveTable === 'function') renderMoveTable(window.moveTree);
-                            if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
+                                window.moveTree = window.parsePgnWithVariations(cellText.trim());
+                                window.cycleVarSequence = [];
+                                window.cycleVarIndex = -1;
+                                window.currentMoveNode = null;
+                                if (typeof renderMoveTable === 'function') renderMoveTable(window.moveTree);
+                                if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
 
-                            window.studyReportPositionIndex = 0;
-                            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                                window.board2.position(window.studyReportPositions[0]);
-                                if (typeof updateBoard2MoveIndicator === 'function') updateBoard2MoveIndicator(0);
+                                window.studyReportPositionIndex = 0;
+                                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                                    window.board2.position(window.studyReportPositions[0]);
+                                    if (typeof updateBoard2MoveIndicator === 'function') updateBoard2MoveIndicator(0);
+                                }
+                                gdriveSetStatus('Loaded row: "' + label + '" → PGN loaded');
+                            } catch (err) {
+                                await navigator.clipboard.writeText(cellText).catch(function(){});
+                                gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard (PGN parse failed)');
                             }
-                            gdriveSetStatus('Loaded row: "' + label + '" → PGN loaded');
-                        } catch (err) {
-                            await navigator.clipboard.writeText(cellText).catch(function(){});
-                            gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard (PGN parse failed)');
+                        } else {
+                            gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard');
                         }
-                    } else if (cellText.trim()) {
-                        // Not PGN — copy to clipboard
-                        await navigator.clipboard.writeText(cellText).catch(function(){});
-                        gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard');
                     } else {
                         gdriveSetStatus('Loaded row: "' + label + '" → selected cell (col ' + (copyCellIndex + 1) + ') is empty');
                     }
