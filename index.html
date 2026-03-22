@@ -1033,6 +1033,12 @@
             <button id="gdrive-auth-btn" onclick="gdriveSignIn()" style="padding: 6px 14px; background: #333; color: #eee; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; margin-left: auto;">Sign In</button>
         </div>
         <div id="gdrive-status" style="margin-top: 6px; color: #888; font-size: 12px;"></div>
+        <!-- Radio toggle: which cell to copy on row click -->
+        <div class="copy-cell-toggle" style="margin-top: 10px; display: flex; gap: 12px; align-items: center;">
+            <span style="color: #888; font-size: 11px;">Row click copies:</span>
+            <label style="color: #ccc; font-size: 12px; cursor: pointer;"><input type="radio" name="gdriveCopyCell" value="1"> Cell 2</label>
+            <label style="color: #ccc; font-size: 12px; cursor: pointer;"><input type="radio" name="gdriveCopyCell" value="2" checked> Cell 3</label>
+        </div>
         <!-- Three inputs: Column 1 (title), Column 2 (PGN), Column 3 (PGN/custom) -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
             <div>
@@ -8948,31 +8954,68 @@ ${contentToAnalyze}`;
             document.getElementById('gdrive-table-area').innerHTML = html;
             gdriveSelectedRow = null;
 
-            // Row click — populate Column 1 + Column 2 inputs, paste PGN into pgnInput
+            // Row click — populate inputs, copy selected cell to cell3, load PGN or copy to clipboard
             document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(tr) {
                 tr.addEventListener('click', function() {
                     var ri = parseInt(tr.dataset.rowIndex);
                     var dataRows = rows.slice(1);
                     var col1 = (dataRows[ri] && dataRows[ri][0]) || '';
                     var col2 = (dataRows[ri] && dataRows[ri][1]) || '';
+                    var col3 = (dataRows[ri] && dataRows[ri][2]) || '';
 
                     // Highlight row
                     document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(r) { r.classList.remove('gdrive-selected-row'); });
                     tr.classList.add('gdrive-selected-row');
                     gdriveSelectedRow = ri;
 
-                    // Populate the two inputs
+                    // Populate the inputs
                     document.getElementById('gdrive-cell1-input').value = col1;
                     document.getElementById('gdrive-cell2-input').value = col2;
 
-                    // Paste annotated PGN into the main PGN input
-                    var pgnInput = document.getElementById('pgnInput');
-                    if (pgnInput && col2.trim()) {
-                        pgnInput.value = col2;
-                        pgnInput.dispatchEvent(new Event('input'));
-                    }
+                    // Determine which cell to use based on radio toggle
+                    var copyCellRadio = document.querySelector('input[name="gdriveCopyCell"]:checked');
+                    var copyCellIndex = copyCellRadio ? parseInt(copyCellRadio.value) : 2;
+                    var cellText = (dataRows[ri] && dataRows[ri][copyCellIndex]) || '';
 
-                    gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → PGN pasted');
+                    // Put selected cell value into Column 3 input
+                    document.getElementById('gdrive-cell3-input').value = cellText;
+
+                    // Check if it looks like PGN (contains move numbers like "1." or "1...")
+                    var isPgn = /\b1\.\s*[A-Za-z]/.test(cellText.trim());
+
+                    if (isPgn && cellText.trim()) {
+                        // Load as annotated PGN (same as Load Annotated PGN button)
+                        try {
+                            var result = window.parsePgnToPositionsWithComments(cellText.trim());
+                            window.studyReportPositions = result.positions;
+                            window.studyReportComments = result.comments;
+                            window.currentLoadedPgn = cellText.trim();
+
+                            window.moveTree = window.parsePgnWithVariations(cellText.trim());
+                            window.cycleVarSequence = [];
+                            window.cycleVarIndex = -1;
+                            window.currentMoveNode = null;
+                            if (typeof renderMoveTable === 'function') renderMoveTable(window.moveTree);
+                            if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
+
+                            window.studyReportPositionIndex = 0;
+                            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                                window.board2.position(window.studyReportPositions[0]);
+                                if (typeof updateBoard2MoveIndicator === 'function') updateBoard2MoveIndicator(0);
+                            }
+                            gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → PGN loaded');
+                        } catch (err) {
+                            // Fallback: copy to clipboard if PGN parsing fails
+                            navigator.clipboard.writeText(cellText);
+                            gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → copied to clipboard');
+                        }
+                    } else if (cellText.trim()) {
+                        // Not PGN — copy to clipboard
+                        navigator.clipboard.writeText(cellText);
+                        gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → copied to clipboard');
+                    } else {
+                        gdriveSetStatus('Loaded row: "' + (col1.length > 50 ? col1.substring(0, 50) + '...' : col1) + '" → cell empty');
+                    }
                 });
             });
 
