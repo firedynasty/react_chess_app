@@ -679,6 +679,7 @@
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
                 <button onclick="clearResults()" style="background: #333; color: #888;">Clear</button>
                 <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
+                <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
             </div>
 
             <div class="progress-bar" id="progressBar" style="display: none;">
@@ -1831,6 +1832,10 @@
                 return;
             }
 
+            // Save original PGN for Chessis {Best:} extraction later
+            const originalPgnForChessis = pgn;
+            const hasChessisBestMoves = pgn.includes('{Best:');
+
             // Reset move tree and container (fresh state like a page refresh)
             window.moveTree = null;
             window.currentMoveNode = null;
@@ -2173,6 +2178,70 @@
 
                 // Clear the input textarea (PGN is now in moveContainer and hidden variable)
                 document.getElementById('pgnInput').value = '';
+
+                // Auto-add Chessis {Best:} moves as variations with Stockfish PV lines
+                if (hasChessisBestMoves) {
+                    log('Chessis annotations detected — running Stockfish for best-move variations...', 'info');
+
+                    // Build move tree from annotated PGN so variations can be inserted
+                    if (typeof window.parsePgnWithVariations === 'function') {
+                        window.moveTree = window.parsePgnWithVariations(annotatedPgn);
+                        window.currentMoveNode = null;
+                        window.cycleVarSequence = [];
+                        window.cycleVarIndex = -1;
+                        renderMoveTable(window.moveTree);
+                    }
+
+                    // Get positions array for FEN lookup
+                    const positions = getPositionsFromPgn(pgn);
+                    const chessisMoves = extractAllChessisBestMoves(originalPgnForChessis);
+                    const variationDepth = parseInt(document.getElementById('variation-depth').value) || depth;
+                    let addedCount = 0;
+
+                    for (const cm of chessisMoves) {
+                        const plyIndex = (cm.moveNumber - 1) * 2 + (cm.isBlack ? 1 : 0);
+                        if (!positions || plyIndex >= positions.length) continue;
+
+                        const fen = positions[plyIndex]; // Position BEFORE the move
+                        const moveLabel = cm.isBlack ? `${cm.moveNumber}...` : `${cm.moveNumber}.`;
+
+                        try {
+                            log(`Stockfish analyzing ${moveLabel} (Best: ${cm.bestMove})...`, 'info');
+                            const result = await analyzePositionForVariation(fen, variationDepth);
+
+                            if (result && result.pv && result.pv.length > 0) {
+                                // Use Stockfish PV (full continuation line)
+                                window.currentVariationResult = {
+                                    moveNumber: cm.moveNumber,
+                                    isBlack: cm.isBlack,
+                                    plyIndex: plyIndex,
+                                    fen: fen,
+                                    bestMove: result.bestMove,
+                                    score: result.score,
+                                    pv: result.pv
+                                };
+                                addVariationToPgn();
+                                addedCount++;
+                            } else {
+                                // Fallback: add just the Chessis best move
+                                const movePrefix = cm.isBlack
+                                    ? `${cm.moveNumber}... ${cm.bestMove}`
+                                    : `${cm.moveNumber}. ${cm.bestMove}`;
+                                const statusEl = document.getElementById('variation-status');
+                                const resultEl = document.getElementById('variation-result');
+                                await addMovesAsVariation(movePrefix, statusEl, resultEl);
+                                addedCount++;
+                            }
+                        } catch (e) {
+                            log(`Could not add variation at ${moveLabel}: ${e.message}`, 'warning');
+                        }
+                    }
+
+                    if (addedCount > 0) {
+                        log(`Added ${addedCount} Chessis best-move variations with Stockfish lines`, 'success');
+                        updateReportWithPgn();
+                    }
+                }
 
                 setStatus('ready', 'Analysis complete');
                 log(`Analysis complete: ${blunders} blunders, ${mistakeCount} mistakes`, 'success');
@@ -2824,6 +2893,119 @@
         // Store current variation analysis result
         window.currentVariationResult = null;
 
+        function extractChessisBestMove(pgn, moveNumber, isBlack) {
+            // Extract {Best: X} annotation for a specific move from Chessis-annotated PGN
+            // Strip PGN headers first
+            const movesSection = pgn.replace(/\[[^\]]*\]\s*/g, '').trim();
+
+            // Tokenize properly: separate move numbers, moves, and {annotations} as whole units
+            const tokenRegex = /\{[^}]*\}|\d+\.{1,3}|[^\s{}]+/g;
+            const tokens = [];
+            let m;
+            while ((m = tokenRegex.exec(movesSection)) !== null) {
+                tokens.push(m[0]);
+            }
+
+            let currentMoveNum = 0;
+            let lookingForBlackMove = false;
+
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+
+                // Skip annotation blocks
+                if (token.startsWith('{')) continue;
+
+                // Match move number like "14." or "2."
+                const moveNumMatch = token.match(/^(\d+)(\.{1,3})$/);
+                if (moveNumMatch) {
+                    currentMoveNum = parseInt(moveNumMatch[1]);
+                    lookingForBlackMove = moveNumMatch[2].length === 3;
+                    continue;
+                }
+
+                // Skip results
+                if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(token)) continue;
+
+                // This is a move token
+                if (currentMoveNum === 0) continue;
+
+                const isThisBlack = lookingForBlackMove;
+
+                if (currentMoveNum === moveNumber && isThisBlack === isBlack) {
+                    // Look at the next token for {Best: X} or {... Best: X}
+                    if (i + 1 < tokens.length && tokens[i + 1].startsWith('{')) {
+                        const annotation = tokens[i + 1];
+                        const bestMatch = annotation.match(/Best:\s*([^}]+)/);
+                        if (bestMatch) {
+                            return bestMatch[1].trim();
+                        }
+                    }
+                    return null;
+                }
+
+                // Toggle: after white's move, next is black's (same move number)
+                if (!isThisBlack) {
+                    lookingForBlackMove = true;
+                } else {
+                    lookingForBlackMove = false;
+                }
+            }
+            return null;
+        }
+
+        function extractAllChessisBestMoves(pgn) {
+            // Extract ALL {Best: X} annotations from Chessis-annotated PGN
+            // Returns array of { moveNumber, isBlack, bestMove }
+            const movesSection = pgn.replace(/\[[^\]]*\]\s*/g, '').trim();
+            const tokenRegex = /\{[^}]*\}|\d+\.{1,3}|[^\s{}]+/g;
+            const tokens = [];
+            let m;
+            while ((m = tokenRegex.exec(movesSection)) !== null) {
+                tokens.push(m[0]);
+            }
+
+            const results = [];
+            let currentMoveNum = 0;
+            let lookingForBlackMove = false;
+
+            for (let i = 0; i < tokens.length; i++) {
+                const token = tokens[i];
+                if (token.startsWith('{')) continue;
+
+                const moveNumMatch = token.match(/^(\d+)(\.{1,3})$/);
+                if (moveNumMatch) {
+                    currentMoveNum = parseInt(moveNumMatch[1]);
+                    lookingForBlackMove = moveNumMatch[2].length === 3;
+                    continue;
+                }
+
+                if (/^(1-0|0-1|1\/2-1\/2|\*)$/.test(token)) continue;
+                if (currentMoveNum === 0) continue;
+
+                const isThisBlack = lookingForBlackMove;
+
+                // Check next token for {Best: X}
+                if (i + 1 < tokens.length && tokens[i + 1].startsWith('{')) {
+                    const annotation = tokens[i + 1];
+                    const bestMatch = annotation.match(/Best:\s*([^}]+)/);
+                    if (bestMatch) {
+                        results.push({
+                            moveNumber: currentMoveNum,
+                            isBlack: isThisBlack,
+                            bestMove: bestMatch[1].trim()
+                        });
+                    }
+                }
+
+                if (!isThisBlack) {
+                    lookingForBlackMove = true;
+                } else {
+                    lookingForBlackMove = false;
+                }
+            }
+            return results;
+        }
+
         function parseVariationMoveInput(input) {
             // Parse "12." or "12..." to get move number and color
             const match = input.trim().match(/^(\d+)(\.{1,3})$/);
@@ -2901,6 +3083,25 @@
 
             // Parse move input - if format doesn't match, use current board position
             let parsed = parseVariationMoveInput(input);
+
+            // If a move number was entered, check for Chessis {Best: X} annotation
+            if (parsed) {
+                const pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || document.getElementById('pgnInput').value.trim();
+                if (pgn) {
+                    const bestMove = extractChessisBestMove(pgn, parsed.moveNumber, parsed.isBlack);
+                    if (bestMove) {
+                        const movePrefix = parsed.isBlack
+                            ? `${parsed.moveNumber}... ${bestMove}`
+                            : `${parsed.moveNumber}. ${bestMove}`;
+                        statusEl.textContent = `Found Chessis best move: ${movePrefix}`;
+                        statusEl.style.color = '#00d4ff';
+                        await addMovesAsVariation(movePrefix, statusEl, resultEl);
+                        document.getElementById('variation-move-input').value = '';
+                        return;
+                    }
+                }
+            }
+
             let fen;
             let useCurrentPosition = false;
 
@@ -6342,6 +6543,27 @@
             const loadToBoardBtn = document.getElementById('loadToBoard');
             if (loadToBoardBtn) {
                 loadToBoardBtn.addEventListener('click', loadPgnToBoard);
+            }
+
+            // Copy PGN to clipboard
+            const copyPgnBtn = document.getElementById('copyPgnBtn');
+            if (copyPgnBtn) {
+                copyPgnBtn.addEventListener('click', async function() {
+                    const pgn = document.getElementById('pgnInput').value.trim();
+                    if (!pgn) {
+                        copyPgnBtn.textContent = 'No PGN!';
+                        setTimeout(() => { copyPgnBtn.textContent = 'Copy PGN'; }, 1500);
+                        return;
+                    }
+                    try {
+                        await navigator.clipboard.writeText(pgn);
+                        copyPgnBtn.textContent = 'Copied!';
+                        setTimeout(() => { copyPgnBtn.textContent = 'Copy PGN'; }, 1500);
+                    } catch (err) {
+                        copyPgnBtn.textContent = 'Failed';
+                        setTimeout(() => { copyPgnBtn.textContent = 'Copy PGN'; }, 1500);
+                    }
+                });
             }
 
             // Flip Board 2
