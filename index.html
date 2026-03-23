@@ -884,7 +884,7 @@
             <span style="color: #888; font-size: 12px; margin-left: 10px;">(Attach a comment to a specific mainline move)</span>
         </div>
         <input id="insert-comment-input" type="text"
-            placeholder="White: 10, comment text | Black: 10..., comment text"
+            placeholder="Type comment for current move, or: 10, comment text | 10..., comment"
             style="width: 100%; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; box-sizing: border-box;">
         <div style="margin-top: 10px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <button onclick="insertPastedComment()"
@@ -901,7 +901,7 @@
             </button>
             <span id="insert-comment-status" style="color: #888; font-size: 12px;"></span>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Format: move number, comment text — e.g. "5, great move" for white's 5th move, "5..., great move" for black's 5th move.</p>
+        <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Just type text to attach to current move (works in variations too). Or use: "5, comment" for white's 5th, "5..., comment" for black's 5th.</p>
     </div>
 
     <!-- All Comments Display -->
@@ -927,7 +927,16 @@
           </div>
         </div>
         <p style="color: #888; font-size: 12px; margin: 0 0 8px 0; font-style: italic;">Note: Chess piece images will load fully when choosing 'Next'</p>
-        <div id="myBoard2" style="width: 400px;"></div>
+        <div id="board2Wrap" style="position: relative; width: 400px;">
+          <div id="myBoard2" style="width: 400px;"></div>
+          <svg id="board2ArrowSvg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10;" viewBox="0 0 400 400">
+            <defs>
+              <marker id="ah-green" markerWidth="4" markerHeight="4" refX="2.5" refY="2" orient="auto">
+                <path d="M0,0 L4,2 L0,4 Z" fill="rgba(63,185,80,0.85)"/>
+              </marker>
+            </defs>
+          </svg>
+        </div>
         <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back</p>
       </div>
 
@@ -985,6 +994,7 @@
           <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace;"></span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
+          <button id="clearVariationsBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
           <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
           <button id="backVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Back Var.</button>
           <button id="cycleClipboardBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Clipboard</button>
@@ -1832,6 +1842,10 @@
                 log('Please enter a PGN', 'error');
                 return;
             }
+
+            // Strip PGN headers (e.g. [Site "Chess.com"], [Date ...]) and update textarea
+            pgn = pgn.replace(/\[[^\]]*\]\s*/g, '').trim();
+            document.getElementById('pgnInput').value = pgn;
 
             // Save original PGN for Chessis {Best:} extraction later
             const originalPgnForChessis = pgn;
@@ -3565,50 +3579,53 @@
                 return;
             }
 
-            const commaIdx = text.indexOf(',');
-            if (commaIdx === -1) {
-                statusEl.textContent = 'Invalid format — use: move number, comment text';
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
-
-            const rawBefore = text.substring(0, commaIdx).trim();
-            const wantsBlack = rawBefore.includes('...');
-            const moveNumStr = rawBefore.replace(/\./g, '').trim();
-            const targetMoveNumber = parseInt(moveNumStr, 10);
-            if (isNaN(targetMoveNumber) || targetMoveNumber < 1) {
-                statusEl.textContent = 'Invalid move number: ' + moveNumStr;
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
-
-            const commentText = text.substring(commaIdx + 1).trim();
-            if (!commentText) {
-                statusEl.textContent = 'Comment text is empty';
-                statusEl.style.color = '#ff6b6b';
-                return;
-            }
-
             if (!window.moveTree) {
                 statusEl.textContent = 'No PGN loaded';
                 statusEl.style.color = '#ff6b6b';
                 return;
             }
 
-            // Walk mainline to find the move at targetMoveNumber (white or black)
-            let node = window.moveTree;
             let found = null;
-            while (node) {
-                if (node.moveNumber === targetMoveNumber && node.isBlackMove === wantsBlack && node.san) {
-                    found = node;
-                    break;
+            let commentText = '';
+
+            // Check if input starts with "10. comment" or "10... comment" format
+            const moveNumMatch = text.match(/^(\d+)(\.{1,3})\s+(.*)/);
+
+            if (moveNumMatch) {
+                // Format: "10. comment" or "10... comment"
+                const targetMoveNumber = parseInt(moveNumMatch[1], 10);
+                const wantsBlack = moveNumMatch[2].length === 3;
+                commentText = moveNumMatch[3].trim();
+
+                // Walk mainline to find the move
+                let node = window.moveTree;
+                while (node) {
+                    if (node.moveNumber === targetMoveNumber && node.isBlackMove === wantsBlack && node.san) {
+                        found = node;
+                        break;
+                    }
+                    node = (node.children && node.children.length > 0) ? node.children[0] : null;
                 }
-                node = (node.children && node.children.length > 0) ? node.children[0] : null;
+
+                if (!found) {
+                    const sideLabel = wantsBlack ? 'black move ' + targetMoveNumber + '...' : 'white move ' + targetMoveNumber;
+                    statusEl.textContent = 'Could not find ' + sideLabel + ' on the mainline';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+            } else {
+                // No move number — attach to current highlighted move
+                if (!window.currentMoveNode || !window.currentMoveNode.san) {
+                    statusEl.textContent = 'Navigate to a move first, or use format: 10. comment';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+                found = window.currentMoveNode;
+                commentText = text;
             }
 
-            if (!found) {
-                const sideLabel = wantsBlack ? 'black move ' + targetMoveNumber + '...' : 'white move ' + targetMoveNumber;
-                statusEl.textContent = 'Could not find ' + sideLabel + ' on the mainline';
+            if (!commentText) {
+                statusEl.textContent = 'Comment text is empty';
                 statusEl.style.color = '#ff6b6b';
                 return;
             }
@@ -3616,7 +3633,14 @@
             found.comment = commentText;
             updateAllCommentsDisplay();
 
-            // If user is currently viewing this node, update variantNotesDisplay
+            // Update PGN and report immediately
+            const pgn = moveTreeToPgn(window.moveTree);
+            if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+            window.annotatedPgnWithVariations = pgn;
+            renderMoveTable(window.moveTree);
+            updateReportWithPgn();
+
+            // Update variantNotesDisplay if viewing this node
             if (window.currentMoveNode === found) {
                 const variantNotesDisplay = document.getElementById('variantNotesDisplay');
                 if (variantNotesDisplay) {
@@ -3626,7 +3650,9 @@
                 }
             }
 
-            const moveLabel = wantsBlack ? targetMoveNumber + '... ' + found.san : targetMoveNumber + '. ' + found.san;
+            const moveLabel = found.isBlackMove
+                ? found.moveNumber + '... ' + found.san
+                : found.moveNumber + '. ' + found.san;
             statusEl.textContent = '✓ Comment added to ' + moveLabel;
             statusEl.style.color = '#2ecc71';
             inputEl.value = '';
@@ -5179,10 +5205,12 @@
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
                     if (boardContainer) boardContainer.style.border = '4px solid #ffd700';
+                    drawVariationArrows(node);
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
                     if (boardContainer) boardContainer.style.border = 'none';
+                    clearBoard2Arrows();
                 }
             }
 
@@ -5469,7 +5497,11 @@
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 boardContainer.style.opacity = '1';
+                boardContainer.style.border = 'none';
             }
+
+            // Clear variation arrows
+            clearBoard2Arrows();
 
             // Update other displays
             updateMaterialDisplay(window.moveTree.fen);
@@ -5696,6 +5728,74 @@
 
             // Update all comments display
             updateAllCommentsDisplay();
+        }
+
+        // ── Arrow overlay for variation moves on board2 ──
+        function board2SquareToCoords(sq) {
+            const file = sq.charCodeAt(0) - 97; // a=0, h=7
+            const rank = parseInt(sq[1]) - 1;   // 1=0, 8=7
+            const sqSize = 50; // 400 / 8
+            const flipped = window.board2 && window.board2.orientation() === 'black';
+            let x, y;
+            if (!flipped) {
+                x = file * sqSize + sqSize / 2;
+                y = (7 - rank) * sqSize + sqSize / 2;
+            } else {
+                x = (7 - file) * sqSize + sqSize / 2;
+                y = rank * sqSize + sqSize / 2;
+            }
+            return { x, y };
+        }
+
+        function clearBoard2Arrows() {
+            const svg = document.getElementById('board2ArrowSvg');
+            if (svg) svg.querySelectorAll('.arrow-line').forEach(el => el.remove());
+        }
+
+        function drawBoard2Arrow(fromSq, toSq, color) {
+            const svg = document.getElementById('board2ArrowSvg');
+            if (!svg) return;
+            const from = board2SquareToCoords(fromSq);
+            const to = board2SquareToCoords(toSq);
+            const dx = to.x - from.x;
+            const dy = to.y - from.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const shorten = 8;
+            const toX = to.x - (dx / len) * shorten;
+            const toY = to.y - (dy / len) * shorten;
+
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', from.x);
+            line.setAttribute('y1', from.y);
+            line.setAttribute('x2', toX);
+            line.setAttribute('y2', toY);
+            line.setAttribute('stroke', color || 'rgba(63,185,80,0.85)');
+            line.setAttribute('stroke-width', '8');
+            line.setAttribute('stroke-linecap', 'round');
+            line.setAttribute('marker-end', 'url(#ah-green)');
+            line.classList.add('arrow-line');
+            svg.appendChild(line);
+        }
+
+        function drawVariationArrows(node) {
+            clearBoard2Arrows();
+            if (!node || !node.parent) return;
+            const parent = node.parent;
+            if (!parent.children || parent.children.length <= 1) return;
+
+            // Draw arrows for variation moves (non-mainline siblings)
+            for (let i = 1; i < parent.children.length; i++) {
+                const varNode = parent.children[i];
+                if (!varNode.san || !parent.fen) continue;
+                // Use chess.js to get from/to squares for the variation move
+                try {
+                    const tempChess = new Chess(parent.fen);
+                    const move = tempChess.move(varNode.san, { sloppy: true });
+                    if (move) {
+                        drawBoard2Arrow(move.from, move.to);
+                    }
+                } catch (e) { /* skip invalid */ }
+            }
         }
 
         function board2NextMove() {
@@ -6614,6 +6714,58 @@
                             toggleMoveTableBtn.textContent = 'Show Moves';
                         }
                     }
+                });
+            }
+
+            // Clear all variations from PGN
+            const clearVariationsBtn = document.getElementById('clearVariationsBtn');
+            if (clearVariationsBtn) {
+                clearVariationsBtn.addEventListener('click', function() {
+                    if (!window.moveTree) return;
+
+                    // Walk the mainline and remove all non-first children (variations)
+                    function stripVariations(node) {
+                        if (node.children && node.children.length > 1) {
+                            node.children = [node.children[0]];
+                        }
+                        if (node.children && node.children.length > 0) {
+                            stripVariations(node.children[0]);
+                        }
+                    }
+                    stripVariations(window.moveTree);
+
+                    // Rebuild registry
+                    window.moveNodeRegistry = { 'root': window.moveTree };
+                    function registerNodes(node) {
+                        if (node.nodeId && node.nodeId !== 'root') {
+                            window.moveNodeRegistry[node.nodeId] = node;
+                        }
+                        if (node.children) {
+                            for (const child of node.children) {
+                                registerNodes(child);
+                            }
+                        }
+                    }
+                    registerNodes(window.moveTree);
+
+                    // Update PGN strings
+                    const pgn = moveTreeToPgn(window.moveTree);
+                    if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+                    window.annotatedPgnWithVariations = pgn;
+
+                    // Re-render
+                    window.currentMoveNode = null;
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    renderMoveTable(window.moveTree);
+                    clearBoard2Arrows();
+                    updateReportWithPgn();
+
+                    log('All variations removed', 'success');
+
+                    // Flash button feedback
+                    clearVariationsBtn.textContent = 'Cleared!';
+                    setTimeout(() => { clearVariationsBtn.textContent = 'Clear Var.'; }, 1500);
                 });
             }
 
