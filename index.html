@@ -977,8 +977,9 @@
     <div style="margin: 0 auto 20px; max-width: 1200px;">
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
+          <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
           <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee;">Start</span>
+          <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
           <span id="board2MovePlayedSan" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace;"></span>
           <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace;"></span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
@@ -989,7 +990,6 @@
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
-          <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
           <div class="drag-scroll-toggle">
             <label class="switch">
                 <input type="checkbox" id="dragScrollToggle">
@@ -5700,27 +5700,26 @@
                         jumpToNode(window.moveTree.children[0].nodeId);
                     }
                 } else {
-                    // Check if we're on the main line by walking up the tree
-                    let onMainLine = true;
-                    let topmostBranch = null;
+                    // Check if we're in a variation (find nearest branch point)
+                    let nearestBranch = null;
                     let walk = window.currentMoveNode;
                     while (walk && walk.parent) {
                         if (walk.parent.children[0] !== walk) {
-                            onMainLine = false;
-                            topmostBranch = walk.parent;
+                            nearestBranch = walk.parent;
+                            break;
                         }
                         walk = walk.parent;
                     }
 
-                    if (!onMainLine && topmostBranch) {
-                        // In a variation - jump to the main line continuation at the branch point
-                        jumpToNode(topmostBranch.children[0].nodeId);
+                    if (nearestBranch) {
+                        // In a variation — exit right: jump to mainline continuation
+                        jumpToNode(nearestBranch.children[0].nodeId);
                     } else if (window.currentMoveNode.children && window.currentMoveNode.children.length > 0) {
-                        // On main line - go to first child (main continuation)
+                        // On main line — go to first child (main continuation)
                         jumpToNode(window.currentMoveNode.children[0].nodeId);
                     }
                 }
-                // If no children, stay at current position (end of line)
+                // If no children and on main line, stay at current position
                 return;
             }
 
@@ -5742,12 +5741,31 @@
                 if (window.currentMoveNode === null) {
                     // Already at start, do nothing
                     return;
-                } else if (window.currentMoveNode.parent) {
-                    if (window.currentMoveNode.parent.nodeId === 'root') {
-                        // Going back to root (start position)
+                }
+
+                // Check if we're in a variation (find nearest branch point)
+                let nearestBranch = null;
+                let walk = window.currentMoveNode;
+                while (walk && walk.parent) {
+                    if (walk.parent.children[0] !== walk) {
+                        nearestBranch = walk.parent;
+                        break;
+                    }
+                    walk = walk.parent;
+                }
+
+                if (nearestBranch) {
+                    // In a variation — exit left: jump to the branch point
+                    if (nearestBranch.nodeId === 'root') {
                         jumpToRoot();
                     } else {
-                        // Go to parent node
+                        jumpToNode(nearestBranch.nodeId);
+                    }
+                } else if (window.currentMoveNode.parent) {
+                    // On main line — go to parent
+                    if (window.currentMoveNode.parent.nodeId === 'root') {
+                        jumpToRoot();
+                    } else {
                         jumpToNode(window.currentMoveNode.parent.nodeId);
                     }
                 }
