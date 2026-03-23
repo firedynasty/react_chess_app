@@ -995,9 +995,7 @@
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
           <button id="clearVariationsBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
-          <button id="nextVarBtn" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Var.</button>
-          <button id="backVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Back Var.</button>
-          <button id="cycleClipboardBtn" style="background: #e91e63; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Clipboard</button>
+          <!-- Next Var, Back Var, Cycle Clipboard moved to hidden-features/nav-buttons.html -->
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
@@ -6373,10 +6371,7 @@
                 board2PrevBtn.addEventListener('click', board2PrevMove);
             }
 
-            const nextVarBtn = document.getElementById('nextVarBtn');
-            if (nextVarBtn) {
-                nextVarBtn.addEventListener('click', nextVariation);
-            }
+            // nextVarBtn moved to hidden-features/nav-buttons.html
 
             // Cycle Var. button - cycles through moves within the current variation
             const cycleVarBtn = document.getElementById('cycleVarBtn');
@@ -6399,66 +6394,10 @@
                 });
             }
 
-            // Back Var. button - jumps to previous main-line branch point
-            const backVarBtn = document.getElementById('backVarBtn');
-            if (backVarBtn) {
-                backVarBtn.addEventListener('click', backVariation);
-            }
+            // backVarBtn moved to hidden-features/nav-buttons.html
 
-            // Cycle Clipboard button - loads from clipboard or cycles through positions
+            // cycleClipboardBtn moved to hidden-features/nav-buttons.html
             window.lastCycleClipboardContent = null;
-            const cycleClipboardBtn = document.getElementById('cycleClipboardBtn');
-            if (cycleClipboardBtn) {
-                cycleClipboardBtn.addEventListener('click', async function() {
-                    try {
-                        const clipboardText = await navigator.clipboard.readText();
-                        const trimmedClipboard = clipboardText ? clipboardText.trim() : '';
-
-                        // Check if clipboard is same as last loaded content
-                        if (window.lastCycleClipboardContent && trimmedClipboard === window.lastCycleClipboardContent) {
-                            // Same content - cycle to next position (loop to start)
-                            if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                                window.studyReportPositionIndex++;
-                                if (window.studyReportPositionIndex >= window.studyReportPositions.length) {
-                                    window.studyReportPositionIndex = 0; // Loop back to start
-                                }
-                                if (window.board2) {
-                                    window.board2.position(window.studyReportPositions[window.studyReportPositionIndex]);
-                                }
-                                updateBoard2MoveIndicator(window.studyReportPositionIndex);
-                            }
-                        } else {
-                            // New content - load it
-                            if (!trimmedClipboard) {
-                                log('Clipboard is empty', 'warn');
-                                return;
-                            }
-
-                            // Store the new clipboard content
-                            window.lastCycleClipboardContent = trimmedClipboard;
-
-                            // Parse the PGN (handles FEN headers automatically)
-                            if (typeof window.parsePgnToPositions === 'function') {
-                                window.studyReportPositions = window.parsePgnToPositions(trimmedClipboard);
-                                window.studyReportPositionIndex = 0;
-
-                                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                                    if (window.board2) {
-                                        window.board2.position(window.studyReportPositions[0]);
-                                    }
-                                    updateBoard2MoveIndicator(0);
-                                    log(`Loaded ${window.studyReportPositions.length} positions from clipboard`, 'success');
-                                } else {
-                                    log('No valid positions found in clipboard', 'warn');
-                                }
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Clipboard read error:', err);
-                        log('Could not read clipboard', 'error');
-                    }
-                });
-            }
 
             // Load Annotated PGN from clipboard into move container
             const loadClipboardPgnBtn = document.getElementById('loadClipboardPgnBtn');
