@@ -1580,7 +1580,7 @@
         // Thresholds (in centipawns) - stricter thresholds
         const BLUNDER_THRESHOLD = 200;     // 2 pawns
         const MISTAKE_THRESHOLD = 100;     // 1 pawn
-        const OPENING_MOVES = 8;           // Skip minor errors in first N full moves
+        const OPENING_MOVES = 0;           // No opening filter — flag all mistakes (NNUE is accurate enough)
 
         // Initialize Stockfish Web Worker
         function initStockfish() {
@@ -1979,8 +1979,13 @@
                     const isOpening = moveNum <= OPENING_MOVES;
                     const isMinorError = swing > -BLUNDER_THRESHOLD;
 
+                    // Detect missed mates: prevEval was mate-level but currentEval is not
+                    const wasMate = Math.abs(prevEval) >= 9000;
+                    const isMate = Math.abs(currentEval) >= 9000;
+                    const missedMate = wasMate && !isMate;
+
                     let filterReason = null;
-                    if (isWonPosition) {
+                    if (isWonPosition && !missedMate) {
                         severity = null;
                         filterReason = 'WON-POS';
                     } else if (isOpening && isMinorError) {

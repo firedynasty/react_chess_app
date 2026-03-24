@@ -149,17 +149,23 @@ Even with the single-pass fix, big eval swings appear in already-decided positio
 
 After White is up +31 pawns, every move by both sides creates huge swings because the engine's evaluation fluctuates in overwhelming positions. These are not real blunders.
 
-**Fix:** skip blunder detection if the position was already decided before the move:
+**Fix:** skip blunder detection if the position was already decided before the move — **unless a forced mate was missed**:
 
 ```js
-const DECIDED = 600;  // ±6 pawns
-
 const isWonPosition = Math.abs(prevEval) >= 600;
-if (isWonPosition) {
+
+// Detect missed mates: prevEval was mate-level but currentEval is not
+const wasMate = Math.abs(prevEval) >= 9000;
+const isMate = Math.abs(currentEval) >= 9000;
+const missedMate = wasMate && !isMate;
+
+if (isWonPosition && !missedMate) {
     filterReason = 'WON-POS';
     // don't flag anything here
 }
 ```
+
+The missed-mate exception catches positions like `9. Qe2?!` where Chessis finds `Best: Qd6#` — the player had mate-in-1 but played a non-mate move. The eval drop from ~10000 (mate) to ~800 (just winning) is massive and correctly flags as a blunder.
 
 ---
 
@@ -226,8 +232,8 @@ Status values:
 - `ok` — no issue, not flagged
 - `BLUNDER` — swing ≤ -200cp (−2 pawns)
 - `MISTAKE` — swing ≤ -100cp (−1 pawn)
-- `skip(OPENING)` — moveNum ≤ 8, swing < BLUNDER threshold
-- `skip(WON-POS)` — |prevEval| ≥ 600cp before move
+- `skip(OPENING)` — moveNum ≤ OPENING_MOVES (currently 0 — disabled, NNUE is accurate enough)
+- `skip(WON-POS)` — |prevEval| ≥ 600cp before move (except missed mates: prevEval ≥ 9000 but currentEval < 9000)
 
 Paste this section into chat to debug any incorrect annotations.
 

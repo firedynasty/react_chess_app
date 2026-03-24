@@ -87,12 +87,20 @@ Since the analysis pipeline lives in one large `index.html`, follow these guidel
 
 ---
 
-## 6. Won-Position Filter Refinement (Low Impact)
+## 6. Won-Position Filter Refinement (Done — Missed Mate Exception)
 
-Current filter: skip blunder detection when `|prevEval| >= 600cp` (±6 pawns).
+~~Current filter: skip blunder detection when `|prevEval| >= 600cp` (±6 pawns).~~
 
-This is aggressive — a 6-pawn advantage can still be thrown away with a single bad move. Consider:
-- Raising the threshold to ±10 pawns (1000cp) — only truly decided positions
-- Or using a sliding scale: flag blunders in won positions only if the swing is enormous (e.g., from +8 to +1)
+**Updated:** The won-position filter now has a **missed-mate exception**. If the previous eval was mate-level (≥ 9000cp, i.e. forced mate) but the player's move drops to a non-mate eval, the filter does not suppress it. This catches positions like `9. Qe2?!` where `Best: Qd6#` — a missed mate-in-1 that Chessis correctly flags.
 
-Low priority because won-position false blunders are cosmetic — they don't affect the useful annotations in competitive positions.
+Still worth considering in the future:
+- Raising the base threshold to ±10 pawns (1000cp) — only truly decided positions
+- Sliding scale: flag blunders in won positions only if the swing is enormous (e.g., from +8 to +1)
+
+---
+
+## 7. Opening Filter (Done — Removed)
+
+~~Previous: `OPENING_MOVES = 8` skipped mistakes/inaccuracies in the first 8 moves.~~
+
+**Removed:** Set `OPENING_MOVES = 0`. The opening filter was originally added to suppress false blunders from the old classical Stockfish engine (no NNUE). With Stockfish 17.1 NNUE, evaluations in the opening are accurate enough to flag real mistakes. Chessis flags opening mistakes like `2. Bc4?!` and `4... c6?` — the analyzer should too.
