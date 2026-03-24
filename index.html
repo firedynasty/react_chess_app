@@ -2105,68 +2105,74 @@
 
                 log('Annotated PGN loaded into board', 'success');
 
-                // Auto-add Chessis {Best:} moves as variations with Stockfish PV lines
+                // Add Stockfish best-move variations for every blunder/mistake
+                // — Chessis path uses {Best:} annotations; regular path uses detected mistakes
+                const variationDepth = parseInt(document.getElementById('variation-depth').value) || depth;
+                let addedCount = 0;
+
                 if (hasChessisBestMoves) {
-                    log('Chessis annotations detected — running Stockfish for best-move variations...', 'info');
-
-                    // Rebuild move tree after variations are added
-                    if (typeof window.parsePgnWithVariations === 'function') {
-                        window.moveTree = window.parsePgnWithVariations(annotatedPgn);
-                        window.currentMoveNode = null;
-                        window.cycleVarSequence = [];
-                        window.cycleVarIndex = -1;
-                        renderMoveTable(window.moveTree);
-                    }
-
-                    // Get positions array for FEN lookup
+                    log('Chessis annotations detected — adding best-move variations...', 'info');
                     const positions = getPositionsFromPgn(pgn);
                     const chessisMoves = extractAllChessisBestMoves(originalPgnForChessis);
-                    const variationDepth = parseInt(document.getElementById('variation-depth').value) || depth;
-                    let addedCount = 0;
 
                     for (const cm of chessisMoves) {
                         const plyIndex = (cm.moveNumber - 1) * 2 + (cm.isBlack ? 1 : 0);
                         if (!positions || plyIndex >= positions.length) continue;
-
-                        const fen = positions[plyIndex]; // Position BEFORE the move
+                        const fen = positions[plyIndex];
                         const moveLabel = cm.isBlack ? `${cm.moveNumber}...` : `${cm.moveNumber}.`;
-
                         try {
                             log(`Stockfish analyzing ${moveLabel} (Best: ${cm.bestMove})...`, 'info');
                             const result = await analyzePositionForVariation(fen, variationDepth);
-
                             if (result && result.pv && result.pv.length > 0) {
-                                // Use Stockfish PV (full continuation line)
                                 window.currentVariationResult = {
-                                    moveNumber: cm.moveNumber,
-                                    isBlack: cm.isBlack,
-                                    plyIndex: plyIndex,
-                                    fen: fen,
-                                    bestMove: result.bestMove,
-                                    score: result.score,
-                                    pv: result.pv
+                                    moveNumber: cm.moveNumber, isBlack: cm.isBlack,
+                                    plyIndex, fen, bestMove: result.bestMove,
+                                    score: result.score, pv: result.pv
                                 };
                                 addVariationToPgn();
                                 addedCount++;
                             } else {
-                                // Fallback: add just the Chessis best move
                                 const movePrefix = cm.isBlack
                                     ? `${cm.moveNumber}... ${cm.bestMove}`
                                     : `${cm.moveNumber}. ${cm.bestMove}`;
-                                const statusEl = document.getElementById('variation-status');
-                                const resultEl = document.getElementById('variation-result');
-                                await addMovesAsVariation(movePrefix, statusEl, resultEl);
+                                await addMovesAsVariation(movePrefix,
+                                    document.getElementById('variation-status'),
+                                    document.getElementById('variation-result'));
                                 addedCount++;
                             }
                         } catch (e) {
                             log(`Could not add variation at ${moveLabel}: ${e.message}`, 'warning');
                         }
                     }
-
-                    if (addedCount > 0) {
-                        log(`Added ${addedCount} Chessis best-move variations with Stockfish lines`, 'success');
-                        updateReportWithPgn();
+                } else if (mistakes.length > 0) {
+                    // Regular game: add Stockfish best-line variation at each blunder/mistake
+                    log(`Adding Stockfish variations for ${mistakes.length} blunder(s)/mistake(s)...`, 'info');
+                    for (const mistake of mistakes) {
+                        const isBlack = mistake.notation.includes('...');
+                        const moveNumber = parseInt(mistake.notation);
+                        const plyIndex = (moveNumber - 1) * 2 + (isBlack ? 1 : 0);
+                        try {
+                            log(`Stockfish finding best line for ${mistake.notation} ${mistake.move} (${mistake.severity})...`, 'info');
+                            const result = await analyzePositionForVariation(mistake.fen, variationDepth);
+                            if (result && result.pv && result.pv.length > 0) {
+                                window.currentVariationResult = {
+                                    moveNumber, isBlack, plyIndex,
+                                    fen: mistake.fen,
+                                    bestMove: result.bestMove,
+                                    score: result.score, pv: result.pv
+                                };
+                                addVariationToPgn();
+                                addedCount++;
+                            }
+                        } catch (e) {
+                            log(`Could not add variation for ${mistake.notation}: ${e.message}`, 'warning');
+                        }
                     }
+                }
+
+                if (addedCount > 0) {
+                    log(`Added ${addedCount} best-move variation(s)`, 'success');
+                    updateReportWithPgn();
                 }
 
                 setStatus('ready', 'Analysis complete');
