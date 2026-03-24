@@ -8602,10 +8602,10 @@ End with a Socratic question about a specific position to help me learn.`
 
         // Available models
         const openaiModels = {
+            'GPT-4o Mini ($0.15/M)': 'gpt-4o-mini',
+            'GPT-5 Mini ($0.25/M)': 'gpt-5-mini',
             'GPT-4o': 'gpt-4o',
-            'GPT-4o Mini': 'gpt-4o-mini',
             'GPT-4 Turbo': 'gpt-4-turbo',
-            'GPT-3.5 Turbo': 'gpt-3.5-turbo',
             'o1': 'o1',
             'o1 Mini': 'o1-mini',
         };
@@ -8629,6 +8629,7 @@ End with a Socratic question about a specific position to help me learn.`
             const [inputValue, setInputValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [chatEnabled, setChatEnabled] = useState(false);
+            const [lastCoachQuery, setLastCoachQuery] = useState(null);
 
             const chatContainerRef = useRef(null);
             const models = aiProvider === 'ChatGPT' ? openaiModels : anthropicModels;
@@ -8722,7 +8723,7 @@ ${contentToAnalyze}`;
 
             // Analyze the currently selected move with coaching context
             const analyzeCurrentMove = async () => {
-                const ctx = window.getMoveContext ? window.getMoveContext() : null;
+                let ctx = window.getMoveContext ? window.getMoveContext() : null;
                 if (!ctx) {
                     setMessages(prev => [...prev, {
                         role: 'assistant',
@@ -8736,6 +8737,28 @@ ${contentToAnalyze}`;
                 if (needsApiKey && !apiKey) {
                     alert(`Please enter your ${aiProvider === 'ChatGPT' ? 'OpenAI' : 'Anthropic'} API key`);
                     return;
+                }
+
+                // If PGN has no variations yet, run analysis first to enrich it
+                const hasVariations = ctx.variations.length > 0 ||
+                    (ctx.annotatedPgn && ctx.annotatedPgn.includes('('));
+                if (!hasVariations && typeof analyzeGame === 'function') {
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: '**No variations detected.** Running Stockfish analysis first to enrich the PGN with best-move variations...'
+                    }]);
+                    setIsLoading(true);
+                    try {
+                        await analyzeGame();
+                        // Re-fetch context now that PGN has variations
+                        ctx = window.getMoveContext ? window.getMoveContext() : ctx;
+                    } catch (e) {
+                        setMessages(prev => [...prev, {
+                            role: 'assistant',
+                            content: `Analysis failed: ${e.message}. Continuing with current PGN.`
+                        }]);
+                    }
+                    setIsLoading(false);
                 }
 
                 // Prompt user for optional additional notes/questions
@@ -8768,8 +8791,15 @@ ${contentToAnalyze}`;
                     query += `\nThe game continued: ${ctx.mainContinuation}\n`;
                 }
 
+                // Add eval context if available
+                const evalBefore = window.positionEvalMap && ctx.fenBefore ? window.positionEvalMap[ctx.fenBefore] : null;
+                const evalAfter = window.positionEvalMap && ctx.fenAfter ? window.positionEvalMap[ctx.fenAfter] : null;
+                if (evalBefore !== null && evalBefore !== undefined && evalAfter !== null && evalAfter !== undefined) {
+                    query += `\nStockfish evaluation: ${(evalBefore/100).toFixed(2)} → ${(evalAfter/100).toFixed(2)} (${((evalAfter - evalBefore)/100).toFixed(2)} swing, from White's perspective)\n`;
+                }
+
                 query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
-                query += `\nPlease analyze this move in depth. Reference chess principles from your knowledge base. If there are variations, compare them and explain the strategic differences.`;
+                query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles. If there are variations, compare them and explain the strategic differences.`;
 
                 // Append user's additional notes/questions if provided
                 const trimmedNotes = userNotes ? userNotes.trim() : '';
@@ -8805,8 +8835,68 @@ ${contentToAnalyze}`;
 
                     setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
                     setChatEnabled(true);
+                    setLastCoachQuery(query);  // save for "Reanalyze with Higher Model"
 
                     // Push response into chatNotesPanel near the board
+                    const chatNotesContent = document.getElementById('chatNotesContent');
+                    const chatNotesPanel = document.getElementById('chatNotesPanel');
+                    if (chatNotesContent && chatNotesPanel) {
+                        chatNotesContent.innerHTML = marked.parse(data.content);
+                        chatNotesPanel.style.display = 'block';
+                    }
+                } catch (err) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Reanalyze with Higher Model — fresh session, same query, better model
+            // Cascade order: gpt-4o-mini → gpt-5-mini → claude-3-5-haiku
+            const higherModelMap = {
+                'gpt-4o-mini': { model: 'gpt-5-mini', provider: 'openai' },
+                'gpt-5-mini': { model: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+                'claude-3-5-haiku-20241022': { model: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
+            };
+
+            const goDeeper = async () => {
+                if (!lastCoachQuery) return;
+
+                const escalation = higherModelMap[selectedModel] || { model: 'gpt-5-mini', provider: 'openai' };
+                const escalatedModel = escalation.model;
+                const escalatedProvider = escalation.provider;
+
+                const allModels = { ...openaiModels, ...anthropicModels };
+                const modelLabel = Object.entries(allModels)
+                    .find(([, id]) => id === escalatedModel)?.[0] || escalatedModel;
+
+                // Fresh session
+                setMessages([{ role: 'user', content: `🔍 Reanalyzing with **${modelLabel}**...` }]);
+                setIsLoading(true);
+
+                try {
+                    const response = await fetch('/api/rag-chess', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            query: lastCoachQuery,
+                            provider: escalatedProvider,
+                            model: escalatedModel,
+                            apiKey: apiKey || undefined,
+                            accessCode: useSharedKey ? accessCode : undefined,
+                            webSearch: webSearchEnabled,
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error);
+
+                    setMessages([
+                        { role: 'user', content: `🔍 Reanalyzed with **${modelLabel}**` },
+                        { role: 'assistant', content: data.content }
+                    ]);
+                    setChatEnabled(true);
+
                     const chatNotesContent = document.getElementById('chatNotesContent');
                     const chatNotesPanel = document.getElementById('chatNotesPanel');
                     if (chatNotesContent && chatNotesPanel) {
@@ -9068,11 +9158,11 @@ ${contentToAnalyze}`;
                             </button>
                         )}
 
-                        {/* Model Selection - hidden but still functional */}
+                        {/* Model Selection */}
                         <select
                             value={selectedModel}
                             onChange={(e) => setSelectedModel(e.target.value)}
-                            style={{ ...styles.select, display: 'none' }}
+                            style={styles.select}
                         >
                             {Object.entries(models).map(([name, id]) => (
                                 <option key={id} value={id}>{name}</option>
@@ -9092,16 +9182,16 @@ ${contentToAnalyze}`;
                             </label>
                         )}
 
-                        {/* Analyze full game with Chess Coach */}
+                        {/* Analyze full game with Chess Coach — hidden */}
                         <button
                             onClick={analyzeWithChessCoach}
                             disabled={isLoading}
-                            style={{ ...styles.button, background: '#9c27b0', color: 'white', opacity: isLoading ? 0.6 : 1 }}
+                            style={{ ...styles.button, background: '#9c27b0', color: 'white', opacity: isLoading ? 0.6 : 1, display: 'none' }}
                         >
                             🤖 Analyze with Chess Coach
                         </button>
 
-                        {/* Analyze current move */}
+                        {/* Analyze current move (cheap model) */}
                         <button
                             onClick={analyzeCurrentMove}
                             disabled={isLoading}
@@ -9109,6 +9199,17 @@ ${contentToAnalyze}`;
                         >
                             🎯 Ask Coach About Selected Move
                         </button>
+
+                        {/* Go Deeper — fresh session with higher model, same question */}
+                        {lastCoachQuery && (
+                            <button
+                                onClick={goDeeper}
+                                disabled={isLoading}
+                                style={{ ...styles.button, background: '#ff6f00', color: 'white', opacity: isLoading ? 0.6 : 1 }}
+                            >
+                                🔍 Reanalyze with Higher Model
+                            </button>
+                        )}
 
                         {/* Copy Chat */}
                         <button
