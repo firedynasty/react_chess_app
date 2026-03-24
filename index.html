@@ -1710,6 +1710,8 @@
                 // Set up handler for this analysis
                 stockfish.onmessage = analysisHandler;
 
+                // Clear hash table between positions to avoid stale cached evals
+                stockfish.postMessage('ucinewgame');
                 // Set up position and analyze
                 stockfish.postMessage('position fen ' + fen);
                 stockfish.postMessage('go depth ' + targetDepth);
@@ -1931,122 +1933,75 @@
                 let blunders = 0, mistakeCount = 0;
 
                 log('Analyzing all positions...', 'info');
-                const evaluations = [];
 
-                let result;
-                if (useCloud) {
-                    const cloudResult = await lichessCloudEval(chess.fen());
-                    result = cloudResult ? cloudResult.score : 0;
-                } else {
-                    const sfResult = await analyzePosition(chess.fen(), depth);
-                    result = sfResult.evaluation;
-                }
-                evaluations.push(result);
+                // Single-pass approach (from chess-blunders / React pattern):
+                // After each move, evaluate the resulting position, convert to White's
+                // perspective via chess.turn(), carry prevEval forward.
+                // This avoids the 0.00 evalBefore bug caused by re-reading stale evaluations.
+                let prevEval = 0;  // starting position ≈ equal
 
-                for (let i = 0; i < history.length; i++) {
-                    chess.move(history[i].san);
-                    const currentFen = chess.fen();
-
-                    try {
-                        if (useCloud) {
-                            const cloudResult = await lichessCloudEval(currentFen);
-                            result = cloudResult ? cloudResult.score : 0;
-                        } else {
-                            const sfResult = await analyzePosition(currentFen, depth);
-                            result = sfResult.evaluation;
-                        }
-                    } catch (evalError) {
-                        log(`Error evaluating move ${i + 1}: ${evalError.message}`, 'warning');
-                        result = evaluations.length > 0 ? evaluations[evaluations.length - 1] : 0;
-                    }
-                    evaluations.push(result);
-
-                    const progress = ((i + 1) / totalMoves) * 100;
-                    document.getElementById('progressFill').style.width = progress + '%';
-
-                    // Log progress every 10 moves or on last move
-                    if ((i + 1) % 10 === 0 || i === history.length - 1) {
-                        log(`Analyzed ${i + 1}/${totalMoves} positions...`, 'info');
-                    }
-                }
-
-                chess.reset();
-
-                log(`Evaluations complete: ${evaluations.length} positions analyzed`, 'info');
-                log('Identifying mistakes...', 'info');
                 for (let i = 0; i < history.length; i++) {
                     const move = history[i];
                     const moveNum = Math.floor(i / 2) + 1;
                     const isWhite = i % 2 === 0;
                     const notation = isWhite ? `${moveNum}.` : `${moveNum}...`;
-
                     const fenBefore = chess.fen();
 
-                    let evalBefore = evaluations[i];
-                    let evalAfter = evaluations[i + 1];
+                    chess.move(move.san);
+                    const fenAfter = chess.fen();
 
-                    let swing;
-                    let evalBeforeForDisplay, evalAfterForDisplay;
-
-                    // Match analyze_game.js logic:
-                    // Normalize scores to White's perspective, then calculate change
-                    // based on who moved
-
-                    if (useCloud) {
-                        // Lichess Cloud: scores are from White's perspective
-                        const prevWhiteScore = evalBefore;
-                        const currWhiteScore = evalAfter;
-
-                        if (isWhite) {
-                            // White just moved: negative change = White got worse
-                            swing = currWhiteScore - prevWhiteScore;
-                            evalBeforeForDisplay = evalBefore;
-                            evalAfterForDisplay = evalAfter;
+                    let rawEval = 0;
+                    try {
+                        if (useCloud) {
+                            const cloudResult = await lichessCloudEval(fenAfter);
+                            rawEval = cloudResult ? cloudResult.score : prevEval;
                         } else {
-                            // Black just moved: if White's score increased, Black got worse
-                            swing = prevWhiteScore - currWhiteScore;
-                            evalBeforeForDisplay = -evalBefore;
-                            evalAfterForDisplay = -evalAfter;
+                            const sfResult = await analyzePosition(fenAfter, depth);
+                            rawEval = sfResult.evaluation;
                         }
-                    } else {
-                        // Stockfish.js: scores from side-to-move perspective
-                        // evalBefore: from the mover's perspective (before they move)
-                        // evalAfter: from opponent's perspective (after move)
-
-                        // Convert to White's perspective
-                        const prevWhiteScore = isWhite ? evalBefore : -evalBefore;
-                        const currWhiteScore = isWhite ? -evalAfter : evalAfter;
-
-                        if (isWhite) {
-                            swing = currWhiteScore - prevWhiteScore;
-                            evalBeforeForDisplay = prevWhiteScore;
-                            evalAfterForDisplay = currWhiteScore;
-                        } else {
-                            swing = prevWhiteScore - currWhiteScore;
-                            evalBeforeForDisplay = -prevWhiteScore;
-                            evalAfterForDisplay = -currWhiteScore;
-                        }
+                    } catch (evalError) {
+                        log(`Error evaluating move ${i + 1}: ${evalError.message}`, 'warning');
+                        rawEval = prevEval;
                     }
 
-                    chess.move(move.san);
+                    // Convert raw Stockfish score (side-to-move perspective) to White's perspective:
+                    // After the move, chess.turn() tells us whose turn it is next.
+                    // If it's White's turn → Black just moved → score is from White's POV already.
+                    // If it's Black's turn → White just moved → score is from Black's POV, negate.
+                    const currentEval = chess.turn() === 'w' ? rawEval : -rawEval;
+
+                    // Swing from White's perspective — negative = mover made a bad move
+                    // For White's move: White wants positive swing (improvement)
+                    // For Black's move: Black wants negative swing from White's POV (i.e. White gets worse)
+                    const swing = isWhite
+                        ? currentEval - prevEval          // White moved: did White's eval improve?
+                        : prevEval - currentEval;         // Black moved: did White's eval drop? (= Black blundered)
+                    // swing < 0 means the mover hurt their own position
+
+                    const evalBeforeForDisplay = isWhite ? prevEval : -prevEval;
+                    const evalAfterForDisplay  = isWhite ? currentEval : -currentEval;
+
+                    const progress = ((i + 1) / totalMoves) * 100;
+                    document.getElementById('progressFill').style.width = progress + '%';
+                    if ((i + 1) % 10 === 0 || i === history.length - 1) {
+                        log(`Analyzed ${i + 1}/${totalMoves} positions...`, 'info');
+                    }
 
                     let severity = null;
 
                     // Won-position filter: if position was already decided (±6 pawns),
                     // eval swings are noise — skip blunder detection entirely
-                    const isWonPosition = Math.abs(evalBeforeForDisplay) >= 600;
+                    const isWonPosition = Math.abs(prevEval) >= 600;
 
-                    // Opening filter: skip minor errors (< 2 pawns) in first N moves
+                    // Opening filter: skip minor errors in first N moves
                     const isOpening = moveNum <= OPENING_MOVES;
                     const isMinorError = swing > -BLUNDER_THRESHOLD;
 
                     let filterReason = null;
                     if (isWonPosition) {
-                        // Skip — position already decided, swings are unreliable
                         severity = null;
                         filterReason = 'WON-POS';
                     } else if (isOpening && isMinorError) {
-                        // Skip minor errors in opening
                         severity = null;
                         filterReason = 'OPENING';
                     } else if (swing <= -BLUNDER_THRESHOLD) {
@@ -2056,32 +2011,26 @@
                         severity = 'MISTAKE';
                         mistakeCount++;
                     }
-                    // No inaccuracies - only show blunders and mistakes
 
-                    // Record every move for debug log
                     evalLog.push({
-                        notation: notation,
-                        move: move.san,
+                        notation, move: move.san,
                         evalBefore: evalBeforeForDisplay,
                         evalAfter: evalAfterForDisplay,
-                        swing: swing,
-                        severity: severity,
-                        filterReason: filterReason
+                        swing, severity, filterReason
                     });
 
                     if (severity) {
                         mistakes.push({
-                            notation: notation,
-                            move: move.san,
-                            severity: severity,
+                            notation, move: move.san, severity,
                             evalBefore: evalBeforeForDisplay,
                             evalAfter: evalAfterForDisplay,
-                            swing: swing,
-                            fen: fenBefore
+                            swing, fen: fenBefore
                         });
-                        log(`${notation} ${move.san}: ${severity} (${swing} cp)`,
+                        log(`${notation} ${move.san}: ${severity} (swing ${swing} cp)`,
                             severity === 'BLUNDER' ? 'error' : 'warning');
                     }
+
+                    prevEval = currentEval;  // carry forward for next move
                 }
 
                 if (openingInfo) {
