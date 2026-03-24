@@ -1737,8 +1737,9 @@
 
         async function getOpeningName(fen) {
             try {
+                // lichess.org/api/opening is public and does not require auth
                 const response = await fetch(
-                    `https://explorer.lichess.ovh/masters?fen=${encodeURIComponent(fen)}`
+                    `https://lichess.org/api/opening?fen=${encodeURIComponent(fen)}`
                 );
 
                 if (!response.ok) return null;
@@ -1759,11 +1760,13 @@
 
         async function getOpeningMoves(fen) {
             try {
+                // explorer.lichess.ovh now requires a Bearer token (401 = auth required)
+                // gracefully return null so deviation detection is skipped
                 const response = await fetch(
                     `https://explorer.lichess.ovh/masters?fen=${encodeURIComponent(fen)}&topGames=0`
                 );
 
-                if (!response.ok) return null;
+                if (!response.ok) return null;  // silently skip on 401/403/etc
 
                 const data = await response.json();
 
