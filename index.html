@@ -1736,37 +1736,19 @@
         // =====================================================================
 
         async function getOpeningName(fen) {
-            try {
-                // lichess.org/api/opening is public and does not require auth
-                const response = await fetch(
-                    `https://lichess.org/api/opening?fen=${encodeURIComponent(fen)}`
-                );
-
-                if (!response.ok) return null;
-
-                const data = await response.json();
-
-                if (data.opening) {
-                    return {
-                        eco: data.opening.eco,
-                        name: data.opening.name
-                    };
-                }
-                return null;
-            } catch (e) {
-                return null;
-            }
+            // Lichess opening APIs require auth or return 404 — disabled to avoid console spam
+            return null;
         }
 
         async function getOpeningMoves(fen) {
+            // explorer.lichess.ovh requires Bearer token auth — disabled to avoid console spam
+            return null;
             try {
-                // explorer.lichess.ovh now requires a Bearer token (401 = auth required)
-                // gracefully return null so deviation detection is skipped
                 const response = await fetch(
                     `https://explorer.lichess.ovh/masters?fen=${encodeURIComponent(fen)}&topGames=0`
                 );
 
-                if (!response.ok) return null;  // silently skip on 401/403/etc
+                if (!response.ok) return null;
 
                 const data = await response.json();
 
@@ -1930,68 +1912,16 @@
 
                 log(`Parsed ${totalMoves} moves`, 'info');
 
-                // Detect opening and deviations from theory
+                // Get opening from already-loaded game metadata (no API call needed)
                 let openingInfo = null;
-                let openingDeviations = [];
-                let leftBook = false;
-                let leftBookAtMove = null;
-
-                const tempChess = new Chess();
-                for (let i = 0; i < Math.min(history.length, 10); i++) {
-                    const fenBefore = tempChess.fen();
-                    const movePlayed = history[i].san;
-                    const moveNum = Math.floor(i / 2) + 1;
-                    const isWhite = i % 2 === 0;
-                    const notation = isWhite ? `${moveNum}.` : `${moveNum}...`;
-
-                    const bookData = await getOpeningMoves(fenBefore);
-
-                    tempChess.move(movePlayed);
-
-                    const opening = await getOpeningName(tempChess.fen());
-                    if (opening) {
-                        openingInfo = opening;
-                    }
-
-                    if (bookData && bookData.moves.length > 0 && !leftBook) {
-                        const bookMoves = bookData.moves.map(m => m.san);
-                        const isBookMove = bookMoves.includes(movePlayed);
-                        const topMove = bookData.moves[0];
-
-                        if (!isBookMove) {
-                            leftBook = true;
-                            leftBookAtMove = notation;
-
-                            const mainLineMoves = bookData.moves.slice(0, 3)
-                                .map(m => `${m.san} (${m.percentage}%)`)
-                                .join(', ');
-
-                            openingDeviations.push({
-                                notation: notation,
-                                movePlayed: movePlayed,
-                                isWhite: isWhite,
-                                mainLine: topMove.san,
-                                mainLinePercentage: topMove.percentage,
-                                alternatives: mainLineMoves,
-                                totalGames: bookData.totalGames,
-                                fen: fenBefore
-                            });
-
-                            log(`${notation} ${movePlayed}: Left opening theory! Main line was ${topMove.san} (${topMove.percentage}%)`, 'warning');
-                        }
-                    } else if (!bookData || bookData.moves.length === 0) {
-                        if (!leftBook) {
-                            leftBook = true;
-                            leftBookAtMove = notation;
-                        }
-                    }
-                }
-
-                if (openingInfo) {
-                    log(`Opening: ${openingInfo.eco} - ${openingInfo.name}`, 'success');
-                }
-                if (leftBookAtMove && openingDeviations.length === 0) {
-                    log(`Left book at move ${leftBookAtMove} (end of theory)`, 'info');
+                const openingDeviations = [];
+                const selectedLabel = document.getElementById('game-dropdown').value;
+                const selectedGameMeta = (window.fetchedGames && selectedLabel && window.fetchedGames[selectedLabel])
+                    ? window.fetchedGames[selectedLabel].metadata
+                    : null;
+                if (selectedGameMeta && (selectedGameMeta.eco || selectedGameMeta.opening)) {
+                    openingInfo = { eco: selectedGameMeta.eco || '', name: selectedGameMeta.opening || '' };
+                    log(`Opening: ${openingInfo.eco} ${openingInfo.name}`, 'success');
                 }
 
                 chess.reset();
