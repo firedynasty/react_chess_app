@@ -1083,6 +1083,7 @@
                 <input type="text" id="gdrive-cell3-input" class="gdrive-cell-input" placeholder="PGN will appear here when you click Copy PGN...">
             </div>
             <button onclick="gdriveSaveRow()" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px;">Save Row</button>
+            <button onclick="document.getElementById('gdrive-cell1-input').value=''; document.getElementById('gdrive-cell2-input').value=''; document.getElementById('gdrive-cell3-input').value='';" style="padding: 8px 18px; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px; margin-left: 4px;">Clear Inputs</button>
         </div>
         <div id="gdrive-table-area"></div>
     </div>
@@ -6650,14 +6651,22 @@
             const loadCurrentBtn = document.getElementById('loadCurrentBtn');
             if (loadCurrentBtn) {
                 loadCurrentBtn.addEventListener('click', function() {
+                    // Try game dropdown first, then fall back to current board PGN
+                    let pgn = '';
                     const selectedLabel = document.getElementById('game-dropdown').value;
                     const gameData = window.fetchedGames && selectedLabel && window.fetchedGames[selectedLabel];
-                    if (!gameData) {
-                        log('No game selected or games not loaded', 'warn');
+                    if (gameData) {
+                        pgn = gameData.pgn || gameData.fullPgn || '';
+                    } else if (window.moveTree) {
+                        pgn = moveTreeToPgn(window.moveTree);
+                    } else {
+                        pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || '';
+                    }
+                    if (!pgn) {
+                        log('No PGN available to load', 'warn');
                         return;
                     }
-                    // Load clean PGN (no variations) into textarea
-                    document.getElementById('pgnInput').value = gameData.pgn || gameData.fullPgn || '';
+                    document.getElementById('pgnInput').value = pgn;
                     // Clear report and board state for fresh analysis
                     clearResults();
                     window.moveTree = null;
