@@ -1994,6 +1994,7 @@
                 chess.reset();
 
                 const mistakes = [];
+                const evalLog = [];  // full per-move debug log
                 let blunders = 0, mistakeCount = 0;
 
                 log('Analyzing all positions...', 'info');
@@ -2098,13 +2099,23 @@
 
                     let severity = null;
 
+                    // Won-position filter: if position was already decided (±6 pawns),
+                    // eval swings are noise — skip blunder detection entirely
+                    const isWonPosition = Math.abs(evalBeforeForDisplay) >= 600;
+
                     // Opening filter: skip minor errors (< 2 pawns) in first N moves
                     const isOpening = moveNum <= OPENING_MOVES;
                     const isMinorError = swing > -BLUNDER_THRESHOLD;
 
-                    if (isOpening && isMinorError) {
+                    let filterReason = null;
+                    if (isWonPosition) {
+                        // Skip — position already decided, swings are unreliable
+                        severity = null;
+                        filterReason = 'WON-POS';
+                    } else if (isOpening && isMinorError) {
                         // Skip minor errors in opening
                         severity = null;
+                        filterReason = 'OPENING';
                     } else if (swing <= -BLUNDER_THRESHOLD) {
                         severity = 'BLUNDER';
                         blunders++;
@@ -2113,6 +2124,17 @@
                         mistakeCount++;
                     }
                     // No inaccuracies - only show blunders and mistakes
+
+                    // Record every move for debug log
+                    evalLog.push({
+                        notation: notation,
+                        move: move.san,
+                        evalBefore: evalBeforeForDisplay,
+                        evalAfter: evalAfterForDisplay,
+                        swing: swing,
+                        severity: severity,
+                        filterReason: filterReason
+                    });
 
                     if (severity) {
                         mistakes.push({
@@ -2643,19 +2665,33 @@
                 }
             }
 
-            // Mistakes & Blunders section - hidden (data still in annotated PGN)
-            // if (mistakes.length > 0) {
-            //     report += 'MISTAKES & BLUNDERS\n';
-            //     report += '-' .repeat(70) + '\n';
-            //     const mistakeLines = [];
-            //     for (const err of mistakes) {
-            //         const evalBeforeStr = (err.evalBefore / 100).toFixed(2);
-            //         const evalAfterStr = (err.evalAfter / 100).toFixed(2);
-            //         const swingStr = (err.swing / 100).toFixed(2);
-            //         mistakeLines.push(`${err.severity}: ${err.notation} ${err.move}, Eval: ${evalBeforeStr} → ${evalAfterStr} (${err.swing > 0 ? '+' : ''}${swingStr})`);
-            //     }
-            //     report += mistakeLines.join(', ') + '\n\n';
-            // }
+            // Mistakes & Blunders section
+            if (mistakes.length > 0) {
+                report += 'MISTAKES & BLUNDERS\n';
+                report += '-'.repeat(70) + '\n';
+                for (const err of mistakes) {
+                    const evalBeforeStr = (err.evalBefore / 100).toFixed(2);
+                    const evalAfterStr = (err.evalAfter / 100).toFixed(2);
+                    const swingStr = (err.swing / 100).toFixed(2);
+                    report += `${err.severity}: ${err.notation} ${err.move}, Eval: ${evalBeforeStr} → ${evalAfterStr} (${err.swing > 0 ? '+' : ''}${swingStr})\n`;
+                }
+                report += '\n';
+            }
+
+            // Full eval debug log — every move with cp values and filter status
+            report += 'EVAL DEBUG LOG\n';
+            report += '-'.repeat(70) + '\n';
+            report += '(positive eval = good for the side that just moved)\n';
+            for (const e of evalLog) {
+                const before = (e.evalBefore / 100).toFixed(2);
+                const after  = (e.evalAfter  / 100).toFixed(2);
+                const swing  = (e.swing / 100).toFixed(2);
+                const status = e.severity
+                    ? e.severity
+                    : (e.filterReason ? `skip(${e.filterReason})` : 'ok');
+                report += `${e.notation} ${e.move}: ${before} → ${after}  swing ${e.swing > 0 ? '+' : ''}${swing}  [${status}]\n`;
+            }
+            report += '\n';
 
             // Recommended puzzles section
             report += '=' .repeat(70) + '\n';
