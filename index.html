@@ -1587,15 +1587,15 @@
             log('Initializing Stockfish.js...', 'info');
 
             try {
-                // Load from local file (same directory as this HTML)
-                stockfish = new Worker('stockfish.js');
+                // Load Stockfish 17.1 lite-single (NNUE, ~7MB WASM, no SharedArrayBuffer needed)
+                stockfish = new Worker('src/stockfish-17.1-lite-single-03e3232.js');
 
                 stockfish.onmessage = handleStockfishMessage;
                 stockfish.onerror = (e) => {
                     log('Stockfish error: ' + e.message, 'error');
                 };
 
-                // Initialize UCI
+                // Initialize UCI with NNUE enabled
                 stockfish.postMessage('uci');
 
             } catch (e) {
@@ -1609,6 +1609,7 @@
 
             if (line === 'uciok') {
                 log('Stockfish UCI initialized', 'success');
+                stockfish.postMessage('setoption name Use NNUE value true');
                 stockfish.postMessage('isready');
             }
             else if (line === 'readyok') {
@@ -1616,7 +1617,7 @@
                 setStatus('ready', 'Stockfish ready');
                 document.getElementById('analyzeBtn').disabled = false;
                 document.getElementById('analyzeFenBtn').disabled = false;
-                document.getElementById('engineInfo').textContent = 'Stockfish.js (Client-side WASM)';
+                document.getElementById('engineInfo').textContent = 'Stockfish 17.1 NNUE (Client-side WASM)';
                 log('Stockfish is ready!', 'success');
             }
             else if (line.startsWith('info depth')) {
