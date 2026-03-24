@@ -648,8 +648,8 @@
                     <label>Analysis Depth</label>
                     <select id="depth">
                         <option value="10">10 (Fast ~2s/move)</option>
-                        <option value="12" selected>12 (Balanced ~4s/move)</option>
-                        <option value="15">15 (Accurate ~8s/move)</option>
+                        <option value="12">12 (Balanced ~4s/move)</option>
+                        <option value="15" selected>15 (Accurate ~8s/move)</option>
                         <option value="18">18 (Deep ~15s/move)</option>
                     </select>
                 </div>
@@ -1655,7 +1655,8 @@
 
         let currentEval = 0;
 
-        // Analyze a single position
+        // Analyze a single position — uses addEventListener so queued messages
+        // from prior positions don't pollute results (github pattern)
         function analyzePosition(fen, targetDepth = 10) {
             return new Promise((resolve, reject) => {
                 if (!isReady) {
@@ -1668,12 +1669,11 @@
                 let resolved = false;
                 let timeoutId = null;
 
-                const analysisHandler = (e) => {
+                const handler = (e) => {
                     const line = e.data;
 
-                    // Capture evaluation at each depth
-                    if (line.startsWith('info depth')) {
-                        const depthMatch = line.match(/info depth (\d+)/);
+                    if (line.startsWith('info') && line.includes('score')) {
+                        const depthMatch = line.match(/\bdepth (\d+)/);
                         const scoreMatch = line.match(/score (cp|mate) (-?\d+)/);
 
                         if (depthMatch && scoreMatch) {
@@ -1681,7 +1681,6 @@
                             const scoreType = scoreMatch[1];
                             const scoreValue = parseInt(scoreMatch[2]);
 
-                            // Only update if this is a deeper search
                             if (depth >= currentDepth) {
                                 currentDepth = depth;
                                 finalEval = scoreType === 'mate'
@@ -1691,45 +1690,27 @@
                         }
                     }
 
-                    // Analysis complete
                     if (line.startsWith('bestmove')) {
                         if (resolved) return;
                         resolved = true;
                         if (timeoutId) clearTimeout(timeoutId);
-
-                        // Restore original handler
-                        stockfish.onmessage = handleStockfishMessage;
-
-                        resolve({
-                            evaluation: finalEval,
-                            depth: currentDepth
-                        });
+                        stockfish.removeEventListener('message', handler);
+                        resolve({ evaluation: finalEval, depth: currentDepth });
                     }
                 };
 
-                // Set up handler for this analysis
-                stockfish.onmessage = analysisHandler;
-
-                // Clear hash table between positions to avoid stale cached evals
-                stockfish.postMessage('ucinewgame');
-                // Set up position and analyze
+                stockfish.addEventListener('message', handler);
                 stockfish.postMessage('position fen ' + fen);
                 stockfish.postMessage('go depth ' + targetDepth);
 
-                // Timeout after 15 seconds per move - resolve with current eval if no response
                 timeoutId = setTimeout(() => {
                     if (resolved) return;
                     resolved = true;
-
                     stockfish.postMessage('stop');
-                    stockfish.onmessage = handleStockfishMessage;
-
-                    log('Position analysis timed out, using partial result', 'warning');
-                    resolve({
-                        evaluation: finalEval,
-                        depth: currentDepth
-                    });
-                }, 5000);
+                    stockfish.removeEventListener('message', handler);
+                    log('Position analysis timed out at depth ' + currentDepth, 'warning');
+                    resolve({ evaluation: finalEval, depth: currentDepth });
+                }, 8000);
             });
         }
 
