@@ -2078,11 +2078,38 @@
                 // Clear the input textarea (PGN is now in moveContainer and hidden variable)
                 document.getElementById('pgnInput').value = '';
 
+                // Always load the annotated PGN into the board after analysis
+                if (typeof window.parsePgnWithVariations === 'function') {
+                    window.moveTree = window.parsePgnWithVariations(annotatedPgn);
+                    window.currentMoveNode = null;
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    window.currentLoadedPgn = annotatedPgn;
+                    renderMoveTable(window.moveTree);
+                    if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
+                }
+
+                // Reset board to start position
+                const startPositions = window.parsePgnToPositionsWithComments
+                    ? window.parsePgnToPositionsWithComments(annotatedPgn)
+                    : null;
+                if (startPositions && startPositions.positions && startPositions.positions.length > 0) {
+                    window.studyReportPositions = startPositions.positions;
+                    window.studyReportComments = startPositions.comments;
+                    window.studyReportPositionIndex = 0;
+                    window.board2.position(startPositions.positions[0]);
+                    if (typeof updateBoard2MoveIndicator === 'function') updateBoard2MoveIndicator(0);
+                } else {
+                    window.board2.start();
+                }
+
+                log('Annotated PGN loaded into board', 'success');
+
                 // Auto-add Chessis {Best:} moves as variations with Stockfish PV lines
                 if (hasChessisBestMoves) {
                     log('Chessis annotations detected — running Stockfish for best-move variations...', 'info');
 
-                    // Build move tree from annotated PGN so variations can be inserted
+                    // Rebuild move tree after variations are added
                     if (typeof window.parsePgnWithVariations === 'function') {
                         window.moveTree = window.parsePgnWithVariations(annotatedPgn);
                         window.currentMoveNode = null;
