@@ -674,12 +674,13 @@
                 <input type="text" id="fenInput" placeholder="rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1">
             </div>
 
-            <div style="margin-top: 15px;">
+            <div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                 <button id="analyzeBtn" onclick="analyzeGame()" disabled>Analyze Game</button>
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
-                <button onclick="clearResults()" style="background: #333; color: #888;">Clear</button>
+                <button id="loadCurrentBtn" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Current</button>
                 <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
                 <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
+                <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
             </div>
 
             <div class="progress-bar" id="progressBar" style="display: none;">
@@ -721,7 +722,7 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
                     <span style="font-weight: bold; color: #00d4ff;">Full Analysis Report</span>
                     <span id="reportFilenameDisplay" style="color: #51cf66; font-size: 12px; margin-left: 10px;"></span>
-                    <button id="toggleReportBtn" style="background: #0f3460; color: #00d4ff; padding: 6px 12px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer;">Hide Report</button>
+                    <button id="toggleReportBtn" style="background: #0f3460; color: #00d4ff; padding: 6px 12px; font-size: 12px; border: none; border-radius: 6px; cursor: pointer;">Show Report</button>
                 </div>
                 <div id="analysisReportText" style="
                     background: #ffffff;
@@ -738,6 +739,7 @@
                     word-wrap: break-word;
                     border: 1px solid #ccc;
                     box-sizing: border-box;
+                    display: none;
                 ">Loading report...</div>
                 <textarea id="reportEditTextarea" style="
                     display: none;
@@ -6640,6 +6642,39 @@
                             display.textContent = fullFen;
                         }
                     });
+                });
+            }
+
+            // Load Current — loads selected game's clean PGN into textarea, clears report
+            const loadCurrentBtn = document.getElementById('loadCurrentBtn');
+            if (loadCurrentBtn) {
+                loadCurrentBtn.addEventListener('click', function() {
+                    const selectedLabel = document.getElementById('game-dropdown').value;
+                    const gameData = window.fetchedGames && selectedLabel && window.fetchedGames[selectedLabel];
+                    if (!gameData) {
+                        log('No game selected or games not loaded', 'warn');
+                        return;
+                    }
+                    // Load clean PGN (no variations) into textarea
+                    document.getElementById('pgnInput').value = gameData.pgn || gameData.fullPgn || '';
+                    // Clear report and board state for fresh analysis
+                    clearResults();
+                    window.moveTree = null;
+                    window.currentMoveNode = null;
+                    window.moveNodeRegistry = {};
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    window.positionEvalMap = {};
+                    const moveTableContainer = document.getElementById('moveTableContainer');
+                    if (moveTableContainer) moveTableContainer.innerHTML = '';
+                    clearBoard2Arrows();
+                    updateEvalBar(null);
+                    log(`Loaded: ${selectedLabel} — starting analysis in 500ms`, 'success');
+                    loadCurrentBtn.textContent = 'Loaded!';
+                    setTimeout(() => {
+                        loadCurrentBtn.textContent = 'Load Current';
+                        analyzeGame();
+                    }, 500);
                 });
             }
 
