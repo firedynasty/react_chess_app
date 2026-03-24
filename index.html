@@ -967,15 +967,8 @@
       </div>
     </div>
 
-    <!-- Chat Notes Panel -->
+    <!-- Chat Notes Panel — Toggle Chat, Clear Chat, Socratic Guide, Paste from Clipboard buttons moved to hidden-features/chat-buttons.html -->
     <div style="margin: 0 auto; max-width: 1200px;">
-      <button id="toggleChatBtn" onclick="document.getElementById('chatNotesPanel').style.display = document.getElementById('chatNotesPanel').style.display === 'none' ? 'block' : 'none'"
-        style="background: #6f42c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px;">Toggle Chat</button>
-      <button onclick="document.getElementById('chatNotesContent').innerHTML = ''; document.getElementById('chatNotesPanel').style.display = 'none';"
-        style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Clear Chat</button>
-      <button id="saveSocraticBtn2" style="background: #fd7e14; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Socratic Guide</button>
-      <button onclick="navigator.clipboard.readText().then(function(text) { if (text) { var el = document.getElementById('chatNotesContent'); var div = document.createElement('div'); div.style.borderTop = '1px solid #444'; div.style.marginTop = '12px'; div.style.paddingTop = '10px'; div.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/&lt;/g,'&amp;lt;').replace(/\n/g,'<br>'); el.appendChild(div); document.getElementById('chatNotesPanel').style.display = 'block'; } }).catch(function() { alert('Clipboard access denied'); });"
-        style="background: #17a2b8; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Paste from Clipboard</button>
       <div id="chatNotesPanel" style="display: none; background: #1a1a2e; border: 1px solid #6f42c1; border-radius: 8px; max-height: 250px; overflow-y: auto; padding: 12px; margin-bottom: 8px;">
         <div id="chatNotesContent" contenteditable="true"
           style="min-height: 60px; color: #eee; font-family: -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; line-height: 1.6; outline: none;"
@@ -990,8 +983,8 @@
           <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Hide Moves</button>
           <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Flip Board</button>
           <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee;">Start</span>
-          <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
           <span id="board2MovePlayedSan" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace;"></span>
+          <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev</button>
           <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace;"></span>
           <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next →</button>
           <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Cycle Var.</button>
@@ -1007,8 +1000,15 @@
             </label>
             <span class="toggle-label" id="dragScrollLabel">Auto Play</span>
           </div>
-          <button id="prevVariant" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
-          <button id="nextVariant" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
+          <button id="prevVariant" style="display:none; background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">← Prev FEN/PGN</button>
+          <button id="nextVariant" style="display:none; background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next FEN/PGN →</button>
+          <button id="gdriveRowUp" style="background: linear-gradient(90deg, #1565c0, #0d47a1); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">↑ Prev Row</button>
+          <button id="gdriveRowDown" style="background: linear-gradient(90deg, #0d47a1, #1565c0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Next Row ↓</button>
+          <span id="gdriveRowIndicator" style="color: #00d4ff; font-family: monospace; font-size: 13px; font-weight: bold; margin-left: 8px;"></span>
+          <div id="gdriveRowPreview" style="margin-top: 6px; display: none;">
+            <span id="gdriveRowPreviewText" style="color: #aed581; font-family: monospace; font-size: 13px; max-width: 700px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;"></span>
+            <button id="gdriveRowCopyBtn" style="background: #27ae60; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle;">Copy</button>
+          </div>
           <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
           <button id="updateReportBtn" onclick="updateReportWithPgn()" style="background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
           <button id="loadFenBtn" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Load FEN</button>
@@ -9147,6 +9147,7 @@ ${contentToAnalyze}`;
         let gdriveWorkbook = null;
         let gdriveSelectedRow = null;
         let gdriveFileId = null;
+        let gdriveCurrentDataRows = [];  // store parsed data rows (excluding header) for row navigation
 
         function gdriveParseCsvRows(text) {
             const rows = [];
@@ -9309,6 +9310,7 @@ ${contentToAnalyze}`;
             html += '</tbody></table></div>';
             document.getElementById('gdrive-table-area').innerHTML = html;
             gdriveSelectedRow = null;
+            gdriveCurrentDataRows = rows.slice(1);
 
             // Row click — populate inputs, copy selected cell to cell3, load PGN or copy to clipboard
             document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(tr) {
@@ -9325,17 +9327,14 @@ ${contentToAnalyze}`;
                     tr.classList.add('gdrive-selected-row');
                     gdriveSelectedRow = ri;
 
-                    // Populate the inputs
+                    // Populate the inputs — direct column mapping: input1=col1, input2=col2, input3=col3
+                    var col3 = row[2] || '';
                     document.getElementById('gdrive-cell1-input').value = col1;
                     document.getElementById('gdrive-cell2-input').value = col2;
+                    document.getElementById('gdrive-cell3-input').value = col3;
 
-                    // Determine which cell to use based on radio toggle
-                    var copyCellRadio = document.querySelector('input[name="gdriveCopyCell"]:checked');
-                    var copyCellIndex = copyCellRadio ? parseInt(copyCellRadio.value) : 1;
-                    var cellText = row[copyCellIndex] || '';
-
-                    // Put selected cell value into Column 3 input
-                    document.getElementById('gdrive-cell3-input').value = cellText;
+                    // Use col3 (the PGN column) for loading into the board
+                    var cellText = col3;
 
                     // Check if it looks like PGN — must start with "1." (possibly after [headers])
                     var pgnTest = cellText.trim().replace(/\[[^\]]*\]\s*/g, '');
@@ -9379,6 +9378,111 @@ ${contentToAnalyze}`;
             gdriveSetStatus('Loaded sheet "' + sheetName + '" — ' + (rows.length - 1) + ' rows');
         }
 
+        // Navigate to a specific row in the Google Table and load its content
+        function gdriveNavigateToRow(rowIndex) {
+            if (gdriveCurrentDataRows.length === 0) return;
+            if (rowIndex < 0 || rowIndex >= gdriveCurrentDataRows.length) return;
+
+            gdriveSelectedRow = rowIndex;
+
+            // Highlight the row in the table
+            document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(r) { r.classList.remove('gdrive-selected-row'); });
+            var targetTr = document.querySelector('.gdrive-csv-table tbody tr[data-row-index="' + rowIndex + '"]');
+            if (targetTr) {
+                targetTr.classList.add('gdrive-selected-row');
+            }
+
+            var row = gdriveCurrentDataRows[rowIndex] || [];
+            var col1 = row[0] || '';
+            var col2 = row[1] || '';
+            var label = col1.length > 50 ? col1.substring(0, 50) + '...' : col1;
+
+            // Populate inputs — direct column mapping: input1=col1, input2=col2, input3=col3
+            var col3 = row[2] || '';
+            document.getElementById('gdrive-cell1-input').value = col1;
+            document.getElementById('gdrive-cell2-input').value = col2;
+            document.getElementById('gdrive-cell3-input').value = col3;
+
+            var cellText = col3;
+
+            // Update row indicator
+            var indicator = document.getElementById('gdriveRowIndicator');
+            if (indicator) indicator.textContent = (rowIndex + 1) + '/' + gdriveCurrentDataRows.length;
+
+            // Check if PGN
+            var pgnTest = cellText.trim().replace(/\[[^\]]*\]\s*/g, '');
+            var isPgn = /^1\.\s*[A-Za-z]/.test(pgnTest);
+
+            // Update preview span — show col1, col2, (first 100 chars of col3)
+            var previewDiv = document.getElementById('gdriveRowPreview');
+            var previewText = document.getElementById('gdriveRowPreviewText');
+            if (previewDiv && previewText) {
+                var col3 = row[2] || '';
+                var col3Preview = col3.trim().length > 100 ? col3.trim().substring(0, 100) + '...' : col3.trim();
+                var parts = [col1, col2, col3Preview].filter(function(p) { return p; });
+                var previewContent = parts.join(', ');
+                previewText.textContent = previewContent;
+                previewText.title = col3.trim() || col1;
+                previewDiv.style.display = previewContent ? 'block' : 'none';
+                // Store full text for copy
+                previewDiv.dataset.fullText = cellText.trim() || col1;
+            }
+
+            if (cellText.trim() && isPgn) {
+                try {
+                    var result = window.parsePgnToPositionsWithComments(cellText.trim());
+                    window.studyReportPositions = result.positions;
+                    window.studyReportComments = result.comments;
+                    window.currentLoadedPgn = cellText.trim();
+
+                    window.moveTree = window.parsePgnWithVariations(cellText.trim());
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    window.currentMoveNode = null;
+                    if (typeof renderMoveTable === 'function') renderMoveTable(window.moveTree);
+                    if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
+
+                    window.studyReportPositionIndex = 0;
+                    if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                        window.board2.position(window.studyReportPositions[0]);
+                        if (typeof updateBoard2MoveIndicator === 'function') updateBoard2MoveIndicator(0);
+                    }
+                    gdriveSetStatus('Row ' + (rowIndex + 1) + ': "' + label + '" → PGN loaded');
+                } catch (err) {
+                    gdriveSetStatus('Row ' + (rowIndex + 1) + ': "' + label + '" → PGN parse failed');
+                }
+            } else if (cellText.trim()) {
+                gdriveSetStatus('Row ' + (rowIndex + 1) + ': "' + label + '" → note');
+            } else {
+                gdriveSetStatus('Row ' + (rowIndex + 1) + ': "' + label + '" → selected cell is empty');
+            }
+        }
+
+        // Row Up/Down navigation buttons
+        document.getElementById('gdriveRowUp').addEventListener('click', function() {
+            if (gdriveCurrentDataRows.length === 0) return;
+            var newIndex = (gdriveSelectedRow === null) ? 0 : gdriveSelectedRow - 1;
+            if (newIndex < 0) newIndex = gdriveCurrentDataRows.length - 1;
+            gdriveNavigateToRow(newIndex);
+        });
+        document.getElementById('gdriveRowDown').addEventListener('click', function() {
+            if (gdriveCurrentDataRows.length === 0) return;
+            var newIndex = (gdriveSelectedRow === null) ? 0 : gdriveSelectedRow + 1;
+            if (newIndex >= gdriveCurrentDataRows.length) newIndex = 0;
+            gdriveNavigateToRow(newIndex);
+        });
+
+        // Copy button for row preview
+        document.getElementById('gdriveRowCopyBtn').addEventListener('click', function() {
+            var previewDiv = document.getElementById('gdriveRowPreview');
+            var textToCopy = previewDiv ? previewDiv.dataset.fullText : '';
+            if (textToCopy) {
+                navigator.clipboard.writeText(textToCopy).then(function() {
+                    gdriveSetStatus('Copied to clipboard');
+                });
+            }
+        });
+
         // Dropdown change
         document.getElementById('gdrive-sheet-select').addEventListener('change', function() {
             if (this.value) gdriveRenderSheet(this.value);
@@ -9407,8 +9511,15 @@ ${contentToAnalyze}`;
             var col1 = document.getElementById('gdrive-cell1-input').value;
             var col2 = document.getElementById('gdrive-cell2-input').value;
             var col3Input = document.getElementById('gdrive-cell3-input').value;
-            // Use col3 input if filled, otherwise fall back to PGN from Copy PGN
-            var col3 = col3Input.trim() || col2;
+            // If col3 is blank, auto-fill with current board PGN (which may include variations)
+            var col3 = col3Input.trim();
+            if (!col3) {
+                if (window.moveTree && typeof moveTreeToPgn === 'function') {
+                    col3 = moveTreeToPgn(window.moveTree);
+                } else {
+                    col3 = window.currentLoadedPgn || window.annotatedPgnWithVariations || '';
+                }
+            }
             if (!col1 && !col2 && !col3) { gdriveSetStatus('Error: nothing to save'); return; }
 
             gdriveSetStatus('Saving row...');
@@ -9447,25 +9558,6 @@ ${contentToAnalyze}`;
             gdriveSetStatus('');
         };
 
-        // Hook into Copy PGN — also populate Column 2 and Column 3 inputs
-        var origCopyPgnToClipboard = window.copyPgnToClipboard;
-        window.copyPgnToClipboard = function() {
-            origCopyPgnToClipboard();
-            var pgn;
-            if (window.moveTree) {
-                pgn = typeof moveTreeToPgn === 'function' ? moveTreeToPgn(window.moveTree) : null;
-            } else {
-                pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
-            }
-            if (pgn) {
-                document.getElementById('gdrive-cell2-input').value = pgn;
-                // Also fill Column 3 if it's empty
-                var cell3 = document.getElementById('gdrive-cell3-input');
-                if (!cell3.value.trim()) {
-                    cell3.value = pgn;
-                }
-            }
-        };
     })();
     </script>
 </body>

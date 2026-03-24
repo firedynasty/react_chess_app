@@ -1,0 +1,16 @@
+<!-- Hidden Chat Buttons: Toggle Chat, Clear Chat, Socratic Guide, Paste from Clipboard -->
+<!-- To restore: add these buttons back inside the Chat Notes Panel div in index.html, before the chatNotesPanel div -->
+
+<!-- Button HTML -->
+<button id="toggleChatBtn" onclick="document.getElementById('chatNotesPanel').style.display = document.getElementById('chatNotesPanel').style.display === 'none' ? 'block' : 'none'"
+  style="background: #6f42c1; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px;">Toggle Chat</button>
+
+<button onclick="document.getElementById('chatNotesContent').innerHTML = ''; document.getElementById('chatNotesPanel').style.display = 'none';"
+  style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Clear Chat</button>
+
+<button id="saveSocraticBtn2" style="background: #fd7e14; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Socratic Guide</button>
+
+<button onclick="navigator.clipboard.readText().then(function(text) { if (text) { var el = document.getElementById('chatNotesContent'); var div = document.createElement('div'); div.style.borderTop = '1px solid #444'; div.style.marginTop = '12px'; div.style.paddingTop = '10px'; div.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text.replace(/&lt;/g,'&amp;lt;').replace(/\n/g,'<br>'); el.appendChild(div); document.getElementById('chatNotesPanel').style.display = 'block'; } }).catch(function() { alert('Clipboard access denied'); });"
+  style="background: #17a2b8; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: 6px; margin-left: 4px;">Paste from Clipboard</button>
+
+<!-- Note: The Socratic Guide button (saveSocraticBtn2) has an event listener in the main JS init section -->
