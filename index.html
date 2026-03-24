@@ -2139,7 +2139,7 @@
                 document.getElementById('inaccuracyCount').textContent = 0;  // No longer tracking
 
                 log('Generating report...', 'info');
-                displayResults(mistakes, openingInfo, openingDeviations);
+                displayResults(mistakes, openingInfo, openingDeviations, evalLog);
 
                 // Store annotated PGN in hidden variable for later retrieval
                 const annotatedPgn = generateAnnotatedPgn(pgn, mistakes, openingInfo);
@@ -2516,7 +2516,7 @@
             return result;
         }
 
-        function displayResults(mistakes, openingInfo, openingDeviations) {
+        function displayResults(mistakes, openingInfo, openingDeviations, evalLog) {
             // Hide the old results div - we're using the report container now
             document.getElementById('results').innerHTML = '';
 
