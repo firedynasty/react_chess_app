@@ -3960,9 +3960,7 @@
                     })();
                 }
             } else {
-                console.log('[addVariationToPgn] Failed to insert. parentNode:', parentNode ? parentNode.nodeId : 'null',
-                    'parentNode.fen:', parentNode ? parentNode.fen : 'n/a',
-                    'result.fen:', result.fen, 'pv:', result.pv, 'moveTree:', !!window.moveTree);
+                console.log('[addVariationToPgn] Failed to insert. result.fen:', result.fen, 'pv:', result.pv, 'moveTree:', !!window.moveTree);
                 document.getElementById('variation-status').textContent = 'Could not insert variation';
                 document.getElementById('variation-status').style.color = '#ff6b6b';
             }
