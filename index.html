@@ -8701,7 +8701,6 @@ End with a Socratic question about a specific position to help me learn.`
         // Available models
         const openaiModels = {
             'GPT-4o Mini ($0.15/M)': 'gpt-4o-mini',
-            'GPT-5 Mini ($0.25/M)': 'gpt-5-mini',
             'GPT-4o': 'gpt-4o',
             'GPT-4 Turbo': 'gpt-4-turbo',
             'o1': 'o1',
@@ -8778,7 +8777,7 @@ Game Data:
 ${contentToAnalyze}`;
 
                 // Check API key requirements
-                const needsApiKey = !(getProvider(selectedModel) === 'openai' && useSharedKey);
+                const needsApiKey = !useSharedKey;
                 if (needsApiKey && !apiKey) {
                     alert(`Please enter your ${getProvider(selectedModel) === 'openai' ? 'OpenAI' : 'Anthropic'} API key`);
                     return;
@@ -8826,7 +8825,7 @@ ${contentToAnalyze}`;
                 }
 
                 // Check API key
-                const needsApiKey = !(getProvider(selectedModel) === 'openai' && useSharedKey);
+                const needsApiKey = !useSharedKey;
                 if (needsApiKey && !apiKey) {
                     alert(`Please enter your ${getProvider(selectedModel) === 'openai' ? 'OpenAI' : 'Anthropic'} API key`);
                     return;
@@ -8994,7 +8993,7 @@ ${contentToAnalyze}`;
 
             // Send message — routes through /api/rag-chess so knowledge base stays in context
             const sendMessage = async () => {
-                const needsApiKey = !(getProvider(selectedModel) === 'openai' && useSharedKey);
+                const needsApiKey = !useSharedKey;
                 if (!inputValue.trim()) return;
                 if (needsApiKey && !apiKey) {
                     alert(`Please enter your ${getProvider(selectedModel) === 'openai' ? 'OpenAI' : 'Anthropic'} API key`);
@@ -9219,8 +9218,8 @@ ${contentToAnalyze}`;
                             style={styles.input}
                         />
 
-                        {/* Use Stanley's Key - OpenAI models only */}
-                        {getProvider(selectedModel) === 'openai' && (
+                        {/* Use Stanley's Key */}
+                        {(
                             <button
                                 onClick={() => {
                                     const code = prompt("Enter access code for Stanley's key:");
