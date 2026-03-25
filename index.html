@@ -1117,6 +1117,7 @@
                 <input type="text" id="gdrive-cell3-input" class="gdrive-cell-input" placeholder="PGN will appear here when you click Copy PGN...">
             </div>
             <button onclick="gdriveSaveRow()" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px;">Save Row</button>
+            <button onclick="gdriveReplaceRow()" style="padding: 8px 18px; background: #e67e22; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px; margin-left: 4px;">Replace Row</button>
             <button onclick="document.getElementById('gdrive-cell1-input').value=''; document.getElementById('gdrive-cell2-input').value=''; document.getElementById('gdrive-cell3-input').value='';" style="padding: 8px 18px; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px; margin-left: 4px;">Clear Inputs</button>
         </div>
         <div id="gdrive-table-area"></div>
@@ -9801,6 +9802,59 @@ ${contentToAnalyze}`;
                 document.getElementById('gdrive-sheet-select').value = sheetName;
             } catch (err) {
                 gdriveSetStatus('Error saving: ' + err.message);
+            }
+        };
+
+        // Replace row — overwrite the currently highlighted row with input values
+        window.gdriveReplaceRow = async function() {
+            if (!gdriveAccessToken) { gdriveSetStatus('Error: not signed in'); return; }
+            if (!gdriveFileId) { gdriveSetStatus('Error: no spreadsheet loaded'); return; }
+            var sheetName = document.getElementById('gdrive-sheet-select').value;
+            if (!sheetName) { gdriveSetStatus('Error: select a sheet first'); return; }
+            if (gdriveSelectedRow === null || gdriveSelectedRow === undefined) {
+                gdriveSetStatus('Error: click a row in the table first to select it');
+                return;
+            }
+
+            var col1 = document.getElementById('gdrive-cell1-input').value;
+            var col2 = document.getElementById('gdrive-cell2-input').value;
+            var col3Input = document.getElementById('gdrive-cell3-input').value;
+            var col3 = col3Input.trim();
+            if (!col3) {
+                if (window.moveTree && typeof moveTreeToPgn === 'function') {
+                    col3 = moveTreeToPgn(window.moveTree);
+                } else {
+                    col3 = window.currentLoadedPgn || window.annotatedPgnWithVariations || '';
+                }
+            }
+            if (!col1 && !col2 && !col3) { gdriveSetStatus('Error: nothing to save'); return; }
+
+            // Row index in sheet: +2 because row 0 is header (row 1 in sheet), data starts at row 2
+            var sheetRowNum = gdriveSelectedRow + 2;
+
+            gdriveSetStatus('Replacing row ' + sheetRowNum + '...');
+            try {
+                var encodedSheet = encodeURIComponent(sheetName);
+                var range = encodedSheet + '!A' + sheetRowNum + ':C' + sheetRowNum;
+                var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + gdriveFileId + '/values/' + range + '?valueInputOption=RAW';
+                var resp = await fetch(url, {
+                    method: 'PUT',
+                    headers: {
+                        Authorization: 'Bearer ' + gdriveAccessToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ values: [[col1, col2, col3]] }),
+                });
+                if (!resp.ok) {
+                    var errData = await resp.json().catch(function() { return {}; });
+                    throw new Error(errData.error?.message || 'HTTP ' + resp.status);
+                }
+                gdriveSetStatus('Row ' + sheetRowNum + ' replaced in "' + sheetName + '" successfully!');
+                await gdriveLoadSpreadsheet(gdriveFileId, '');
+                gdriveRenderSheet(sheetName);
+                document.getElementById('gdrive-sheet-select').value = sheetName;
+            } catch (err) {
+                gdriveSetStatus('Error replacing: ' + err.message);
             }
         };
 
