@@ -3784,8 +3784,28 @@
 
             // ---- Tree-based insertion (preserves all comments and existing variations) ----
             if (window.moveTree) {
-                // Use pre-found parent node (supports sub-variations), or fall back to mainline walk
+                // Find parent node by FEN match (more reliable than ply walk)
+                function fenPositionKey(fen) {
+                    // Compare only piece placement + active color + castling + en passant (ignore clocks)
+                    return fen.split(' ').slice(0, 4).join(' ');
+                }
+                function findNodeByFen(node, targetFenKey) {
+                    if (!node) return null;
+                    if (fenPositionKey(node.fen) === targetFenKey) return node;
+                    if (node.children) {
+                        for (const child of node.children) {
+                            const found = findNodeByFen(child, targetFenKey);
+                            if (found) return found;
+                        }
+                    }
+                    return null;
+                }
+
                 let parentNode = result.parentNode || null;
+                if (!parentNode && result.fen) {
+                    parentNode = findNodeByFen(window.moveTree, fenPositionKey(result.fen));
+                }
+                // Fall back to ply walk if FEN search fails
                 if (!parentNode) {
                     const targetPly = (result.moveNumber - 1) * 2 + (result.isBlack ? 1 : 0);
                     parentNode = window.moveTree;
@@ -3910,7 +3930,8 @@
                 }
             } else {
                 console.log('[addVariationToPgn] Failed to insert. parentNode:', parentNode ? parentNode.nodeId : 'null',
-                    'pv:', result.pv, 'fen:', result.fen, 'moveTree:', !!window.moveTree);
+                    'parentNode.fen:', parentNode ? parentNode.fen : 'n/a',
+                    'result.fen:', result.fen, 'pv:', result.pv, 'moveTree:', !!window.moveTree);
                 document.getElementById('variation-status').textContent = 'Could not insert variation';
                 document.getElementById('variation-status').style.color = '#ff6b6b';
             }
