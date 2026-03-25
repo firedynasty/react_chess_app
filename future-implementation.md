@@ -104,3 +104,10 @@ Still worth considering in the future:
 ~~Previous: `OPENING_MOVES = 8` skipped mistakes/inaccuracies in the first 8 moves.~~
 
 **Removed:** Set `OPENING_MOVES = 0`. The opening filter was originally added to suppress false blunders from the old classical Stockfish engine (no NNUE). With Stockfish 17.1 NNUE, evaluations in the opening are accurate enough to flag real mistakes. Chessis flags opening mistakes like `2. Bc4?!` and `4... c6?` — the analyzer should too.
+
+
+
+Chat GPT / Claude AI ask about a position why is white better or black better, alternatives? 
+
+
+
