@@ -2232,32 +2232,42 @@
                     } else {
                         log('Stockfish ready — adding variations one at a time...', 'info');
                         for (const target of variationTargets) {
-                            try {
-                                log(`Stockfish analyzing ${target.label}...`, 'info');
-                                const result = await analyzePositionForVariation(target.fen, variationDepth);
-                                if (result && result.pv && result.pv.length > 0) {
-                                    window.currentVariationResult = {
-                                        moveNumber: target.moveNumber,
-                                        isBlack: target.isBlack,
-                                        plyIndex: target.plyIndex,
-                                        fen: target.fen,
-                                        bestMove: result.bestMove,
-                                        score: result.score,
-                                        pv: result.pv
-                                    };
-                                    addVariationToPgn();
-                                    addedCount++;
-                                } else if (target.isChessis && target.bestMove) {
-                                    const movePrefix = target.isBlack
-                                        ? `${target.moveNumber}... ${target.bestMove}`
-                                        : `${target.moveNumber}. ${target.bestMove}`;
-                                    await addMovesAsVariation(movePrefix,
-                                        document.getElementById('variation-status'),
-                                        document.getElementById('variation-result'));
-                                    addedCount++;
+                            let result = null;
+                            for (let attempt = 0; attempt < 3; attempt++) {
+                                try {
+                                    log(`Stockfish analyzing ${target.label}${attempt > 0 ? ` (retry ${attempt})` : ''}...`, 'info');
+                                    result = await analyzePositionForVariation(target.fen, variationDepth);
+                                    break;
+                                } catch (e) {
+                                    log(`Stockfish failed for ${target.label}: ${e.message} — reinitializing...`, 'warning');
+                                    if (stockfish) { stockfish.terminate(); stockfish = null; isReady = false; }
+                                    initStockfish();
+                                    for (let w = 0; w < 20 && !isReady; w++) {
+                                        await new Promise(r => setTimeout(r, 500));
+                                    }
+                                    if (!isReady) { log('Stockfish failed to reinit, skipping', 'error'); break; }
                                 }
-                            } catch (e) {
-                                log(`Could not add variation for ${target.label}: ${e.message}`, 'warning');
+                            }
+                            if (result && result.pv && result.pv.length > 0) {
+                                window.currentVariationResult = {
+                                    moveNumber: target.moveNumber,
+                                    isBlack: target.isBlack,
+                                    plyIndex: target.plyIndex,
+                                    fen: target.fen,
+                                    bestMove: result.bestMove,
+                                    score: result.score,
+                                    pv: result.pv
+                                };
+                                addVariationToPgn();
+                                addedCount++;
+                            } else if (target.isChessis && target.bestMove) {
+                                const movePrefix = target.isBlack
+                                    ? `${target.moveNumber}... ${target.bestMove}`
+                                    : `${target.moveNumber}. ${target.bestMove}`;
+                                await addMovesAsVariation(movePrefix,
+                                    document.getElementById('variation-status'),
+                                    document.getElementById('variation-result'));
+                                addedCount++;
                             }
                         }
                     }
@@ -3771,7 +3781,7 @@
                     resolved = true;
                     stockfish.onmessage = handleStockfishMessage;
                     reject(new Error('Stockfish timed out for variation analysis'));
-                }, 15000);
+                }, 4000);
 
                 const origHandler = handler;
                 stockfish.onmessage = (e) => {
