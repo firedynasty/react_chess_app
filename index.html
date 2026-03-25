@@ -828,7 +828,8 @@
             <select id="variation-depth" title="Depth" style="padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;">
                 <option value="12">d12</option>
                 <option value="14">d14</option>
-                <option value="16" selected>d16</option>
+                <option value="15" selected>d15</option>
+                <option value="16">d16</option>
                 <option value="18">d18</option>
             </select>
             <span id="variation-status" style="color: #888; font-size: 12px;"></span>
@@ -1645,6 +1646,12 @@
                 stockfish.onmessage = handleStockfishMessage;
                 stockfish.onerror = (e) => {
                     log('Stockfish error: ' + e.message, 'error');
+                    log('Reinitializing Stockfish after crash...', 'info');
+                    isReady = false;
+                    stockfish.terminate();
+                    stockfish = null;
+                    // Re-init after a brief delay
+                    setTimeout(initStockfish, 500);
                 };
 
                 // Initialize UCI with NNUE enabled
@@ -3656,8 +3663,8 @@
 
         function analyzePositionForVariation(fen, depth) {
             return new Promise((resolve, reject) => {
-                if (!stockfish) {
-                    reject(new Error('Stockfish not ready'));
+                if (!stockfish || !isReady) {
+                    reject(new Error('Stockfish not ready — it may have crashed and is reinitializing. Try again in a moment.'));
                     return;
                 }
 
@@ -3723,6 +3730,8 @@
                 };
 
                 stockfish.onmessage = handler;
+                stockfish.postMessage('ucinewgame');
+                stockfish.postMessage('isready');
                 stockfish.postMessage('position fen ' + fen);
                 stockfish.postMessage('go depth ' + depth);
             });
