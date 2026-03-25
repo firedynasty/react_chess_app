@@ -3806,6 +3806,29 @@
                 window.cycleVarSequence = [];
                 window.cycleVarIndex = -1;
                 renderMoveTable(window.moveTree);
+
+                // Fetch evals for newly added variation nodes if positionEvalMap exists
+                if (window.positionEvalMap && firstVarNode) {
+                    (async () => {
+                        let node = firstVarNode;
+                        while (node) {
+                            if (window.positionEvalMap[node.fen] === undefined) {
+                                try {
+                                    const sfResult = await analyzePosition(node.fen, 12);
+                                    const turn = node.fen.split(' ')[1];
+                                    window.positionEvalMap[node.fen] = turn === 'w' ? sfResult.evaluation : -sfResult.evaluation;
+                                } catch (e) {
+                                    window.positionEvalMap[node.fen] = 0;
+                                }
+                            }
+                            node = (node.children && node.children.length > 0) ? node.children[0] : null;
+                        }
+                        // Update eval bar for current position after variation evals loaded
+                        const currentFen = window.currentMoveNode ? window.currentMoveNode.fen : window.moveTree.fen;
+                        updateEvalBar(currentFen);
+                        log('Variation evals loaded', 'success');
+                    })();
+                }
             } else {
                 document.getElementById('variation-status').textContent = 'Could not insert variation';
                 document.getElementById('variation-status').style.color = '#ff6b6b';
