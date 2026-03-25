@@ -8632,6 +8632,12 @@ End with a Socratic question about a specific position to help me learn.`
             'Claude Opus 4.5': 'claude-opus-4-5-20251101',
         };
 
+        const allModels = { ...openaiModels, ...anthropicModels };
+        const anthropicModelIds = new Set(Object.values(anthropicModels));
+        function getProvider(modelId) {
+            return anthropicModelIds.has(modelId) ? 'anthropic' : 'openai';
+        }
+
         function ChessChat() {
             // State
             const [aiProvider, setAiProvider] = useState('ChatGPT');
@@ -8647,16 +8653,6 @@ End with a Socratic question about a specific position to help me learn.`
             const [lastCoachQuery, setLastCoachQuery] = useState(null);
 
             const chatContainerRef = useRef(null);
-            const models = aiProvider === 'ChatGPT' ? openaiModels : anthropicModels;
-
-            // Reset model when provider changes
-            useEffect(() => {
-                if (aiProvider === 'ChatGPT') {
-                    setSelectedModel('gpt-4o-mini');
-                } else {
-                    setSelectedModel('claude-3-5-haiku-20241022');
-                }
-            }, [aiProvider]);
 
             // Auto-scroll to bottom when new messages arrive
             useEffect(() => {
@@ -8700,9 +8696,9 @@ Game Data:
 ${contentToAnalyze}`;
 
                 // Check API key requirements
-                const needsApiKey = !(aiProvider === 'ChatGPT' && useSharedKey);
+                const needsApiKey = !(getProvider(selectedModel) === 'openai' && useSharedKey);
                 if (needsApiKey && !apiKey) {
-                    alert(`Please enter your ${aiProvider === 'ChatGPT' ? 'OpenAI' : 'Anthropic'} API key`);
+                    alert(`Please enter your ${getProvider(selectedModel) === 'openai' ? 'OpenAI' : 'Anthropic'} API key`);
                     return;
                 }
 
@@ -8716,7 +8712,7 @@ ${contentToAnalyze}`;
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             query,
-                            provider: aiProvider === 'ChatGPT' ? 'openai' : 'anthropic',
+                            provider: getProvider(selectedModel),
                             model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
@@ -8748,9 +8744,9 @@ ${contentToAnalyze}`;
                 }
 
                 // Check API key
-                const needsApiKey = !(aiProvider === 'ChatGPT' && useSharedKey);
+                const needsApiKey = !(getProvider(selectedModel) === 'openai' && useSharedKey);
                 if (needsApiKey && !apiKey) {
-                    alert(`Please enter your ${aiProvider === 'ChatGPT' ? 'OpenAI' : 'Anthropic'} API key`);
+                    alert(`Please enter your ${getProvider(selectedModel) === 'openai' ? 'OpenAI' : 'Anthropic'} API key`);
                     return;
                 }
 
@@ -8837,7 +8833,7 @@ ${contentToAnalyze}`;
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             query,
-                            provider: aiProvider === 'ChatGPT' ? 'openai' : 'anthropic',
+                            provider: getProvider(selectedModel),
                             model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
@@ -8866,24 +8862,13 @@ ${contentToAnalyze}`;
                 }
             };
 
-            // Reanalyze with Higher Model — fresh session, same query, better model
-            // Cascade order: gpt-4o-mini → gpt-5-mini → claude-3-5-haiku
-            const higherModelMap = {
-                'gpt-4o-mini': { model: 'gpt-5-mini', provider: 'openai' },
-                'gpt-5-mini': { model: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-                'claude-3-5-haiku-20241022': { model: 'claude-3-5-haiku-20241022', provider: 'anthropic' },
-            };
-
+            // Reanalyze with current dropdown model — fresh session, same query
             const goDeeper = async () => {
                 if (!lastCoachQuery) return;
 
-                const escalation = higherModelMap[selectedModel] || { model: 'gpt-5-mini', provider: 'openai' };
-                const escalatedModel = escalation.model;
-                const escalatedProvider = escalation.provider;
-
-                const allModels = { ...openaiModels, ...anthropicModels };
+                const provider = getProvider(selectedModel);
                 const modelLabel = Object.entries(allModels)
-                    .find(([, id]) => id === escalatedModel)?.[0] || escalatedModel;
+                    .find(([, id]) => id === selectedModel)?.[0] || selectedModel;
 
                 // Fresh session
                 setMessages([{ role: 'user', content: `🔍 Reanalyzing with **${modelLabel}**...` }]);
@@ -8895,8 +8880,8 @@ ${contentToAnalyze}`;
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             query: lastCoachQuery,
-                            provider: escalatedProvider,
-                            model: escalatedModel,
+                            provider,
+                            model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
                             webSearch: webSearchEnabled,
@@ -8927,10 +8912,10 @@ ${contentToAnalyze}`;
 
             // Send message — routes through /api/rag-chess so knowledge base stays in context
             const sendMessage = async () => {
-                const needsApiKey = !(aiProvider === 'ChatGPT' && useSharedKey);
+                const needsApiKey = !(getProvider(selectedModel) === 'openai' && useSharedKey);
                 if (!inputValue.trim()) return;
                 if (needsApiKey && !apiKey) {
-                    alert(`Please enter your ${aiProvider === 'ChatGPT' ? 'OpenAI' : 'Anthropic'} API key`);
+                    alert(`Please enter your ${getProvider(selectedModel) === 'openai' ? 'OpenAI' : 'Anthropic'} API key`);
                     return;
                 }
 
@@ -8948,7 +8933,7 @@ ${contentToAnalyze}`;
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             messages: chatMessages,
-                            provider: aiProvider === 'ChatGPT' ? 'openai' : 'anthropic',
+                            provider: getProvider(selectedModel),
                             model: selectedModel,
                             apiKey: apiKey || undefined,
                             accessCode: useSharedKey ? accessCode : undefined,
@@ -9148,12 +9133,12 @@ ${contentToAnalyze}`;
                             type="password"
                             value={apiKey}
                             onChange={(e) => setApiKey(e.target.value)}
-                            placeholder={aiProvider === 'ChatGPT' ? 'OpenAI API Key' : 'Anthropic API Key'}
+                            placeholder={getProvider(selectedModel) === 'openai' ? 'OpenAI API Key' : 'Anthropic API Key'}
                             style={styles.input}
                         />
 
-                        {/* Use Stanley's Key - ChatGPT only */}
-                        {aiProvider === 'ChatGPT' && (
+                        {/* Use Stanley's Key - OpenAI models only */}
+                        {getProvider(selectedModel) === 'openai' && (
                             <button
                                 onClick={() => {
                                     const code = prompt("Enter access code for Stanley's key:");
@@ -9179,13 +9164,13 @@ ${contentToAnalyze}`;
                             onChange={(e) => setSelectedModel(e.target.value)}
                             style={styles.select}
                         >
-                            {Object.entries(models).map(([name, id]) => (
+                            {Object.entries(allModels).map(([name, id]) => (
                                 <option key={id} value={id}>{name}</option>
                             ))}
                         </select>
 
-                        {/* Web Search Toggle */}
-                        {aiProvider === 'ChatGPT' && (
+                        {/* Web Search Toggle - OpenAI only */}
+                        {getProvider(selectedModel) === 'openai' && (
                             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', color: '#fff', cursor: 'pointer' }}>
                                 <input
                                     type="checkbox"
@@ -9263,7 +9248,7 @@ ${contentToAnalyze}`;
                                     }}
                                 >
                                     <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>
-                                        {msg.role === 'user' ? 'You' : (aiProvider === 'ChatGPT' ? 'ChatGPT' : 'Claude')}
+                                        {msg.role === 'user' ? 'You' : (getProvider(selectedModel) === 'openai' ? 'ChatGPT' : 'Claude')}
                                     </div>
                                     {msg.role === 'assistant' ? (
                                         <div
@@ -9282,7 +9267,7 @@ ${contentToAnalyze}`;
                         {isLoading && (
                             <div style={{ ...styles.message, ...styles.assistantMessage }}>
                                 <div style={{ fontSize: '11px', fontWeight: 'bold', marginBottom: '4px', opacity: 0.7 }}>
-                                    {aiProvider === 'ChatGPT' ? 'ChatGPT' : 'Claude'}
+                                    {getProvider(selectedModel) === 'openai' ? 'ChatGPT' : 'Claude'}
                                 </div>
                                 <div>Thinking...</div>
                             </div>
