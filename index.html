@@ -3765,7 +3765,24 @@
                     }
                 };
 
-                stockfish.onmessage = handler;
+                let resolved = false;
+                const timeoutId = setTimeout(() => {
+                    if (resolved) return;
+                    resolved = true;
+                    stockfish.onmessage = handleStockfishMessage;
+                    reject(new Error('Stockfish timed out for variation analysis'));
+                }, 15000);
+
+                const origHandler = handler;
+                stockfish.onmessage = (e) => {
+                    if (resolved) return;
+                    const line = e.data;
+                    if (line.startsWith('bestmove')) {
+                        resolved = true;
+                        clearTimeout(timeoutId);
+                    }
+                    origHandler(e);
+                };
                 stockfish.postMessage('ucinewgame');
                 stockfish.postMessage('isready');
                 stockfish.postMessage('position fen ' + fen);
