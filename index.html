@@ -7801,6 +7801,13 @@
                     nextVariation();
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
+                } else if (e.key === 'Escape') {
+                    // Escape = Analyze (same as Analyze button)
+                    const analyzeBtn = document.getElementById('analyze-variation-btn');
+                    if (analyzeBtn && !analyzeBtn.disabled) {
+                        analyzeForVariation();
+                        e.preventDefault();
+                    }
                 }
             });
 
