@@ -832,6 +832,10 @@
                 <option value="16">d16</option>
                 <option value="18">d18</option>
             </select>
+            <button id="fill-variations-btn" onclick="fillMissingVariations()"
+                style="padding: 8px 15px; background: #6a0dad; color: #fff; border: 1px solid #9b59b6; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap;">
+                Fill Variations
+            </button>
             <span id="variation-status" style="color: #888; font-size: 12px;"></span>
         </div>
         <div id="variation-result" style="display: none; margin-top: 12px; padding: 12px; background: #0f3460; border-radius: 6px; border-left: 3px solid #27ae60;">
@@ -3962,6 +3966,83 @@
                 document.getElementById('variation-status').textContent = 'Could not insert variation';
                 document.getElementById('variation-status').style.color = '#ff6b6b';
             }
+        }
+
+        async function fillMissingVariations() {
+            const statusEl = document.getElementById('variation-status');
+            const btn = document.getElementById('fill-variations-btn');
+            if (!window.moveTree) {
+                statusEl.textContent = 'No PGN loaded';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const depth = parseInt(document.getElementById('variation-depth').value) || 15;
+
+            // Walk entire tree and collect nodes with ?/??  whose parent has no variation branch
+            const targets = [];
+            function collectTargets(node) {
+                if (!node) return;
+                if (node.annotation && (node.annotation.includes('??') || (node.annotation.includes('?') && !node.annotation.includes('!?'))) ) {
+                    const parent = node.parent;
+                    // Parent has no variation if it has only 1 child (the mainline)
+                    if (parent && parent.fen && parent.children.length <= 1) {
+                        targets.push({ node, parent });
+                    }
+                }
+                if (node.children) node.children.forEach(collectTargets);
+            }
+            collectTargets(window.moveTree);
+
+            if (targets.length === 0) {
+                statusEl.textContent = 'No missing variations found';
+                statusEl.style.color = '#2ecc71';
+                return;
+            }
+
+            btn.disabled = true;
+            statusEl.style.color = '#00d4ff';
+            let added = 0;
+
+            for (let i = 0; i < targets.length; i++) {
+                const { node, parent } = targets[i];
+                const label = `${node.moveNumber}${node.isBlackMove ? '...' : '.'}${node.san}${node.annotation}`;
+                statusEl.textContent = `Analyzing ${label} (${i + 1}/${targets.length})...`;
+
+                let result = null;
+                for (let attempt = 0; attempt < 3; attempt++) {
+                    try {
+                        result = await analyzePositionForVariation(parent.fen, depth);
+                        break;
+                    } catch (e) {
+                        statusEl.textContent = `Reinitializing Stockfish (${label}, attempt ${attempt + 1}/3)...`;
+                        if (stockfish) { stockfish.terminate(); stockfish = null; isReady = false; }
+                        initStockfish();
+                        for (let w = 0; w < 20 && !isReady; w++) await new Promise(r => setTimeout(r, 500));
+                    }
+                }
+
+                if (result && result.pv && result.pv.length > 0) {
+                    window.currentVariationResult = {
+                        moveNumber: node.moveNumber,
+                        isBlack: node.isBlackMove,
+                        fen: parent.fen,
+                        bestMove: result.bestMove,
+                        score: result.score,
+                        pv: result.pv,
+                        parentNode: parent
+                    };
+                    addVariationToPgn();
+                    added++;
+                } else {
+                    log(`Fill Variations: no result for ${label}`, 'warning');
+                }
+            }
+
+            updateReportWithPgn();
+            statusEl.textContent = `Done — added ${added}/${targets.length} variation(s)`;
+            statusEl.style.color = '#2ecc71';
+            btn.disabled = false;
         }
 
         function clearVariationResult() {
