@@ -3859,7 +3859,14 @@
 
                     for (const moveSan of result.pv) {
                         const turnBefore = varChess.turn();
-                        const move = varChess.move(moveSan, { sloppy: true });
+                        // Try SAN first; if it looks like UCI (e.g. "e2e4", "b4c3"), use {from,to} object
+                        let move = null;
+                        const uciPattern = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+                        if (uciPattern.test(moveSan)) {
+                            move = varChess.move({ from: moveSan.slice(0,2), to: moveSan.slice(2,4), promotion: moveSan[4] || undefined });
+                        } else {
+                            move = varChess.move(moveSan, { sloppy: true });
+                        }
                         if (!move) {
                             console.log('[addVariationToPgn] move failed for:', moveSan, 'turn:', turnBefore, 'fen:', varChess.fen());
                             break;
