@@ -3981,15 +3981,16 @@
 
             const depth = parseInt(document.getElementById('variation-depth').value) || 15;
 
-            // Walk entire tree and collect nodes with ?/??  whose parent has no variation branch
+            // Walk entire tree and collect ?/?? nodes that have no variation children yet
             const targets = [];
             function collectTargets(node) {
                 if (!node) return;
-                if (node.annotation && (node.annotation.includes('??') || (node.annotation.includes('?') && !node.annotation.includes('!?'))) ) {
-                    const parent = node.parent;
-                    // Parent has no variation if it has only 1 child (the mainline)
-                    if (parent && parent.fen && parent.children.length <= 1) {
-                        targets.push({ node, parent });
+                if (node.annotation && node.fen &&
+                    (node.annotation.includes('??') || (node.annotation.includes('?') && !node.annotation.includes('!?')))) {
+                    // No variation exists if node has 0 or 1 child (0 = end of game, 1 = only mainline continuation)
+                    const hasVariation = node.children && node.children.length > 1;
+                    if (!hasVariation) {
+                        targets.push(node);
                     }
                 }
                 if (node.children) node.children.forEach(collectTargets);
@@ -4007,14 +4008,18 @@
             let added = 0;
 
             for (let i = 0; i < targets.length; i++) {
-                const { node, parent } = targets[i];
+                const node = targets[i];
                 const label = `${node.moveNumber}${node.isBlackMove ? '...' : '.'}${node.san}${node.annotation}`;
                 statusEl.textContent = `Analyzing ${label} (${i + 1}/${targets.length})...`;
+
+                // Analyze from node.fen (position after the ?/?? move) — same as clicking the node + Analyze
+                const nextIsBlack = !node.isBlackMove;
+                const nextMoveNumber = node.isBlackMove ? node.moveNumber + 1 : node.moveNumber;
 
                 let result = null;
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
-                        result = await analyzePositionForVariation(parent.fen, depth);
+                        result = await analyzePositionForVariation(node.fen, depth);
                         break;
                     } catch (e) {
                         statusEl.textContent = `Reinitializing Stockfish (${label}, attempt ${attempt + 1}/3)...`;
@@ -4026,13 +4031,13 @@
 
                 if (result && result.pv && result.pv.length > 0) {
                     window.currentVariationResult = {
-                        moveNumber: node.moveNumber,
-                        isBlack: node.isBlackMove,
-                        fen: parent.fen,
+                        moveNumber: nextMoveNumber,
+                        isBlack: nextIsBlack,
+                        fen: node.fen,
                         bestMove: result.bestMove,
                         score: result.score,
                         pv: result.pv,
-                        parentNode: parent
+                        parentNode: node
                     };
                     const beforeCount = added;
                     addVariationToPgn();
