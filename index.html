@@ -3849,7 +3849,8 @@
                 if (parentNode) {
                     // Build variation nodes using Chess.js for validation
                     const varChess = new Chess();
-                    varChess.load(parentNode.fen);
+                    const loadOk = varChess.load(parentNode.fen);
+                    console.log('[addVariationToPgn] parentNode.fen:', parentNode.fen, 'loadOk:', loadOk, 'pv:', result.pv);
 
                     let prevNode = parentNode;
                     firstVarNode = null;
@@ -3859,7 +3860,10 @@
                     for (const moveSan of result.pv) {
                         const turnBefore = varChess.turn();
                         const move = varChess.move(moveSan, { sloppy: true });
-                        if (!move) break;
+                        if (!move) {
+                            console.log('[addVariationToPgn] move failed for:', moveSan, 'turn:', turnBefore, 'fen:', varChess.fen());
+                            break;
+                        }
 
                         const isBlack = (turnBefore === 'b');
                         let moveNumber;
@@ -4030,8 +4034,14 @@
                         pv: result.pv,
                         parentNode: parent
                     };
+                    const beforeCount = added;
                     addVariationToPgn();
-                    added++;
+                    // addVariationToPgn sets status to '' on success, error text on failure
+                    if (document.getElementById('variation-status').textContent !== 'Could not insert variation') {
+                        added++;
+                    } else {
+                        log(`Fill Variations: insert failed for ${label}`, 'warning');
+                    }
                 } else {
                     log(`Fill Variations: no result for ${label}`, 'warning');
                 }
