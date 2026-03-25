@@ -3702,6 +3702,7 @@
 
             const result = window.currentVariationResult;
             let inserted = false;
+            let firstVarNode = null;
 
             // ---- Tree-based insertion (preserves all comments and existing variations) ----
             if (window.moveTree) {
@@ -3722,7 +3723,7 @@
                     varChess.load(parentNode.fen);
 
                     let prevNode = parentNode;
-                    let firstVarNode = null;
+                    firstVarNode = null;
                     const counterBase = Object.keys(window.moveNodeRegistry).length;
                     let ci = 0;
 
