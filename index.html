@@ -3847,6 +3847,23 @@
                 }
 
                 if (parentNode) {
+                    // Deduplicate: check if first PV move already exists as a child
+                    const firstPvMove = result.pv[0];
+                    const uciPat = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+                    const firstPvSan = (() => {
+                        if (!firstPvMove) return null;
+                        if (uciPat.test(firstPvMove)) {
+                            const tmp = new Chess(); tmp.load(parentNode.fen);
+                            const m = tmp.move({ from: firstPvMove.slice(0,2), to: firstPvMove.slice(2,4), promotion: firstPvMove[4] || undefined });
+                            return m ? m.san : firstPvMove;
+                        }
+                        return firstPvMove;
+                    })();
+                    if (firstPvSan && parentNode.children.some(c => c.san === firstPvSan)) {
+                        inserted = true; // treat as success, just skip duplicate
+                        return;
+                    }
+
                     // Build variation nodes using Chess.js for validation
                     const varChess = new Chess();
                     const loadOk = varChess.load(parentNode.fen);
