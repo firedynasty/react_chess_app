@@ -3166,27 +3166,29 @@
                     return;
                 }
 
-                // Use current position for analysis
-                fen = window.currentMoveNode.fen;
+                // Use the position BEFORE the clicked move (parent.fen),
+                // so variation shows what should have been played instead
+                const parentNode = window.currentMoveNode.parent;
+                if (!parentNode || !parentNode.fen) {
+                    statusEl.textContent = 'Cannot analyze — no parent position found';
+                    statusEl.style.color = '#ff6b6b';
+                    return;
+                }
+                fen = parentNode.fen;
                 const moveNumber = window.currentMoveNode.moveNumber || 1;
-                // After a move is played, it's the opponent's turn
-                // If current node is black's move, next to play is white (new move number)
-                // If current node is white's move, next to play is black (same move number)
-                const isBlack = !window.currentMoveNode.isBlackMove;
-                const nextMoveNumber = window.currentMoveNode.isBlackMove ? moveNumber + 1 : moveNumber;
+                const isBlack = window.currentMoveNode.isBlackMove;
 
                 parsed = {
-                    moveNumber: nextMoveNumber,
+                    moveNumber: moveNumber,
                     isBlack: isBlack,
-                    plyIndex: null  // Not used when using current position
+                    plyIndex: null
                 };
                 useCurrentPosition = true;
 
                 // Show which move we're analyzing from
                 const currentSan = window.currentMoveNode.san || '';
-                const currentMoveNum = window.currentMoveNode.moveNumber || 1;
-                const moveLabel = window.currentMoveNode.isBlackMove ? `${currentMoveNum}...${currentSan}` : `${currentMoveNum}.${currentSan}`;
-                statusEl.textContent = `Analyzing after ${moveLabel} at depth ${depth}...`;
+                const moveLabel = isBlack ? `${moveNumber}...${currentSan}` : `${moveNumber}.${currentSan}`;
+                statusEl.textContent = `Analyzing before ${moveLabel} at depth ${depth}...`;
                 statusEl.style.color = '#00d4ff';
             } else {
                 // Standard flow with move number input
@@ -4036,14 +4038,14 @@
                 const label = `${node.moveNumber}${node.isBlackMove ? '...' : '.'}${node.san}${node.annotation}`;
                 statusEl.textContent = `Analyzing ${label} (${i + 1}/${targets.length})...`;
 
-                // Analyze from node.fen (position after the ?/?? move) — same as clicking the node + Analyze
-                const nextIsBlack = !node.isBlackMove;
-                const nextMoveNumber = node.isBlackMove ? node.moveNumber + 1 : node.moveNumber;
+                // Analyze from parent.fen (position BEFORE the ?/?? move) — shows what should have been played instead
+                const parentFen = node.parent ? node.parent.fen : null;
+                if (!parentFen) { log(`Fill Variations: no parent FEN for ${label}`, 'warning'); continue; }
 
                 let result = null;
                 for (let attempt = 0; attempt < 3; attempt++) {
                     try {
-                        result = await analyzePositionForVariation(node.fen, depth);
+                        result = await analyzePositionForVariation(parentFen, depth);
                         break;
                     } catch (e) {
                         statusEl.textContent = `Reinitializing Stockfish (${label}, attempt ${attempt + 1}/3)...`;
@@ -4055,13 +4057,13 @@
 
                 if (result && result.pv && result.pv.length > 0) {
                     window.currentVariationResult = {
-                        moveNumber: nextMoveNumber,
-                        isBlack: nextIsBlack,
-                        fen: node.fen,
+                        moveNumber: node.moveNumber,
+                        isBlack: node.isBlackMove,
+                        fen: parentFen,
                         bestMove: result.bestMove,
                         score: result.score,
                         pv: result.pv,
-                        parentNode: node
+                        parentNode: node.parent
                     };
                     const beforeCount = added;
                     addVariationToPgn();
