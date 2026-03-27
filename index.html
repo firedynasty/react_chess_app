@@ -630,6 +630,21 @@
         </select>
     </div>
 
+    <!-- Lichess Import Section -->
+    <div class="chesscom-import-bar" id="lichess-import-bar">
+        <label for="lichess-username">Lichess:</label>
+        <input type="text" id="lichess-username" placeholder="Enter username" autocomplete="username" value="FirebirdBot">
+        <button type="button" id="fetch-lichess-btn" onclick="fetchLichessGames()">
+            📥 Fetch Games
+        </button>
+        <select id="lichess-num-games" class="num-games-select">
+            <option value="5" selected>5 games</option>
+            <option value="10">10 games</option>
+            <option value="15">15 games</option>
+            <option value="20">20 games</option>
+        </select>
+    </div>
+
     <div class="game-selection-container" id="game-selection-container" style="display: none;">
         <label for="game-dropdown">Select a game to analyze:</label>
         <select id="game-dropdown" onchange="loadSelectedGame()">
@@ -925,12 +940,12 @@
         <!-- Material Display -->
         <div id="materialDisplay" style="display: flex; justify-content: space-between; align-items: center; width: 400px; margin-bottom: 8px; font-size: 18px; min-height: 24px;">
           <div style="display: flex; align-items: center;">
-            <span id="whiteCaptured" style="color: #fff; letter-spacing: 1px;"></span>
-            <span id="whiteAdvantage" style="color: #4ade80; font-weight: bold; margin-left: 6px; font-size: 14px;"></span>
+            <span id="blackCaptured" style="color: #fff; letter-spacing: 1px;"></span>
+            <span id="blackAdvantage" style="color: #4ade80; font-weight: bold; margin-left: 6px; font-size: 14px;"></span>
           </div>
           <div style="display: flex; align-items: center;">
-            <span id="blackAdvantage" style="color: #4ade80; font-weight: bold; margin-right: 6px; font-size: 14px;"></span>
-            <span id="blackCaptured" style="color: #fff; letter-spacing: 1px;"></span>
+            <span id="whiteAdvantage" style="color: #4ade80; font-weight: bold; margin-right: 6px; font-size: 14px;"></span>
+            <span id="whiteCaptured" style="color: #fff; letter-spacing: 1px;"></span>
           </div>
         </div>
         <p style="color: #888; font-size: 12px; margin: 0 0 8px 0; font-style: italic; display: none;">Note: Chess piece images will load fully when choosing 'Next'</p>
@@ -4613,6 +4628,134 @@
             } catch (error) {
                 showChesscomMessage(error.message || 'Failed to fetch games. Please try again.', 'error');
                 log('Chess.com fetch error: ' + error.message, 'error');
+                gameSelectionContainer.style.display = 'none';
+            } finally {
+                fetchBtn.disabled = false;
+                fetchBtn.innerHTML = '📥 Fetch Games';
+            }
+        }
+
+        async function fetchLichessGames() {
+            const usernameInput = document.getElementById('lichess-username');
+            const fetchBtn = document.getElementById('fetch-lichess-btn');
+            const gameSelectionContainer = document.getElementById('game-selection-container');
+            const gameDropdown = document.getElementById('game-dropdown');
+            const numGamesSelect = document.getElementById('lichess-num-games');
+
+            const username = usernameInput.value.trim();
+            const numGames = parseInt(numGamesSelect.value);
+
+            if (!username) {
+                showChesscomMessage('Please enter a Lichess username', 'error');
+                return;
+            }
+
+            clearChesscomMessages();
+            fetchedGames = {};
+            gameDropdown.innerHTML = '<option value="">-- Select a game --</option>';
+            gameSelectionContainer.style.display = 'none';
+
+            fetchBtn.disabled = true;
+            fetchBtn.innerHTML = '<span class="chesscom-spinner"></span> Fetching...';
+            log('Fetching games from Lichess for: ' + username, 'info');
+
+            try {
+                const url = `https://lichess.org/api/games/user/${username}?max=${numGames}&opening=true&pgnInJson=true`;
+                const response = await fetch(url, {
+                    headers: { 'Accept': 'application/x-ndjson' }
+                });
+
+                if (response.status === 404) {
+                    throw new Error('User not found on Lichess. Check the username and try again.');
+                }
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch games from Lichess.');
+                }
+
+                const text = await response.text();
+                const lines = text.trim().split('\n').filter(l => l.trim());
+                const games = lines.map(l => JSON.parse(l));
+
+                if (games.length === 0) {
+                    showChesscomMessage('No games found for this Lichess user.', 'info');
+                    log('No games found for ' + username, 'warning');
+                    return;
+                }
+
+                for (let idx = 0; idx < games.length; idx++) {
+                    const game = games[idx];
+                    if (!game.pgn) continue;
+
+                    const whiteName = game.players?.white?.user?.name || game.players?.white?.aiLevel ? `AI Level ${game.players.white.aiLevel}` : 'Anonymous';
+                    const blackName = game.players?.black?.user?.name || game.players?.black?.aiLevel ? `AI Level ${game.players.black.aiLevel}` : 'Anonymous';
+                    const whiteRating = game.players?.white?.rating || '?';
+                    const blackRating = game.players?.black?.rating || '?';
+
+                    let opponent, resultDisplay, playerColor;
+                    if (username.toLowerCase() === whiteName.toLowerCase()) {
+                        opponent = blackName;
+                        playerColor = 'White';
+                        if (game.winner === 'white') resultDisplay = 'Win';
+                        else if (game.winner === 'black') resultDisplay = 'Loss';
+                        else resultDisplay = 'Draw';
+                    } else {
+                        opponent = whiteName;
+                        playerColor = 'Black';
+                        if (game.winner === 'black') resultDisplay = 'Win';
+                        else if (game.winner === 'white') resultDisplay = 'Loss';
+                        else resultDisplay = 'Draw';
+                    }
+
+                    const gameDate = game.lastMoveAt ? new Date(game.lastMoveAt).toLocaleDateString() : 'Unknown';
+                    const timeClass = game.speed || game.perf || 'unknown';
+
+                    const label = `Game ${idx + 1}: vs ${opponent} (${resultDisplay} as ${playerColor}) - ${timeClass} - ${gameDate}`;
+
+                    const openingInfo = {
+                        eco: game.opening?.eco || '',
+                        opening: game.opening?.name || ''
+                    };
+
+                    fetchedGames[label] = {
+                        pgn: extractPgnMoves(game.pgn),
+                        fullPgn: game.pgn,
+                        metadata: {
+                            white: whiteName,
+                            black: blackName,
+                            white_rating: whiteRating,
+                            black_rating: blackRating,
+                            result: resultDisplay,
+                            time_class: timeClass,
+                            time_control: game.clock ? `${game.clock.initial}+${game.clock.increment}` : '',
+                            url: `https://lichess.org/${game.id}`,
+                            end_time: game.lastMoveAt ? Math.floor(game.lastMoveAt / 1000) : null,
+                            eco: openingInfo.eco,
+                            opening: openingInfo.opening
+                        }
+                    };
+                    window.fetchedGames = fetchedGames;
+                }
+
+                if (Object.keys(fetchedGames).length === 0) {
+                    showChesscomMessage('No valid games found (games may be missing PGN data).', 'info');
+                    return;
+                }
+
+                for (const label of Object.keys(fetchedGames)) {
+                    const option = document.createElement('option');
+                    option.value = label;
+                    option.textContent = label;
+                    gameDropdown.appendChild(option);
+                }
+
+                gameSelectionContainer.style.display = 'block';
+                showChesscomMessage(`Found ${Object.keys(fetchedGames).length} recent Lichess games!`, 'success');
+                log(`Fetched ${Object.keys(fetchedGames).length} games from Lichess`, 'success');
+
+            } catch (error) {
+                showChesscomMessage(error.message || 'Failed to fetch Lichess games. Please try again.', 'error');
+                log('Lichess fetch error: ' + error.message, 'error');
                 gameSelectionContainer.style.display = 'none';
             } finally {
                 fetchBtn.disabled = false;
