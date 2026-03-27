@@ -10048,8 +10048,9 @@ ${contentToAnalyze}`;
                 previewText.textContent = previewContent;
                 previewText.title = col3.trim() || col1;
                 previewDiv.style.display = previewContent ? 'block' : 'none';
-                // Store full text for copy
-                previewDiv.dataset.fullText = cellText.trim() || col1;
+                // Store full text (all columns, untruncated) for copy
+                var fullParts = [col1, col2, col3.trim()].filter(function(p) { return p; });
+                previewDiv.dataset.fullText = fullParts.join(', ');
             }
 
             if (cellText.trim() && isPgn) {
