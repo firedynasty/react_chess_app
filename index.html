@@ -10027,7 +10027,9 @@ ${contentToAnalyze}`;
             document.getElementById('gdrive-cell2-input').value = col2;
             document.getElementById('gdrive-cell3-input').value = col3;
 
-            var cellText = col3;
+            var copyCellRadio = document.querySelector('input[name="gdriveCopyCell"]:checked');
+            var selectedCellIndex = copyCellRadio ? parseInt(copyCellRadio.value) : 2;
+            var cellText = row[selectedCellIndex] || '';
 
             // Update row indicator
             var indicator = document.getElementById('gdriveRowIndicator');
