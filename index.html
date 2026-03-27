@@ -9957,8 +9957,10 @@ ${contentToAnalyze}`;
                     document.getElementById('gdrive-cell2-input').value = col2;
                     document.getElementById('gdrive-cell3-input').value = col3;
 
-                    // Use col3 (the PGN column) for loading into the board
-                    var cellText = col3;
+                    // Use the radio-selected cell for loading into the board
+                    var copyCellRadio = document.querySelector('input[name="gdriveCopyCell"]:checked');
+                    var cellIdx = copyCellRadio ? parseInt(copyCellRadio.value) : 2;
+                    var cellText = row[cellIdx] || '';
 
                     // Check if it looks like PGN — must start with "1." (possibly after [headers])
                     var pgnTest = cellText.trim().replace(/\[[^\]]*\]\s*/g, '');
@@ -9994,7 +9996,7 @@ ${contentToAnalyze}`;
                             gdriveSetStatus('Loaded row: "' + label + '" → copied to clipboard');
                         }
                     } else {
-                        gdriveSetStatus('Loaded row: "' + label + '" → selected cell (col ' + (copyCellIndex + 1) + ') is empty');
+                        gdriveSetStatus('Loaded row: "' + label + '" → selected cell (col ' + (cellIdx + 1) + ') is empty');
                     }
                 });
             });
