@@ -1057,6 +1057,7 @@
           <button id="lichessLinksBtn" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Lichess Links</button>
           <button id="toggleChatBtn" onclick="var p = document.getElementById('chatNotesPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Toggle Chat</button>
           <button id="toggleSoundBtn" onclick="window.chessSoundEnabled = !window.chessSoundEnabled; this.textContent = window.chessSoundEnabled ? 'Sound On' : 'Sound Off'; this.style.background = window.chessSoundEnabled ? '#555' : '#333'" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
+          <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -1086,6 +1087,23 @@
                 <div style="font-size:11px; color:#aaa; margin-bottom:6px;">Note: use the White to Move FEN as the starting point when pasting into the editor.</div>
                 <a id="fenLichessEditorLink" href="#" target="_blank" style="word-break:break-all; color:#4285f4; text-decoration:none; font-size:12px; display:block; margin-bottom:6px;"></a>
                 <button onclick="navigator.clipboard.writeText(document.getElementById('fenLichessEditorLink').href); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy Editor URL',1500)" style="width:100%; padding:6px; font-size:13px; background:#00d4ff; color:#1a1a2e; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy Editor URL</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Text View Modal -->
+          <div id="textViewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:800px; width:90%; max-height:80vh; border:1px solid #0f3460; position:relative; display:flex; flex-direction:column;">
+              <button onclick="document.getElementById('textViewModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <div style="font-weight:bold; color:#a8d8ea; font-size:15px;" id="textViewModalTitle">Text View</div>
+                <div style="display:flex; gap:6px; margin-right:30px;">
+                  <button onclick="copyTextViewFormatted()" style="padding:5px 12px; background:#28a745; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">Copy Formatted</button>
+                  <button onclick="copyTextViewOneLine()" style="padding:5px 12px; background:#17a2b8; color:white; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">Copy One-Line</button>
+                </div>
+              </div>
+              <div id="textViewModalContent" style="overflow-y:auto; flex:1; line-height:1.7; font-size:15px; white-space:pre-wrap; word-wrap:break-word; color:#eee; background:#0f3460; border-radius:8px; padding:20px 24px; min-height:100px;">
+                <span style="color:#555;">No text loaded. Select a row from the table.</span>
               </div>
             </div>
           </div>
@@ -1287,6 +1305,59 @@
                 gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
                 src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
                 src.start(t); src.stop(t + 0.1);
+            });
+        }
+
+        // =====================================================================
+        // TEXT VIEW MODAL
+        // =====================================================================
+        window.textViewRawContent = '';
+
+        function formatTextForView(text) {
+            let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            s = s.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#00d4ff;">$1</strong>');
+            s = s.replace(/^(\d+[\.\)]\s*)(.+)$/gm, '<div style="margin:8px 0;"><strong style="color:#00d4ff;">$1</strong>$2</div>');
+            s = s.replace(/^(.+:)\s*$/gm, '<span style="color:#ffd43b; font-weight:600; display:block; margin-top:16px; margin-bottom:4px;">$1</span>');
+            let sentenceCount = 0;
+            s = s.replace(/(\.)(\s)/g, function(match, dot, space) {
+                sentenceCount++;
+                return sentenceCount % 2 === 0 ? dot + '\n\n' : match;
+            });
+            s = s.replace(/\n{2,}/g, '\n\n');
+            return s;
+        }
+
+        function openTextViewModal() {
+            var modal = document.getElementById('textViewModal');
+            var content = document.getElementById('textViewModalContent');
+            var title = document.getElementById('textViewModalTitle');
+            if (!window.textViewRawContent) {
+                content.innerHTML = '<span style="color:#555;">No text loaded. Select a row from the table.</span>';
+                title.textContent = 'Text View';
+            } else {
+                content.innerHTML = formatTextForView(window.textViewRawContent);
+                var col1 = document.getElementById('gdrive-cell1-input');
+                title.textContent = col1 && col1.value ? col1.value : 'Text View';
+            }
+            modal.style.display = 'flex';
+        }
+
+        function copyTextViewFormatted() {
+            if (!window.textViewRawContent) return;
+            navigator.clipboard.writeText(window.textViewRawContent).then(function() {
+                var btn = event.target;
+                btn.textContent = 'Copied!';
+                setTimeout(function() { btn.textContent = 'Copy Formatted'; }, 1500);
+            });
+        }
+
+        function copyTextViewOneLine() {
+            if (!window.textViewRawContent) return;
+            var oneLine = window.textViewRawContent.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+            navigator.clipboard.writeText(oneLine).then(function() {
+                var btn = event.target;
+                btn.textContent = 'Copied!';
+                setTimeout(function() { btn.textContent = 'Copy One-Line'; }, 1500);
             });
         }
 
@@ -10109,6 +10180,9 @@ ${contentToAnalyze}`;
                     var cellIdx = copyCellRadio ? parseInt(copyCellRadio.value) : 2;
                     var cellText = row[cellIdx] || '';
 
+                    // Store content for text view modal
+                    window.textViewRawContent = cellText;
+
                     // Check if it looks like PGN — must start with "1." (possibly after [headers])
                     var pgnTest = cellText.trim().replace(/\[[^\]]*\]\s*/g, '');
                     var isPgn = /^1\.\s*[A-Za-z]/.test(pgnTest);
@@ -10179,6 +10253,9 @@ ${contentToAnalyze}`;
             var copyCellRadio = document.querySelector('input[name="gdriveCopyCell"]:checked');
             var selectedCellIndex = copyCellRadio ? parseInt(copyCellRadio.value) : 2;
             var cellText = row[selectedCellIndex] || '';
+
+            // Store content for text view modal
+            window.textViewRawContent = cellText;
 
             // Update row indicator
             var indicator = document.getElementById('gdriveRowIndicator');
