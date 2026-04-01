@@ -1056,6 +1056,7 @@
           <button id="exportFenBtn" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Export FEN</button>
           <button id="lichessLinksBtn" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Lichess Links</button>
           <button id="toggleChatBtn" onclick="var p = document.getElementById('chatNotesPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Toggle Chat</button>
+          <button id="toggleSoundBtn" onclick="window.chessSoundEnabled = !window.chessSoundEnabled; this.textContent = window.chessSoundEnabled ? 'Sound On' : 'Sound Off'; this.style.background = window.chessSoundEnabled ? '#555' : '#333'" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -1204,6 +1205,91 @@
     <script src="analysis_chess.js"></script>
 
     <script>
+        // =====================================================================
+        // CHESS SOUND EFFECTS (Web Audio API)
+        // =====================================================================
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        window.chessSoundEnabled = true;
+
+        function playMoveSound(san) {
+            if (!window.chessSoundEnabled) return;
+            if (!san) { playMove(); return; }
+            if (san === 'O-O' || san === 'O-O-O') { playCastle(); }
+            else if (san.includes('+') || san.includes('#')) { playCheck(); }
+            else if (san.includes('x')) { playCapture(); }
+            else { playMove(); }
+        }
+
+        function playMove() {
+            const t = ctx.currentTime;
+            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            const filt = ctx.createBiquadFilter();
+            filt.type = 'bandpass'; filt.frequency.value = 2400; filt.Q.value = 0.8;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.45, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+            src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+            src.start(t); src.stop(t + 0.1);
+        }
+
+        function playCapture() {
+            const t = ctx.currentTime;
+            const buf = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+            const src = ctx.createBufferSource();
+            src.buffer = buf;
+            const filt = ctx.createBiquadFilter();
+            filt.type = 'bandpass'; filt.frequency.value = 900; filt.Q.value = 1.2;
+            const gain = ctx.createGain();
+            gain.gain.setValueAtTime(0.9, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+            src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+            src.start(t); src.stop(t + 0.3);
+        }
+
+        function playCheck() {
+            [0, 0.12].forEach((delay, i) => {
+                const t = ctx.currentTime + delay;
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+                const d = buf.getChannelData(0);
+                for (let j = 0; j < d.length; j++) d[j] = Math.random() * 2 - 1;
+                const src = ctx.createBufferSource();
+                src.buffer = buf;
+                const filt = ctx.createBiquadFilter();
+                filt.type = 'bandpass';
+                filt.frequency.value = i === 0 ? 2400 : 1800;
+                filt.Q.value = 1.0;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(i === 0 ? 0.45 : 0.35, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+                src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+                src.start(t); src.stop(t + 0.2);
+            });
+        }
+
+        function playCastle() {
+            [0, 0.18].forEach(delay => {
+                const t = ctx.currentTime + delay;
+                const buf = ctx.createBuffer(1, ctx.sampleRate * 0.1, ctx.sampleRate);
+                const d = buf.getChannelData(0);
+                for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+                const src = ctx.createBufferSource();
+                src.buffer = buf;
+                const filt = ctx.createBiquadFilter();
+                filt.type = 'bandpass'; filt.frequency.value = 2200; filt.Q.value = 0.9;
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.42, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+                src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+                src.start(t); src.stop(t + 0.1);
+            });
+        }
+
         // =====================================================================
         // DROPBOX INTEGRATION (OAuth PKCE + File Operations)
         // =====================================================================
@@ -5484,6 +5570,12 @@
                 window.board2.position(node.fen);
             }
 
+            // Play sound effect based on move type
+            playMoveSound(node.san);
+
+            // Highlight from/to squares of last move
+            highlightNodeMove(node);
+
             // Update highlighting in move table
             document.querySelectorAll('.move-san.current, .variation-move.current').forEach(el => {
                 el.classList.remove('current');
@@ -5891,8 +5983,9 @@
                 boardContainer.style.border = 'none';
             }
 
-            // Clear variation arrows
+            // Clear variation arrows and move highlights
             clearBoard2Arrows();
+            clearMoveHighlights();
 
             // Update other displays
             updateMaterialDisplay(window.moveTree.fen);
@@ -6144,6 +6237,48 @@
             if (svg) svg.querySelectorAll('.arrow-line').forEach(el => el.remove());
         }
 
+        function clearMoveHighlights() {
+            const svg = document.getElementById('board2ArrowSvg');
+            if (svg) svg.querySelectorAll('.move-highlight').forEach(el => el.remove());
+        }
+
+        function highlightLastMove(fromSq, toSq) {
+            clearMoveHighlights();
+            const svg = document.getElementById('board2ArrowSvg');
+            if (!svg) return;
+            const sqSize = 50; // 400 / 8
+            [fromSq, toSq].forEach(sq => {
+                const coords = board2SquareToCoords(sq);
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', coords.x - sqSize / 2);
+                rect.setAttribute('y', coords.y - sqSize / 2);
+                rect.setAttribute('width', sqSize);
+                rect.setAttribute('height', sqSize);
+                rect.setAttribute('fill', 'rgba(255, 255, 0, 0.35)');
+                rect.classList.add('move-highlight');
+                // Insert before arrows so arrows draw on top
+                svg.insertBefore(rect, svg.querySelector('.arrow-line') || null);
+            });
+        }
+
+        function highlightNodeMove(node) {
+            if (!node || !node.san || !node.parent || !node.parent.fen) {
+                clearMoveHighlights();
+                return;
+            }
+            try {
+                const tempChess = new Chess(node.parent.fen);
+                const move = tempChess.move(node.san, { sloppy: true });
+                if (move) {
+                    highlightLastMove(move.from, move.to);
+                } else {
+                    clearMoveHighlights();
+                }
+            } catch (e) {
+                clearMoveHighlights();
+            }
+        }
+
         // ── Eval Bar ──────────────────────────────────────────────────────────
 
         function updateEvalBar(fen) {
@@ -6304,6 +6439,7 @@
             }
             if (window.board2) {
                 window.board2.position(window.studyReportPositions[window.studyReportPositionIndex]);
+                playMoveSound(null);
             }
             updateBoard2MoveIndicator(window.studyReportPositionIndex);
         }
@@ -6353,6 +6489,7 @@
             }
             if (window.board2) {
                 window.board2.position(window.studyReportPositions[window.studyReportPositionIndex]);
+                playMoveSound(null);
             }
             updateBoard2MoveIndicator(window.studyReportPositionIndex);
         }
