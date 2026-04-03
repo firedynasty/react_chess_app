@@ -1022,7 +1022,10 @@
           <button onclick="undoTypedMove()" style="background: rgba(255,152,0,0.5); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Undo</button>
           <button onclick="copyTypedStatusAndOpenEditor()" style="background: #629924; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Copy + Lichess Editor</button>
         </div>
-        <div id="typedMoveStatus" style="font-size: 12px; color: #888; margin-bottom: 8px;"></div>
+        <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px;">
+          <div id="typedMoveStatus" style="font-size: 12px; color: #888; flex: 1;"></div>
+          <button onclick="navigator.clipboard.writeText(document.getElementById('typedMoveStatus').textContent)" style="background: #555; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; white-space: nowrap; flex-shrink: 0;">📋 Copy</button>
+        </div>
 
         <!-- Play vs Stockfish -->
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
@@ -1051,6 +1054,7 @@
           <label style="color: #ccc; font-size: 13px; display: flex; align-items: center; gap: 3px; cursor: pointer;">
             <input type="radio" name="board2Mode" id="board2ModeDrag" value="drag" onchange="setBoard2MoveMode('drag')"> Desktop
           </label>
+          <button onclick="(function(){ var fen = (typeof getTypedChess === 'function' ? getTypedChess().fen() : 'start'); window.open('https://lichess.org/analysis/' + fen.replace(/ /g,'_'), '_blank'); })()" style="background: #1a1a2e; color: #00d4ff; border: 1px solid #00d4ff; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap;">Lichess ↗</button>
         </div>
         <div id="sfPlayStatus" style="font-size: 13px; color: #ffd700; font-family: monospace;"></div>
       </div>
@@ -10965,8 +10969,7 @@ ${contentToAnalyze}`;
                                 var chess = getTypedChess();
                                 var testMove = chess.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
                                 if (!testMove) {
-                                    // Invalid — try re-selecting target if it has a piece
-                                    chess.undo(); // no-op if move failed, but safe
+                                    // chess.move returned null — nothing was applied, do NOT undo
                                     mobileSelectedSquare = null;
                                     if (currentPos[targetSquare]) {
                                         mobileSelectedSquare = targetSquare;
@@ -10976,7 +10979,7 @@ ${contentToAnalyze}`;
                                     return;
                                 }
                                 var san = testMove.san;
-                                chess.undo(); // undo the test — user confirms via Apply or Enter
+                                chess.undo(); // undo the test move only — user confirms via Apply or Enter
                                 var input = document.getElementById('typedMoveInput');
                                 if (input) { input.value = san; input.focus(); }
                                 mobileSelectedSquare = null;
