@@ -10976,10 +10976,9 @@ ${contentToAnalyze}`;
                                     return;
                                 }
                                 var san = testMove.san;
-                                chess.undo(); // undo the test — applyTypedMove will apply it properly
+                                chess.undo(); // undo the test — user confirms via Apply or Enter
                                 var input = document.getElementById('typedMoveInput');
-                                if (input) input.value = san;
-                                if (typeof window.applyTypedMove === 'function') window.applyTypedMove();
+                                if (input) { input.value = san; input.focus(); }
                                 mobileSelectedSquare = null;
                                 return;
                             }
