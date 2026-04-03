@@ -1045,7 +1045,12 @@
           </select>
           <button onclick="startStockfishGame()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">New Game</button>
           <button onclick="startStockfishFromPosition()" style="background: #ff9800; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">From Position</button>
-          <button onclick="stopStockfishGame()" style="background: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Stop</button>
+          <label style="color: #ccc; font-size: 13px; display: flex; align-items: center; gap: 3px; cursor: pointer;">
+            <input type="radio" name="board2Mode" id="board2ModeClick" value="click" onchange="setBoard2MoveMode('click')"> Mobile
+          </label>
+          <label style="color: #ccc; font-size: 13px; display: flex; align-items: center; gap: 3px; cursor: pointer;">
+            <input type="radio" name="board2Mode" id="board2ModeDrag" value="drag" onchange="setBoard2MoveMode('drag')"> Desktop
+          </label>
         </div>
         <div id="sfPlayStatus" style="font-size: 13px; color: #ffd700; font-family: monospace;"></div>
       </div>
@@ -10870,6 +10875,9 @@ ${contentToAnalyze}`;
             }
         }
 
+        // Expose patchedBoardDrop globally so setBoard2MoveMode can use it
+        window._patchedBoardDrop = null; // filled after definition below
+
         // Re-initialize board with patched drop handler after a short delay
         setTimeout(function() {
             if (window.board2) {
@@ -10887,13 +10895,41 @@ ${contentToAnalyze}`;
                 window.board2.orientation(currentOrientation);
             }
 
-            // Setup mobile click-to-move on board2
+            window._patchedBoardDrop = patchedBoardDrop;
+
+            // Determine initial mode based on device
             var isMobileBoard2 = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
-            if (isMobileBoard2) {
-                var mobileSelectedSquare = null;
-                var board2El = document.getElementById('myBoard2');
-                if (board2El) {
-                    board2El.addEventListener('click', function(e) {
+            window._board2ClickMode = isMobileBoard2;
+
+            // Set the correct radio default
+            var defaultRadio = document.getElementById(isMobileBoard2 ? 'board2ModeClick' : 'board2ModeDrag');
+            if (defaultRadio) defaultRadio.checked = true;
+
+            // setBoard2MoveMode: re-init board with correct draggable and set flag
+            window.setBoard2MoveMode = function(mode) {
+                window._board2ClickMode = (mode === 'click');
+                if (window.board2) {
+                    var pos = window.board2.position();
+                    var ori = window.board2.orientation();
+                    window.board2 = Chessboard('myBoard2', {
+                        draggable: mode === 'drag',
+                        dropOffBoard: 'snapback',
+                        position: pos,
+                        snapbackSpeed: 500,
+                        snapSpeed: 100,
+                        pieceTheme: window._pieceThemePath || 'img/chesspieces/wikipedia/{piece}.png',
+                        onDrop: window._patchedBoardDrop
+                    });
+                    window.board2.orientation(ori);
+                }
+            };
+
+            // Always attach click-to-move listener; active only when _board2ClickMode is true
+            var mobileSelectedSquare = null;
+            var board2El = document.getElementById('myBoard2');
+            if (board2El) {
+                board2El.addEventListener('click', function(e) {
+                    if (!window._board2ClickMode) return;
                         var square = e.target.closest('.square-55d63');
                         if (!square) return;
                         var squareId = square.getAttribute('data-square');
@@ -10962,7 +10998,6 @@ ${contentToAnalyze}`;
                         }
                     });
                 }
-            }
         }, 1000);
     })();
     </script>
