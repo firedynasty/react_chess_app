@@ -10886,6 +10886,83 @@ ${contentToAnalyze}`;
                 });
                 window.board2.orientation(currentOrientation);
             }
+
+            // Setup mobile click-to-move on board2
+            var isMobileBoard2 = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
+            if (isMobileBoard2) {
+                var mobileSelectedSquare = null;
+                var board2El = document.getElementById('myBoard2');
+                if (board2El) {
+                    board2El.addEventListener('click', function(e) {
+                        var square = e.target.closest('.square-55d63');
+                        if (!square) return;
+                        var squareId = square.getAttribute('data-square');
+                        if (!squareId) return;
+
+                        var currentPos = window.board2.position();
+
+                        if (!mobileSelectedSquare) {
+                            // First click — select a piece
+                            if (currentPos[squareId]) {
+                                mobileSelectedSquare = squareId;
+                                document.querySelectorAll('#myBoard2 .square-55d63').forEach(function(sq) {
+                                    sq.style.boxShadow = '';
+                                });
+                                square.style.boxShadow = 'inset 0 0 0 4px rgba(255, 255, 0, 0.8)';
+                            }
+                        } else {
+                            // Second click — attempt move
+                            var sourceSquare = mobileSelectedSquare;
+                            var targetSquare = squareId;
+
+                            document.querySelectorAll('#myBoard2 .square-55d63').forEach(function(sq) {
+                                sq.style.boxShadow = '';
+                            });
+
+                            if (sourceSquare === targetSquare) {
+                                mobileSelectedSquare = null;
+                                return;
+                            }
+
+                            // When playing vs Stockfish, route through typedMoveInput / applyTypedMove
+                            if (window._sfGame && window._sfGame.active) {
+                                var chess = getTypedChess();
+                                var testMove = chess.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
+                                if (!testMove) {
+                                    // Invalid — try re-selecting target if it has a piece
+                                    chess.undo(); // no-op if move failed, but safe
+                                    mobileSelectedSquare = null;
+                                    if (currentPos[targetSquare]) {
+                                        mobileSelectedSquare = targetSquare;
+                                        var targetEl = document.querySelector('#myBoard2 .square-55d63[data-square="' + targetSquare + '"]');
+                                        if (targetEl) targetEl.style.boxShadow = 'inset 0 0 0 4px rgba(255, 255, 0, 0.8)';
+                                    }
+                                    return;
+                                }
+                                var san = testMove.san;
+                                chess.undo(); // undo the test — applyTypedMove will apply it properly
+                                var input = document.getElementById('typedMoveInput');
+                                if (input) input.value = san;
+                                if (typeof window.applyTypedMove === 'function') window.applyTypedMove();
+                                mobileSelectedSquare = null;
+                                return;
+                            }
+
+                            var result = patchedBoardDrop(sourceSquare, targetSquare, currentPos[sourceSquare]);
+                            mobileSelectedSquare = null;
+
+                            if (result === 'snapback') {
+                                // Invalid move — if there's a piece at target, select it instead
+                                if (currentPos[targetSquare]) {
+                                    mobileSelectedSquare = targetSquare;
+                                    var targetEl = document.querySelector('#myBoard2 .square-55d63[data-square="' + targetSquare + '"]');
+                                    if (targetEl) targetEl.style.boxShadow = 'inset 0 0 0 4px rgba(255, 255, 0, 0.8)';
+                                }
+                            }
+                        }
+                    });
+                }
+            }
         }, 1000);
     })();
     </script>
