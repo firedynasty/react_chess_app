@@ -1019,7 +1019,7 @@
             style="flex: 1; padding: 8px 10px; font-size: 14px; font-family: monospace; border: 2px solid #555; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff;"
             onkeydown="if(event.key==='Enter'){applyTypedMove(); event.preventDefault();}">
           <button onclick="applyTypedMove()" style="background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap;">Apply</button>
-          <button onclick="undoTypedMove()" style="background: rgba(255,152,0,0.5); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Undo</button>
+          <button onclick="toggleBoard2Compact()" id="board2CompactBtn" style="background: #555; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap;">⊡ Small</button>
           <button onclick="copyTypedStatusAndOpenEditor()" style="background: #629924; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Copy + Lichess Editor</button>
         </div>
         <div style="display: flex; align-items: flex-start; gap: 6px; margin-bottom: 8px;">
@@ -10584,6 +10584,21 @@ ${contentToAnalyze}`;
             if (window.board2) window.board2.position(fen, false);
         }
 
+        window._board2Compact = false;
+        window.toggleBoard2Compact = function() {
+            window._board2Compact = !window._board2Compact;
+            const size = window._board2Compact ? 190 : 400;
+            const wrap = document.getElementById('board2Wrap');
+            const boardEl = document.getElementById('myBoard2');
+            const svg = document.getElementById('board2ArrowSvg');
+            if (wrap) wrap.style.width = size + 'px';
+            if (boardEl) boardEl.style.width = size + 'px';
+            if (svg) { svg.style.width = '100%'; svg.setAttribute('viewBox', '0 0 ' + size + ' ' + size); }
+            if (window.board2) window.board2.resize();
+            const btn = document.getElementById('board2CompactBtn');
+            if (btn) btn.textContent = window._board2Compact ? '⊞ Full' : '⊡ Small';
+        };
+
         window.applyTypedMove = function() {
             const input = document.getElementById('typedMoveInput');
             let raw = input.value.trim();
@@ -10599,6 +10614,13 @@ ${contentToAnalyze}`;
 
             for (const token of tokens) {
                 let san = token;
+                // Normalize castling words → standard notation
+                const lower = san.toLowerCase();
+                if (/^(0-0-0|o-o-o|ooo|000|queenside|castle-long|castlelong|longcastle|long-castle)$/.test(lower)) {
+                    san = 'O-O-O';
+                } else if (/^(0-0|o-o|oo|00|castle|castles|kingside|castle-short|castleshort|shortcastle|short-castle)$/.test(lower)) {
+                    san = 'O-O';
+                }
                 let move = chess.move(san);
                 // Try uppercase first letter (bc4 → Bc4)
                 if (!move && /^[a-z]/.test(san) && san.length > 2) {
