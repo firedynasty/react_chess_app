@@ -1010,6 +1010,47 @@
       </div>
     </div>
 
+    <!-- Typed Move Input & Play vs Stockfish -->
+    <div id="typedMovePanel" style="display: none; margin: 0 auto 10px; max-width: 1200px;">
+      <div style="padding: 12px; background: #16213e; border-radius: 8px; width: 100%;">
+        <!-- Typed Move Input -->
+        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px;">
+          <input id="typedMoveInput" type="text" placeholder="Type move (e.g. e4, Nf3, O-O)"
+            style="flex: 1; padding: 8px 10px; font-size: 14px; font-family: monospace; border: 2px solid #555; border-radius: 4px; background: rgba(255,255,255,0.1); color: #fff;"
+            onkeydown="if(event.key==='Enter'){applyTypedMove(); event.preventDefault();}">
+          <button onclick="applyTypedMove()" style="background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap;">Apply</button>
+          <button onclick="undoTypedMove()" style="background: rgba(255,152,0,0.5); color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Undo</button>
+          <button onclick="copyTypedStatusAndOpenEditor()" style="background: #629924; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Copy + Lichess Editor</button>
+        </div>
+        <div id="typedMoveStatus" style="font-size: 12px; color: #888; margin-bottom: 8px;"></div>
+
+        <!-- Play vs Stockfish -->
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+          <span style="color: #e91e63; font-weight: bold; font-size: 13px;">Play vs Stockfish</span>
+          <label style="color: #ccc; font-size: 13px;">Level:</label>
+          <select id="sfLevel" style="padding: 6px; background: #1a1a2e; color: #eee; border: 1px solid #555; border-radius: 4px; font-size: 13px;">
+            <option value="1">1 - Beginner</option>
+            <option value="2">2 - Easy</option>
+            <option value="3">3 - Casual</option>
+            <option value="5" selected>5 - Medium</option>
+            <option value="7">7 - Strong</option>
+            <option value="10">10 - Hard</option>
+            <option value="15">15 - Expert</option>
+            <option value="20">20 - Maximum</option>
+          </select>
+          <label style="color: #ccc; font-size: 13px;">Play as:</label>
+          <select id="sfPlayColor" style="padding: 6px; background: #1a1a2e; color: #eee; border: 1px solid #555; border-radius: 4px; font-size: 13px;">
+            <option value="white">White</option>
+            <option value="black">Black</option>
+          </select>
+          <button onclick="startStockfishGame()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">New Game</button>
+          <button onclick="startStockfishFromPosition()" style="background: #ff9800; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">From Position</button>
+          <button onclick="stopStockfishGame()" style="background: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold;">Stop</button>
+        </div>
+        <div id="sfPlayStatus" style="font-size: 13px; color: #ffd700; font-family: monospace;"></div>
+      </div>
+    </div>
+
     <!-- Board Navigation Container (full width) -->
     <div style="margin: 0 auto 20px; max-width: 1200px;">
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
@@ -1058,6 +1099,7 @@
           <button id="toggleChatBtn" onclick="var p = document.getElementById('chatNotesPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Toggle Chat</button>
           <button id="toggleSoundBtn" onclick="window.chessSoundEnabled = !window.chessSoundEnabled; this.textContent = window.chessSoundEnabled ? 'Sound On' : 'Sound Off'; this.style.background = window.chessSoundEnabled ? '#555' : '#333'" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
           <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
+          <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); p.style.display=p.style.display==='none'?'block':'none'; this.style.background=p.style.display==='none'?'linear-gradient(90deg, #e91e63, #9c27b0)':'#555'" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -1229,6 +1271,7 @@
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         window.chessSoundEnabled = true;
 
+        window.playMoveSound = playMoveSound;
         function playMoveSound(san) {
             if (!window.chessSoundEnabled) return;
             if (!san) { playMove(); return; }
@@ -1815,6 +1858,8 @@
         // =====================================================================
 
         let stockfish = null;
+        window._sfEngine = function() { return stockfish; };
+        window._sfReady = function() { return isReady; };
         let isReady = false;
         let currentResolve = null;
         let analysisQueue = [];
@@ -5020,6 +5065,7 @@
 
         // Piece theme path for chess board (local images)
         const pieceThemePath = 'img/chesspieces/wikipedia/{piece}.png';
+        window._pieceThemePath = pieceThemePath;
 
         /**
          * Check if text matches [Variant "From Position"][FEN "..."] format
@@ -6313,6 +6359,7 @@
             if (svg) svg.querySelectorAll('.move-highlight').forEach(el => el.remove());
         }
 
+        window.highlightLastMove = highlightLastMove;
         function highlightLastMove(fromSq, toSq) {
             clearMoveHighlights();
             const svg = document.getElementById('board2ArrowSvg');
@@ -6927,6 +6974,7 @@
                 }
             }
 
+            window.handleBoardDrop = handleBoardDrop;
             function handleBoardDrop(source, target, piece) {
                 // Need a loaded game with a current position
                 if (!window.currentMoveNode && !window.moveTree) return 'snapback';
@@ -10495,6 +10543,350 @@ ${contentToAnalyze}`;
             gdriveSetStatus('');
         };
 
+    })();
+    </script>
+
+    <!-- Typed Move Input & Play vs Stockfish -->
+    <script>
+    (function() {
+        // =====================================================================
+        // TYPED MOVE INPUT
+        // =====================================================================
+
+        // Internal chess instance for typed-move / vs-stockfish games
+        let typedChess = null;
+        let typedMoveList = []; // track SAN history
+
+        function getTypedChess() {
+            if (!typedChess) {
+                typedChess = new Chess();
+                typedMoveList = [];
+            }
+            return typedChess;
+        }
+
+        function setTypedStatus(msg) {
+            const el = document.getElementById('typedMoveStatus');
+            if (el) el.textContent = msg;
+        }
+
+        function syncBoardFromTypedChess() {
+            const fen = getTypedChess().fen();
+            if (window.board2) window.board2.position(fen, false);
+        }
+
+        window.applyTypedMove = function() {
+            const input = document.getElementById('typedMoveInput');
+            let raw = input.value.trim();
+            if (!raw) return;
+
+            const chess = getTypedChess();
+
+            // Split by spaces/commas to allow multiple moves
+            const tokens = raw.replace(/\b\d+\.\s*/g, ' ').replace(/[,]+/g, ' ').trim().split(/\s+/).filter(t => t);
+            let applied = [];
+            let failedAt = null;
+            let lastMove = null;
+
+            for (const token of tokens) {
+                let san = token;
+                let move = chess.move(san);
+                // Try uppercase first letter (bc4 → Bc4)
+                if (!move && /^[a-z]/.test(san) && san.length > 2) {
+                    move = chess.move(san.charAt(0).toUpperCase() + san.substring(1));
+                }
+                if (move) {
+                    applied.push(move.san);
+                    typedMoveList.push(move.san);
+                    lastMove = move;
+                } else {
+                    failedAt = token;
+                    break;
+                }
+            }
+
+            syncBoardFromTypedChess();
+
+            if (lastMove && window.highlightLastMove) {
+                window.highlightLastMove(lastMove.from, lastMove.to);
+            }
+            if (applied.length > 0) {
+                playMoveSound(applied[applied.length - 1]);
+            }
+
+            if (failedAt) {
+                setTypedStatus('Applied: ' + applied.join(' ') + ' | Failed at: "' + failedAt + '"');
+            } else {
+                setTypedStatus('Applied: ' + applied.join(' ') + ' | ' + getPgnSummary());
+                input.value = '';
+            }
+
+            // If playing vs stockfish and it's the engine's turn, trigger engine move
+            if (window._sfGame && !failedAt) {
+                const chess = getTypedChess();
+                const turn = chess.turn(); // 'w' or 'b'
+                const engineColor = window._sfGame.engineColor;
+                if ((turn === 'w' && engineColor === 'white') || (turn === 'b' && engineColor === 'black')) {
+                    makeStockfishMove();
+                }
+            }
+
+            input.focus();
+        };
+
+        window.copyTypedStatusAndOpenEditor = function() {
+            const el = document.getElementById('typedMoveStatus');
+            const text = el ? el.textContent : '';
+            if (!text) { return; }
+            navigator.clipboard.writeText(text).then(function() {
+                // Get the current FEN from typedChess to open editor at that position
+                const fen = getTypedChess().fen();
+                window.open('https://lichess.org/editor/' + fen.replace(/ /g, '_'), '_blank');
+            });
+        };
+
+        window.undoTypedMove = function() {
+            const chess = getTypedChess();
+            const undone = chess.undo();
+            if (undone) {
+                typedMoveList.pop();
+                syncBoardFromTypedChess();
+                setTypedStatus('Undone: ' + undone.san + ' | ' + getPgnSummary());
+            } else {
+                setTypedStatus('Nothing to undo');
+            }
+        };
+
+        function getPgnSummary() {
+            const chess = getTypedChess();
+            const pgn = chess.pgn();
+            return pgn || '(starting position)';
+        }
+
+        // =====================================================================
+        // PLAY VS STOCKFISH
+        // =====================================================================
+
+        // _sfGame state: { active, engineColor, level }
+        window._sfGame = null;
+
+        function setSfStatus(msg) {
+            const el = document.getElementById('sfPlayStatus');
+            if (el) el.textContent = msg;
+        }
+
+        window.startStockfishGame = function() {
+            const level = parseInt(document.getElementById('sfLevel').value);
+            const playAs = document.getElementById('sfPlayColor').value;
+            const engineColor = playAs === 'white' ? 'black' : 'white';
+
+            typedChess = new Chess();
+            typedMoveList = [];
+            syncBoardFromTypedChess();
+
+            // Flip board if playing as black
+            if (playAs === 'black' && window.board2) {
+                window.board2.orientation('black');
+            } else if (window.board2) {
+                window.board2.orientation('white');
+            }
+
+            window._sfGame = { active: true, engineColor: engineColor, level: level };
+            setSfStatus('Game started! You play ' + playAs + '. Stockfish level ' + level + '.');
+            setTypedStatus('Type your moves below or drag pieces on the board.');
+
+            // If engine plays white, make first move
+            if (engineColor === 'white') {
+                makeStockfishMove();
+            }
+        };
+
+        window.startStockfishFromPosition = function() {
+            const level = parseInt(document.getElementById('sfLevel').value);
+            const playAs = document.getElementById('sfPlayColor').value;
+            const engineColor = playAs === 'white' ? 'black' : 'white';
+
+            // Get current board position
+            let fen;
+            if (window.currentMoveNode) {
+                fen = window.currentMoveNode.fen;
+            } else if (window.board2) {
+                fen = window.board2.fen() + ' w KQkq - 0 1'; // approximate
+            } else {
+                fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+            }
+
+            typedChess = new Chess(fen);
+            typedMoveList = [];
+            syncBoardFromTypedChess();
+
+            if (playAs === 'black' && window.board2) {
+                window.board2.orientation('black');
+            } else if (window.board2) {
+                window.board2.orientation('white');
+            }
+
+            window._sfGame = { active: true, engineColor: engineColor, level: level };
+            setSfStatus('Playing from position. You play ' + playAs + '. Level ' + level + '.');
+
+            // If it's the engine's turn, make a move
+            const turn = typedChess.turn();
+            if ((turn === 'w' && engineColor === 'white') || (turn === 'b' && engineColor === 'black')) {
+                makeStockfishMove();
+            }
+        };
+
+        window.stopStockfishGame = function() {
+            window._sfGame = null;
+            setSfStatus('Game stopped.');
+        };
+
+        function makeStockfishMove() {
+            if (!window._sfGame || !window._sfGame.active) return;
+            const chess = getTypedChess();
+            if (chess.game_over()) {
+                let result = 'Game over: ';
+                if (chess.in_checkmate()) result += 'Checkmate!';
+                else if (chess.in_stalemate()) result += 'Stalemate';
+                else if (chess.in_draw()) result += 'Draw';
+                setSfStatus(result);
+                window._sfGame.active = false;
+                return;
+            }
+
+            const fen = chess.fen();
+            const depth = window._sfGame.level;
+
+            setSfStatus('Stockfish thinking (depth ' + depth + ')...');
+
+            // Use the existing stockfish worker
+            const sf = window._sfEngine();
+            if (!sf || !window._sfReady()) {
+                setSfStatus('Stockfish not ready — wait and try again');
+                return;
+            }
+
+            const handler = function(e) {
+                const line = e.data;
+                if (line.startsWith('bestmove')) {
+                    sf.removeEventListener('message', handler);
+                    const uciMove = line.split(' ')[1];
+                    if (!uciMove || uciMove === '(none)') {
+                        setSfStatus('Stockfish has no move — game over?');
+                        return;
+                    }
+
+                    // Convert UCI to SAN
+                    const from = uciMove.substring(0, 2);
+                    const to = uciMove.substring(2, 4);
+                    const promo = uciMove.length > 4 ? uciMove[4] : undefined;
+                    const moveObj = { from: from, to: to };
+                    if (promo) moveObj.promotion = promo;
+
+                    const move = chess.move(moveObj);
+                    if (move) {
+                        typedMoveList.push(move.san);
+                        syncBoardFromTypedChess();
+                        if (window.highlightLastMove) window.highlightLastMove(move.from, move.to);
+                        playMoveSound(move.san);
+                        setSfStatus('Stockfish played: ' + move.san);
+                        setTypedStatus(getPgnSummary());
+
+                        // Check game over after engine move
+                        if (chess.game_over()) {
+                            let result = 'Game over: ';
+                            if (chess.in_checkmate()) result += 'Checkmate!';
+                            else if (chess.in_stalemate()) result += 'Stalemate';
+                            else if (chess.in_draw()) result += 'Draw';
+                            setSfStatus(result);
+                            window._sfGame.active = false;
+                        }
+                    } else {
+                        setSfStatus('Engine returned invalid move: ' + uciMove);
+                    }
+                }
+            };
+
+            sf.addEventListener('message', handler);
+
+            // Set skill level for weaker play
+            if (depth <= 5) {
+                sf.postMessage('setoption name Skill Level value ' + Math.max(0, (depth - 1) * 4));
+            } else {
+                sf.postMessage('setoption name Skill Level value 20');
+            }
+
+            sf.postMessage('position fen ' + fen);
+            sf.postMessage('go depth ' + depth);
+        }
+
+        // Override board drop handler to support typed-move/vs-stockfish mode
+        const origHandleBoardDrop = window.board2 ? window.board2.config.onDrop : null;
+
+        // Patch: intercept drag-drop when in vs-stockfish or typed-move mode
+        function patchedBoardDrop(source, target, piece) {
+            if (window._sfGame && window._sfGame.active) {
+                const chess = getTypedChess();
+                const turn = chess.turn();
+                const engineColor = window._sfGame.engineColor;
+
+                // Only allow drops on player's turn
+                if ((turn === 'w' && engineColor === 'white') || (turn === 'b' && engineColor === 'black')) {
+                    return 'snapback'; // Engine's turn
+                }
+
+                const move = chess.move({
+                    from: source,
+                    to: target,
+                    promotion: 'q'
+                });
+
+                if (!move) return 'snapback';
+
+                typedMoveList.push(move.san);
+                if (window.highlightLastMove) window.highlightLastMove(move.from, move.to);
+                playMoveSound(move.san);
+                setTypedStatus(getPgnSummary());
+
+                // Check game over
+                if (chess.game_over()) {
+                    let result = 'Game over: ';
+                    if (chess.in_checkmate()) result += 'Checkmate!';
+                    else if (chess.in_stalemate()) result += 'Stalemate';
+                    else if (chess.in_draw()) result += 'Draw';
+                    setSfStatus(result);
+                    window._sfGame.active = false;
+                    return;
+                }
+
+                // Trigger engine response
+                setTimeout(makeStockfishMove, 200);
+                return;
+            }
+
+            // Default behavior when not in sf game mode
+            if (typeof window.handleBoardDrop === 'function') {
+                return window.handleBoardDrop(source, target, piece);
+            }
+        }
+
+        // Re-initialize board with patched drop handler after a short delay
+        setTimeout(function() {
+            if (window.board2) {
+                const currentPos = window.board2.position();
+                const currentOrientation = window.board2.orientation();
+                window.board2 = Chessboard('myBoard2', {
+                    draggable: true,
+                    dropOffBoard: 'snapback',
+                    position: currentPos,
+                    snapbackSpeed: 500,
+                    snapSpeed: 100,
+                    pieceTheme: window._pieceThemePath || 'img/chesspieces/wikipedia/{piece}.png',
+                    onDrop: patchedBoardDrop
+                });
+                window.board2.orientation(currentOrientation);
+            }
+        }, 1000);
     })();
     </script>
 </body>
