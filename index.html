@@ -10662,7 +10662,6 @@ ${contentToAnalyze}`;
                 }
             }
 
-            input.focus();
         };
 
         window.copyTypedStatusAndOpenEditor = function() {
@@ -11000,10 +10999,10 @@ ${contentToAnalyze}`;
                                     }
                                     return;
                                 }
-                                var san = testMove.san;
-                                chess.undo(); // undo the test move only — user confirms via Apply or Enter
+                                // Undo test move — fill input only (no focus), Apply confirms + triggers SF
+                                chess.undo();
                                 var input = document.getElementById('typedMoveInput');
-                                if (input) { input.value = san; input.focus(); }
+                                if (input) input.value = testMove.san;
                                 mobileSelectedSquare = null;
                                 return;
                             }
