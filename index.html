@@ -9634,6 +9634,97 @@ ${contentToAnalyze}`;
                 }
             };
 
+            // Copy the prompt that would be sent to the AI to the clipboard
+            const retrievePrompt = async () => {
+                const ctx = window.getMoveContext ? window.getMoveContext() : null;
+                if (!ctx) {
+                    alert('No move selected. Click on a move in the move table first.');
+                    return;
+                }
+
+                // Ask the player why they played this move
+                const reasoning = prompt(`Why did you play ${ctx.move}? (e.g. "I thought the outpost was strong" — leave blank to skip)`);
+                if (reasoning === null) return; // user clicked Cancel — abort
+
+                let query = `Analyze this specific move: **${ctx.move}${ctx.annotation}**\n`;
+                query += `Position before (FEN): ${ctx.fenBefore}\n`;
+                query += `Position after (FEN): ${ctx.fenAfter}\n`;
+
+                const trimmedReasoning = reasoning ? reasoning.trim() : '';
+                if (trimmedReasoning) {
+                    query += `\nI played ${ctx.move} because: "${trimmedReasoning}"\nWhere did my reasoning break down? Was my thinking correct or flawed, and why?\n`;
+                }
+
+                if (ctx.comment) {
+                    query += `\nMy note on this move: "${ctx.comment}"\n`;
+                }
+
+                if (ctx.annotation) {
+                    const labels = { '??': 'blunder', '?': 'mistake', '?!': 'dubious', '!': 'good move', '!!': 'brilliant' };
+                    query += `This move was marked as a ${labels[ctx.annotation] || ctx.annotation}.\n`;
+                }
+
+                if (ctx.variations.length > 0) {
+                    query += `\nAlternative variation(s) to compare:\n`;
+                    ctx.variations.forEach((v, i) => {
+                        query += `  Variation ${i + 1}: ${v}\n`;
+                    });
+                    query += `\nCompare the game move with the variation(s). Why is one line better? What does each accomplish strategically?\n`;
+                }
+
+                if (ctx.mainContinuation) {
+                    query += `\nThe game continued: ${ctx.mainContinuation}\n`;
+                }
+
+                const evalBefore = window.positionEvalMap && ctx.fenBefore ? window.positionEvalMap[ctx.fenBefore] : null;
+                const evalAfter = window.positionEvalMap && ctx.fenAfter ? window.positionEvalMap[ctx.fenAfter] : null;
+                if (evalBefore !== null && evalBefore !== undefined && evalAfter !== null && evalAfter !== undefined) {
+                    query += `\nStockfish evaluation: ${(evalBefore/100).toFixed(2)} → ${(evalAfter/100).toFixed(2)} (${((evalAfter - evalBefore)/100).toFixed(2)} swing, from White's perspective)\n`;
+                }
+
+                query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
+                query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles. If there are variations, compare them and explain the strategic differences.`;
+
+                // Fetch chess knowledge base and prepend as system context
+                let knowledgeBase = '';
+                try {
+                    const kbResponse = await fetch('/chess_knowledge.txt');
+                    if (kbResponse.ok) {
+                        knowledgeBase = await kbResponse.text();
+                    }
+                } catch (e) {
+                    // Continue without knowledge base if fetch fails
+                }
+
+                let fullPrompt = '';
+                if (knowledgeBase) {
+                    fullPrompt += `You are a chess coach with deep knowledge of chess principles and strategies.\n\n`;
+                    fullPrompt += `When analyzing games or positions:\n`;
+                    fullPrompt += `1. Reference specific chess principles when applicable - cite them explicitly\n`;
+                    fullPrompt += `2. Compare the move with alternatives/variations when provided\n`;
+                    fullPrompt += `3. Explain strategic and tactical implications clearly\n`;
+                    fullPrompt += `4. When variations are provided, explain why one line is better than another\n`;
+                    fullPrompt += `5. Provide actionable improvement suggestions\n`;
+                    fullPrompt += `6. Use a Socratic approach - ask thought-provoking questions\n\n`;
+                    fullPrompt += `CHESS KNOWLEDGE BASE:\n${knowledgeBase}\n\n`;
+                    fullPrompt += `---\n\n`;
+                }
+                fullPrompt += query;
+
+                try {
+                    await navigator.clipboard.writeText(fullPrompt);
+                    alert('Prompt copied to clipboard (with chess knowledge base)!');
+                } catch (err) {
+                    const ta = document.createElement('textarea');
+                    ta.value = fullPrompt;
+                    document.body.appendChild(ta);
+                    ta.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    alert('Prompt copied to clipboard (with chess knowledge base)!');
+                }
+            };
+
             // Send message — routes through /api/rag-chess so knowledge base stays in context
             const sendMessage = async () => {
                 const needsApiKey = !useSharedKey;
@@ -9922,6 +10013,14 @@ ${contentToAnalyze}`;
                             style={{ ...styles.button, background: '#e91e63', color: 'white', opacity: isLoading ? 0.6 : 1 }}
                         >
                             🎯 Ask Coach About Selected Move
+                        </button>
+
+                        {/* Retrieve Prompt — copy to clipboard */}
+                        <button
+                            onClick={retrievePrompt}
+                            style={{ ...styles.button, background: '#ff5722', color: 'white' }}
+                        >
+                            📋 Retrieve Prompt
                         </button>
 
                         {/* Go Deeper — fresh session with higher model, same question */}
