@@ -1064,7 +1064,7 @@
     <div style="margin: 0 auto 20px; max-width: 1200px;">
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
         <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Hide Moves</button>
+          <button id="dropboxBtn" title="Click to sign in to Dropbox. Once signed in, click again to load a PGN that was sent from the CSV loader." style="background: #0061fe; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">DB: Sign In</button>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
             <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap;">Start</span>
@@ -1109,6 +1109,7 @@
           <button id="toggleSoundBtn" onclick="window.chessSoundEnabled = !window.chessSoundEnabled; this.textContent = window.chessSoundEnabled ? 'Sound On' : 'Sound Off'; this.style.background = window.chessSoundEnabled ? '#555' : '#333'" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
           <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
           <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); p.style.display=p.style.display==='none'?'block':'none'; this.style.background=p.style.display==='none'?'linear-gradient(90deg, #e91e63, #9c27b0)':'#555'" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
+          <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Hide Moves</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -1550,6 +1551,52 @@
                 logoutBtn.style.display = 'none';
                 saveBtn.style.display = 'none';
             }
+            const pgnDropboxBtn = document.getElementById('dropboxBtn');
+            if (pgnDropboxBtn) {
+                pgnDropboxBtn.textContent = window.dropboxAccessToken ? 'DB: Load PGN' : 'DB: Sign In';
+            }
+        }
+
+        // Dropbox clipboard path shared with vercel_csv_loader and clipboard_manager
+        const DROPBOX_PGN_CLIPBOARD_PATH = '/blob_vercel_replacement/blob_clipboard_content.txt';
+
+        async function loadPgnFromDropboxClipboard() {
+            if (!window.dropboxAccessToken) {
+                await dropboxSignIn();
+                return;
+            }
+            try {
+                const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${window.dropboxAccessToken}`,
+                        'Dropbox-API-Arg': JSON.stringify({ path: DROPBOX_PGN_CLIPBOARD_PATH }),
+                    },
+                });
+                if (!res.ok) {
+                    if (res.status === 409) {
+                        alert('No PGN found in Dropbox yet. Send one from the CSV loader first.');
+                        return;
+                    }
+                    throw new Error('Download failed: ' + res.status);
+                }
+                const content = await res.text();
+                if (!content || !content.trim()) {
+                    alert('Dropbox clipboard is empty.');
+                    return;
+                }
+                const pgnTextarea = document.getElementById('pgnInput');
+                if (!pgnTextarea) {
+                    alert('PGN input not found on page.');
+                    return;
+                }
+                pgnTextarea.value = content.trim();
+                if (typeof loadPgnToBoard === 'function') {
+                    loadPgnToBoard();
+                }
+            } catch (err) {
+                alert('Failed to load PGN from Dropbox: ' + err.message);
+            }
         }
 
         // Search files
@@ -1826,6 +1873,8 @@
             document.getElementById('dbFilesBtn').addEventListener('click', openDropboxSidebar);
             document.getElementById('dbLogoutBtn').addEventListener('click', dropboxSignOut);
             document.getElementById('dbSaveBtn').addEventListener('click', dropboxSaveReport);
+            document.getElementById('dropboxBtn').addEventListener('click', loadPgnFromDropboxClipboard);
+            updateDropboxButtons();
             document.getElementById('closeDropboxSidebar').addEventListener('click', closeDropboxSidebar);
             document.getElementById('dropboxSaveConfirmBtn').addEventListener('click', dropboxConfirmSave);
             document.getElementById('dropboxSaveInput').addEventListener('keydown', function(e) {
