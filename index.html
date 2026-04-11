@@ -2505,62 +2505,53 @@
                     }
                 }
 
-                // Reinitialize Stockfish fresh before variation pass
+                // Variation pass — reuse the already-initialized Stockfish from the main loop.
+                // The retry logic below will lazily reinit if a call actually fails.
                 let addedCount = 0;
                 if (variationTargets.length > 0) {
-                    log(`Reinitializing Stockfish for variation analysis (${variationTargets.length} positions)...`, 'info');
-                    if (stockfish) {
-                        stockfish.terminate();
-                        stockfish = null;
-                        isReady = false;
-                    }
-                    initStockfish();
-                    // Wait for Stockfish to be ready
-                    for (let w = 0; w < 20 && !isReady; w++) {
-                        await new Promise(r => setTimeout(r, 500));
-                    }
-                    if (!isReady) {
-                        log('Stockfish failed to reinitialize — skipping variations', 'error');
-                    } else {
-                        log('Stockfish ready — adding variations one at a time...', 'info');
-                        for (const target of variationTargets) {
-                            let result = null;
-                            for (let attempt = 0; attempt < 3; attempt++) {
-                                try {
-                                    log(`Stockfish analyzing ${target.label}${attempt > 0 ? ` (retry ${attempt})` : ''}...`, 'info');
-                                    result = await analyzePositionForVariation(target.fen, variationDepth);
-                                    break;
-                                } catch (e) {
-                                    log(`Stockfish failed for ${target.label}: ${e.message} — reinitializing...`, 'warning');
-                                    if (stockfish) { stockfish.terminate(); stockfish = null; isReady = false; }
-                                    initStockfish();
-                                    for (let w = 0; w < 20 && !isReady; w++) {
-                                        await new Promise(r => setTimeout(r, 500));
-                                    }
-                                    if (!isReady) { log('Stockfish failed to reinit, skipping', 'error'); break; }
+                    log(`Adding variations for ${variationTargets.length} position(s)...`, 'info');
+                    for (const target of variationTargets) {
+                        // Short-circuit: if Chessis already gave us the best move, skip Stockfish entirely
+                        if (target.isChessis && target.bestMove) {
+                            const movePrefix = target.isBlack
+                                ? `${target.moveNumber}... ${target.bestMove}`
+                                : `${target.moveNumber}. ${target.bestMove}`;
+                            await addMovesAsVariation(movePrefix,
+                                document.getElementById('variation-status'),
+                                document.getElementById('variation-result'));
+                            addedCount++;
+                            continue;
+                        }
+
+                        // Otherwise, run Stockfish for this position (with lazy reinit on failure)
+                        let result = null;
+                        for (let attempt = 0; attempt < 3; attempt++) {
+                            try {
+                                log(`Stockfish analyzing ${target.label}${attempt > 0 ? ` (retry ${attempt})` : ''}...`, 'info');
+                                result = await analyzePositionForVariation(target.fen, variationDepth);
+                                break;
+                            } catch (e) {
+                                log(`Stockfish failed for ${target.label}: ${e.message} — reinitializing...`, 'warning');
+                                if (stockfish) { stockfish.terminate(); stockfish = null; isReady = false; }
+                                initStockfish();
+                                for (let w = 0; w < 20 && !isReady; w++) {
+                                    await new Promise(r => setTimeout(r, 500));
                                 }
+                                if (!isReady) { log('Stockfish failed to reinit, skipping', 'error'); break; }
                             }
-                            if (result && result.pv && result.pv.length > 0) {
-                                window.currentVariationResult = {
-                                    moveNumber: target.moveNumber,
-                                    isBlack: target.isBlack,
-                                    plyIndex: target.plyIndex,
-                                    fen: target.fen,
-                                    bestMove: result.bestMove,
-                                    score: result.score,
-                                    pv: result.pv
-                                };
-                                addVariationToPgn();
-                                addedCount++;
-                            } else if (target.isChessis && target.bestMove) {
-                                const movePrefix = target.isBlack
-                                    ? `${target.moveNumber}... ${target.bestMove}`
-                                    : `${target.moveNumber}. ${target.bestMove}`;
-                                await addMovesAsVariation(movePrefix,
-                                    document.getElementById('variation-status'),
-                                    document.getElementById('variation-result'));
-                                addedCount++;
-                            }
+                        }
+                        if (result && result.pv && result.pv.length > 0) {
+                            window.currentVariationResult = {
+                                moveNumber: target.moveNumber,
+                                isBlack: target.isBlack,
+                                plyIndex: target.plyIndex,
+                                fen: target.fen,
+                                bestMove: result.bestMove,
+                                score: result.score,
+                                pv: result.pv
+                            };
+                            addVariationToPgn();
+                            addedCount++;
                         }
                     }
                 }
