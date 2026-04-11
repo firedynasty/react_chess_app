@@ -9564,11 +9564,15 @@ ${contentToAnalyze}`;
                 }
 
                 if (ctx.variations.length > 0) {
-                    query += `\nAlternative variation(s) to compare:\n`;
-                    ctx.variations.forEach((v, i) => {
-                        query += `  Variation ${i + 1}: ${v}\n`;
-                    });
-                    query += `\nCompare the game move with the variation(s). Why is one line better? What does each accomplish strategically?\n`;
+                    query += `\n=== STOCKFISH BEST LINE (authoritative ground truth) ===\n`;
+                    query += `${ctx.variations[0]}\n`;
+                    query += `=== END STOCKFISH BEST LINE ===\n`;
+                    if (ctx.variations.length > 1) {
+                        query += `\nOther variations (lower priority, context only — do NOT recommend these over the Stockfish best line above):\n`;
+                        ctx.variations.slice(1).forEach((v, i) => {
+                            query += `  ${i + 2}: ${v}\n`;
+                        });
+                    }
                 }
 
                 if (ctx.mainContinuation) {
@@ -9583,7 +9587,11 @@ ${contentToAnalyze}`;
                 }
 
                 query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
-                query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles. If there are variations, compare them and explain the strategic differences.`;
+                if (ctx.variations.length > 0) {
+                    query += `\nYour job: explain in concrete terms why ${ctx.move} is worse than the Stockfish best line above. You MUST treat the first move of that line as the correct alternative — name it explicitly and use it as THE answer. Do NOT suggest any other move as best. Do NOT invent variations. Name pieces and squares concretely. Focus on the tactical or positional reason the Stockfish move wins (material, threats, king safety, piece activity).`;
+                } else {
+                    query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles.`;
+                }
 
                 // Append user's additional notes/questions if provided
                 const trimmedNotes = userNotes ? userNotes.trim() : '';
@@ -9714,11 +9722,15 @@ ${contentToAnalyze}`;
                 }
 
                 if (ctx.variations.length > 0) {
-                    query += `\nAlternative variation(s) to compare:\n`;
-                    ctx.variations.forEach((v, i) => {
-                        query += `  Variation ${i + 1}: ${v}\n`;
-                    });
-                    query += `\nCompare the game move with the variation(s). Why is one line better? What does each accomplish strategically?\n`;
+                    query += `\n=== STOCKFISH BEST LINE (authoritative ground truth) ===\n`;
+                    query += `${ctx.variations[0]}\n`;
+                    query += `=== END STOCKFISH BEST LINE ===\n`;
+                    if (ctx.variations.length > 1) {
+                        query += `\nOther variations (lower priority, context only — do NOT recommend these over the Stockfish best line above):\n`;
+                        ctx.variations.slice(1).forEach((v, i) => {
+                            query += `  ${i + 2}: ${v}\n`;
+                        });
+                    }
                 }
 
                 if (ctx.mainContinuation) {
@@ -9732,7 +9744,11 @@ ${contentToAnalyze}`;
                 }
 
                 query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
-                query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles. If there are variations, compare them and explain the strategic differences.`;
+                if (ctx.variations.length > 0) {
+                    query += `\nYour job: explain in concrete terms why ${ctx.move} is worse than the Stockfish best line above. You MUST treat the first move of that line as the correct alternative — name it explicitly and use it as THE answer. Do NOT suggest any other move as best. Do NOT invent variations. Name pieces and squares concretely. Focus on the tactical or positional reason the Stockfish move wins (material, threats, king safety, piece activity).`;
+                } else {
+                    query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles.`;
+                }
 
                 // Fetch chess knowledge base and prepend as system context
                 let knowledgeBase = '';
