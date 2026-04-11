@@ -4729,6 +4729,8 @@
         }
 
         async function fetchChesscomGames() {
+            const lichessBar = document.getElementById('lichess-import-bar');
+            if (lichessBar) lichessBar.style.display = 'none';
             const usernameInput = document.getElementById('chesscom-username');
             const fetchBtn = document.getElementById('fetch-games-btn');
             const gameSelectionContainer = document.getElementById('game-selection-container');
