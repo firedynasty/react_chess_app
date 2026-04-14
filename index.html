@@ -1108,7 +1108,7 @@
           <button id="toggleChatBtn" onclick="var p = document.getElementById('chatNotesPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Toggle Chat</button>
           <button id="toggleSoundBtn" onclick="window.chessSoundEnabled = !window.chessSoundEnabled; this.textContent = window.chessSoundEnabled ? 'Sound On' : 'Sound Off'; this.style.background = window.chessSoundEnabled ? '#555' : '#333'" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
           <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
-          <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); p.style.display=p.style.display==='none'?'block':'none'; this.style.background=p.style.display==='none'?'linear-gradient(90deg, #e91e63, #9c27b0)':'#555'" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
+          <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); if(p.style.display!=='none'){p.style.display='none'; this.style.background='linear-gradient(90deg, #e91e63, #9c27b0)'; if(typeof stopStockfishGame==='function') stopStockfishGame();}else{p.style.display='block'; this.style.background='#555';}" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
           <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Hide Moves</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
@@ -11066,7 +11066,7 @@ ${contentToAnalyze}`;
                 const currentPos = window.board2.position();
                 const currentOrientation = window.board2.orientation();
                 window.board2 = Chessboard('myBoard2', {
-                    draggable: true,
+                    draggable: false,
                     dropOffBoard: 'snapback',
                     position: currentPos,
                     snapbackSpeed: 500,
@@ -11079,12 +11079,11 @@ ${contentToAnalyze}`;
 
             window._patchedBoardDrop = patchedBoardDrop;
 
-            // Determine initial mode based on device
-            var isMobileBoard2 = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth <= 768;
-            window._board2ClickMode = isMobileBoard2;
+            // Always default to click (mobile) mode for reliable move handling
+            window._board2ClickMode = true;
 
             // Set the correct radio default
-            var defaultRadio = document.getElementById(isMobileBoard2 ? 'board2ModeClick' : 'board2ModeDrag');
+            var defaultRadio = document.getElementById('board2ModeClick');
             if (defaultRadio) defaultRadio.checked = true;
 
             // setBoard2MoveMode: re-init board with correct draggable and set flag
@@ -11156,11 +11155,12 @@ ${contentToAnalyze}`;
                                     }
                                     return;
                                 }
-                                // Undo test move — fill input only (no focus), Apply confirms + triggers SF
+                                // Undo test move, fill input, and auto-apply so Stockfish responds
                                 chess.undo();
                                 var input = document.getElementById('typedMoveInput');
                                 if (input) input.value = testMove.san;
                                 mobileSelectedSquare = null;
+                                applyTypedMove();
                                 return;
                             }
 
