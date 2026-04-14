@@ -873,7 +873,7 @@
     <!-- Extend Variation from Lichess -->
 
     <!-- Insert Variation from Paste -->
-    <div id="insert-variation-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+    <div id="insert-variation-container" style="display: none; max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
         <div style="margin-bottom: 10px;">
             <span style="color: #e67e22; font-weight: bold; font-size: 14px;">📌 Insert Variation into PGN</span>
             <span style="color: #888; font-size: 12px; margin-left: 10px;">(Paste a variation with move numbers — it will be inserted at the correct mainline position)</span>
@@ -1060,6 +1060,34 @@
       </div>
     </div>
 
+    <!-- Add Variation Panel (toggled from button row) -->
+    <div id="addVarPanel" style="display: none; margin: 0 auto 10px; max-width: 1200px;">
+      <div style="padding: 12px; background: #16213e; border-radius: 8px; width: 100%;">
+        <div style="margin-bottom: 8px;">
+          <span style="color: #e67e22; font-weight: bold; font-size: 14px;">Insert Variation into PGN</span>
+          <span style="color: #888; font-size: 12px; margin-left: 10px;">(Paste a variation with move numbers — inserted at the correct mainline position)</span>
+        </div>
+        <textarea id="insert-variation-input2"
+            placeholder="Paste variation e.g. (13. Nxe5 Nxe5 14. Bf4 f6 15. Bxe5 fxe5 16. Qh5+ Bf7 17. Rxe5+ Kf8 18. Qe2)"
+            style="width: 100%; height: 80px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; resize: vertical;"></textarea>
+        <div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <button onclick="document.getElementById('insert-variation-input').value = document.getElementById('insert-variation-input2').value; insertPastedVariation(); document.getElementById('insert-variation-input2').value = ''; var s=document.getElementById('insert-variation-status'); if(s) document.getElementById('insert-variation-status2').textContent = s.textContent;"
+              style="padding: 8px 15px; background: #e67e22; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
+              Insert as Variation
+          </button>
+          <button onclick="navigator.clipboard.readText().then(t => document.getElementById('insert-variation-input2').value = t)"
+              style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px;">
+              Paste from Clipboard
+          </button>
+          <button onclick="document.getElementById('insert-variation-input2').value = '';"
+              style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">
+              Clear
+          </button>
+          <span id="insert-variation-status2" style="color: #888; font-size: 12px;"></span>
+        </div>
+      </div>
+    </div>
+
     <!-- Board Navigation Container (full width) -->
     <div style="margin: 0 auto 20px; max-width: 1200px;">
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
@@ -1110,6 +1138,9 @@
           <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
           <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); if(p.style.display!=='none'){p.style.display='none'; this.style.background='linear-gradient(90deg, #e91e63, #9c27b0)'; if(typeof stopStockfishGame==='function') stopStockfishGame();}else{p.style.display='block'; this.style.background='#555';}" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
           <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Hide Moves</button>
+          <button id="toggleAddVarBtn" onclick="var p=document.getElementById('addVarPanel'); if(p.style.display!=='none'){p.style.display='none'; this.style.background='linear-gradient(90deg, #e67e22, #e74c3c)';}else{p.style.display='block'; this.style.background='#555';}" style="background: linear-gradient(90deg, #e67e22, #e74c3c); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Add Var</button>
+          <button id="castleBtn" onclick="showCastleMenu()" style="background: #795548; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px; position: relative;">Castle</button>
+          <div id="castleMenu" style="display: none; position: absolute; z-index: 1000; background: #16213e; border: 1px solid #555; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);"></div>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -7013,113 +7044,283 @@
             window._dragBuild = null; // { fen, startNodeId, moveCount }
 
             function resetDragBuild() {
-                if (window._dragBuild) {
-                    const savedNode = window._dragBuild.startNodeId;
-                    window._dragBuild = null;
-                    // Restore board to the navigated position
-                    if (window.currentMoveNode && window.board2) {
-                        window.board2.position(window.currentMoveNode.fen);
+                window._dragBuild = null;
+            }
+
+            // Helper: check if a node is on the mainline (every ancestor is children[0])
+            function isOnMainline(node) {
+                let walk = node;
+                while (walk && walk.parent) {
+                    if (walk.parent.children[0] !== walk) return false;
+                    walk = walk.parent;
+                }
+                return true;
+            }
+
+            // Helper: remove a node and all its descendants from the registry
+            function unregisterSubtree(node) {
+                if (!node) return;
+                if (node.nodeId && window.moveNodeRegistry) {
+                    delete window.moveNodeRegistry[node.nodeId];
+                }
+                if (node.children) {
+                    for (const child of node.children) {
+                        unregisterSubtree(child);
                     }
-                    const statusEl = document.getElementById('insert-variation-status');
-                    if (statusEl) statusEl.textContent = '';
                 }
             }
+
+            // Helper: sync PGN strings and re-render move table after tree modification
+            function syncTreeAndRender(navigateToNode) {
+                const pgn = moveTreeToPgn(window.moveTree);
+                if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+                window.annotatedPgnWithVariations = pgn;
+
+                // Re-render move table
+                window.cycleVarSequence = [];
+                window.cycleVarIndex = -1;
+                renderMoveTable(window.moveTree);
+
+                // Navigate to the new node
+                if (navigateToNode) {
+                    jumpToNode(navigateToNode.nodeId);
+                }
+            }
+
+            // Castle menu: show legal castling options for the current position
+            window.showCastleMenu = function() {
+                var menu = document.getElementById('castleMenu');
+                if (!menu) return;
+
+                // Toggle off if already visible
+                if (menu.style.display !== 'none') {
+                    menu.style.display = 'none';
+                    return;
+                }
+
+                // Get current position
+                var node = window.currentMoveNode || window.moveTree;
+                if (!node || !node.fen) {
+                    menu.innerHTML = '<div style="color: #ff6b6b; padding: 8px; font-size: 13px;">No position loaded</div>';
+                    menu.style.display = 'block';
+                    var btn = document.getElementById('castleBtn');
+                    if (btn) { menu.style.left = btn.offsetLeft + 'px'; menu.style.top = (btn.offsetTop + btn.offsetHeight + 4) + 'px'; }
+                    setTimeout(function() { menu.style.display = 'none'; }, 2000);
+                    return;
+                }
+
+                var chess = new Chess(node.fen);
+                var turn = chess.turn(); // 'w' or 'b'
+                var icon = turn === 'w' ? '\u2654' : '\u265A'; // ♔ or ♚
+                var color = turn === 'w' ? 'White' : 'Black';
+
+                // Check which castling moves are legal
+                var legalMoves = chess.moves();
+                var canKingside = legalMoves.indexOf('O-O') !== -1;
+                var canQueenside = legalMoves.indexOf('O-O-O') !== -1;
+
+                var html = '';
+                if (!canKingside && !canQueenside) {
+                    html = '<div style="color: #ff6b6b; padding: 8px; font-size: 13px;">No castling available for ' + color + '</div>';
+                } else {
+                    if (canKingside) {
+                        var dir = turn === 'w' ? 'h1' : 'h8';
+                        html += '<button onclick="applyCastle(\'O-O\')" style="display: block; width: 100%; background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; margin-bottom: ' + (canQueenside ? '4' : '0') + 'px; white-space: nowrap;">' + icon + ' O-O (\u2192' + dir + ')</button>';
+                    }
+                    if (canQueenside) {
+                        var dir = turn === 'w' ? 'a1' : 'a8';
+                        html += '<button onclick="applyCastle(\'O-O-O\')" style="display: block; width: 100%; background: #2196f3; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap;">' + icon + ' O-O-O (\u2192' + dir + ')</button>';
+                    }
+                }
+
+                menu.innerHTML = html;
+                menu.style.display = 'block';
+                var btn = document.getElementById('castleBtn');
+                if (btn) {
+                    menu.style.left = btn.offsetLeft + 'px';
+                    menu.style.top = (btn.offsetTop + btn.offsetHeight + 4) + 'px';
+                }
+            };
+
+            // Apply a castling move — uses the same tree logic as handleBoardDrop
+            window.applyCastle = function(san) {
+                document.getElementById('castleMenu').style.display = 'none';
+
+                var node = window.currentMoveNode || window.moveTree;
+                if (!node || !node.fen) return;
+
+                var chess = new Chess(node.fen);
+                var move = chess.move(san);
+                if (!move) return;
+
+                // Check if this move already exists as a child
+                if (node.children) {
+                    for (var i = 0; i < node.children.length; i++) {
+                        if (node.children[i].san === move.san) {
+                            jumpToNode(node.children[i].nodeId);
+                            return;
+                        }
+                    }
+                }
+
+                // Same logic as handleBoardDrop: mainline → replace variations, variation → truncate forward
+                var onMain = isOnMainline(node);
+                if (onMain) {
+                    if (node.children && node.children.length > 1) {
+                        for (var i = 1; i < node.children.length; i++) {
+                            unregisterSubtree(node.children[i]);
+                        }
+                        node.children = [node.children[0]];
+                    }
+                } else {
+                    if (node.children && node.children.length > 0) {
+                        for (var ci = 0; ci < node.children.length; ci++) {
+                            unregisterSubtree(node.children[ci]);
+                        }
+                        node.children = [];
+                    }
+                }
+
+                // Build new node
+                var turnBefore = node.fen.split(' ')[1];
+                var isBlack = (turnBefore === 'b');
+                var moveNumber;
+                if (node.nodeId === 'root') {
+                    var fenParts = node.fen.split(' ');
+                    moveNumber = fenParts.length >= 6 ? parseInt(fenParts[5]) || 1 : 1;
+                } else if (isBlack) {
+                    moveNumber = node.moveNumber;
+                } else {
+                    moveNumber = node.moveNumber + (node.isBlackMove ? 1 : 0);
+                }
+
+                var counterBase = Object.keys(window.moveNodeRegistry).length;
+                var newNode = {
+                    san: move.san,
+                    annotation: '',
+                    fen: chess.fen(),
+                    moveNumber: moveNumber,
+                    isBlackMove: isBlack,
+                    comment: '',
+                    parent: node,
+                    children: [],
+                    depth: (node.depth || 0) + 1,
+                    nodeId: 'node-var-' + counterBase
+                };
+
+                node.children.push(newNode);
+                window.moveNodeRegistry[newNode.nodeId] = newNode;
+
+                if (window.highlightLastMove) window.highlightLastMove(move.from, move.to);
+                playMoveSound(move.san);
+                syncTreeAndRender(newNode);
+                window.board2.position(chess.fen());
+            };
+
+            // Close castle menu when clicking elsewhere
+            document.addEventListener('click', function(e) {
+                var menu = document.getElementById('castleMenu');
+                var btn = document.getElementById('castleBtn');
+                if (menu && menu.style.display !== 'none' && !menu.contains(e.target) && e.target !== btn) {
+                    menu.style.display = 'none';
+                }
+            });
 
             window.handleBoardDrop = handleBoardDrop;
             function handleBoardDrop(source, target, piece) {
                 // Need a loaded game with a current position
                 if (!window.currentMoveNode && !window.moveTree) return 'snapback';
 
-                // Determine the FEN to validate from
-                let baseFen;
-                if (window._dragBuild) {
-                    baseFen = window._dragBuild.fen;
-                } else {
-                    const node = window.currentMoveNode || window.moveTree;
-                    baseFen = node.fen;
-                }
-
+                const node = window.currentMoveNode || window.moveTree;
+                const baseFen = node.fen;
                 const chess = new Chess(baseFen);
 
                 // Validate the move
                 const move = chess.move({
                     from: source,
                     to: target,
-                    promotion: 'q' // auto-promote to queen
+                    promotion: 'q'
                 });
 
                 if (!move) return 'snapback';
 
-                // If not in drag-build mode, check if this move is the next mainline move
-                // If so, just advance forward instead of starting a variation
-                if (!window._dragBuild) {
-                    const node = window.currentMoveNode || window.moveTree;
-                    if (node && node.children && node.children.length > 0) {
-                        const nextMainMove = node.children[0];
-                        if (nextMainMove.san === move.san) {
-                            // It's the next move in the game — just advance
-                            board2NextMove();
-                            // Return the new position so the board updates
+                // Check if this move already exists as a child — if so, navigate into it
+                if (node.children && node.children.length > 0) {
+                    for (let i = 0; i < node.children.length; i++) {
+                        if (node.children[i].san === move.san) {
+                            // Move already exists — just navigate to it
+                            jumpToNode(node.children[i].nodeId);
                             return;
                         }
                     }
                 }
 
-                // Initialize drag-build state on first drop
-                if (!window._dragBuild) {
-                    const node = window.currentMoveNode || window.moveTree;
-                    window._dragBuild = {
-                        fen: chess.fen(),
-                        startNodeId: node.nodeId,
-                        moveCount: 1
-                    };
-                } else {
-                    window._dragBuild.fen = chess.fen();
-                    window._dragBuild.moveCount++;
-                }
+                // Determine if we're on the mainline or in a variation
+                const onMainline = isOnMainline(node);
 
-                // Build the SAN text with move number
-                const fenParts = baseFen.split(' ');
-                const turnBefore = fenParts[1]; // 'w' or 'b'
-                const fullMoveNum = parseInt(fenParts[5]);
-                let moveText = '';
-
-                if (turnBefore === 'w') {
-                    moveText = fullMoveNum + '. ' + move.san;
+                if (onMainline) {
+                    // On mainline: replace any existing non-mainline variations (children[1+])
+                    if (node.children && node.children.length > 1) {
+                        // Remove all variation branches
+                        for (let i = 1; i < node.children.length; i++) {
+                            unregisterSubtree(node.children[i]);
+                        }
+                        node.children = [node.children[0]];
+                    }
                 } else {
-                    // For the first black move, include "N..." prefix
-                    const textarea = document.getElementById('insert-variation-input');
-                    const existing = textarea ? textarea.value.trim() : '';
-                    if (!existing) {
-                        moveText = fullMoveNum + '... ' + move.san;
-                    } else {
-                        moveText = move.san;
+                    // In a variation: truncate everything after current position
+                    if (node.children && node.children.length > 0) {
+                        for (const child of node.children) {
+                            unregisterSubtree(child);
+                        }
+                        node.children = [];
                     }
                 }
 
-                // Append to the insert-variation textarea
-                const textarea = document.getElementById('insert-variation-input');
-                if (textarea) {
-                    const existing = textarea.value.trim();
-                    textarea.value = existing ? existing + ' ' + moveText : moveText;
-                    // Scroll textarea to bottom
-                    textarea.scrollTop = textarea.scrollHeight;
+                // Build the new variation node
+                const turnBefore = baseFen.split(' ')[1];
+                const isBlack = (turnBefore === 'b');
+                let moveNumber;
+                if (node.nodeId === 'root') {
+                    const fenParts = node.fen.split(' ');
+                    moveNumber = fenParts.length >= 6 ? parseInt(fenParts[5]) || 1 : 1;
+                } else if (isBlack) {
+                    moveNumber = node.moveNumber;
+                } else {
+                    moveNumber = node.moveNumber + (node.isBlackMove ? 1 : 0);
                 }
 
-                // Update status
-                const statusEl = document.getElementById('insert-variation-status');
-                if (statusEl) {
-                    statusEl.textContent = 'Building variation... (' + window._dragBuild.moveCount + ' move' + (window._dragBuild.moveCount > 1 ? 's' : '') + ')';
-                    statusEl.style.color = '#e67e22';
-                }
+                const counterBase = Object.keys(window.moveNodeRegistry).length;
+                const newNode = {
+                    san: move.san,
+                    annotation: '',
+                    fen: chess.fen(),
+                    moveNumber: moveNumber,
+                    isBlackMove: isBlack,
+                    comment: '',
+                    parent: node,
+                    children: [],
+                    depth: (node.depth || 0) + 1,
+                    nodeId: 'node-var-' + counterBase
+                };
 
-                // Update board to new position (return undefined to let chessboard.js update)
+                node.children.push(newNode);
+                window.moveNodeRegistry[newNode.nodeId] = newNode;
+
+                // Play sound and highlight
+                if (window.highlightLastMove) window.highlightLastMove(move.from, move.to);
+                playMoveSound(move.san);
+
+                // Sync tree, re-render, and navigate to the new node
+                syncTreeAndRender(newNode);
+
+                // Update board position
                 window.board2.position(chess.fen());
             }
 
             // Initialize Board2
             window.board2 = Chessboard('myBoard2', {
-                draggable: true,
+                draggable: false,
                 dropOffBoard: 'snapback',
                 position: 'start',
                 snapbackSpeed: 500,
