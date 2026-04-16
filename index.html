@@ -3638,6 +3638,13 @@
         async function addMovesAsVariation(input, statusEl, resultEl) {
             let movesText = input;
 
+            // Extract FEN from header BEFORE stripping, so we can anchor
+            // a Lichess "From Position" export on the matching tree node
+            // even when its moves are renumbered from 1.
+            let pastedFen = null;
+            const fenHeaderMatch = movesText.match(/\[FEN\s+"([^"]+)"\]/);
+            if (fenHeaderMatch) pastedFen = fenHeaderMatch[1];
+
             // Remove PGN headers (lines/sections starting with [)
             movesText = movesText.replace(/\[[^\]]*\]/g, '').trim();
 
@@ -3677,7 +3684,45 @@
             let insertIsBlack;
             let treeParent = null;
 
-            if (startMoveNumber !== null) {
+            // If the paste had a [FEN ...] header, try to find a tree node
+            // whose position matches. Prefer currentMoveNode, then search the
+            // whole tree. Compare piece placement + side-to-move (ignore
+            // halfmove/fullmove counters which often differ after export).
+            let fenMatchedParent = null;
+            if (pastedFen) {
+                const normFen = (f) => f.split(' ').slice(0, 2).join(' ');
+                const target = normFen(pastedFen);
+                if (window.currentMoveNode && window.currentMoveNode.fen &&
+                    normFen(window.currentMoveNode.fen) === target) {
+                    fenMatchedParent = window.currentMoveNode;
+                } else if (window.moveNodeRegistry) {
+                    for (const nodeId of Object.keys(window.moveNodeRegistry)) {
+                        const node = window.moveNodeRegistry[nodeId];
+                        if (node && node.fen && normFen(node.fen) === target) {
+                            fenMatchedParent = node;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (fenMatchedParent) {
+                // Anchor on the FEN-matched node, ignoring any renumbered
+                // "1..." at the start of the paste.
+                startFen = fenMatchedParent.fen;
+                treeParent = fenMatchedParent;
+                if (fenMatchedParent.nodeId === 'root') {
+                    const turnField = (pastedFen.split(' ')[1] || 'w');
+                    const fullmoveField = parseInt(pastedFen.split(' ')[5]) || 1;
+                    insertIsBlack = (turnField === 'b');
+                    insertMoveNumber = fullmoveField;
+                } else {
+                    insertIsBlack = !fenMatchedParent.isBlackMove;
+                    insertMoveNumber = fenMatchedParent.isBlackMove
+                        ? (fenMatchedParent.moveNumber || 0) + 1
+                        : (fenMatchedParent.moveNumber || 1);
+                }
+            } else if (startMoveNumber !== null) {
                 // Collect candidate parent nodes, then pick the one where the first
                 // move is actually legal. This handles sub-variations: e.g. "19... Rxg8"
                 // might be invalid from the mainline but valid inside a variation.
