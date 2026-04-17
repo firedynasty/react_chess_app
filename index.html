@@ -612,6 +612,7 @@
     <div class="status-bar">
         <a href="https://youtu.be/fwPcoDfQwyo" target="_blank" style="background: #0f3460; color: #00d4ff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">Tutorial ↗</a>
         <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
+        <a href="https://vercel-youtube.vercel.app/parser.html" target="_blank" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Parser</a>
         <a href="/reformatter" target="_blank" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Text Reformatter</a>
     </div>
 
@@ -1128,7 +1129,7 @@
             <button id="gdriveRowCopyBtn" style="background: #27ae60; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle;">Copy</button>
           </div>
           <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
-          <button id="updateReportBtn" onclick="updateReportWithPgn()" style="background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
+          <button id="updateReportBtn" onclick="updateReportWithPgn()" style="display: none; background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
           <button id="loadFenBtn" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Load FEN</button>
           <button id="fenColorToggleBtn" style="background: #fff; color: #333; border: 2px solid #ccc; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">White</button>
           <button id="exportFenBtn" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Export FEN</button>
@@ -3195,14 +3196,21 @@
         /**
          * Load PGN from textarea directly to board and move container
          */
-        function loadPgnToBoard() {
-            const pgnTextarea = document.getElementById('pgnInput');
-            if (!pgnTextarea || !pgnTextarea.value.trim()) {
-                alert('No PGN in textarea');
+        async function loadPgnToBoard() {
+            let pgnString = '';
+            try {
+                pgnString = (await navigator.clipboard.readText()).trim();
+            } catch (err) {
+                // Fallback to textarea if clipboard access denied
+                const pgnTextarea = document.getElementById('pgnInput');
+                if (pgnTextarea && pgnTextarea.value.trim()) {
+                    pgnString = pgnTextarea.value.trim();
+                }
+            }
+            if (!pgnString) {
+                alert('No PGN in clipboard');
                 return;
             }
-
-            const pgnString = pgnTextarea.value.trim();
 
             // Update analysisReportText with the PGN content
             const reportContainer = document.getElementById('analysisReportContainer');
