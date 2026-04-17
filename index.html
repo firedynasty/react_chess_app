@@ -1109,6 +1109,7 @@
           <button id="clearVariationsBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
           <!-- Next Var, Back Var, Cycle Clipboard moved to hidden-features/nav-buttons.html -->
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
+          <button id="analyzeGameBtn" onclick="analyzeLoadedGame()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Analyze Game</button>
           <button id="getEvalBtn" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Get Eval</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
@@ -2604,6 +2605,17 @@
 
             document.getElementById('analyzeBtn').disabled = false;
             document.getElementById('progressBar').style.display = 'none';
+        }
+
+        async function analyzeLoadedGame() {
+            const pgn = window.currentLoadedPgn;
+            if (!pgn) {
+                log('No PGN loaded. Use "Load Annotated PGN" first.', 'error');
+                alert('No PGN loaded. Use "Load Annotated PGN" first.');
+                return;
+            }
+            document.getElementById('pgnInput').value = pgn;
+            await analyzeGame();
         }
 
         async function analyzeFen() {
