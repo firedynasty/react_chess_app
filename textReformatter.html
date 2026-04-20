@@ -139,7 +139,9 @@
     </style>
 </head>
 <body>
-    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 12px;">
+    <div style="display: flex; justify-content: flex-end; gap: 10px; margin-bottom: 12px; align-items: center;">
+        <button id="dropboxBtn" onclick="handleDropboxClick()" oncontextmenu="return handleDropboxRightClick(event)" title="Sign in to Dropbox. Once signed in, auto-loads content sent from the CSV loader. Right-click to sign out." style="background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;">DB: Sign In</button>
+        <span id="dropboxStatus" style="color: #51cf66; font-size: 12px; display: none;"></span>
         <a href="/" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Analyzer</a>
         <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
         <a href="https://vercel-youtube.vercel.app/parser.html" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Parser</a>
@@ -311,6 +313,148 @@
                 }
             });
         }
+    </script>
+
+    <!-- Dropbox Integration -->
+    <script>
+    (function() {
+        let dropboxAccessToken = null;
+        let dropboxAppKey = '';
+        const CLIPBOARD_PATH = '/blob_vercel_replacement/blob_clipboard_content.txt';
+
+        function generateCodeVerifier() {
+            const array = new Uint8Array(64);
+            crypto.getRandomValues(array);
+            return btoa(String.fromCharCode(...array))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        async function generateCodeChallenge(verifier) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(verifier);
+            const digest = await crypto.subtle.digest('SHA-256', data);
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        async function fetchAppKey() {
+            try {
+                const res = await fetch('/api/dropbox-config');
+                const data = await res.json();
+                return data.appKey || '';
+            } catch { return ''; }
+        }
+
+        function setStatus(msg) {
+            const el = document.getElementById('dropboxStatus');
+            el.textContent = msg;
+            el.style.display = msg ? 'inline' : 'none';
+        }
+
+        function updateBtn() {
+            const btn = document.getElementById('dropboxBtn');
+            btn.textContent = dropboxAccessToken ? 'DB: Load' : 'DB: Sign In';
+            btn.style.background = dropboxAccessToken ? '#28a745' : '#0061fe';
+        }
+
+        async function loadFromDropbox() {
+            if (!dropboxAccessToken) return;
+            setStatus('Loading...');
+            try {
+                const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + dropboxAccessToken,
+                        'Dropbox-API-Arg': JSON.stringify({ path: CLIPBOARD_PATH }),
+                    },
+                });
+                if (!res.ok) {
+                    if (res.status === 409) { setStatus('No file found in Dropbox yet'); return; }
+                    throw new Error('Download failed: ' + res.status);
+                }
+                const content = await res.text();
+                if (!content || !content.trim()) { setStatus('Dropbox clipboard is empty'); return; }
+                document.getElementById('inputArea').value = content.trim();
+                reformat();
+                setStatus('Loaded from Dropbox');
+                setTimeout(() => setStatus(''), 2000);
+            } catch (err) {
+                console.error('Dropbox load error:', err);
+                setStatus('Load failed');
+            }
+        }
+
+        window.handleDropboxClick = async function() {
+            if (dropboxAccessToken) {
+                loadFromDropbox();
+                return;
+            }
+            const appKey = await fetchAppKey();
+            if (!appKey) { alert('Dropbox App Key not configured'); return; }
+            dropboxAppKey = appKey;
+
+            const verifier = generateCodeVerifier();
+            const challenge = await generateCodeChallenge(verifier);
+            sessionStorage.setItem('dropbox_code_verifier', verifier);
+
+            const redirectUri = window.location.origin + '/reformatter';
+            const authUrl = 'https://www.dropbox.com/oauth2/authorize?client_id=' + appKey
+                + '&response_type=code&code_challenge=' + challenge
+                + '&code_challenge_method=S256&redirect_uri=' + encodeURIComponent(redirectUri)
+                + '&token_access_type=online';
+            window.location.href = authUrl;
+        };
+
+        window.handleDropboxRightClick = function(e) {
+            e.preventDefault();
+            if (!dropboxAccessToken) return false;
+            fetch('https://api.dropboxapi.com/2/auth/token/revoke', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + dropboxAccessToken },
+            }).catch(() => {});
+            dropboxAccessToken = null;
+            updateBtn();
+            return false;
+        };
+
+        // Handle OAuth callback
+        (async function() {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get('code');
+            if (!code) return;
+
+            const verifier = sessionStorage.getItem('dropbox_code_verifier');
+            const appKey = await fetchAppKey();
+            if (!verifier || !appKey) return;
+            dropboxAppKey = appKey;
+
+            const redirectUri = window.location.origin + '/reformatter';
+            const body = new URLSearchParams({
+                code,
+                grant_type: 'authorization_code',
+                client_id: appKey,
+                redirect_uri: redirectUri,
+                code_verifier: verifier,
+            });
+
+            try {
+                const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: body.toString(),
+                });
+                const data = await res.json();
+                if (data.access_token) {
+                    dropboxAccessToken = data.access_token;
+                    sessionStorage.removeItem('dropbox_code_verifier');
+                    window.history.replaceState({}, document.title, '/reformatter');
+                    updateBtn();
+                }
+            } catch (err) {
+                console.error('Dropbox auth error:', err);
+            }
+        })();
+    })();
     </script>
 </body>
 </html>
