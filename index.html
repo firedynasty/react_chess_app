@@ -1143,6 +1143,7 @@
           <button id="toggleAddVarBtn" onclick="var p=document.getElementById('addVarPanel'); if(p.style.display!=='none'){p.style.display='none'; this.style.background='linear-gradient(90deg, #e67e22, #e74c3c)';}else{p.style.display='block'; this.style.background='#555';}" style="background: linear-gradient(90deg, #e67e22, #e74c3c); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Add Var</button>
           <button id="castleBtn" onclick="showCastleMenu()" style="background: #795548; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px; position: relative;">Castle</button>
           <div id="castleMenu" style="display: none; position: absolute; z-index: 1000; background: #16213e; border: 1px solid #555; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);"></div>
+          <button id="downloadBoardImagesBtn" onclick="downloadBoardImages()" style="background: linear-gradient(90deg, #43a047, #2e7d32); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Download Images</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -1299,6 +1300,8 @@
     </div>
 
     <!-- jQuery (required for chessboard.js) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src='https://code.jquery.com/jquery-2.2.4.min.js'></script>
     <!-- Chessboard.js -->
     <script src='https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js'></script>
@@ -11446,6 +11449,228 @@ ${contentToAnalyze}`;
                 }
         }, 1000);
     })();
+    </script>
+    <script>
+    /**
+     * Build ordered capture list from the move tree.
+     * Walks the main line (children[0]), and after each main-line move that has
+     * variations (children[1+]), inserts the full variation lines before
+     * continuing the main line.
+     *
+     * Each entry: { node, isVariation: bool }
+     */
+    function buildCaptureList() {
+        var list = [];
+        if (!window.moveTree) return list;
+
+        // Root (start position)
+        list.push({ node: window.moveTree, isVariation: false });
+
+        // Walk main line
+        var mainNode = window.moveTree;
+        while (mainNode.children && mainNode.children.length > 0) {
+            var mainChild = mainNode.children[0]; // main continuation
+            list.push({ node: mainChild, isVariation: false });
+
+            // Insert variations (children[1], children[2], ...) after this main move
+            for (var v = 1; v < mainNode.children.length; v++) {
+                walkVariation(mainNode.children[v], list);
+            }
+
+            mainNode = mainChild;
+        }
+        return list;
+    }
+
+    // Recursively walk a variation branch depth-first
+    function walkVariation(node, list) {
+        list.push({ node: node, isVariation: true });
+        if (node.children && node.children.length > 0) {
+            // Main continuation of this variation
+            walkVariation(node.children[0], list);
+            // Sub-variations
+            for (var v = 1; v < node.children.length; v++) {
+                walkVariation(node.children[v], list);
+            }
+        }
+    }
+
+    // Get move indicator text and colors for a node
+    function getMoveLabel(node, isVariation, flatIndex) {
+        var text = 'Start';
+        var bg = 'transparent';
+        var fg = '#eee';
+
+        if (node && node.san) {
+            var prefix = node.isBlackMove ? (node.moveNumber + '...') : (node.moveNumber + '.');
+            text = prefix + ' ' + node.san + (node.annotation || '');
+            if (isVariation) text = '(' + text + ')';
+
+            if (node.annotation) {
+                if (node.annotation.includes('??')) {
+                    bg = '#ff4444'; fg = '#1a1a2e'; // Blunder
+                } else if (node.annotation.includes('?') && !node.annotation.includes('!?')) {
+                    bg = '#ff69b4'; fg = '#1a1a2e'; // Mistake
+                } else if (node.annotation.includes('?!')) {
+                    bg = '#ffd700'; fg = '#1a1a2e'; // Dubious
+                }
+            }
+
+            // Gray background for variation moves with no annotation
+            if (isVariation && bg === 'transparent') {
+                bg = '#555'; fg = '#eee';
+            }
+        } else if (flatIndex > 0) {
+            var moveNumber = Math.ceil(flatIndex / 2);
+            var isWhite = flatIndex % 2 === 1;
+            text = isWhite ? (moveNumber + '.') : (moveNumber + '...');
+        }
+        return { text: text, bg: bg, fg: fg };
+    }
+
+    async function downloadBoardImages() {
+        var positions = window.studyReportPositions;
+        if (!positions || positions.length === 0) {
+            alert('No positions loaded. Load a PGN first.');
+            return;
+        }
+
+        var btn = document.getElementById('downloadBoardImagesBtn');
+        var origText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Capturing...';
+
+        var savedIndex = window.studyReportPositionIndex;
+        var savedNode = window.currentMoveNode;
+        var boardEl = document.getElementById('board2Wrap');
+        var boardContainer = document.getElementById('myBoard2');
+        var zip = new JSZip();
+
+        // Build capture list: main line with variations sandwiched in
+        var captureList = buildCaptureList();
+        var useTree = captureList.length > 1; // >1 because root alone isn't useful
+
+        // Count variations for debug
+        var varCount = 0;
+        for (var vc = 0; vc < captureList.length; vc++) {
+            if (captureList[vc].isVariation) varCount++;
+        }
+        console.log('[Download Images] Tree:', !!window.moveTree, 'captureList:', captureList.length, 'mainline:', captureList.length - varCount, 'variations:', varCount);
+
+        // Fallback: if no tree, use flat positions array
+        if (!useTree) {
+            captureList = [];
+            for (var p = 0; p < positions.length; p++) {
+                captureList.push({ node: null, fen: positions[p], isVariation: false, flatIndex: p });
+            }
+        }
+
+        // Save and clear the yellow variation border
+        var savedBorder = boardContainer ? boardContainer.style.border : '';
+        if (boardContainer) boardContainer.style.border = 'none';
+
+        // Save and reset board opacity
+        var savedOpacity = boardContainer ? boardContainer.style.opacity : '1';
+        if (boardContainer) boardContainer.style.opacity = '1';
+
+        // Create a footer overlay element for the move label
+        var footer = document.createElement('div');
+        footer.id = 'downloadImageFooter';
+        footer.style.cssText = 'position:absolute; bottom:0; left:0; right:0; text-align:center; padding:4px 0; font-family:monospace; font-size:14px; font-weight:bold; z-index:20; pointer-events:none;';
+        boardEl.appendChild(footer);
+
+        var total = captureList.length;
+
+        try {
+            for (var i = 0; i < total; i++) {
+                var entry = captureList[i];
+                var node = entry.node;
+                var fen = node ? node.fen : entry.fen;
+
+                window.board2.position(fen, false);
+
+                // Highlight the last move (yellow squares)
+                if (node && node.san && node.parent && node.parent.fen) {
+                    highlightNodeMove(node);
+                } else if (!useTree && entry.flatIndex > 0) {
+                    // Flat array fallback: derive move from consecutive FENs
+                    try {
+                        var prevFen = positions[entry.flatIndex - 1];
+                        var prevChess = new Chess(prevFen);
+                        var moves = prevChess.moves({ verbose: true });
+                        var found = false;
+                        for (var m = 0; m < moves.length; m++) {
+                            var testChess = new Chess(prevFen);
+                            testChess.move(moves[m].san);
+                            if (testChess.fen().split(' ').slice(0, 4).join(' ') === fen.split(' ').slice(0, 4).join(' ')) {
+                                highlightLastMove(moves[m].from, moves[m].to);
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) clearMoveHighlights();
+                    } catch (e) { clearMoveHighlights(); }
+                } else {
+                    clearMoveHighlights();
+                }
+
+                // Set footer move label
+                var label = getMoveLabel(node, entry.isVariation, entry.flatIndex || 0);
+                footer.textContent = label.text;
+                footer.style.background = label.bg === 'transparent' ? 'rgba(0,0,0,0.6)' : label.bg;
+                footer.style.color = label.fg;
+
+                btn.textContent = 'Capturing ' + (i + 1) + '/' + total;
+                // Let the DOM render
+                await new Promise(function(r) { setTimeout(r, 100); });
+
+                var canvas = await html2canvas(boardEl, {
+                    backgroundColor: null,
+                    scale: 2,
+                    useCORS: true
+                });
+                var dataUrl = canvas.toDataURL('image/png');
+                var base64 = dataUrl.split(',')[1];
+                var padded = String(i).padStart(4, '0');
+                zip.file('board_' + padded + '.png', base64, { base64: true });
+            }
+
+            btn.textContent = 'Zipping...';
+            var blob = await zip.generateAsync({ type: 'blob' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'board_images.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Download images error:', e);
+            alert('Error capturing images: ' + e.message);
+        }
+
+        // Clean up footer overlay
+        if (footer.parentNode) footer.parentNode.removeChild(footer);
+
+        // Restore original state
+        if (boardContainer) {
+            boardContainer.style.border = savedBorder;
+            boardContainer.style.opacity = savedOpacity;
+        }
+        window.board2.position(positions[savedIndex], false);
+        window.studyReportPositionIndex = savedIndex;
+        window.currentMoveNode = savedNode;
+        if (savedNode) {
+            highlightNodeMove(savedNode);
+        } else {
+            clearMoveHighlights();
+        }
+        updateBoard2MoveIndicator(savedIndex);
+
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
     </script>
 </body>
 </html>
