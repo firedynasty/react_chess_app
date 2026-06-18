@@ -1092,7 +1092,16 @@
     <!-- Board Navigation Container (full width) -->
     <div style="margin: 0 auto 20px; max-width: 1200px;">
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
-        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <button id="toggleNavBtnsBtn" onclick="var c=document.getElementById('navBtnsContent'); var m=document.getElementById('miniNavControls'); if(c.style.display==='none'){c.style.display='flex';m.style.display='none';this.textContent='▼ Hide Nav Buttons';}else{c.style.display='none';m.style.display='flex';this.textContent='▶ Show Nav Buttons';}" style="background: #0f3460; color: #a8d8ea; border: 1px solid #1a3a6e; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">▼ Hide Nav Buttons</button>
+          <div id="miniNavControls" style="display: none; align-items: center; gap: 8px;">
+            <button onclick="document.getElementById('board2PrevMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
+            <span id="board2MoveIndicatorMini" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap; background: transparent; padding: 4px 8px; border-radius: 4px;">Start</span>
+            <span id="board2MovePlayedSanMini" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
+            <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
+          </div>
+        </div>
+        <div id="navBtnsContent" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
           <button id="dropboxBtn" title="Click to sign in to Dropbox. Once signed in, click again to load a PGN that was sent from the CSV loader." style="background: #0061fe; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">DB: Sign In</button>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
             <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
@@ -1217,6 +1226,29 @@
                  background: #0f3460; color: #eee; resize: vertical; display: none;"
           placeholder="After clicking 'Set Variant', make moves on the board to build PGN..."
           readonly></textarea>
+      </div>
+
+      <!-- Report Loader Section -->
+      <div id="reportLoaderContainer" style="margin-top: 10px; padding: 15px; background: #1a1a3e; border-radius: 8px; border: 1px solid #1a3a6e;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+          <button id="toggleReportLoaderBtn" onclick="var c=document.getElementById('reportLoaderContent'); if(c.style.display==='none'){c.style.display='block';this.textContent='▼ Report Loader';}else{c.style.display='none';this.textContent='▶ Report Loader';}" style="background: #0f3460; color: #ffd700; border: 1px solid #1a3a6e; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">▶ Report Loader</button>
+          <span style="color: #888; font-size: 12px;">Paste a chess analysis report to extract and load positions/variants</span>
+        </div>
+        <div id="reportLoaderContent" style="display: none;">
+          <textarea id="reportTextArea" style="width: 100%; height: 150px; padding: 10px; border: 2px solid #ffd700; border-radius: 5px; font-family: monospace; font-size: 12px; background: #0f3460; color: #eee; resize: vertical; margin-bottom: 10px;" placeholder="Paste your chess analysis report here..."></textarea>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <button id="parseReportBtn" onclick="parseAnalysisReport()" style="background: #ffd700; color: #1a1a2e; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Parse Report</button>
+            <select id="reportSectionSelect" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #ffd700; border-radius: 6px; font-size: 13px; min-width: 300px;">
+              <option value="">-- Parse a report first --</option>
+            </select>
+            <button id="loadReportSectionBtn" onclick="loadReportSection()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Selected</button>
+            <button id="loadHighlightedBtn" onclick="loadHighlightedText()" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Highlighted Text</button>
+            <span id="reportLoaderStatus" style="color: #4caf50; font-family: monospace; font-size: 12px;"></span>
+          </div>
+          <div id="reportSectionPreview" style="display: none; margin-top: 10px; padding: 10px; background: #0a1628; border-radius: 5px; border: 1px solid #333; max-height: 200px; overflow-y: auto;">
+            <pre id="reportSectionPreviewText" style="color: #aed581; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 0;"></pre>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -5923,6 +5955,15 @@
                         indicator.style.color = '#1a1a2e';
                     }
                 }
+                // Sync mini indicator
+                const miniInd = document.getElementById('board2MoveIndicatorMini');
+                if (miniInd) {
+                    miniInd.textContent = indicator.textContent;
+                    miniInd.style.background = indicator.style.background;
+                    miniInd.style.color = indicator.style.color;
+                    miniInd.style.padding = indicator.style.padding;
+                    miniInd.style.borderRadius = indicator.style.borderRadius;
+                }
             }
 
             // Update board2MovePlayedSan with the move played
@@ -5943,6 +5984,9 @@
                 } else {
                     sanSpan.style.color = '#00d4ff';
                 }
+                // Sync mini SAN
+                const sanMini = document.getElementById('board2MovePlayedSanMini');
+                if (sanMini) { sanMini.textContent = sanSpan.textContent; sanMini.style.color = sanSpan.style.color; }
             }
 
             // Update variation indicator - show "(" if variations exist at this position
@@ -6281,12 +6325,16 @@
                 indicator.textContent = 'Start';
                 indicator.style.background = 'transparent';
                 indicator.style.color = '#eee';
+                const miniInd = document.getElementById('board2MoveIndicatorMini');
+                if (miniInd) { miniInd.textContent = 'Start'; miniInd.style.background = 'transparent'; miniInd.style.color = '#eee'; }
             }
 
             // Clear the move played san
             const sanSpan = document.getElementById('board2MovePlayedSan');
             if (sanSpan) {
                 sanSpan.textContent = '';
+                const sanMini = document.getElementById('board2MovePlayedSanMini');
+                if (sanMini) { sanMini.textContent = ''; }
             }
 
             // Update variation indicator at root
@@ -6450,6 +6498,16 @@
                     indicator.style.background = '#ffd700'; // Dubious - yellow
                     indicator.style.color = '#1a1a2e';
                 }
+            }
+
+            // Sync mini indicator
+            const miniIndicator = document.getElementById('board2MoveIndicatorMini');
+            if (miniIndicator) {
+                miniIndicator.textContent = indicator.textContent;
+                miniIndicator.style.background = indicator.style.background;
+                miniIndicator.style.color = indicator.style.color;
+                miniIndicator.style.padding = indicator.style.padding;
+                miniIndicator.style.borderRadius = indicator.style.borderRadius;
             }
 
             // Update Lichess link
@@ -7601,6 +7659,262 @@
                     }
                 });
             }
+
+            // ============================================================
+            // Report Loader - parse analysis report and load sections
+            // ============================================================
+            window.parsedReportSections = [];
+
+            window.parseAnalysisReport = function() {
+                const textarea = document.getElementById('reportTextArea');
+                const select = document.getElementById('reportSectionSelect');
+                const status = document.getElementById('reportLoaderStatus');
+                const text = textarea.value.trim();
+                if (!text) {
+                    alert('Paste a report into the text area first.');
+                    return;
+                }
+
+                const sections = [];
+
+                // 1. Extract the main GAME PGN
+                const gamePgnMatch = text.match(/GAME PGN\s*[-]+\s*\n([\s\S]*?)(?=\n\n[A-Z]|\n[-=]{5,})/);
+                if (gamePgnMatch) {
+                    const pgn = gamePgnMatch[1].trim();
+                    if (pgn) {
+                        sections.push({
+                            label: 'Main Game PGN',
+                            type: 'pgn',
+                            data: pgn
+                        });
+                    }
+                }
+
+                // 2. Extract [Variant "From Position"] blocks with FEN and moves
+                const variantRegex = /\[Variant\s+"From Position"\]\s*\n\[FEN\s+"([^"]+)"\]\s*\n\n?([\s\S]*?)(?=\n\n[^\d\s.]|\n\*|\n\n\*|$)/g;
+                let varMatch;
+                let varIdx = 0;
+                while ((varMatch = variantRegex.exec(text)) !== null) {
+                    varIdx++;
+                    const fen = varMatch[1];
+                    const moves = varMatch[2].trim();
+                    // Try to find context: look backwards for "Move XX" line
+                    const beforeVariant = text.substring(0, varMatch.index);
+                    const moveLabel = beforeVariant.match(/Move\s+(\d+\.{0,3}\s*\S+)\s*$/m);
+                    const contextLabel = moveLabel ? ` (after ${moveLabel[1].trim()})` : '';
+                    sections.push({
+                        label: `Variant ${varIdx}${contextLabel}: ${fen.substring(0, 40)}...`,
+                        type: 'variant',
+                        data: `[Variant "From Position"]\n[FEN "${fen}"]\n\n${moves}`
+                    });
+                }
+
+                // 3. Extract Key Position FEN links (lichess analysis URLs)
+                const keyPosRegex = /Move\s+([\d]+\.{0,3}\s*\S+)\s*\n\s*(https:\/\/lichess\.org\/analysis\/\S+)/g;
+                let kpMatch;
+                while ((kpMatch = keyPosRegex.exec(text)) !== null) {
+                    const moveDesc = kpMatch[1].trim();
+                    const url = kpMatch[2];
+                    // Extract FEN from lichess URL (underscores -> spaces)
+                    const fenFromUrl = url.split('/analysis/')[1];
+                    if (fenFromUrl) {
+                        const fen = decodeURIComponent(fenFromUrl).replace(/_/g, ' ');
+                        sections.push({
+                            label: `Key Position: Move ${moveDesc}`,
+                            type: 'fen',
+                            data: fen
+                        });
+                    }
+                }
+
+                // 4. Extract Opening Deviation positions
+                const devRegex = /(\d+\.{0,3}\s*\S+)\s+\(book:.*?\)\s*\n.*?\n\s*(https:\/\/lichess\.org\/analysis\/\S+)/g;
+                let devMatch;
+                while ((devMatch = devRegex.exec(text)) !== null) {
+                    const moveDesc = devMatch[1].trim();
+                    const url = devMatch[2];
+                    const fenFromUrl = url.split('/analysis/')[1];
+                    if (fenFromUrl) {
+                        const fen = decodeURIComponent(fenFromUrl).replace(/_/g, ' ');
+                        sections.push({
+                            label: `Opening Deviation: ${moveDesc}`,
+                            type: 'fen',
+                            data: fen
+                        });
+                    }
+                }
+
+                window.parsedReportSections = sections;
+
+                // Populate dropdown
+                select.innerHTML = '';
+                if (sections.length === 0) {
+                    select.innerHTML = '<option value="">No sections found</option>';
+                    status.textContent = 'No parseable sections found.';
+                    status.style.color = '#ff5252';
+                    return;
+                }
+
+                sections.forEach((s, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = i;
+                    opt.textContent = s.label;
+                    select.appendChild(opt);
+                });
+
+                status.textContent = `Found ${sections.length} section(s)`;
+                status.style.color = '#4caf50';
+            };
+
+            // Preview on dropdown change
+            document.getElementById('reportSectionSelect').addEventListener('change', function() {
+                const idx = parseInt(this.value);
+                const preview = document.getElementById('reportSectionPreview');
+                const previewText = document.getElementById('reportSectionPreviewText');
+                if (isNaN(idx) || !window.parsedReportSections[idx]) {
+                    preview.style.display = 'none';
+                    return;
+                }
+                const section = window.parsedReportSections[idx];
+                previewText.textContent = section.data;
+                preview.style.display = 'block';
+            });
+
+            window.loadReportSection = function() {
+                const select = document.getElementById('reportSectionSelect');
+                const idx = parseInt(select.value);
+                const status = document.getElementById('reportLoaderStatus');
+                if (isNaN(idx) || !window.parsedReportSections[idx]) {
+                    alert('Select a section first.');
+                    return;
+                }
+
+                const section = window.parsedReportSections[idx];
+
+                if (section.type === 'pgn') {
+                    // Load as annotated PGN
+                    const pgnString = section.data;
+                    const result = window.parsePgnToPositionsWithComments(pgnString);
+                    window.studyReportPositions = result.positions;
+                    window.studyReportComments = result.comments;
+                    window.currentLoadedPgn = pgnString;
+                    window.moveTree = window.parsePgnWithVariations(pgnString);
+                    window.cycleVarSequence = [];
+                    window.cycleVarIndex = -1;
+                    window.currentMoveNode = null;
+                    renderMoveTable(window.moveTree);
+                    updateAllCommentsDisplay();
+                    window.studyReportPositionIndex = 0;
+                    if (window.studyReportPositions && window.studyReportPositions.length > 0) {
+                        window.board2.position(window.studyReportPositions[0]);
+                        updateBoard2MoveIndicator(0);
+                    }
+                    status.textContent = 'Loaded main game PGN';
+                    status.style.color = '#4caf50';
+                } else if (section.type === 'variant') {
+                    // Load as FEN variant (same as Load FEN button)
+                    const pgnString = section.data;
+                    window.loadedFenVariants = [pgnString];
+                    window.loadFenVariantByIndex(0);
+                    status.textContent = 'Loaded variant onto board';
+                    status.style.color = '#4caf50';
+                } else if (section.type === 'fen') {
+                    // Load bare FEN
+                    const fen = section.data;
+                    const pgnString = `[Variant "From Position"]\n[FEN "${fen}"]\n\n`;
+                    window.loadedFenVariants = [pgnString];
+                    window.loadFenVariantByIndex(0);
+                    status.textContent = 'Loaded FEN position onto board';
+                    status.style.color = '#4caf50';
+                }
+            };
+
+            window.loadHighlightedText = function() {
+                const textarea = document.getElementById('reportTextArea');
+                const status = document.getElementById('reportLoaderStatus');
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const selected = textarea.value.substring(start, end).trim();
+
+                if (!selected) {
+                    alert('Highlight text in the report textarea first.');
+                    return;
+                }
+
+                // Check if it contains a [Variant "From Position"] + [FEN] block
+                const variantMatch = selected.match(/\[Variant\s+"From Position"\]\s*\n\[FEN\s+"([^"]+)"\]\s*\n\n?([\s\S]*)/);
+                if (variantMatch) {
+                    const fen = variantMatch[1];
+                    const moves = variantMatch[2].trim();
+                    const pgnString = `[Variant "From Position"]\n[FEN "${fen}"]\n\n${moves}`;
+                    window.loadedFenVariants = [pgnString];
+                    window.loadFenVariantByIndex(0);
+                    status.textContent = 'Loaded highlighted variant';
+                    status.style.color = '#4caf50';
+                    return;
+                }
+
+                // Check if it contains just a [FEN "..."] line
+                const fenHeaderMatch = selected.match(/\[FEN\s+"([^"]+)"\]/);
+                if (fenHeaderMatch) {
+                    const fen = fenHeaderMatch[1];
+                    const afterFen = selected.substring(selected.indexOf(']', selected.indexOf('[FEN')) + 1).replace(/\[.*?\]/g, '').trim();
+                    const pgnString = `[Variant "From Position"]\n[FEN "${fen}"]\n\n${afterFen}`;
+                    window.loadedFenVariants = [pgnString];
+                    window.loadFenVariantByIndex(0);
+                    status.textContent = 'Loaded highlighted FEN';
+                    status.style.color = '#4caf50';
+                    return;
+                }
+
+                // Check if it looks like a bare FEN (has / separators and rank data)
+                const bareFenMatch = selected.match(/^([rnbqkpRNBQKP1-8\/]+\s+[wb]\s+[KQkq-]+\s+[a-h1-8-]+\s+\d+\s+\d+)/);
+                if (bareFenMatch) {
+                    const fen = bareFenMatch[1];
+                    const pgnString = `[Variant "From Position"]\n[FEN "${fen}"]\n\n`;
+                    window.loadedFenVariants = [pgnString];
+                    window.loadFenVariantByIndex(0);
+                    status.textContent = 'Loaded highlighted bare FEN';
+                    status.style.color = '#4caf50';
+                    return;
+                }
+
+                // Check if it contains a lichess analysis URL with FEN
+                const lichessMatch = selected.match(/https:\/\/lichess\.org\/analysis\/(\S+)/);
+                if (lichessMatch) {
+                    const fen = decodeURIComponent(lichessMatch[1]).replace(/_/g, ' ');
+                    const pgnString = `[Variant "From Position"]\n[FEN "${fen}"]\n\n`;
+                    window.loadedFenVariants = [pgnString];
+                    window.loadFenVariantByIndex(0);
+                    status.textContent = 'Loaded FEN from highlighted Lichess URL';
+                    status.style.color = '#4caf50';
+                    return;
+                }
+
+                // Otherwise try as PGN moves (e.g. "1. e4 e5 2. Nf3 ...")
+                try {
+                    const result = window.parsePgnToPositionsWithComments(selected);
+                    if (result.positions && result.positions.length > 1) {
+                        window.studyReportPositions = result.positions;
+                        window.studyReportComments = result.comments;
+                        window.currentLoadedPgn = selected;
+                        window.moveTree = window.parsePgnWithVariations(selected);
+                        window.cycleVarSequence = [];
+                        window.cycleVarIndex = -1;
+                        window.currentMoveNode = null;
+                        renderMoveTable(window.moveTree);
+                        updateAllCommentsDisplay();
+                        window.studyReportPositionIndex = 0;
+                        window.board2.position(window.studyReportPositions[0]);
+                        updateBoard2MoveIndicator(0);
+                        status.textContent = 'Loaded highlighted PGN';
+                        status.style.color = '#4caf50';
+                        return;
+                    }
+                } catch (e) {}
+
+                alert('Could not detect a loadable format in the highlighted text. Try highlighting a FEN, variant block, Lichess URL, or PGN moves.');
+            };
 
             // FEN color toggle button - switches between White and Black
             window.fenExportColor = 'w';
