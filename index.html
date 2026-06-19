@@ -1250,6 +1250,7 @@
           </div>
         </div>
       </div>
+      <div id="reportDropdownValue" style="margin-top: 6px; padding: 6px 12px; color: #ffd700; font-family: monospace; font-size: 13px; display: none;"></div>
     </div>
 
     <!-- Google Drive Sheets Loader -->
@@ -7771,13 +7772,18 @@
                 const idx = parseInt(this.value);
                 const preview = document.getElementById('reportSectionPreview');
                 const previewText = document.getElementById('reportSectionPreviewText');
+                const dropdownValue = document.getElementById('reportDropdownValue');
                 if (isNaN(idx) || !window.parsedReportSections[idx]) {
                     preview.style.display = 'none';
+                    dropdownValue.style.display = 'none';
+                    dropdownValue.textContent = '';
                     return;
                 }
                 const section = window.parsedReportSections[idx];
                 previewText.textContent = section.data;
                 preview.style.display = 'block';
+                dropdownValue.textContent = this.options[this.selectedIndex].text;
+                dropdownValue.style.display = 'block';
             });
 
             window.loadReportSection = function() {
