@@ -5991,10 +5991,14 @@
             const container = document.getElementById('moveTableContainer');
             if (!container) return;
 
-            // Preserve hidden state if user toggled it off
-            const wasHidden = container.style.display === 'none';
+            // Toggle button label is the source of truth for user intent:
+            // "Show Moves" means the user deliberately hid the table — keep it
+            // hidden across re-renders. Otherwise always show, so fresh loads
+            // (new PGN / analysis / report) are never stuck hidden.
+            const toggleBtn = document.getElementById('toggleMoveTableBtn');
+            const userHidIt = toggleBtn && toggleBtn.textContent === 'Show Moves';
             container.innerHTML = '';
-            if (!wasHidden) container.style.display = 'block';
+            container.style.display = userHidIt ? 'none' : 'block';
 
             // Render from root's children (the actual moves)
             if (rootNode.children && rootNode.children.length > 0) {
