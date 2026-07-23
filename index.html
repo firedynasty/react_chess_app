@@ -10044,8 +10044,33 @@ End with a Socratic question about a specific position to help me learn.`
                 // Clear textarea after using its content
                 setInputValue('');
 
-                // Build the query with pre-defined prompt
-                const query = `What did you think of this game? When referencing chess principles from the knowledge base, explicitly mention them, and talk about the opening, middlegame and endgame please.
+                // Build the query with pre-defined prompt (structured move-by-move coaching)
+                const query = `You are an expert chess coach analyzing a student's game. You are given a Stockfish analysis report. It contains:
+- GAME PGN and ANNOTATED PGN (bad moves are marked ? / ?? and the engine's best line follows in parentheses)
+- A MISTAKES & BLUNDERS section listing each error with the evaluation before → after and the eval swing
+
+Provide your coaching analysis in this exact format:
+
+## Game Summary
+2-3 sentences: opening played, key turning points, and result.
+
+## Why the Bad Moves Were Bad
+Go through EVERY move listed in the MISTAKES & BLUNDERS section, in game order. For each one:
+- The move (with move number) and its eval swing
+- The best move instead — taken from the best line in parentheses in the ANNOTATED PGN (this is Stockfish ground truth: never contradict it or invent your own alternatives)
+- WHY the played move is weaker: the concrete tactical or strategic reason (what it hangs, what it allows, what plan it misses), referencing the best line
+- The lesson: one sentence on the pattern to remember
+
+## Missed Tactics
+Tactical patterns the student missed (forks, pins, skewers, discovered attacks, etc.). If none, say so.
+
+## Strategic Themes
+The strategic concepts relevant to this game (pawn structure, piece activity, king safety, etc.). When referencing chess principles from the knowledge base, cite them explicitly.
+
+## Top 3 Tips
+Three specific, actionable tips for improvement based on this game.
+
+Use chess notation (e.g., Nf3, e4) when referring to moves. Keep the language encouraging and educational.
 
 Game Data:
 ${contentToAnalyze}`;
@@ -10080,6 +10105,14 @@ ${contentToAnalyze}`;
 
                     setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
                     setChatEnabled(true);  // Enable follow-up chat after first response
+
+                    // Append coach analysis to the report so it's viewable/savable with it
+                    const reportEl = document.getElementById('analysisReportText');
+                    if (reportEl && reportEl.textContent !== 'Loading report...' && reportEl.textContent.trim()) {
+                        const coachSection = '\n' + '='.repeat(70) + '\nAI COACH ANALYSIS\n' + '='.repeat(70) + '\n\n' + data.content + '\n';
+                        reportEl.textContent += coachSection;
+                        window.analysisReportRawText = reportEl.textContent;
+                    }
                 } catch (err) {
                     setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
                 } finally {
@@ -10644,11 +10677,11 @@ ${contentToAnalyze}`;
                             </label>
                         )}
 
-                        {/* Analyze full game with Chess Coach — hidden */}
+                        {/* Analyze full game with Chess Coach */}
                         <button
                             onClick={analyzeWithChessCoach}
                             disabled={isLoading}
-                            style={{ ...styles.button, background: '#9c27b0', color: 'white', opacity: isLoading ? 0.6 : 1, display: 'none' }}
+                            style={{ ...styles.button, background: '#9c27b0', color: 'white', opacity: isLoading ? 0.6 : 1 }}
                         >
                             🤖 Analyze with Chess Coach
                         </button>
