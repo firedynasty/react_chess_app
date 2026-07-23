@@ -1102,9 +1102,9 @@
           </div>
         </div>
         <div id="navBtnsContent" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-          <button id="dropboxBtn" title="Click to sign in to Dropbox. Once signed in, click again to load a PGN that was sent from the CSV loader." style="background: #0061fe; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">DB: Sign In</button>
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
             <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
+            <button id="coachNoteBtn" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="openCoachNoteForCurrentMove()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap;">Start</span>
             <span id="board2MovePlayedSan" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
@@ -1154,6 +1154,7 @@
           <button id="castleBtn" onclick="showCastleMenu()" style="background: #795548; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px; position: relative;">Castle</button>
           <div id="castleMenu" style="display: none; position: absolute; z-index: 1000; background: #16213e; border: 1px solid #555; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);"></div>
           <button id="downloadBoardImagesBtn" onclick="downloadBoardImages()" style="background: linear-gradient(90deg, #43a047, #2e7d32); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Download Images</button>
+          <button id="dropboxBtn" title="Click to sign in to Dropbox. Once signed in, click again to load a PGN that was sent from the CSV loader." style="background: #0061fe; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">DB: Sign In</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
           <!-- Lichess Modal -->
@@ -1437,6 +1438,84 @@
         window.textViewRawContent = '';
         window.textViewTitle = '';
 
+        // =====================================================================
+        // COACH MOVE NOTES — parse "Why the Bad Moves Were Bad" per-move entries
+        // =====================================================================
+        window.coachMoveNotes = { source: '', map: {} };
+
+        function parseCoachMoveNotes(markdown) {
+            var map = {};
+            if (!markdown) return map;
+            var startMatch = markdown.match(/^#{1,4}\s*Why the Bad Moves Were Bad.*$/im);
+            if (!startMatch) return map;
+            var rest = markdown.slice(startMatch.index + startMatch[0].length);
+            var endMatch = rest.match(/^#{1,4}\s/m);
+            var section = endMatch ? rest.slice(0, endMatch.index) : rest;
+
+            // Entry header: optional list number + optional **, then "4... e5" or "9. Qxd4".
+            // Require "Eval" on the line so body sentences starting with a bare move
+            // (e.g. "12. Nd2 helps to reinforce...") don't split an entry.
+            var blackRe = /^\s*(?:\d+[\.)]\s*)?(?:\*\*)?(\d+)\.\.\.\s*([A-Za-z][A-Za-z0-9x=+#-]*)/;
+            var whiteRe = /^\s*(?:\d+[\.)]\s*)?(?:\*\*)?(\d+)\.\s+([A-Za-z][A-Za-z0-9x=+#-]*)/;
+            var currentKey = null, currentSan = null, currentLabel = null, buf = [];
+
+            function flush() {
+                if (currentKey && buf.length) {
+                    map[currentKey] = { label: currentLabel, san: currentSan, text: buf.join('\n').trim() };
+                }
+            }
+
+            section.split('\n').forEach(function(line) {
+                var m = line.match(blackRe);
+                var isBlack = true;
+                if (!m) { m = line.match(whiteRe); isBlack = false; }
+                if (m && /eval/i.test(line)) {
+                    flush();
+                    var dots = isBlack ? '...' : '.';
+                    currentKey = m[1] + dots;
+                    currentSan = m[2];
+                    currentLabel = m[1] + dots + ' ' + m[2];
+                    buf = [line];
+                } else if (currentKey) {
+                    buf.push(line);
+                }
+            });
+            flush();
+            return map;
+        }
+
+        function getCoachMoveNotes() {
+            var src = window.textViewRawContent || '';
+            if (window.coachMoveNotes.source !== src) {
+                window.coachMoveNotes = { source: src, map: parseCoachMoveNotes(src) };
+            }
+            return window.coachMoveNotes;
+        }
+
+        function getCurrentMoveKey() {
+            if (window.moveTree) {
+                var node = window.currentMoveNode;
+                if (!node || node.nodeId === 'root') return null;
+                return { key: node.moveNumber + (node.isBlackMove ? '...' : '.'), san: node.san || null };
+            }
+            if (typeof window.studyReportPositionIndex === 'number' && window.studyReportPositionIndex > 0) {
+                var idx = window.studyReportPositionIndex;
+                return { key: Math.ceil(idx / 2) + (idx % 2 === 1 ? '.' : '...'), san: null };
+            }
+            return null;
+        }
+
+        function findCoachNoteForCurrentMove() {
+            var cur = getCurrentMoveKey();
+            if (!cur) return null;
+            var entry = getCoachMoveNotes().map[cur.key];
+            if (!entry) return null;
+            // Tree mode: require SAN match so a variation move with the same
+            // move number doesn't show the main-line note
+            if (cur.san && entry.san && cur.san !== entry.san) return null;
+            return entry;
+        }
+
         function formatTextForView(text) {
             let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             s = s.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#00d4ff;">$1</strong>');
@@ -1455,11 +1534,14 @@
             return s;
         }
 
-        function openTextViewModal() {
+        function openTextViewModal(contentOverride, titleOverride) {
             var modal = document.getElementById('textViewModal');
             var content = document.getElementById('textViewModalContent');
             var title = document.getElementById('textViewModalTitle');
-            if (!window.textViewRawContent) {
+            if (typeof contentOverride === 'string' && contentOverride.trim()) {
+                content.innerHTML = formatTextForView(contentOverride);
+                title.textContent = titleOverride || 'Text View';
+            } else if (!window.textViewRawContent) {
                 content.innerHTML = '<span style="color:#555;">No text loaded. Select a row from the table or run Analyze with Chess Coach.</span>';
                 title.textContent = 'Text View';
             } else {
@@ -1469,6 +1551,36 @@
             }
             modal.style.display = 'flex';
         }
+
+        // Star button: gold when the current move has a coach note, dim otherwise
+        function updateCoachNoteButton() {
+            var btn = document.getElementById('coachNoteBtn');
+            if (!btn) return;
+            if (findCoachNoteForCurrentMove()) {
+                btn.style.background = '#ffd700';
+                btn.style.color = '#1a1a2e';
+                btn.style.boxShadow = '0 0 8px rgba(255,215,0,0.6)';
+            } else {
+                btn.style.background = '#4a4a4a';
+                btn.style.color = '#ccc';
+                btn.style.boxShadow = 'none';
+            }
+        }
+        window.updateCoachNoteButton = updateCoachNoteButton;
+
+        function openCoachNoteForCurrentMove() {
+            if (!Object.keys(getCoachMoveNotes().map).length) {
+                openTextViewModal('No coach analysis yet. Run "Analyze with Chess Coach" first.', '⭐ Coach Note');
+                return;
+            }
+            var entry = findCoachNoteForCurrentMove();
+            if (entry) {
+                openTextViewModal(entry.text, '⭐ Coach: ' + entry.label);
+            } else {
+                openTextViewModal('No coach note for this move.', '⭐ Coach Note');
+            }
+        }
+        window.openCoachNoteForCurrentMove = openCoachNoteForCurrentMove;
 
         function copyTextViewFormatted() {
             if (!window.textViewRawContent) return;
@@ -6119,6 +6231,9 @@
             // Update all comments display
             updateAllCommentsDisplay();
 
+            // Refresh coach note star for the new current move
+            if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+
             // Update board2MoveIndicator with annotation highlighting
             const indicator = document.getElementById('board2MoveIndicator');
             if (indicator) {
@@ -6513,6 +6628,9 @@
             // Update all comments display
             updateAllCommentsDisplay();
 
+            // Refresh coach note star (root = no current move, star dims)
+            if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+
             // Update board2MoveIndicator to show Start
             const indicator = document.getElementById('board2MoveIndicator');
             if (indicator) {
@@ -6732,6 +6850,9 @@
 
             // Update all comments display
             updateAllCommentsDisplay();
+
+            // Refresh coach note star for the new current move
+            if (window.updateCoachNoteButton) window.updateCoachNoteButton();
         }
 
         // ── Arrow overlay for variation moves on board2 ──
@@ -10292,6 +10413,7 @@ End with a Socratic question about a specific position to help me learn.`
                 if (lastAssistant) {
                     window.textViewRawContent = lastAssistant.content;
                     window.textViewTitle = 'AI Coach Analysis';
+                    if (window.updateCoachNoteButton) window.updateCoachNoteButton();
                 }
             }, [messages]);
 
