@@ -1800,7 +1800,17 @@
                     },
                     body: JSON.stringify({ path }),
                 });
-                if (!res.ok) throw new Error('Failed to list folder');
+                if (!res.ok) {
+                    if (res.status === 409) {
+                        // Folder doesn't exist yet — the first save will create it
+                        window.dropboxFolderPath = path;
+                        window.dropboxFolderFiles = [];
+                        setDropboxStatus(`${path} is new — it will be created on save`);
+                        renderDropboxSidebar([], true);
+                        return;
+                    }
+                    throw new Error('Failed to list folder');
+                }
                 const data = await res.json();
                 const entries = (data.entries || []).map(entry => ({
                     name: entry.name,
@@ -1835,7 +1845,7 @@
                 if (!res.ok) throw new Error('Download failed');
                 const content = await res.text();
                 window.dropboxCurrentFilePath = path;
-                loadStudyReportFromContent(content, fileName);
+                loadFullReportFromContent(content);
                 setDropboxStatus(`Loaded ${fileName}`);
                 closeDropboxSidebar();
             } catch (err) {
@@ -1868,10 +1878,13 @@
             if (!filename || filename === '.txt') filename = 'chess_report.txt';
             saveInput.value = filename;
 
-            // Show save row and open sidebar
+            // Show save row and open sidebar in the /chess reports folder
             document.getElementById('dropboxSaveRow').style.display = 'block';
             document.getElementById('dropboxSaveRow').dataset.keepOpen = '1';
+            window.dropboxFolderPath = '/chess';
+            window.dropboxFolderFiles = [];
             openDropboxSidebar();
+            dropboxLoadFolder('/chess');
         }
 
         // Actually upload to Dropbox from sidebar save input
