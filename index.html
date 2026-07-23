@@ -1435,10 +1435,15 @@
         // TEXT VIEW MODAL
         // =====================================================================
         window.textViewRawContent = '';
+        window.textViewTitle = '';
 
         function formatTextForView(text) {
             let s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             s = s.replace(/\*\*(.+?)\*\*/g, '<strong style="color:#00d4ff;">$1</strong>');
+            s = s.replace(/^(#{1,4})\s*(.+)$/gm, function(m, hashes, heading) {
+                var size = 22 - (hashes.length * 2);
+                return '<div style="color:#ffd43b; font-weight:700; font-size:' + size + 'px; margin:16px 0 6px;">' + heading + '</div>';
+            });
             s = s.replace(/^(\d+[\.\)]\s*)(.+)$/gm, '<div style="margin:8px 0;"><strong style="color:#00d4ff;">$1</strong>$2</div>');
             s = s.replace(/^(.+:)\s*$/gm, '<span style="color:#ffd43b; font-weight:600; display:block; margin-top:16px; margin-bottom:4px;">$1</span>');
             let sentenceCount = 0;
@@ -1455,12 +1460,12 @@
             var content = document.getElementById('textViewModalContent');
             var title = document.getElementById('textViewModalTitle');
             if (!window.textViewRawContent) {
-                content.innerHTML = '<span style="color:#555;">No text loaded. Select a row from the table.</span>';
+                content.innerHTML = '<span style="color:#555;">No text loaded. Select a row from the table or run Analyze with Chess Coach.</span>';
                 title.textContent = 'Text View';
             } else {
                 content.innerHTML = formatTextForView(window.textViewRawContent);
                 var col1 = document.getElementById('gdrive-cell1-input');
-                title.textContent = col1 && col1.value ? col1.value : 'Text View';
+                title.textContent = window.textViewTitle || (col1 && col1.value ? col1.value : 'Text View');
             }
             modal.style.display = 'flex';
         }
@@ -10279,6 +10284,17 @@ End with a Socratic question about a specific position to help me learn.`
                 }
             }, [messages]);
 
+            // Sync latest coach report into the Text View modal (View Text button)
+            useEffect(() => {
+                const lastAssistant = [...messages].reverse().find(
+                    m => m.role === 'assistant' && !m.content.startsWith('Error:')
+                );
+                if (lastAssistant) {
+                    window.textViewRawContent = lastAssistant.content;
+                    window.textViewTitle = 'AI Coach Analysis';
+                }
+            }, [messages]);
+
             // Analyze with Chess Coach (RAG-powered)
             const analyzeWithChessCoach = async () => {
                 // Priority: Textarea content > Loaded report
@@ -11291,6 +11307,7 @@ ${contentToAnalyze}`;
 
                     // Store content for text view modal
                     window.textViewRawContent = cellText;
+                    window.textViewTitle = '';
 
                     // Check if it looks like PGN — must start with "1." (possibly after [headers])
                     var pgnTest = cellText.trim().replace(/\[[^\]]*\]\s*/g, '');
@@ -11365,6 +11382,7 @@ ${contentToAnalyze}`;
 
             // Store content for text view modal
             window.textViewRawContent = cellText;
+            window.textViewTitle = '';
 
             // Update row indicator
             var indicator = document.getElementById('gdriveRowIndicator');
