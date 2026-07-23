@@ -6846,6 +6846,24 @@
             return lines.join('\n');
         }
 
+        // Split the ENGINE EVALUATIONS section out of a report (wherever it sits).
+        // Returns { body, evalSection } — evalSection is null if not present.
+        // Safe because eval payload lines never contain '=' characters.
+        function extractEngineEvalSection(text) {
+            const bar = '='.repeat(70);
+            const marker = '\n' + bar + '\nENGINE EVALUATIONS';
+            const start = text.indexOf(marker);
+            if (start < 0) return { body: text, evalSection: null };
+            // Skip past the section header's own closing bar line first
+            const headerClose = text.indexOf('\n' + bar + '\n', start + marker.length);
+            const searchFrom = headerClose < 0 ? start + marker.length : headerClose + 1 + bar.length;
+            const nextBar = text.indexOf('\n' + bar + '\n', searchFrom);
+            const end = nextBar < 0 ? text.length : nextBar;
+            const evalSection = text.slice(start, end).replace(/^\n+/, '').replace(/\s+$/, '');
+            const body = (text.slice(0, start) + text.slice(end)).replace(/\s+$/, '');
+            return { body, evalSection };
+        }
+
         async function getEvalForLoadedPgn() {
             if (!window.moveTree || !window.moveNodeRegistry) {
                 log('No PGN loaded on board', 'warn');
@@ -10286,6 +10304,11 @@ End with a Socratic question about a specific position to help me learn.`
                     return;
                 }
 
+                // Don't send the ENGINE EVALUATIONS section to the coach — it's
+                // paste data for the PHP viewer, not coaching input. It gets
+                // re-appended at the very bottom after the response comes back.
+                contentToAnalyze = extractEngineEvalSection(contentToAnalyze).body;
+
                 // Clear textarea after using its content
                 setInputValue('');
 
@@ -10352,11 +10375,15 @@ ${contentToAnalyze}`;
                     setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
                     setChatEnabled(true);  // Enable follow-up chat after first response
 
-                    // Append coach analysis to the report so it's viewable/savable with it
+                    // Append coach analysis to the report, keeping ENGINE EVALUATIONS
+                    // pinned to the very bottom (re-extract from the live report)
                     const reportEl = document.getElementById('analysisReportText');
                     if (reportEl && reportEl.textContent !== 'Loading report...' && reportEl.textContent.trim()) {
+                        const split = extractEngineEvalSection(reportEl.textContent);
                         const coachSection = '\n' + '='.repeat(70) + '\nAI COACH ANALYSIS\n' + '='.repeat(70) + '\n\n' + data.content + '\n';
-                        reportEl.textContent += coachSection;
+                        reportEl.textContent = split.body.replace(/\s+$/, '') + '\n'
+                            + coachSection
+                            + (split.evalSection ? '\n' + split.evalSection + '\n' : '');
                         window.analysisReportRawText = reportEl.textContent;
                     }
                 } catch (err) {
