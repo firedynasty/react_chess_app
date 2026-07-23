@@ -972,7 +972,7 @@
             </defs>
           </svg>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back | Tab = enter/exit variation | Enter = ⭐ coach note</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -1118,6 +1118,7 @@
           <button id="clearVariationsBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
           <!-- Next Var, Back Var, Cycle Clipboard moved to hidden-features/nav-buttons.html -->
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
+          <button id="loadFullReportBtn" title="Load a previously saved analysis report from the clipboard — restores game, evals, and AI coach analysis" style="background: linear-gradient(90deg, #1565c0, #0d47a1); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Report</button>
           <button id="analyzeGameBtn" onclick="analyzeLoadedGame()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Analyze Game</button>
           <button id="getEvalBtn" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Get Eval</button>
           <button id="copyEvalsBtn" onclick="copyEvalsForPaste()" title="Copy evals for pasting into the PGN viewer app" style="background: linear-gradient(90deg, #ff6f00, #f57f17); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">📋 Copy Evals</button>
@@ -2475,6 +2476,7 @@
             window.cycleVarIndex = -1;
             window.currentVariationResult = null;
             window.positionEvalMap = {};  // clear evals for fresh game
+            window.positionEvalMap2 = {}; // clear report-loaded evals too
             window.positionDepthMap = {};
             window.positionPvMap = {};
             window.annotatedPgnWithVariations = null;
@@ -2573,6 +2575,7 @@
                 // Phase 2 — walk the results in game order computing swings and
                 //   flagging blunders/mistakes (pure math, no engine).
                 window.positionEvalMap = {};  // fresh map for this analysis
+                window.positionEvalMap2 = {};  // drop report-loaded evals too
                 window.positionDepthMap = {};
                 window.positionPvMap = {};
                 const startFen = chess.fen();
@@ -6930,7 +6933,14 @@
 
             const evalCp = (window.positionEvalMap && fen && window.positionEvalMap[fen] !== undefined)
                 ? window.positionEvalMap[fen]
-                : null;
+                : (function() {
+                    // Fallback: 2-field (board+turn) map loaded from a saved report's
+                    // ENGINE EVALUATIONS section (Load Report button)
+                    if (!fen || !window.positionEvalMap2) return null;
+                    const p = fen.split(' ');
+                    const v = window.positionEvalMap2[p[0] + ' ' + p[1]];
+                    return v !== undefined ? v : null;
+                })();
 
             if (evalCp === null) {
                 blackEl.style.width = '50%';
@@ -6990,6 +7000,22 @@
             return { body, evalSection };
         }
 
+        // Extract the AI COACH ANALYSIS markdown from a saved report.
+        // Returns the markdown string, or null if the report has no coach section.
+        function extractCoachAnalysisSection(text) {
+            const bar = '='.repeat(70);
+            const marker = '\n' + bar + '\nAI COACH ANALYSIS';
+            const start = text.indexOf(marker);
+            if (start < 0) return null;
+            // Skip past the section header's own closing bar line
+            const headerClose = text.indexOf('\n' + bar, start + marker.length);
+            const contentStart = headerClose < 0 ? start + marker.length : headerClose + 1 + bar.length;
+            // Coach section ends at the next ==== banner (e.g. ENGINE EVALUATIONS) or EOF
+            const nextBar = text.indexOf('\n' + bar, contentStart);
+            const end = nextBar < 0 ? text.length : nextBar;
+            return text.slice(contentStart, end).trim();
+        }
+
         async function getEvalForLoadedPgn() {
             if (!window.moveTree || !window.moveNodeRegistry) {
                 log('No PGN loaded on board', 'warn');
@@ -7000,6 +7026,7 @@
 
             const GET_EVAL_DEPTH = 12;
             window.positionEvalMap = window.positionEvalMap || {};
+            window.positionEvalMap2 = window.positionEvalMap2 || {};
             window.positionDepthMap = window.positionDepthMap || {};
             // Root position defaults to equal
             if (window.positionEvalMap[window.moveTree.fen] === undefined) {
@@ -7136,8 +7163,11 @@
                     }
 
                     if (nearestBranch) {
-                        // In a variation — exit right: jump to mainline continuation
-                        jumpToNode(nearestBranch.children[0].nodeId);
+                        // In a variation — step forward WITHIN the variation only.
+                        // At the last move, stay (Tab exits back to the main line).
+                        if (window.currentMoveNode.children && window.currentMoveNode.children.length > 0) {
+                            jumpToNode(window.currentMoveNode.children[0].nodeId);
+                        }
                     } else if (window.currentMoveNode.children && window.currentMoveNode.children.length > 0) {
                         // On main line — go to first child (main continuation)
                         jumpToNode(window.currentMoveNode.children[0].nodeId);
@@ -7180,11 +7210,11 @@
                 }
 
                 if (nearestBranch) {
-                    // In a variation — exit left: jump to the branch point
-                    if (nearestBranch.nodeId === 'root') {
-                        jumpToRoot();
-                    } else {
-                        jumpToNode(nearestBranch.nodeId);
+                    // In a variation — step back WITHIN the variation, never exit to
+                    // the branch point. At the variation's first move, stay (stuck).
+                    const parent = window.currentMoveNode.parent;
+                    if (parent && parent.nodeId !== nearestBranch.nodeId) {
+                        jumpToNode(parent.nodeId);
                     }
                 } else if (window.currentMoveNode.parent) {
                     // On main line — go to parent
@@ -7331,6 +7361,61 @@
             return seq;
         }
 
+        // Advance within the current variation (Cycle Var behavior): step to the next
+        // node in the local variation sequence, wrapping back to the main-line move.
+        // Returns true if a step was taken (i.e. we are at or in a variation).
+        function cycleLocalVariationStep() {
+            if (!window.moveTree) return false;
+
+            const localSeq = collectLocalVariationSequence();
+            if (localSeq.length === 0) return false; // not at or in a variation
+
+            // Find current position in the local sequence
+            let currentIdx = -1;
+            if (window.currentMoveNode) {
+                currentIdx = localSeq.findIndex(n => n.nodeId === window.currentMoveNode.nodeId);
+            }
+
+            // Advance (wraps back to main-line move at branch = restart behavior)
+            const nextIdx = (currentIdx + 1) % localSeq.length;
+            jumpToNode(localSeq[nextIdx].nodeId);
+            return true;
+        }
+
+        // Enter the variation of the current main-line move (Tab key): if the current
+        // move is the main-line child of a branch point, jump into its first variation.
+        function enterVariationAtCurrentMove() {
+            if (!window.moveTree || !window.currentMoveNode) return false;
+            const parent = window.currentMoveNode.parent;
+            if (parent && parent.children && parent.children.length > 1 && parent.children[0] === window.currentMoveNode) {
+                jumpToNode(parent.children[1].nodeId);
+                return true;
+            }
+            return false;
+        }
+
+        // Exit the current variation (Tab key): jump out to the NEXT main-line move
+        // (the continuation after the original move the variation branched from).
+        // Falls back to the original move itself if it has no continuation.
+        function exitVariationToNextMainLineMove() {
+            if (!window.moveTree || !window.currentMoveNode) return false;
+            // Find the outermost branch point (closest to root) — exits nested
+            // variations all the way back to the main line
+            let outerBranch = null;
+            let walk = window.currentMoveNode;
+            while (walk && walk.parent) {
+                if (walk.parent.children[0] !== walk) outerBranch = walk.parent;
+                walk = walk.parent;
+            }
+            if (!outerBranch) return false; // on the main line, not in a variation
+            const mainLineMove = outerBranch.children[0];
+            const target = (mainLineMove.children && mainLineMove.children.length > 0)
+                ? mainLineMove.children[0]
+                : mainLineMove;
+            jumpToNode(target.nodeId);
+            return true;
+        }
+
         /**
          * Extract and display game info from report content
          */
@@ -7431,6 +7516,98 @@
             }
 
             log(`Loaded report from ${sourceName}`, 'success');
+        }
+
+        /**
+         * Load a full saved analysis report (Load Report button).
+         * Restores: report panel + raw text, game WITH variations (ANNOTATED PGN),
+         * engine evals from the ENGINE EVALUATIONS section (no Stockfish needed),
+         * and the AI COACH ANALYSIS into View Text / star notes / chat.
+         */
+        function loadFullReportFromContent(text) {
+            if (!text || !text.trim()) return;
+            // Normalize line endings — saved/clipboard reports may arrive with CRLF,
+            // which would break the banner/section markers
+            text = text.replace(/\r\n?/g, '\n');
+
+            // 1. Report panel + raw text globals (coach chat reads these)
+            window.studyReportRawText = text;
+            window.analysisReportRawText = text;
+            const container = document.getElementById('analysisReportContainer');
+            if (container) container.style.display = 'block';
+            const reportEl = document.getElementById('analysisReportText');
+            if (reportEl) reportEl.textContent = text;
+            updateCurrentGameInfo(text);
+            window.fenVariants = [];
+            window.pgnVariants = [];
+            window.allVariants = [];
+            if (typeof window.scanReportForFenVariants === 'function') window.scanReportForFenVariants();
+            if (typeof window.scanReportForPgnVariants === 'function') window.scanReportForPgnVariants();
+
+            // 2. PGN: prefer ANNOTATED PGN (has variations), fall back to GAME PGN
+            let pgnText = null;
+            const annMatch = text.match(/ANNOTATED PGN[^\n]*\n-{5,}\s*\n([\s\S]*?)(?=\n[A-Z][A-Z0-9 &()',.]+\n-{5,}|\n={5,}|$)/);
+            if (annMatch && annMatch[1]) {
+                pgnText = annMatch[1].trim().replace(/\s+/g, ' ').trim();
+            }
+            if (!pgnText) {
+                const gameMatch = text.match(/GAME PGN[\s\S]*?-{5,}\s*(1\.[^\n]+)/);
+                if (gameMatch && gameMatch[1]) pgnText = gameMatch[1].trim().replace(/\s+/g, ' ').trim();
+            }
+            if (!pgnText) {
+                alert('No PGN found in report.');
+                return;
+            }
+
+            // Also populate the pgnInput textarea so "Reload Game from Report" works
+            const pgnTextarea = document.getElementById('pgnInput');
+            if (pgnTextarea) pgnTextarea.value = pgnText;
+
+            // 3. Load game tree (mirrors the Load Annotated PGN handler)
+            const result = window.parsePgnToPositionsWithComments(pgnText);
+            window.studyReportPositions = result.positions;
+            window.studyReportComments = result.comments;
+            window.currentLoadedPgn = pgnText;
+            window.moveTree = window.parsePgnWithVariations(pgnText);
+            window.cycleVarSequence = [];
+            window.cycleVarIndex = -1;
+            window.currentMoveNode = null;
+            window.positionEvalMap = {};   // drop stale Stockfish evals from any previous game
+            window.positionEvalMap2 = {};
+            renderMoveTable(window.moveTree);
+            updateAllCommentsDisplay();
+            window.studyReportPositionIndex = 0;
+            if (window.board2 && window.studyReportPositions && window.studyReportPositions.length > 0) {
+                window.board2.position(window.studyReportPositions[0]);
+                updateBoard2MoveIndicator(0);
+            }
+
+            // 4. Evals from the report's ENGINE EVALUATIONS section (no engine run needed).
+            // Lines: "<board> <turn> <cp>" — cp is White-perspective, same as positionEvalMap.
+            const split = extractEngineEvalSection(text);
+            if (split.evalSection) {
+                split.evalSection.split('\n').forEach(function(line) {
+                    const m = line.trim().match(/^(\S+)\s+(w|b)\s+(-?\d+)$/);
+                    if (m) window.positionEvalMap2[m[1] + ' ' + m[2]] = parseInt(m[3], 10);
+                });
+            }
+            updateEvalBar(window.moveTree ? window.moveTree.fen : null);
+
+            // 5. AI COACH ANALYSIS → View Text + star notes + chat
+            const coachMd = extractCoachAnalysisSection(text);
+            if (coachMd) {
+                window.textViewRawContent = coachMd;
+                window.textViewTitle = 'AI Coach Analysis';
+                if (typeof window.loadCoachReportIntoChat === 'function') {
+                    window.loadCoachReportIntoChat(coachMd);
+                }
+            } else {
+                window.textViewRawContent = '';
+                window.textViewTitle = '';
+            }
+            if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+
+            log('Loaded full report (game, evals, coach analysis)', 'success');
         }
 
         /**
@@ -7868,22 +8045,7 @@
             // Cycle Var. button - cycles through moves within the current variation
             const cycleVarBtn = document.getElementById('cycleVarBtn');
             if (cycleVarBtn) {
-                cycleVarBtn.addEventListener('click', function() {
-                    if (!window.moveTree) return;
-
-                    const localSeq = collectLocalVariationSequence();
-                    if (localSeq.length === 0) return; // not at or in a variation
-
-                    // Find current position in the local sequence
-                    let currentIdx = -1;
-                    if (window.currentMoveNode) {
-                        currentIdx = localSeq.findIndex(n => n.nodeId === window.currentMoveNode.nodeId);
-                    }
-
-                    // Advance (wraps back to main-line move at branch = restart behavior)
-                    const nextIdx = (currentIdx + 1) % localSeq.length;
-                    jumpToNode(localSeq[nextIdx].nodeId);
-                });
+                cycleVarBtn.addEventListener('click', cycleLocalVariationStep);
             }
 
             // backVarBtn moved to hidden-features/nav-buttons.html
@@ -7928,6 +8090,25 @@
                             window.board2.position(window.studyReportPositions[0]);
                             updateBoard2MoveIndicator(0);
                         }
+                    } catch (err) {
+                        console.error('Clipboard read error:', err);
+                        alert('Could not read clipboard.');
+                    }
+                });
+            }
+
+            // Load Report — restore a previously saved analysis report from the
+            // clipboard (game with variations, engine evals, AI coach analysis)
+            const loadFullReportBtn = document.getElementById('loadFullReportBtn');
+            if (loadFullReportBtn) {
+                loadFullReportBtn.addEventListener('click', async function() {
+                    try {
+                        const clipboardText = await navigator.clipboard.readText();
+                        if (!clipboardText || !clipboardText.trim()) {
+                            alert('Clipboard is empty.');
+                            return;
+                        }
+                        loadFullReportFromContent(clipboardText.trim());
                     } catch (err) {
                         console.error('Clipboard read error:', err);
                         alert('Could not read clipboard.');
@@ -8414,6 +8595,7 @@
                     window.cycleVarSequence = [];
                     window.cycleVarIndex = -1;
                     window.positionEvalMap = {};
+                    window.positionEvalMap2 = {};
                     const moveTableContainer = document.getElementById('moveTableContainer');
                     if (moveTableContainer) moveTableContainer.innerHTML = '';
                     clearBoard2Arrows();
@@ -8523,6 +8705,7 @@
                     clearBoard2Arrows();
                     updateEvalBar(null);
                     window.positionEvalMap = {};
+                    window.positionEvalMap2 = {};
                     const fenMovesEl = document.getElementById('currentFenMoves');
                     if (fenMovesEl) fenMovesEl.textContent = '';
                     const evalScoreEl = document.getElementById('evalBarScore');
@@ -9225,29 +9408,41 @@
                     e.preventDefault();
                 } else if (e.key === 'ArrowUp') {
                     // ArrowUp = Cycle Var (same as Cycle Var. button)
-                    if (window.moveTree) {
-                        const localSeq = collectLocalVariationSequence();
-                        if (localSeq.length > 0) {
-                            let currentIdx = -1;
-                            if (window.currentMoveNode) {
-                                currentIdx = localSeq.findIndex(n => n.nodeId === window.currentMoveNode.nodeId);
-                            }
-                            const nextIdx = (currentIdx + 1) % localSeq.length;
-                            jumpToNode(localSeq[nextIdx].nodeId);
-                        }
-                    }
+                    cycleLocalVariationStep();
                     e.preventDefault();
+                } else if (e.key === 'Tab') {
+                    // Tab = enter the variation of the current main-line move, or
+                    // exit the current variation to the next main-line move.
+                    // Only intercept when one applies; otherwise keep normal focus behavior.
+                    if (enterVariationAtCurrentMove() || exitVariationToNextMainLineMove()) {
+                        e.preventDefault();
+                    }
+                } else if (e.key === 'Enter') {
+                    // Enter = open the coach note for the current move (gold star only).
+                    // Always preventDefault so Enter never activates the focused
+                    // Prev/Next button; does nothing when the star is dim.
+                    e.preventDefault();
+                    if (findCoachNoteForCurrentMove()) {
+                        openCoachNoteForCurrentMove();
+                    }
                 } else if (e.key === ' ' && (document.activeElement === prevBtn || document.activeElement === nextBtn)) {
                     // Spacebar when focused on nav buttons triggers variation
                     nextVariation();
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
                 } else if (e.key === 'Escape') {
-                    // Escape = Analyze (same as Analyze button)
-                    const analyzeBtn = document.getElementById('analyze-variation-btn');
-                    if (analyzeBtn && !analyzeBtn.disabled) {
-                        analyzeForVariation();
+                    const tvModal = document.getElementById('textViewModal');
+                    if (tvModal && tvModal.style.display !== 'none') {
+                        // Escape = close the coach note / text view modal — nothing else
+                        tvModal.style.display = 'none';
                         e.preventDefault();
+                    } else {
+                        // Escape = Analyze (same as Analyze button) — only when modal is closed
+                        const analyzeBtn = document.getElementById('analyze-variation-btn');
+                        if (analyzeBtn && !analyzeBtn.disabled) {
+                            analyzeForVariation();
+                            e.preventDefault();
+                        }
                     }
                 }
             });
@@ -9258,7 +9453,8 @@
                 loadBtn.addEventListener('click', async function() {
                     try {
                         const clipboardText = await navigator.clipboard.readText();
-                        loadStudyReportFromContent(clipboardText, 'clipboard');
+                        // Full restore (game + variations, evals, coach analysis)
+                        loadFullReportFromContent(clipboardText);
                     } catch (err) {
                         console.error('Failed to read clipboard:', err);
                         alert('Could not read clipboard. Please check permissions.');
@@ -10416,6 +10612,15 @@ End with a Socratic question about a specific position to help me learn.`
                     if (window.updateCoachNoteButton) window.updateCoachNoteButton();
                 }
             }, [messages]);
+
+            // Bridge for classic JS (Load Report button): inject a saved AI COACH
+            // ANALYSIS section into the chat so Copy Chat and follow-ups work
+            useEffect(() => {
+                window.loadCoachReportIntoChat = (md) => {
+                    setMessages([{ role: 'assistant', content: md }]);
+                    setChatEnabled(true);
+                };
+            }, []);
 
             // Analyze with Chess Coach (RAG-powered)
             const analyzeWithChessCoach = async () => {
