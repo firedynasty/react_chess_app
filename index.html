@@ -1120,6 +1120,7 @@
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
           <button id="analyzeGameBtn" onclick="analyzeLoadedGame()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Analyze Game</button>
           <button id="getEvalBtn" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Get Eval</button>
+          <button id="copyEvalsBtn" onclick="copyEvalsForPaste()" title="Copy evals for pasting into the PGN viewer app" style="background: linear-gradient(90deg, #ff6f00, #f57f17); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">📋 Copy Evals</button>
           <span id="currentFenMoves" style="display: none; color: #ffd700; font-family: monospace; font-size: 13px; font-weight: bold; min-width: 50px;"></span>
           <span id="board2PositionCount" style="font-weight: bold; color: #eee; display: none;">0/0</span>
           <div class="drag-scroll-toggle">
@@ -2136,6 +2137,116 @@
         }
 
         // =====================================================================
+        // ANALYSIS WORKER POOL — parallel Stockfish instances for game analysis.
+        // Separate from the main `stockfish` worker (which keeps serving the
+        // eval bar / play-vs-engine features). lite-single is single-threaded,
+        // so N workers = real parallelism on multi-core machines.
+        // =====================================================================
+
+        const ANALYSIS_POOL_SIZE = Math.min(3, Math.max(2, (navigator.hardwareConcurrency || 4) - 2));
+        let analysisPool = null; // persistent across runs (Get Eval reuses it too)
+
+        function createAnalysisWorker() {
+            return new Promise((resolve, reject) => {
+                const w = new Worker('src/stockfish-17.1-lite-single-03e3232.js');
+                let settled = false;
+                const initHandler = (e) => {
+                    const line = e.data;
+                    if (line === 'uciok') {
+                        w.postMessage('setoption name Use NNUE value true');
+                        w.postMessage('isready');
+                    } else if (line === 'readyok') {
+                        settled = true;
+                        w.removeEventListener('message', initHandler);
+                        resolve(w);
+                    }
+                };
+                w.addEventListener('message', initHandler);
+                w.onerror = () => { if (!settled) { settled = true; reject(new Error('pool worker failed to start')); } };
+                w.postMessage('uci');
+                setTimeout(() => { if (!settled) { settled = true; w.terminate(); reject(new Error('pool worker init timeout')); } }, 15000);
+            });
+        }
+
+        async function getAnalysisPool() {
+            if (analysisPool) return analysisPool;
+            log(`Starting ${ANALYSIS_POOL_SIZE} parallel Stockfish workers...`, 'info');
+            analysisPool = await Promise.all(
+                Array.from({ length: ANALYSIS_POOL_SIZE }, () => createAnalysisWorker())
+            );
+            return analysisPool;
+        }
+
+        // Analyze one position on a specific pool worker.
+        // Captures the PV (UCI moves) at the deepest depth, unlike analyzePosition.
+        // Never rejects — on timeout it resolves with whatever depth was reached.
+        function analyzePositionOn(worker, fen, targetDepth) {
+            return new Promise((resolve) => {
+                let finalEval = 0, currentDepth = 0, pvUci = [], resolved = false;
+
+                const finish = () => {
+                    if (resolved) return;
+                    resolved = true;
+                    clearTimeout(timeoutId);
+                    worker.removeEventListener('message', handler);
+                    resolve({ evaluation: finalEval, depth: currentDepth, pvUci });
+                };
+
+                const handler = (e) => {
+                    const line = e.data;
+                    if (line.startsWith('info') && line.includes('score')) {
+                        const depthMatch = line.match(/\bdepth (\d+)/);
+                        const scoreMatch = line.match(/score (cp|mate) (-?\d+)/);
+                        const pvMatch = line.match(/\spv\s+(.+)/);
+                        if (depthMatch && scoreMatch) {
+                            const depth = parseInt(depthMatch[1]);
+                            const scoreValue = parseInt(scoreMatch[2]);
+                            if (depth >= currentDepth) {
+                                currentDepth = depth;
+                                finalEval = scoreMatch[1] === 'mate'
+                                    ? (scoreValue > 0 ? 10000 - scoreValue : -10000 - scoreValue)
+                                    : scoreValue;
+                                if (pvMatch) pvUci = pvMatch[1].split(' ');
+                            }
+                        }
+                    }
+                    if (line.startsWith('bestmove')) finish();
+                };
+
+                worker.addEventListener('message', handler);
+                worker.postMessage('position fen ' + fen);
+                worker.postMessage('go depth ' + targetDepth);
+
+                const timeoutId = setTimeout(() => {
+                    if (resolved) return;
+                    worker.postMessage('stop');
+                    setTimeout(finish, 300); // let the engine emit bestmove, else finish anyway
+                }, 8000);
+            });
+        }
+
+        // Convert a UCI PV to SAN from a given position (same approach as
+        // analyzePositionForVariation). Returns [] if AnalysisChess unavailable.
+        function uciPvToSan(fen, pvUci, maxMoves = 5) {
+            const pvSan = [];
+            if (typeof AnalysisChess === 'undefined') return pvSan;
+            let currentFen = fen;
+            for (const uciMove of pvUci.slice(0, maxMoves)) {
+                const result = AnalysisChess.uciToSan(currentFen, uciMove);
+                if (!result.san) break;
+                pvSan.push(result.san);
+                try {
+                    const chess = new Chess(currentFen);
+                    chess.move(result.san);
+                    currentFen = chess.fen();
+                } catch (e) {
+                    break;
+                }
+            }
+            return pvSan;
+        }
+
+        // =====================================================================
         // LICHESS OPENING EXPLORER API
         // =====================================================================
 
@@ -2247,6 +2358,8 @@
             window.cycleVarIndex = -1;
             window.currentVariationResult = null;
             window.positionEvalMap = {};  // clear evals for fresh game
+            window.positionDepthMap = {};
+            window.positionPvMap = {};
             window.annotatedPgnWithVariations = null;
             const moveTableContainer = document.getElementById('moveTableContainer');
             if (moveTableContainer) {
@@ -2337,46 +2450,89 @@
 
                 log('Analyzing all positions...', 'info');
 
-                // Single-pass approach (from chess-blunders / React pattern):
-                // After each move, evaluate the resulting position, convert to White's
-                // perspective via chess.turn(), carry prevEval forward.
-                // This avoids the 0.00 evalBefore bug caused by re-reading stale evaluations.
-                let prevEval = 0;  // starting position ≈ equal
+                // Two-phase approach:
+                // Phase 1 — replay the game collecting FENs, then analyze every
+                //   position in parallel on the worker pool (PVs captured too).
+                // Phase 2 — walk the results in game order computing swings and
+                //   flagging blunders/mistakes (pure math, no engine).
                 window.positionEvalMap = {};  // fresh map for this analysis
-                window.positionEvalMap[chess.fen()] = 0;  // starting position
+                window.positionDepthMap = {};
+                window.positionPvMap = {};
+                const startFen = chess.fen();
+                window.positionEvalMap[startFen] = 0;  // starting position
 
+                const fens = [];
+                for (let i = 0; i < history.length; i++) {
+                    chess.move(history[i].san);
+                    fens.push(chess.fen());
+                }
+
+                // results[i] aligns with history[i]/fens[i]; null = analysis failed
+                const results = new Array(history.length).fill(null);
+
+                if (useCloud) {
+                    // Lichess cloud: keep sequential (rate limits), no PV capture
+                    let prevCloudEval = 0;
+                    for (let i = 0; i < fens.length; i++) {
+                        let rawEval;
+                        try {
+                            const cloudResult = await lichessCloudEval(fens[i]);
+                            rawEval = cloudResult ? cloudResult.score : prevCloudEval;
+                        } catch (evalError) {
+                            log(`Error evaluating move ${i + 1}: ${evalError.message}`, 'warning');
+                            rawEval = prevCloudEval;
+                        }
+                        const currentEval = fens[i].split(' ')[1] === 'w' ? rawEval : -rawEval;
+                        results[i] = { currentEval, depth: 0, pvUci: [] };
+                        prevCloudEval = currentEval;
+                        document.getElementById('progressFill').style.width = (((i + 1) / totalMoves) * 100) + '%';
+                    }
+                } else {
+                    const pool = await getAnalysisPool();
+                    let nextIdx = 0, doneCount = 0;
+                    await Promise.all(pool.map(async (w) => {
+                        while (nextIdx < fens.length) {
+                            const i = nextIdx++;
+                            const sf = await analyzePositionOn(w, fens[i], depth);
+                            if (sf.depth === 0) {
+                                log(`Error evaluating move ${i + 1}: no depth reached`, 'warning');
+                            } else {
+                                const turn = fens[i].split(' ')[1];
+                                results[i] = {
+                                    currentEval: turn === 'w' ? sf.evaluation : -sf.evaluation,
+                                    depth: sf.depth,
+                                    pvUci: sf.pvUci
+                                };
+                            }
+                            doneCount++;
+                            document.getElementById('progressFill').style.width = ((doneCount / totalMoves) * 100) + '%';
+                            if (doneCount % 10 === 0 || doneCount === totalMoves) {
+                                log(`Analyzed ${doneCount}/${totalMoves} positions...`, 'info');
+                            }
+                        }
+                    }));
+                }
+
+                // Phase 2 — swings and severity flags, in game order.
+                // prevEval carries forward just like the old sequential loop.
+                let prevEval = 0;  // starting position ≈ equal
                 for (let i = 0; i < history.length; i++) {
                     const move = history[i];
                     const moveNum = Math.floor(i / 2) + 1;
                     const isWhite = i % 2 === 0;
                     const notation = isWhite ? `${moveNum}.` : `${moveNum}...`;
-                    const fenBefore = chess.fen();
+                    const fenBefore = i === 0 ? startFen : fens[i - 1];
+                    const fenAfter = fens[i];
 
-                    chess.move(move.san);
-                    const fenAfter = chess.fen();
+                    const r = results[i];
+                    const currentEval = r ? r.currentEval : prevEval;
 
-                    let rawEval = 0;
-                    try {
-                        if (useCloud) {
-                            const cloudResult = await lichessCloudEval(fenAfter);
-                            rawEval = cloudResult ? cloudResult.score : prevEval;
-                        } else {
-                            const sfResult = await analyzePosition(fenAfter, depth);
-                            rawEval = sfResult.evaluation;
-                        }
-                    } catch (evalError) {
-                        log(`Error evaluating move ${i + 1}: ${evalError.message}`, 'warning');
-                        rawEval = prevEval;
-                    }
-
-                    // Convert raw Stockfish score (side-to-move perspective) to White's perspective:
-                    // After the move, chess.turn() tells us whose turn it is next.
-                    // If it's White's turn → Black just moved → score is from White's POV already.
-                    // If it's Black's turn → White just moved → score is from Black's POV, negate.
-                    const currentEval = chess.turn() === 'w' ? rawEval : -rawEval;
-
-                    // Store eval for this position (used by eval bar)
+                    // Store eval for this position (used by eval bar / Get Eval cache)
                     window.positionEvalMap[fenAfter] = currentEval;
+                    if (r) {
+                        if (r.depth > 0) window.positionDepthMap[fenAfter] = r.depth;
+                        if (r.pvUci && r.pvUci.length > 0) window.positionPvMap[fenAfter] = r.pvUci;
+                    }
 
                     // Swing from White's perspective — negative = mover made a bad move
                     // For White's move: White wants positive swing (improvement)
@@ -2388,12 +2544,6 @@
 
                     const evalBeforeForDisplay = isWhite ? prevEval : -prevEval;
                     const evalAfterForDisplay  = isWhite ? currentEval : -currentEval;
-
-                    const progress = ((i + 1) / totalMoves) * 100;
-                    document.getElementById('progressFill').style.width = progress + '%';
-                    if ((i + 1) % 10 === 0 || i === history.length - 1) {
-                        log(`Analyzed ${i + 1}/${totalMoves} positions...`, 'info');
-                    }
 
                     let severity = null;
 
@@ -2592,8 +2742,26 @@
                             continue;
                         }
 
-                        // Otherwise, run Stockfish for this position (with lazy reinit on failure)
+                        // Reuse the PV captured during the main pass — it analyzed this
+                        // exact position (fenBefore of move i = fenAfter of move i-1).
+                        // Only valid when the main-pass depth covers the requested
+                        // variation depth; otherwise fall through to a fresh search.
                         let result = null;
+                        const reusedPvUci = (variationDepth <= depth && window.positionPvMap)
+                            ? window.positionPvMap[target.fen]
+                            : null;
+                        if (reusedPvUci && reusedPvUci.length > 0) {
+                            const pvSan = uciPvToSan(target.fen, reusedPvUci);
+                            result = {
+                                bestMove: pvSan.length > 0 ? pvSan[0] : reusedPvUci[0],
+                                score: null,
+                                pv: pvSan.length > 0 ? pvSan : reusedPvUci.slice(0, 5)
+                            };
+                            log(`Reused main-pass line for ${target.label}`, 'info');
+                        }
+
+                        // Otherwise, run Stockfish for this position (with lazy reinit on failure)
+                        if (!result) {
                         for (let attempt = 0; attempt < 3; attempt++) {
                             try {
                                 log(`Stockfish analyzing ${target.label}${attempt > 0 ? ` (retry ${attempt})` : ''}...`, 'info');
@@ -2608,6 +2776,7 @@
                                 }
                                 if (!isReady) { log('Stockfish failed to reinit, skipping', 'error'); break; }
                             }
+                        }
                         }
                         if (result && result.pv && result.pv.length > 0) {
                             window.currentVariationResult = {
@@ -2633,6 +2802,14 @@
                 setStatus('ready', 'Analysis complete');
                 log(`Analysis complete: ${blunders} blunders, ${mistakeCount} mistakes`, 'success');
                 log('Report generated successfully', 'success');
+
+                // Auto-run Get Eval after a short delay so the report picks up
+                // the ENGINE EVALUATIONS section too (mainline evals are already
+                // cached from the analysis pass — only variation positions get computed)
+                log('Auto-running Get Eval in 2s to add evals to the report...', 'info');
+                setTimeout(() => {
+                    getEvalForLoadedPgn().catch(e => log('Auto Get Eval failed: ' + e.message, 'warning'));
+                }, 2000);
 
             } catch (e) {
                 log('Analysis error: ' + e.message, 'error');
@@ -6655,6 +6832,20 @@
             }
         }
 
+        // Build the paste-ready eval payload (also embedded in the report).
+        // Lines: "<board> <turn><TAB><cp>" — keyed on board+turn only (not full FEN)
+        // so different chess.js versions' en-passant/counter fields can't cause misses.
+        function buildEvalPasteText() {
+            const seen = {};
+            for (const [fen, cp] of Object.entries(window.positionEvalMap || {})) {
+                const parts = fen.split(' ');
+                seen[parts[0] + ' ' + parts[1]] = Math.round(cp);
+            }
+            const lines = ['# <board> <turn> <centipawns, + = White better> — paste into the EVAL box of the PGN viewer'];
+            for (const [key, cp] of Object.entries(seen)) lines.push(key + '\t' + cp);
+            return lines.join('\n');
+        }
+
         async function getEvalForLoadedPgn() {
             if (!window.moveTree || !window.moveNodeRegistry) {
                 log('No PGN loaded on board', 'warn');
@@ -6663,24 +6854,41 @@
             const btn = document.getElementById('getEvalBtn');
             if (btn) { btn.disabled = true; btn.textContent = 'Getting Eval…'; }
 
-            window.positionEvalMap = {};
-            // Root position = equal
-            window.positionEvalMap[window.moveTree.fen] = 0;
+            const GET_EVAL_DEPTH = 12;
+            window.positionEvalMap = window.positionEvalMap || {};
+            window.positionDepthMap = window.positionDepthMap || {};
+            // Root position defaults to equal
+            if (window.positionEvalMap[window.moveTree.fen] === undefined) {
+                window.positionEvalMap[window.moveTree.fen] = 0;
+            }
 
+            // Skip positions already analyzed at sufficient depth (e.g. by Analyze Game)
             const nodes = Object.values(window.moveNodeRegistry);
-            log(`Getting evals for ${nodes.length} positions...`, 'info');
+            const todo = nodes.filter(n => (window.positionDepthMap[n.fen] || 0) < GET_EVAL_DEPTH);
+            const cached = nodes.length - todo.length;
+            log(cached > 0
+                ? `Getting evals for ${todo.length} positions (${cached} cached at depth ≥ ${GET_EVAL_DEPTH})...`
+                : `Getting evals for ${todo.length} positions...`, 'info');
 
-            for (let i = 0; i < nodes.length; i++) {
-                const node = nodes[i];
-                try {
-                    const sfResult = await analyzePosition(node.fen, 12);
-                    // Convert to White's perspective using turn from FEN
-                    const turn = node.fen.split(' ')[1];
-                    window.positionEvalMap[node.fen] = turn === 'w' ? sfResult.evaluation : -sfResult.evaluation;
-                } catch (e) {
-                    window.positionEvalMap[node.fen] = 0;
-                }
-                if (btn) btn.textContent = `Getting Eval… ${i + 1}/${nodes.length}`;
+            if (todo.length > 0) {
+                const pool = await getAnalysisPool();
+                let nextIdx = 0, doneCount = 0;
+                await Promise.all(pool.map(async (w) => {
+                    while (nextIdx < todo.length) {
+                        const node = todo[nextIdx++];
+                        const sfResult = await analyzePositionOn(w, node.fen, GET_EVAL_DEPTH);
+                        if (sfResult.depth > 0) {
+                            // Convert to White's perspective using turn from FEN
+                            const turn = node.fen.split(' ')[1];
+                            window.positionEvalMap[node.fen] = turn === 'w' ? sfResult.evaluation : -sfResult.evaluation;
+                            window.positionDepthMap[node.fen] = sfResult.depth;
+                        } else if (window.positionEvalMap[node.fen] === undefined) {
+                            window.positionEvalMap[node.fen] = 0;
+                        }
+                        doneCount++;
+                        if (btn) btn.textContent = `Getting Eval… ${doneCount}/${todo.length}`;
+                    }
+                }));
             }
 
             if (btn) { btn.disabled = false; btn.textContent = 'Get Eval'; }
@@ -6689,6 +6897,32 @@
             // Update bar for current position
             const currentFen = window.currentMoveNode ? window.currentMoveNode.fen : window.moveTree.fen;
             updateEvalBar(currentFen);
+
+            // Append evals to the report in paste-ready format — copy this section
+            // straight into the PHP viewer's EVAL box (it skips the = / title lines)
+            const reportEl = document.getElementById('analysisReportText');
+            if (reportEl && reportEl.textContent !== 'Loading report...' && reportEl.textContent.trim()) {
+                const section = '\n' + '='.repeat(70) + '\n'
+                    + 'ENGINE EVALUATIONS (Stockfish 17.1, depth 12)\n'
+                    + '='.repeat(70) + '\n\n'
+                    + buildEvalPasteText() + '\n';
+                reportEl.textContent += section;
+                window.analysisReportRawText = reportEl.textContent;
+            }
+        }
+
+        // Copy evals to the clipboard for pasting into the PHP PGN viewer app.
+        function copyEvalsForPaste() {
+            if (!window.positionEvalMap || Object.keys(window.positionEvalMap).length === 0) {
+                log('No evals — run Get Eval first', 'warn');
+                return;
+            }
+            const text = buildEvalPasteText();
+            const count = text.split('\n').length - 1;
+            navigator.clipboard.writeText(text).then(
+                () => log(`Copied ${count} evals — paste into the EVAL box of the PGN viewer`, 'success'),
+                () => log('Clipboard copy failed', 'error')
+            );
         }
 
         function drawBoard2Arrow(fromSq, toSq, color) {
