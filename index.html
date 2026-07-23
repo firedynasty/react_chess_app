@@ -2715,9 +2715,7 @@
         function moveTreeToPgn(rootNode) {
             let parts = [];
 
-            function serializeNode(node, needsMoveNumber) {
-                if (!node || !node.san) return;
-
+            function writeMoveHead(node, needsMoveNumber) {
                 // Write move number
                 if (!node.isBlackMove) {
                     parts.push(node.moveNumber + '.');
@@ -2732,17 +2730,30 @@
                 if (node.comment) {
                     parts.push('{' + node.comment + '}');
                 }
+            }
 
-                if (node.children && node.children.length > 0) {
-                    // Serialize variations (children[1..n]) before continuing mainline
-                    for (let v = 1; v < node.children.length; v++) {
-                        parts.push('(');
-                        serializeNode(node.children[v], true);
-                        parts.push(')');
-                    }
-                    // Continue with mainline child
-                    serializeNode(node.children[0], false);
+            function serializeNode(node, needsMoveNumber) {
+                if (!node || !node.san) return;
+                writeMoveHead(node, needsMoveNumber);
+                serializeChildren(node);
+            }
+
+            function serializeChildren(node) {
+                if (!node.children || node.children.length === 0) return;
+
+                // Write the mainline move first — variations (children[1..n]) are
+                // alternatives TO it, so standard PGN placement is right after it
+                const main = node.children[0];
+                writeMoveHead(main, false);
+
+                for (let v = 1; v < node.children.length; v++) {
+                    parts.push('(');
+                    serializeNode(node.children[v], true);
+                    parts.push(')');
                 }
+
+                // Continue with the mainline move's subtree
+                serializeChildren(main);
             }
 
             // Root node has no san; start from its children
@@ -10046,7 +10057,8 @@ End with a Socratic question about a specific position to help me learn.`
 
                 // Build the query with pre-defined prompt (structured move-by-move coaching)
                 const query = `You are an expert chess coach analyzing a student's game. You are given a Stockfish analysis report. It contains:
-- GAME PGN and ANNOTATED PGN (bad moves are marked ? / ?? and the engine's best line follows in parentheses)
+- GAME PGN and ANNOTATED PGN. In the ANNOTATED PGN, bad moves are marked ? / ??.
+- IMPORTANT — how to read the parentheses: a variation in parentheses immediately AFTER a flagged move shows the engine's best continuation from that position — what should have been played INSTEAD of the flagged move. Its FIRST move is for the SAME side and SAME move number as the flagged move. Example: "13. a3? ( 13. Bxa4 bxa4 14. Qxa4+ ) Nc3" means White should have played 13. Bxa4 instead of 13. a3. The move after the parenthesis (13... Nc3) is NOT the best move — it is the opponent's reply that was actually played.
 - A MISTAKES & BLUNDERS section listing each error with the evaluation before → after and the eval swing
 
 Provide your coaching analysis in this exact format:
@@ -10057,8 +10069,8 @@ Provide your coaching analysis in this exact format:
 ## Why the Bad Moves Were Bad
 Go through EVERY move listed in the MISTAKES & BLUNDERS section, in game order. For each one:
 - The move (with move number) and its eval swing
-- The best move instead — taken from the best line in parentheses in the ANNOTATED PGN (this is Stockfish ground truth: never contradict it or invent your own alternatives)
-- WHY the played move is weaker: the concrete tactical or strategic reason (what it hangs, what it allows, what plan it misses), referencing the best line
+- The best move instead — the first move of the parenthesized variation that immediately FOLLOWS the flagged move in the ANNOTATED PGN. Verify it is for the same side and same move number as the flagged move. If NO such parenthesized variation exists for this move, write "engine line not available" and explain based on the eval swing and position — do NOT invent a specific best move.
+- WHY the played move is weaker: the concrete tactical or strategic reason (what it hangs, what it allows, what plan it misses), referencing the best line when available
 - The lesson: one sentence on the pattern to remember
 
 ## Missed Tactics
