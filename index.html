@@ -1093,8 +1093,8 @@
     <div style="margin: 0 auto 20px; max-width: 1200px;">
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-          <button id="toggleNavBtnsBtn" onclick="var c=document.getElementById('navBtnsContent'); var m=document.getElementById('miniNavControls'); if(c.style.display==='none'){c.style.display='flex';m.style.display='none';this.textContent='▼ Hide Nav Buttons';}else{c.style.display='none';m.style.display='flex';this.textContent='▶ Show Nav Buttons';}" style="background: #0f3460; color: #a8d8ea; border: 1px solid #1a3a6e; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">▼ Hide Nav Buttons</button>
-          <div id="miniNavControls" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <button id="toggleNavBtnsBtn" onclick="var c=document.getElementById('navBtnsContent'); var m=document.getElementById('miniNavControls'); if(c.style.display==='none'){c.style.display='flex';m.style.display='none';this.textContent='▼ Hide Nav Buttons';}else{c.style.display='none';m.style.display='flex';this.textContent='▶ Show Nav Buttons';}" style="background: #0f3460; color: #a8d8ea; border: 1px solid #1a3a6e; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">▶ Show Nav Buttons</button>
+          <div id="miniNavControls" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <button onclick="document.getElementById('board2PrevMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
             <span id="board2MoveIndicatorMini" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap; background: transparent; padding: 4px 8px; border-radius: 4px;">Start</span>
             <span id="board2MovePlayedSanMini" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
@@ -1107,7 +1107,7 @@
             <button onclick="document.getElementById('viewTextBtn').click()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">View Text</button>
           </div>
         </div>
-        <div id="navBtnsContent" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
             <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <button id="coachNoteBtn" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="openCoachNoteForCurrentMove()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
@@ -1163,6 +1163,23 @@
           <button id="downloadBoardImagesBtn" onclick="downloadBoardImages()" style="background: linear-gradient(90deg, #43a047, #2e7d32); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Download Images</button>
           <span id="fenExportDisplay" style="color: #ff9800; font-family: monospace; font-size: 12px; font-weight: bold; margin-left: 5px; max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
 
+          <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">Copy PGN = copy current PGN (with variations) to clipboard | Update Report = write PGN back into the ANNOTATED PGN section of the report | Analyze from the variation input will add variants to the PGN</p>
+          <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4; display: none;"></span>
+          <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: none;"></span>
+          <button id="reportAppendVariantBtn" style="display: none; background: #20c997; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Report Append Variant</button>
+          <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
+        </div>
+        <!-- Move History Textarea for Set Variant -->
+        <textarea id="moveHistoryTextArea"
+          style="width: 100%; height: 80px; margin-top: 10px; padding: 10px;
+                 border: 2px solid #17a2b8; border-radius: 5px;
+                 font-family: monospace; font-size: 13px;
+                 background: #0f3460; color: #eee; resize: vertical; display: none;"
+          placeholder="After clicking 'Set Variant', make moves on the board to build PGN..."
+          readonly></textarea>
+      </div>
+
+      <!-- Fixed-position modals: kept outside navBtnsContent so they open even when the nav buttons are hidden -->
           <!-- Lichess Modal -->
           <div id="fenLichessModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
             <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; border:1px solid #0f3460; position:relative;">
@@ -1257,22 +1274,6 @@
               </div>
             </div>
           </div>
-
-          <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">Copy PGN = copy current PGN (with variations) to clipboard | Update Report = write PGN back into the ANNOTATED PGN section of the report | Analyze from the variation input will add variants to the PGN</p>
-          <span id="currentGameInfo" style="color: #51cf66; font-family: monospace; font-size: 12px; margin-left: 10px; max-width: 700px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; vertical-align: middle; line-height: 1.4; display: none;"></span>
-          <span id="variantNotesDisplay" style="color: #ffd700; font-family: monospace; font-size: 13px; font-style: italic; display: none;"></span>
-          <button id="reportAppendVariantBtn" style="display: none; background: #20c997; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Report Append Variant</button>
-          <span id="variantIndexDisplay" style="color: #00d4ff; font-family: monospace; font-size: 13px; margin-left: 10px; font-weight: bold;"></span>
-        </div>
-        <!-- Move History Textarea for Set Variant -->
-        <textarea id="moveHistoryTextArea"
-          style="width: 100%; height: 80px; margin-top: 10px; padding: 10px;
-                 border: 2px solid #17a2b8; border-radius: 5px;
-                 font-family: monospace; font-size: 13px;
-                 background: #0f3460; color: #eee; resize: vertical; display: none;"
-          placeholder="After clicking 'Set Variant', make moves on the board to build PGN..."
-          readonly></textarea>
-      </div>
 
       <!-- Report Loader Section -->
       <div id="reportLoaderContainer" style="margin-top: 10px; padding: 15px; background: #1a1a3e; border-radius: 8px; border: 1px solid #1a3a6e;">
