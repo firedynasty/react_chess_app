@@ -831,7 +831,7 @@
     </div>
 
     <!-- Variation Adder (moved below reportControls) -->
-    <div id="variation-adder" style="display: block; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
+    <div id="variation-adder" style="display: none; background: #16213e; padding: 15px; border-radius: 8px; margin: 15px auto; max-width: 900px;">
         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
             <label style="color: #00d4ff; font-size: 13px;">Add Variation at (if blank will go from board):</label>
             <input type="text" id="variation-move-input" placeholder="12. or paste moves"
@@ -901,7 +901,7 @@
     </div>
 
     <!-- Insert Comment -->
-    <div id="insert-comment-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+    <div id="insert-comment-container" style="display: none; max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
         <div style="margin-bottom: 10px;">
             <span style="color: #2ecc71; font-weight: bold; font-size: 14px;">💬 Insert Comment at Move</span>
             <span style="color: #888; font-size: 12px; margin-left: 10px;">(Attach a comment to a specific mainline move)</span>
@@ -1094,11 +1094,17 @@
       <div id="board2NavContainer" style="display: block; padding: 15px; background: #16213e; border-radius: 8px; width: 100%;">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
           <button id="toggleNavBtnsBtn" onclick="var c=document.getElementById('navBtnsContent'); var m=document.getElementById('miniNavControls'); if(c.style.display==='none'){c.style.display='flex';m.style.display='none';this.textContent='▼ Hide Nav Buttons';}else{c.style.display='none';m.style.display='flex';this.textContent='▶ Show Nav Buttons';}" style="background: #0f3460; color: #a8d8ea; border: 1px solid #1a3a6e; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">▼ Hide Nav Buttons</button>
-          <div id="miniNavControls" style="display: none; align-items: center; gap: 8px;">
+          <div id="miniNavControls" style="display: none; align-items: center; gap: 8px; flex-wrap: wrap;">
             <button onclick="document.getElementById('board2PrevMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
             <span id="board2MoveIndicatorMini" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap; background: transparent; padding: 4px 8px; border-radius: 4px;">Start</span>
             <span id="board2MovePlayedSanMini" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
+            <!-- Quick-access proxies so the full nav list can stay hidden -->
+            <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
+            <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
+            <button onclick="document.getElementById('loadFenBtn').click()" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load FEN</button>
+            <button onclick="document.getElementById('exportFenBtn').click()" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Export FEN</button>
+            <button onclick="document.getElementById('viewTextBtn').click()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">View Text</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1235,6 +1241,20 @@
               <button onclick="document.getElementById('gdriveRowLinkModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
               <div style="font-weight:bold; margin-bottom:14px; color:#a8d8ea; font-size:15px;">Links</div>
               <div id="gdriveRowLinkList"></div>
+            </div>
+          </div>
+
+          <!-- Load FEN Modal — paste a bare FEN or PGN block(s) with [FEN "..."] headers -->
+          <div id="loadFenModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:640px; width:90%; border:1px solid #0f3460; position:relative;">
+              <button onclick="document.getElementById('loadFenModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:14px; color:#a8d8ea; font-size:15px;">Load FEN</div>
+              <textarea id="loadFenModalInput" rows="6" placeholder='Paste a FEN (e.g. rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1) or PGN block(s) with [FEN "..."] headers' style="width:100%; padding:10px; border:2px solid #0f3460; border-radius:6px; font-family:monospace; font-size:13px; background:#0f3460; color:#eee; resize:vertical; box-sizing:border-box;"></textarea>
+              <div id="loadFenModalStatus" style="min-height:18px; margin-top:8px; font-size:13px; color:#ff6b6b;"></div>
+              <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                <button onclick="document.getElementById('loadFenModal').style.display='none'" style="padding:8px 16px; background:#4a4a4a; color:#ccc; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">Cancel</button>
+                <button onclick="submitLoadFenModal()" style="padding:8px 16px; background:linear-gradient(90deg, #ff6f00, #ff9800); color:white; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">Load</button>
+              </div>
             </div>
           </div>
 
@@ -1581,17 +1601,20 @@
 
         // Star button: gold when the current move has a coach note, dim otherwise
         function updateCoachNoteButton() {
-            var btn = document.getElementById('coachNoteBtn');
-            if (!btn) return;
-            if (findCoachNoteForCurrentMove()) {
-                btn.style.background = '#ffd700';
-                btn.style.color = '#1a1a2e';
-                btn.style.boxShadow = '0 0 8px rgba(255,215,0,0.6)';
-            } else {
-                btn.style.background = '#4a4a4a';
-                btn.style.color = '#ccc';
-                btn.style.boxShadow = 'none';
-            }
+            var hasNote = !!findCoachNoteForCurrentMove();
+            ['coachNoteBtn', 'coachNoteBtnMini'].forEach(function(id) {
+                var btn = document.getElementById(id);
+                if (!btn) return;
+                if (hasNote) {
+                    btn.style.background = '#ffd700';
+                    btn.style.color = '#1a1a2e';
+                    btn.style.boxShadow = '0 0 8px rgba(255,215,0,0.6)';
+                } else {
+                    btn.style.background = '#4a4a4a';
+                    btn.style.color = '#ccc';
+                    btn.style.boxShadow = 'none';
+                }
+            });
         }
         window.updateCoachNoteButton = updateCoachNoteButton;
 
@@ -5508,9 +5531,6 @@
             pgnTextarea.value = pgnWithOpening;
             log('Loaded game: ' + selectedLabel, 'info');
 
-            // Show variation adder
-            document.getElementById('variation-adder').style.display = 'block';
-
             // Load PGN into board2 for navigation
             if (game.pgn && typeof window.parsePgnToPositions === 'function') {
                 let cleanedPgn = game.pgn;
@@ -7674,17 +7694,6 @@
             }
             initStockfish();
 
-            // Show variation adder when PGN is pasted
-            const pgnInput = document.getElementById('pgnInput');
-            if (pgnInput) {
-                pgnInput.addEventListener('input', () => {
-                    const variationAdder = document.getElementById('variation-adder');
-                    if (pgnInput.value.trim().length > 10) {
-                        variationAdder.style.display = 'block';
-                    }
-                });
-            }
-
             // =========================================================
             // AUTO-PLAY FUNCTIONALITY
             // =========================================================
@@ -8166,77 +8175,89 @@
 
             const loadFenBtn = document.getElementById('loadFenBtn');
             if (loadFenBtn) {
-                loadFenBtn.addEventListener('click', async function() {
-                    try {
-                        const clipboardText = await navigator.clipboard.readText();
-                        // Fix Google Sheets doubled quotes: "" -> "
-                        const trimmed = clipboardText ? clipboardText.trim().replace(/""/g, '"') : '';
-                        if (!trimmed) {
-                            alert('Clipboard is empty.');
-                            return;
-                        }
+                loadFenBtn.addEventListener('click', function() {
+                    openLoadFenModal();
+                });
+            }
 
-                        const variants = [];
+            // Load FEN modal: opens with an empty focused paste input
+            window.openLoadFenModal = function() {
+                const modal = document.getElementById('loadFenModal');
+                const input = document.getElementById('loadFenModalInput');
+                const status = document.getElementById('loadFenModalStatus');
+                if (status) status.textContent = '';
+                if (input) input.value = '';
+                modal.style.display = 'flex';
+                setTimeout(() => { if (input) input.focus(); }, 50);
+            };
 
-                        // Check for [FEN "..."] headers - split into separate blocks
-                        const fenHeaderMatches = [...trimmed.matchAll(/\[FEN\s+"([^"]+)"\]/g)];
-                        if (fenHeaderMatches.length > 0) {
-                            // Split text by [Variant ...] or [FEN ...] blocks
-                            const blocks = trimmed.split(/(?=\[(?:Variant|FEN)\s+")/);
-                            let currentFen = null;
-                            let currentMoves = '';
+            window.submitLoadFenModal = function() {
+                const input = document.getElementById('loadFenModalInput');
+                const status = document.getElementById('loadFenModalStatus');
+                // Fix Google Sheets doubled quotes: "" -> "
+                const trimmed = input && input.value ? input.value.trim().replace(/""/g, '"') : '';
+                if (!trimmed) {
+                    status.textContent = 'Paste a FEN first.';
+                    return;
+                }
 
-                            for (const block of blocks) {
-                                const bt = block.trim();
-                                if (!bt) continue;
-                                const fenMatch = bt.match(/\[FEN\s+"([^"]+)"\]/);
-                                if (fenMatch) {
-                                    // Save previous block if we had one
-                                    if (currentFen) {
-                                        variants.push(`[Variant "From Position"]\n[FEN "${currentFen}"]\n\n${currentMoves.trim()}`);
-                                    }
-                                    currentFen = fenMatch[1];
-                                    // Extract moves: everything after the last header line
-                                    currentMoves = bt.replace(/\[.*?\]/g, '').trim();
-                                } else if (bt.match(/\[Variant/)) {
-                                    // Variant header without FEN - skip, FEN will follow
-                                    continue;
-                                } else if (currentFen) {
-                                    // Continuation lines (moves after headers)
-                                    currentMoves += ' ' + bt;
-                                }
-                            }
-                            // Push last block
+                const variants = [];
+
+                // Check for [FEN "..."] headers - split into separate blocks
+                const fenHeaderMatches = [...trimmed.matchAll(/\[FEN\s+"([^"]+)"\]/g)];
+                if (fenHeaderMatches.length > 0) {
+                    // Split text by [Variant ...] or [FEN ...] blocks
+                    const blocks = trimmed.split(/(?=\[(?:Variant|FEN)\s+")/);
+                    let currentFen = null;
+                    let currentMoves = '';
+
+                    for (const block of blocks) {
+                        const bt = block.trim();
+                        if (!bt) continue;
+                        const fenMatch = bt.match(/\[FEN\s+"([^"]+)"\]/);
+                        if (fenMatch) {
+                            // Save previous block if we had one
                             if (currentFen) {
                                 variants.push(`[Variant "From Position"]\n[FEN "${currentFen}"]\n\n${currentMoves.trim()}`);
                             }
-                        } else {
-                            // Try as bare FEN - validate with chess.js
-                            try {
-                                const testChess = new Chess();
-                                testChess.load(trimmed);
-                                // Wrap bare FEN as a PGN with header (no moves)
-                                variants.push(`[Variant "From Position"]\n[FEN "${trimmed}"]\n\n`);
-                            } catch (e) {
-                                alert('Clipboard does not contain a valid FEN or FEN headers.');
-                                return;
-                            }
+                            currentFen = fenMatch[1];
+                            // Extract moves: everything after the last header line
+                            currentMoves = bt.replace(/\[.*?\]/g, '').trim();
+                        } else if (bt.match(/\[Variant/)) {
+                            // Variant header without FEN - skip, FEN will follow
+                            continue;
+                        } else if (currentFen) {
+                            // Continuation lines (moves after headers)
+                            currentMoves += ' ' + bt;
                         }
-
-                        if (variants.length === 0) {
-                            alert('No valid FEN found in clipboard.');
-                            return;
-                        }
-
-                        window.loadedFenVariants = variants;
-                        window.loadFenVariantByIndex(0);
-                        log(`Loaded ${variants.length} FEN variant(s) from clipboard`, 'success');
-                    } catch (err) {
-                        console.error('Clipboard read error:', err);
-                        alert('Could not read clipboard.');
                     }
-                });
-            }
+                    // Push last block
+                    if (currentFen) {
+                        variants.push(`[Variant "From Position"]\n[FEN "${currentFen}"]\n\n${currentMoves.trim()}`);
+                    }
+                } else {
+                    // Try as bare FEN - validate with chess.js
+                    try {
+                        const testChess = new Chess();
+                        testChess.load(trimmed);
+                        // Wrap bare FEN as a PGN with header (no moves)
+                        variants.push(`[Variant "From Position"]\n[FEN "${trimmed}"]\n\n`);
+                    } catch (e) {
+                        status.textContent = 'Input is not a valid FEN or FEN-header PGN.';
+                        return;
+                    }
+                }
+
+                if (variants.length === 0) {
+                    status.textContent = 'No valid FEN found in input.';
+                    return;
+                }
+
+                window.loadedFenVariants = variants;
+                window.loadFenVariantByIndex(0);
+                document.getElementById('loadFenModal').style.display = 'none';
+                log(`Loaded ${variants.length} FEN variant(s) from pasted input`, 'success');
+            };
 
             // ============================================================
             // Report Loader - parse analysis report and load sections
