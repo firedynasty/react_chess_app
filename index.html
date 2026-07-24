@@ -1197,6 +1197,7 @@
               <!-- White to move -->
               <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; margin-bottom:10px; border:2px solid #4CAF50;">
                 <div style="font-weight:600; margin-bottom:6px; color:#4CAF50;">♔ White to Move:</div>
+                <a id="fenExportWhiteLink" href="#" target="_blank" title="Open in Lichess" style="word-break:break-all; color:#4285f4; text-decoration:none; font-size:12px; display:block; margin-bottom:6px;"></a>
                 <div id="fenExportWhiteFen" title="Click to copy" onclick="copyExportedFen(window.exportedWhiteFen, this)" style="font-family:monospace; word-break:break-all; color:#ff9800; font-size:12px; margin-bottom:6px; cursor:pointer;"></div>
                 <button onclick="copyExportedFen(window.exportedWhiteFen, this)" style="width:100%; padding:6px; font-size:13px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy White FEN</button>
               </div>
@@ -1204,6 +1205,7 @@
               <!-- Black to move -->
               <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; border:2px solid #999;">
                 <div style="font-weight:600; margin-bottom:6px; color:#ddd;">♚ Black to Move:</div>
+                <a id="fenExportBlackLink" href="#" target="_blank" title="Open in Lichess" style="word-break:break-all; color:#4285f4; text-decoration:none; font-size:12px; display:block; margin-bottom:6px;"></a>
                 <div id="fenExportBlackFen" title="Click to copy" onclick="copyExportedFen(window.exportedBlackFen, this)" style="font-family:monospace; word-break:break-all; color:#ff9800; font-size:12px; margin-bottom:6px; cursor:pointer;"></div>
                 <button onclick="copyExportedFen(window.exportedBlackFen, this)" style="width:100%; padding:6px; font-size:13px; background:#666; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy Black FEN</button>
               </div>
@@ -8537,6 +8539,16 @@
                     window.exportedBlackFen = boardFen + ' b KQkq - 0 1';
                     document.getElementById('fenExportWhiteFen').textContent = window.exportedWhiteFen;
                     document.getElementById('fenExportBlackFen').textContent = window.exportedBlackFen;
+                    // Lichess analysis links open directly in a new tab (same URL format as vercel_fen_saver)
+                    const baseFen = boardFen.replace(/ /g, '_');
+                    const whiteUrl = `https://lichess.org/analysis/${baseFen}_w_KQkq_-_0_1`;
+                    const blackUrl = `https://lichess.org/analysis/${baseFen}_b_KQkq_-_0_1`;
+                    const whiteLink = document.getElementById('fenExportWhiteLink');
+                    whiteLink.href = whiteUrl;
+                    whiteLink.textContent = whiteUrl;
+                    const blackLink = document.getElementById('fenExportBlackLink');
+                    blackLink.href = blackUrl;
+                    blackLink.textContent = blackUrl;
                     document.getElementById('fenExportModal').style.display = 'flex';
                 });
             }
