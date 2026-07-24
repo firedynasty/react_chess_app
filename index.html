@@ -3085,11 +3085,15 @@
 
         /**
          * Update report's ANNOTATED PGN section (only if section exists)
+         * options.quiet: skip warnings, button flash, and success log —
+         * used when auto-syncing after board moves so it stays silent
+         * until a report with an ANNOTATED PGN section actually exists.
          */
-        function updateReportWithPgn() {
+        function updateReportWithPgn(options) {
+            var quiet = !!(options && options.quiet);
             const pgn = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
             if (!pgn) {
-                log('No PGN available to update', 'warning');
+                if (!quiet) log('No PGN available to update', 'warning');
                 return;
             }
 
@@ -3099,7 +3103,7 @@
             let report = reportText ? reportText.textContent : '';
 
             if (!report || report === 'Loading report...') {
-                log('No report found to update', 'warning');
+                if (!quiet) log('No report found to update', 'warning');
                 return;
             }
 
@@ -3107,7 +3111,7 @@
             const annotatedMatch = report.match(/ANNOTATED PGN[^\n]*\n-{70}\n/);
 
             if (!annotatedMatch) {
-                log('ANNOTATED PGN section not found in report', 'warning');
+                if (!quiet) log('ANNOTATED PGN section not found in report', 'warning');
                 return;
             }
 
@@ -3131,6 +3135,8 @@
             if (reportText) reportText.textContent = report;
             if (reportTextarea) reportTextarea.value = report;
             window.analysisReportRawText = report;
+
+            if (quiet) return;
 
             const btn = document.getElementById('updateReportBtn');
             const originalText = btn.textContent;
@@ -7765,6 +7771,10 @@
                 const pgn = moveTreeToPgn(window.moveTree);
                 if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
                 window.annotatedPgnWithVariations = pgn;
+
+                // Keep the report's ANNOTATED PGN in sync with board-made moves
+                // (drag, click-to-move, castling) — silent when no report exists
+                updateReportWithPgn({ quiet: true });
 
                 // Re-render move table
                 window.cycleVarSequence = [];
