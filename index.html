@@ -1939,6 +1939,7 @@
         // Sidebar helpers
         function openDropboxSidebar() {
             document.getElementById('dropboxSidebar').style.display = 'block';
+            document.getElementById('dropboxSearchInput').focus();
             // Hide save row unless explicitly shown by dropboxSaveReport()
             if (!document.getElementById('dropboxSaveRow').dataset.keepOpen) {
                 document.getElementById('dropboxSaveRow').style.display = 'none';
