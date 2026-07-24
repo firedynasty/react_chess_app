@@ -1188,6 +1188,28 @@
             </div>
           </div>
 
+          <!-- Export FEN Modal -->
+          <div id="fenExportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; border:1px solid #0f3460; position:relative;">
+              <button onclick="document.getElementById('fenExportModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:14px; color:#a8d8ea; font-size:15px;">Export FEN — pick side to move</div>
+
+              <!-- White to move -->
+              <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; margin-bottom:10px; border:2px solid #4CAF50;">
+                <div style="font-weight:600; margin-bottom:6px; color:#4CAF50;">♔ White to Move:</div>
+                <div id="fenExportWhiteFen" title="Click to copy" onclick="copyExportedFen(window.exportedWhiteFen, this)" style="font-family:monospace; word-break:break-all; color:#ff9800; font-size:12px; margin-bottom:6px; cursor:pointer;"></div>
+                <button onclick="copyExportedFen(window.exportedWhiteFen, this)" style="width:100%; padding:6px; font-size:13px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy White FEN</button>
+              </div>
+
+              <!-- Black to move -->
+              <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; border:2px solid #999;">
+                <div style="font-weight:600; margin-bottom:6px; color:#ddd;">♚ Black to Move:</div>
+                <div id="fenExportBlackFen" title="Click to copy" onclick="copyExportedFen(window.exportedBlackFen, this)" style="font-family:monospace; word-break:break-all; color:#ff9800; font-size:12px; margin-bottom:6px; cursor:pointer;"></div>
+                <button onclick="copyExportedFen(window.exportedBlackFen, this)" style="width:100%; padding:6px; font-size:13px; background:#666; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy Black FEN</button>
+              </div>
+            </div>
+          </div>
+
           <!-- Text View Modal -->
           <div id="textViewModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
             <div style="background:#16213e; border-radius:10px; padding:24px; max-width:800px; width:90%; max-height:80vh; border:1px solid #0f3460; position:relative; display:flex; flex-direction:column;">
@@ -8483,7 +8505,24 @@
                 });
             }
 
-            // Export FEN button - grabs current board FEN, sets active color from toggle, copies to clipboard
+            // Copy a FEN from the Export FEN modal; gives feedback on the clicked element
+            function copyExportedFen(fen, el) {
+                const display = document.getElementById('fenExportDisplay');
+                navigator.clipboard.writeText(fen).then(function() {
+                    if (display) display.textContent = fen;
+                    log('FEN copied: ' + fen, 'success');
+                }).catch(function(err) {
+                    console.error('Copy failed:', err);
+                    if (display) display.textContent = fen;
+                });
+                if (el) {
+                    const original = el.textContent;
+                    el.textContent = '✓ Copied!';
+                    setTimeout(function() { el.textContent = original; }, 1500);
+                }
+            }
+
+            // Export FEN button - opens modal showing both White-to-move and Black-to-move FENs
             const exportFenBtn = document.getElementById('exportFenBtn');
             if (exportFenBtn) {
                 exportFenBtn.addEventListener('click', function() {
@@ -8493,23 +8532,12 @@
                     }
 
                     const boardFen = window.board2.fen();
-                    // board2.fen() returns only piece placement; build full FEN with active color
-                    const fullFen = boardFen + ' ' + window.fenExportColor + ' KQkq - 0 1';
-
-                    navigator.clipboard.writeText(fullFen).then(function() {
-                        const display = document.getElementById('fenExportDisplay');
-                        if (display) {
-                            display.textContent = fullFen;
-                        }
-                        log('FEN copied: ' + fullFen, 'success');
-                    }).catch(function(err) {
-                        console.error('Copy failed:', err);
-                        // Fallback: just display it
-                        const display = document.getElementById('fenExportDisplay');
-                        if (display) {
-                            display.textContent = fullFen;
-                        }
-                    });
+                    // board2.fen() returns only piece placement; build full FENs for both turns
+                    window.exportedWhiteFen = boardFen + ' w KQkq - 0 1';
+                    window.exportedBlackFen = boardFen + ' b KQkq - 0 1';
+                    document.getElementById('fenExportWhiteFen').textContent = window.exportedWhiteFen;
+                    document.getElementById('fenExportBlackFen').textContent = window.exportedBlackFen;
+                    document.getElementById('fenExportModal').style.display = 'flex';
                 });
             }
 
