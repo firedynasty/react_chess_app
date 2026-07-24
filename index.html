@@ -1476,11 +1476,14 @@
             var endMatch = rest.match(/^#{1,4}\s/m);
             var section = endMatch ? rest.slice(0, endMatch.index) : rest;
 
-            // Entry header: optional list number + optional **, then "4... e5" or "9. Qxd4".
+            // Entry header: the AI's format varies run to run, so every decoration
+            // is optional — leading bullet, list number ("1." or "1)"), ** bold
+            // (before or after the list number), and a "Move"/"move" word —
+            // then "4... e5" (also "4… e5" or "4...e5") or "9. Qxd4".
             // Require "Eval" on the line so body sentences starting with a bare move
             // (e.g. "12. Nd2 helps to reinforce...") don't split an entry.
-            var blackRe = /^\s*(?:\d+[\.)]\s*)?(?:\*\*)?(\d+)\.\.\.\s*([A-Za-z][A-Za-z0-9x=+#-]*)/;
-            var whiteRe = /^\s*(?:\d+[\.)]\s*)?(?:\*\*)?(\d+)\.\s+([A-Za-z][A-Za-z0-9x=+#-]*)/;
+            var blackRe = /^\s*(?:[-*•]\s*)?(?:\*\*)?(?:\d+[\.)]\s*)?(?:\*\*)?(?:[Mm]ove:?\s+)?(\d+)\s*(?:\.\.\.|…)\s*([A-Za-z][A-Za-z0-9x=+#-]*)/;
+            var whiteRe = /^\s*(?:[-*•]\s*)?(?:\*\*)?(?:\d+[\.)]\s*)?(?:\*\*)?(?:[Mm]ove:?\s+)?(\d+)\.\s+([A-Za-z][A-Za-z0-9x=+#-]*)/;
             var currentKey = null, currentSan = null, currentLabel = null, buf = [];
 
             function flush() {
