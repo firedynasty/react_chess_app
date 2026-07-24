@@ -7440,6 +7440,21 @@
             return true;
         }
 
+        // Exit the current variation (Shift+Tab): jump back to the main-line move
+        // the variation branched from (not its continuation).
+        function exitVariationToBranchMainLineMove() {
+            if (!window.moveTree || !window.currentMoveNode) return false;
+            let outerBranch = null;
+            let walk = window.currentMoveNode;
+            while (walk && walk.parent) {
+                if (walk.parent.children[0] !== walk) outerBranch = walk.parent;
+                walk = walk.parent;
+            }
+            if (!outerBranch) return false; // on the main line, not in a variation
+            jumpToNode(outerBranch.children[0].nodeId);
+            return true;
+        }
+
         /**
          * Extract and display game info from report content
          */
@@ -9458,8 +9473,14 @@
                 } else if (e.key === 'Tab') {
                     // Tab = enter the variation of the current main-line move, or
                     // exit the current variation to the next main-line move.
+                    // Shift+Tab = exit the current variation back to the main-line
+                    // move the variation branched from.
                     // Only intercept when one applies; otherwise keep normal focus behavior.
-                    if (enterVariationAtCurrentMove() || exitVariationToNextMainLineMove()) {
+                    if (e.shiftKey) {
+                        if (exitVariationToBranchMainLineMove()) {
+                            e.preventDefault();
+                        }
+                    } else if (enterVariationAtCurrentMove() || exitVariationToNextMainLineMove()) {
                         e.preventDefault();
                     }
                 } else if (e.key === 'Enter') {
