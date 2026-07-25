@@ -63,6 +63,46 @@
                 grid-template-columns: 1fr;
             }
         }
+        @media (max-width: 560px) {
+            body {
+                padding: 10px;
+            }
+            #boardMainFlex {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+            #boardSection {
+                width: 100% !important;
+                flex-shrink: 1 !important;
+                order: 0;
+            }
+            #materialDisplay {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            #evalBarWrap {
+                width: 100% !important;
+            }
+            #board2Wrap,
+            #myBoard2 {
+                width: 100% !important;
+                max-width: 400px !important;
+            }
+            #board2ArrowSvg {
+                width: 100% !important;
+            }
+            #moveSectionWrap {
+                width: 100% !important;
+                min-width: unset !important;
+                order: -1;
+            }
+            #moveTableContainer {
+                max-height: 220px !important;
+            }
+            #dropboxSidebar {
+                width: 100% !important;
+            }
+        }
         .panel {
             background: #16213e;
             padding: 20px;
@@ -935,9 +975,9 @@
     </div>
 
     <!-- Board and Move Table (side by side) -->
-    <div style="display: flex; gap: 15px; flex-wrap: nowrap; margin: 20px auto; max-width: 1200px; align-items: flex-start;">
+    <div id="boardMainFlex" style="display: flex; gap: 15px; flex-wrap: nowrap; margin: 20px auto; max-width: 1200px; align-items: flex-start;">
       <!-- Chess Board -->
-      <div style="flex-shrink: 0;">
+      <div id="boardSection" style="flex-shrink: 0;">
         <!-- Material Display -->
         <div id="materialDisplay" style="display: flex; justify-content: space-between; align-items: center; width: 400px; margin-bottom: 8px; font-size: 18px; min-height: 24px;">
           <div style="display: flex; align-items: center;">
@@ -951,7 +991,7 @@
         </div>
         <p style="color: #888; font-size: 12px; margin: 0 0 8px 0; font-style: italic; display: none;">Note: Chess piece images will load fully when choosing 'Next'</p>
         <!-- Eval bar (horizontal, tanh-scaled) -->
-        <div style="width: 400px; margin-bottom: 4px;">
+        <div id="evalBarWrap" style="width: 400px; margin-bottom: 4px;">
           <div id="evalBarH" style="width: 100%; height: 12px; background: #111; border-radius: 3px; overflow: hidden; position: relative; display: flex;">
             <div id="evalBarHBlack" style="background: #3a3a3a; height: 100%; width: 50%; transition: width 0.4s ease;"></div>
             <div id="evalBarHWhite" style="background: #ffffff; height: 100%; width: 50%; transition: width 0.4s ease;"></div>
@@ -976,7 +1016,7 @@
       </div>
 
       <!-- Move Table Container with File Section Header -->
-      <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column;">
+      <div id="moveSectionWrap" style="flex: 1; min-width: 200px; display: flex; flex-direction: column;">
         <!-- File Section Header -->
         <div id="fileSectionHeader"
              style="display: none; background: linear-gradient(90deg, #1a1a2e, #16213e);
@@ -1706,19 +1746,27 @@
             if (!appKey) return;
             const verifier = generateCodeVerifier();
             const challenge = await generateCodeChallenge(verifier);
-            sessionStorage.setItem('dropbox_code_verifier', verifier);
+            // Use localStorage so the popup window (same origin) can read the verifier
+            localStorage.setItem('dropbox_code_verifier', verifier);
             const redirectUri = window.location.origin;
             const authUrl = `https://www.dropbox.com/oauth2/authorize?client_id=${appKey}&response_type=code&code_challenge=${challenge}&code_challenge_method=S256&redirect_uri=${encodeURIComponent(redirectUri)}&token_access_type=online`;
-            window.location.href = authUrl;
+            // Open in a popup so the main page state (loaded games, analysis) is preserved
+            const popup = window.open(authUrl, 'dropbox_auth', 'width=520,height=680,scrollbars=yes,resizable=yes');
+            if (!popup) {
+                // Popup blocked — fall back to full-page redirect
+                sessionStorage.setItem('dropbox_code_verifier', verifier);
+                window.location.href = authUrl;
+            }
         }
 
-        // Handle OAuth redirect on page load
+        // Handle OAuth redirect on page load (covers both popup flow and fallback redirect flow)
         async function handleDropboxOAuthRedirect() {
             const params = new URLSearchParams(window.location.search);
             const code = params.get('code');
             if (!code) return;
 
-            const verifier = sessionStorage.getItem('dropbox_code_verifier');
+            // Popup flow stores verifier in localStorage; fallback redirect uses sessionStorage
+            const verifier = localStorage.getItem('dropbox_code_verifier') || sessionStorage.getItem('dropbox_code_verifier');
             if (!verifier) return;
 
             const appKey = await dropboxFetchAppKey();
@@ -1740,16 +1788,26 @@
                     body: body.toString(),
                 });
                 const data = await res.json();
+                localStorage.removeItem('dropbox_code_verifier');
+                sessionStorage.removeItem('dropbox_code_verifier');
                 if (data.access_token) {
+                    if (window.opener && !window.opener.closed) {
+                        // Popup flow: send token back to the parent page, then close
+                        window.opener.postMessage({ dropboxToken: data.access_token }, window.location.origin);
+                        window.close();
+                        return;
+                    }
+                    // Fallback redirect flow: set token on this page directly
                     window.dropboxAccessToken = data.access_token;
-                    sessionStorage.removeItem('dropbox_code_verifier');
                     window.history.replaceState({}, document.title, redirectUri);
                     updateDropboxButtons();
                 } else {
                     console.error('Dropbox auth failed:', data.error_description || data.error);
+                    if (window.opener && !window.opener.closed) window.close();
                 }
             } catch (err) {
                 console.error('Dropbox auth error:', err.message);
+                if (window.opener && !window.opener.closed) window.close();
             }
         }
 
@@ -2070,9 +2128,18 @@
             }
         }
 
+        // Receive Dropbox token from popup window (popup flow)
+        window.addEventListener('message', function(event) {
+            if (event.origin !== window.location.origin) return;
+            if (event.data && event.data.dropboxToken) {
+                window.dropboxAccessToken = event.data.dropboxToken;
+                updateDropboxButtons();
+            }
+        });
+
         // Wire up Dropbox buttons on DOM ready
         document.addEventListener('DOMContentLoaded', function() {
-            // Handle OAuth redirect if returning from Dropbox
+            // Handle OAuth redirect if returning from Dropbox (fallback redirect flow)
             handleDropboxOAuthRedirect();
 
             document.getElementById('dbLoginBtn').addEventListener('click', dropboxSignIn);
@@ -8060,6 +8127,31 @@
                     window.board2.position('start');
                 }
             }, 500);
+
+            // Resize board for mobile screens
+            function applyMobileBoardSize() {
+                if (window.innerWidth <= 560) {
+                    const mobileSize = Math.min(400, window.innerWidth - 20);
+                    const wrap = document.getElementById('board2Wrap');
+                    const boardEl = document.getElementById('myBoard2');
+                    const svg = document.getElementById('board2ArrowSvg');
+                    if (wrap) wrap.style.width = mobileSize + 'px';
+                    if (boardEl) boardEl.style.width = mobileSize + 'px';
+                    if (svg) svg.setAttribute('viewBox', '0 0 ' + mobileSize + ' ' + mobileSize);
+                    if (window.board2) window.board2.resize();
+                } else if (!window._board2Compact) {
+                    // Restore desktop size if not in compact mode
+                    const wrap = document.getElementById('board2Wrap');
+                    const boardEl = document.getElementById('myBoard2');
+                    const svg = document.getElementById('board2ArrowSvg');
+                    if (wrap) wrap.style.width = '400px';
+                    if (boardEl) boardEl.style.width = '400px';
+                    if (svg) svg.setAttribute('viewBox', '0 0 400 400');
+                    if (window.board2) window.board2.resize();
+                }
+            }
+            applyMobileBoardSize();
+            window.addEventListener('resize', applyMobileBoardSize);
 
             // Board2 Navigation
             const board2NextBtn = document.getElementById('board2NextMove');
