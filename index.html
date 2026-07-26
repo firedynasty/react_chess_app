@@ -879,7 +879,7 @@
                 onkeydown="if(event.key==='Enter')analyzeForVariation()">
             <button id="analyze-variation-btn" onclick="analyzeForVariation()"
                 style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
-                Analyze (Esc)
+                Analyze (Tab)
             </button>
             <select id="variation-depth" title="Depth" style="padding: 8px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; border-radius: 6px;">
                 <option value="12">d12</option>
@@ -1012,7 +1012,7 @@
             </defs>
           </svg>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back | Tab = enter/exit variation | Enter = ⭐ coach note</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back | Tab = enter/exit variation (adds one if none) | Esc = clear variation | Enter = ⭐ coach note</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -1139,6 +1139,12 @@
             <span id="board2MoveIndicatorMini" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap; background: transparent; padding: 4px 8px; border-radius: 4px;">Start</span>
             <span id="board2MovePlayedSanMini" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
+            <!-- Add Var. + depth radios (mirrors full nav; button proxied) -->
+            <span title="Depth for Add Var." style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0f3460; border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 13px; font-weight: bold;">
+                <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav-mini" value="12" onchange="setVariationDepth(this.value)">d12</label>
+                <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav-mini" value="15" checked onchange="setVariationDepth(this.value)">d15</label>
+            </span>
+            <button onclick="document.getElementById('analyze-variation-btn2').click()" title="Add variation at the current move (Tab)" style="padding: 10px 18px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
@@ -1158,10 +1164,14 @@
             <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace; white-space: nowrap;"></span>
             <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
           </div>
+          <span id="variation-depth-nav" title="Depth for Add Var." style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0f3460; border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 13px; font-weight: bold;">
+                <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav" value="12" onchange="setVariationDepth(this.value)">d12</label>
+                <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav" value="15" checked onchange="setVariationDepth(this.value)">d15</label>
+            </span>
           <button id="analyze-variation-btn2" onclick="analyzeForVariation()" style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
                 Add Var.
             </button>
-          <button id="clearVariationsBtn" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
+          <button id="clearVariationsBtn" title="Remove the variation at the current move (opposite of Add Var.)" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
           <!-- Next Var, Back Var, Cycle Clipboard moved to hidden-features/nav-buttons.html -->
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
           <button id="loadFullReportBtn" title="Load a previously saved analysis report from the clipboard — restores game, evals, and AI coach analysis" style="background: linear-gradient(90deg, #1565c0, #0d47a1); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Report</button>
@@ -3873,6 +3883,14 @@
             }
 
             return result.join(' ');
+        }
+
+        // Sync depth across all pickers: hidden #variation-depth select (the value
+        // analyzeForVariation reads) plus the nav and mini-nav radio groups
+        function setVariationDepth(v) {
+            const sel = document.getElementById('variation-depth');
+            if (sel) sel.value = v;
+            document.querySelectorAll('input[name="variation-depth-nav"], input[name="variation-depth-nav-mini"]').forEach(r => { r.checked = (r.value === v); });
         }
 
         async function analyzeForVariation() {
@@ -8817,58 +8835,50 @@
             const clearVariationsBtn = document.getElementById('clearVariationsBtn');
             if (clearVariationsBtn) {
                 clearVariationsBtn.addEventListener('click', function() {
-                    if (!window.moveTree) return;
-
-                    // Walk the mainline and remove all non-first children (variations)
-                    function stripVariations(node) {
-                        if (node.children && node.children.length > 1) {
-                            node.children = [node.children[0]];
-                        }
-                        if (node.children && node.children.length > 0) {
-                            stripVariations(node.children[0]);
-                        }
+                    function flashBtn(text) {
+                        clearVariationsBtn.textContent = text;
+                        setTimeout(() => { clearVariationsBtn.textContent = 'Clear Var.'; }, 1500);
                     }
-                    stripVariations(window.moveTree);
 
-                    // Rebuild registry
-                    window.moveNodeRegistry = { 'root': window.moveTree };
-                    function registerNodes(node) {
-                        if (node.nodeId && node.nodeId !== 'root') {
-                            window.moveNodeRegistry[node.nodeId] = node;
-                        }
-                        if (node.children) {
-                            for (const child of node.children) {
-                                registerNodes(child);
-                            }
-                        }
+                    if (!window.moveTree || !window.currentMoveNode) {
+                        flashBtn('No Var.');
+                        return;
                     }
-                    registerNodes(window.moveTree);
+                    const node = window.currentMoveNode;
+                    const parent = node.parent;
 
-                    // Update PGN strings
-                    const pgn = moveTreeToPgn(window.moveTree);
-                    if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
-                    window.annotatedPgnWithVariations = pgn;
+                    // Case 1: current move is a main-line child with variation siblings —
+                    // remove the most recently added sibling (inverse of Add Var.)
+                    if (parent && parent.children && parent.children.length > 1 && parent.children[0] === node) {
+                        const removed = parent.children.pop();
+                        unregisterSubtree(removed);
+                        syncTreeAndRender(node); // stay on the current move
+                        log(`Removed variation ${removed.san || ''} at this move`, 'success');
+                        flashBtn('Cleared!');
+                        return;
+                    }
 
-                    // Re-render
-                    window.currentMoveNode = null;
-                    window.cycleVarSequence = [];
-                    window.cycleVarIndex = -1;
-                    renderMoveTable(window.moveTree);
-                    clearBoard2Arrows();
-                    updateEvalBar(null);
-                    window.positionEvalMap = {};
-                    window.positionEvalMap2 = {};
-                    const fenMovesEl = document.getElementById('currentFenMoves');
-                    if (fenMovesEl) fenMovesEl.textContent = '';
-                    const evalScoreEl = document.getElementById('evalBarScore');
-                    if (evalScoreEl) evalScoreEl.textContent = '';
-                    updateReportWithPgn();
+                    // Case 2: current move is inside a variation — remove the
+                    // innermost variation branch containing it, then jump back
+                    // to the main-line move it branched from
+                    let branchChild = null;
+                    let walk = node;
+                    while (walk && walk.parent) {
+                        if (walk.parent.children[0] !== walk) { branchChild = walk; break; }
+                        walk = walk.parent;
+                    }
+                    if (branchChild) {
+                        const branchParent = branchChild.parent;
+                        branchParent.children = branchParent.children.filter(c => c !== branchChild);
+                        unregisterSubtree(branchChild);
+                        syncTreeAndRender(branchParent.children[0]);
+                        log(`Removed variation ${branchChild.san || ''}`, 'success');
+                        flashBtn('Cleared!');
+                        return;
+                    }
 
-                    log('All variations removed', 'success');
-
-                    // Flash button feedback
-                    clearVariationsBtn.textContent = 'Cleared!';
-                    setTimeout(() => { clearVariationsBtn.textContent = 'Clear Var.'; }, 1500);
+                    // No variation at the current move
+                    flashBtn('No Var.');
                 });
             }
 
@@ -9565,14 +9575,22 @@
                 } else if (e.key === 'Tab') {
                     // Tab = enter the variation of the current main-line move, or
                     // exit the current variation to the next main-line move.
+                    // If neither applies (no variation exists), Tab adds a variation
+                    // (same as the Add Var. button; Escape removes one).
                     // Shift+Tab = exit the current variation back to the main-line
                     // move the variation branched from.
-                    // Only intercept when one applies; otherwise keep normal focus behavior.
                     if (e.shiftKey) {
                         if (exitVariationToBranchMainLineMove()) {
                             e.preventDefault();
                         }
                     } else if (enterVariationAtCurrentMove() || exitVariationToNextMainLineMove()) {
+                        e.preventDefault();
+                    } else {
+                        // No variation to enter/exit — add one (same as Add Var. button)
+                        const analyzeBtn = document.getElementById('analyze-variation-btn');
+                        if (analyzeBtn && !analyzeBtn.disabled) {
+                            analyzeForVariation();
+                        }
                         e.preventDefault();
                     }
                 } else if (e.key === 'Enter') {
@@ -9595,10 +9613,11 @@
                         tvModal.style.display = 'none';
                         e.preventDefault();
                     } else {
-                        // Escape = Analyze (same as Analyze button) — only when modal is closed
-                        const analyzeBtn = document.getElementById('analyze-variation-btn');
-                        if (analyzeBtn && !analyzeBtn.disabled) {
-                            analyzeForVariation();
+                        // Escape = remove the variation at the current move (same as
+                        // Clear Var.) — the inverse of Tab adding one
+                        const clearBtn = document.getElementById('clearVariationsBtn');
+                        if (clearBtn) {
+                            clearBtn.click();
                             e.preventDefault();
                         }
                     }
