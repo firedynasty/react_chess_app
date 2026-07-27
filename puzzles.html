@@ -51,8 +51,8 @@
     .btn-nav:hover { background: rgba(0,212,255,0.15); }
     .btn-nav:disabled { opacity: 0.3; cursor: default; }
     #puzzleCounter { color: #a8d8ea; font-size: 13px; font-family: monospace; min-width: 70px; text-align: center; }
-    .btn-lichess { padding: 6px 14px; background: #629924; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto; text-decoration: none; display: inline-block; }
-    .btn-lichess:hover { background: #527a1e; }
+    .btn-lichess { padding: 10px 18px; background: #ff9800; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: auto; text-decoration: none; display: inline-block; }
+    .btn-lichess:hover { background: #f57c00; }
 
     /* ── Board area ── */
     .board-area { flex: 1; display: flex; align-items: flex-start; justify-content: center; gap: 24px; padding: 14px 18px; overflow: auto; }
@@ -191,6 +191,9 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="sidebar-header">Puzzles <span id="sidebarCount"></span></div>
+    <div style="padding:6px 10px; border-bottom:1px solid #0f3460;">
+      <input type="number" id="startFromInput" min="1" placeholder="Start from #..." style="width:100%; box-sizing:border-box; padding:5px 8px; background:#0f3460; color:#eee; border:1px solid #00d4ff55; border-radius:4px; font-size:12px;">
+    </div>
     <div class="puzzle-list" id="puzzleList"></div>
   </div>
 
@@ -229,6 +232,7 @@
 
         <!-- Move table -->
         <div id="moveTableContainer"></div>
+        <a id="lichessBtnMain" href="#" target="_blank" class="btn-lichess" style="font-size:11px;padding:3px 10px;margin-left:0;margin-bottom:4px;display:none;">↗ Lichess (your line)</a>
 
         <!-- Reset -->
         <button class="btn-reset" onclick="resetPosition()">↺ Reset Top & Refocus Top Variation</button>
@@ -236,7 +240,7 @@
         <!-- Solved Variation -->
         <div class="solved-wrap" id="solvedWrap">
           <div class="solved-label">
-            Solved Variation
+            <span style="display:flex;align-items:center;gap:6px;">Solved Variation <a id="lichessBtnSolved" href="#" target="_blank" class="btn-lichess" style="font-size:11px;padding:2px 8px;margin-left:0;display:none;">↗ Lichess</a></span>
             <button onclick="clearSolved()">clear</button>
           </div>
           <div id="solvedContainer"></div>
@@ -266,6 +270,7 @@
         <div>
           <div class="fen-box-label">FEN (click to copy)</div>
           <div class="fen-box" id="fenBox" onclick="copyFen()"></div>
+          <a id="lichessBtnOrig" href="#" target="_blank" class="btn-lichess" style="font-size:11px;padding:3px 10px;margin-left:0;margin-top:4px;display:none;">↗ Lichess (original)</a>
         </div>
 
         <!-- Answer URL -->
@@ -345,7 +350,7 @@ function loadPuzzles(rows, filename) {
   if (parsed.length === 0) { document.getElementById('fileStatus').textContent = 'No valid FENs found'; return; }
   puzzles = parsed;
   document.getElementById('fileStatus').textContent = filename + ' (' + puzzles.length + ' puzzles)';
-  document.getElementById('sidebarCount').textContent = '(' + puzzles.length + ')';
+  document.getElementById('startFromInput').value = '';
   buildSidebar();
   document.getElementById('navBar').style.display = 'flex';
   document.getElementById('boardArea').style.display = 'flex';
@@ -357,7 +362,12 @@ function loadPuzzles(rows, filename) {
 function buildSidebar() {
   var list = document.getElementById('puzzleList');
   list.innerHTML = '';
+  var v = parseInt(document.getElementById('startFromInput').value, 10);
+  var startFrom = (isNaN(v) || v < 1) ? 1 : v;
+  var shown = 0;
   puzzles.forEach(function(p, i) {
+    if (i + 1 < startFrom) return;
+    shown++;
     var item = document.createElement('div');
     item.className = 'puzzle-list-item'; item.id = 'listItem' + i;
     item.onclick = function() { goTo(i); };
@@ -367,7 +377,17 @@ function buildSidebar() {
     item.appendChild(n); item.appendChild(l); item.appendChild(b);
     list.appendChild(item);
   });
+  document.getElementById('sidebarCount').textContent = startFrom > 1
+    ? '(' + shown + ' of ' + puzzles.length + ')'
+    : '(' + puzzles.length + ')';
 }
+
+document.getElementById('startFromInput').addEventListener('input', function() {
+  if (!puzzles.length) return;
+  buildSidebar();
+  var v = parseInt(this.value, 10);
+  if (!isNaN(v) && v >= 1 && v <= puzzles.length) goTo(v - 1);
+});
 
 // ── Navigation ────────────────────────────────────────────────────────
 function goTo(index) {
@@ -382,7 +402,7 @@ function goTo(index) {
   document.getElementById('btnPrev').disabled = index === 0;
   document.getElementById('btnNext').disabled = index === puzzles.length - 1;
   document.getElementById('infoTitle').textContent = p.label || ('Puzzle ' + (index+1));
-  document.getElementById('lichessBtn').href = p.answerUrl || ('https://lichess.org/analysis/' + encodeURIComponent(p.fen));
+  document.getElementById('lichessBtn').href = p.answerUrl || ('https://lichess.org/analysis/' + p.fen.replace(/ /g, '_'));
   var ab = document.getElementById('answerUrlBox');
   ab.innerHTML = p.answerUrl ? '<div style="font-size:11px;color:#888;margin-bottom:2px;">Answer URL</div><a href="' + escapeHtml(p.answerUrl) + '" target="_blank" style="color:#4285f4;font-size:12px;word-break:break-all;">' + escapeHtml(p.answerUrl) + '</a>' : '';
   resetEvalDisplay();
@@ -552,6 +572,7 @@ function renderMoveTable() {
   // Scroll current move into view
   var cur = el.querySelector('.move-san.current, .variation-move.current');
   if (cur) cur.scrollIntoView({ block: 'nearest' });
+  updateLichessLinks();
 }
 
 // Render the main line starting from parentNode.children[0],
@@ -810,7 +831,7 @@ function populateSolved(fromFen, sanMoves) {
 function renderSolved() {
   var wrap = document.getElementById('solvedWrap');
   var el   = document.getElementById('solvedContainer');
-  if (!solvedLine.length) { wrap.style.display = 'none'; el.innerHTML = ''; return; }
+  if (!solvedLine.length) { wrap.style.display = 'none'; el.innerHTML = ''; updateLichessLinks(); return; }
   wrap.style.display = 'block';
 
   // Renumber from 1, treating the first move of the solved line as move 1
@@ -848,6 +869,7 @@ function renderSolved() {
 
   var cur = el.querySelector('.solved-move.current');
   if (cur) cur.scrollIntoView({ block: 'nearest' });
+  updateLichessLinks();
 }
 
 function highlightSolvedMove(fromFen, san) {
@@ -950,6 +972,44 @@ function copyFen() {
     var ta = document.createElement('textarea'); ta.value = fen;
     document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
   });
+}
+
+// ── Lichess links ─────────────────────────────────────────────────────
+function updateLichessLinks() {
+  // Original puzzle FEN — static per puzzle
+  var origEl = document.getElementById('lichessBtnOrig');
+  if (origEl) {
+    if (startFen) {
+      origEl.href = 'https://lichess.org/analysis/' + startFen.replace(/ /g, '_');
+      origEl.style.display = 'inline-block';
+    } else {
+      origEl.style.display = 'none';
+    }
+  }
+  // Your line — reflects currentNode's FEN
+  var mainEl = document.getElementById('lichessBtnMain');
+  if (mainEl) {
+    var mainFen = currentNode ? currentNode.fen : startFen;
+    if (mainFen) {
+      mainEl.href = 'https://lichess.org/analysis/' + mainFen.replace(/ /g, '_');
+      mainEl.style.display = 'inline-block';
+    } else {
+      mainEl.style.display = 'none';
+    }
+  }
+  // Solved line — reflects current solved position
+  var solvedEl = document.getElementById('lichessBtnSolved');
+  if (solvedEl) {
+    var sFen = solvedLine.length
+      ? ((solvedIndex >= 0 && solvedLine[solvedIndex]) ? solvedLine[solvedIndex].fen : solvedSourceFen)
+      : '';
+    if (sFen) {
+      solvedEl.href = 'https://lichess.org/analysis/' + sFen.replace(/ /g, '_');
+      solvedEl.style.display = 'inline-block';
+    } else {
+      solvedEl.style.display = 'none';
+    }
+  }
 }
 
 // ── Keyboard navigation ───────────────────────────────────────────────
