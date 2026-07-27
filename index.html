@@ -650,7 +650,7 @@
     </div>
 
     <div class="status-bar">
-        <a href="https://youtu.be/fwPcoDfQwyo" target="_blank" style="background: #0f3460; color: #00d4ff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">Tutorial ↗</a>
+        <a href="/puzzles.html" style="background: #0f3460; color: #00d4ff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">Puzzles</a>
         <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
         <a href="https://vercel-youtube.vercel.app/parser.html" target="_blank" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Parser</a>
         <a href="/reformatter" target="_blank" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Text Reformatter</a>
@@ -1281,6 +1281,22 @@
                 <a id="fenExportBlackLink" href="#" target="_blank" title="Open in Lichess" style="word-break:break-all; color:#4285f4; text-decoration:none; font-size:12px; display:block; margin-bottom:6px;"></a>
                 <div id="fenExportBlackFen" title="Click to copy" onclick="copyExportedFen(window.exportedBlackFen, this)" style="font-family:monospace; word-break:break-all; color:#ff9800; font-size:12px; margin-bottom:6px; cursor:pointer;"></div>
                 <button onclick="copyExportedFen(window.exportedBlackFen, this)" style="width:100%; padding:6px; font-size:13px; background:#666; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy Black FEN</button>
+              </div>
+
+              <!-- Save to Puzzles CSV -->
+              <div style="background:rgba(255,152,0,0.08); padding:10px; border-radius:5px; border:1px solid #ff9800; margin-top:12px;">
+                <div style="font-weight:600; margin-bottom:8px; color:#ff9800; font-size:13px;">Save to Puzzles CSV</div>
+                <input id="fenExportLabel" type="text" placeholder="Label / description (optional)" style="width:100%; padding:6px 8px; background:#0f3460; color:#eee; border:1px solid #555; border-radius:4px; font-size:12px; margin-bottom:8px; box-sizing:border-box;">
+                <input id="fenExportAnswerUrl" type="text" placeholder="Answer URL (Lichess training link, optional)" style="width:100%; padding:6px 8px; background:#0f3460; color:#eee; border:1px solid #555; border-radius:4px; font-size:12px; margin-bottom:8px; box-sizing:border-box;">
+                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                  <button onclick="fenQueueAddWhite()" style="flex:1; padding:6px; font-size:12px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ Add White FEN</button>
+                  <button onclick="fenQueueAddBlack()" style="flex:1; padding:6px; font-size:12px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">+ Add Black FEN</button>
+                  <button onclick="fenQueueDownload()" style="flex:1; padding:6px; font-size:12px; background:#ff9800; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Download CSV</button>
+                </div>
+                <div style="margin-top:6px; font-size:11px; display:flex; justify-content:space-between; align-items:center;">
+                  <span id="fenQueueStatus" style="color:#aaa;">Queue: 0 FENs</span>
+                  <button onclick="fenQueueClear()" style="background:none; border:none; color:#888; font-size:11px; cursor:pointer; text-decoration:underline;">Clear queue</button>
+                </div>
               </div>
             </div>
           </div>
@@ -8683,6 +8699,67 @@
                     setTimeout(function() { el.textContent = original; }, 1500);
                 }
             }
+
+            // ── Puzzle CSV queue ────────────────────────────────────────────
+            var fenQueue = JSON.parse(localStorage.getItem('fenPuzzleQueue') || '[]');
+
+            function fenQueueUpdateStatus() {
+                var el = document.getElementById('fenQueueStatus');
+                if (el) el.textContent = 'Queue: ' + fenQueue.length + ' FEN' + (fenQueue.length !== 1 ? 's' : '');
+            }
+            fenQueueUpdateStatus();
+
+            function fenQueueAdd(fen) {
+                if (!fen) return;
+                var label = (document.getElementById('fenExportLabel') || {}).value || '';
+                var answerUrl = (document.getElementById('fenExportAnswerUrl') || {}).value || '';
+                fenQueue.push({ fen: fen, label: label, answer_url: answerUrl });
+                localStorage.setItem('fenPuzzleQueue', JSON.stringify(fenQueue));
+                fenQueueUpdateStatus();
+                var statusEl = document.getElementById('fenQueueStatus');
+                if (statusEl) {
+                    var prev = statusEl.textContent;
+                    statusEl.textContent = '✓ Added! Queue: ' + fenQueue.length;
+                    statusEl.style.color = '#4CAF50';
+                    setTimeout(function() {
+                        fenQueueUpdateStatus();
+                        statusEl.style.color = '#aaa';
+                    }, 1500);
+                }
+            }
+
+            function fenQueueAddWhite() { fenQueueAdd(window.exportedWhiteFen); }
+            function fenQueueAddBlack() { fenQueueAdd(window.exportedBlackFen); }
+
+            function fenQueueDownload() {
+                if (fenQueue.length === 0) {
+                    alert('No FENs in queue. Add some first.');
+                    return;
+                }
+                var rows = ['fen,label,answer_url'];
+                fenQueue.forEach(function(item) {
+                    var fen = '"' + (item.fen || '').replace(/"/g, '""') + '"';
+                    var label = '"' + (item.label || '').replace(/"/g, '""') + '"';
+                    var url = '"' + (item.answer_url || '').replace(/"/g, '""') + '"';
+                    rows.push(fen + ',' + label + ',' + url);
+                });
+                var csv = rows.join('\n');
+                var blob = new Blob([csv], { type: 'text/csv' });
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'puzzles_' + new Date().toISOString().slice(0,10) + '.csv';
+                a.click();
+                URL.revokeObjectURL(a.href);
+            }
+
+            function fenQueueClear() {
+                if (fenQueue.length === 0) return;
+                if (!confirm('Clear all ' + fenQueue.length + ' FEN(s) from queue?')) return;
+                fenQueue = [];
+                localStorage.removeItem('fenPuzzleQueue');
+                fenQueueUpdateStatus();
+            }
+            // ── End puzzle CSV queue ────────────────────────────────────────
 
             // Export FEN button - opens modal showing both White-to-move and Black-to-move FENs
             const exportFenBtn = document.getElementById('exportFenBtn');
