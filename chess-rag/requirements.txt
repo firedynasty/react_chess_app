@@ -1,0 +1,15 @@
+# Phase 1
+requests>=2.31.0
+
+# Phase 4
+openai>=1.0.0
+
+# Phase 2
+python-chess>=1.999
+
+# Phase 3
+sentence-transformers>=2.2.0
+# sqlite-vec  # uncomment when Phase 3 vector store is wired up
+
+# Phase 4
+anthropic>=0.25.0
