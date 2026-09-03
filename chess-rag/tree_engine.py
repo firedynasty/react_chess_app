@@ -2,20 +2,23 @@
 """
 Phase 2 — Position tree engine.
 
-Parses data/games.pgn, builds a transposition-aware SQLite position tree,
+Parses games.pgn, builds a transposition-aware SQLite position tree,
 and exposes:
     get_children(conn, position_key) → moves with win/draw/loss stats
     get_path(conn, moves, start_fen) → node list along a line
 
-Build the tree:
+Build the tree (from chess-rag/, using a bucket key):
+    python tree_engine.py tttstanley
+
+Or from inside a bucket folder (data/<key>/) — no arguments needed:
     python tree_engine.py
 
 Query the tree:
-    python tree_engine.py --query e4 e5 Nf3
+    python tree_engine.py tttstanley --query e4 e5 Nf3
 
 Options:
-    --pgn  PATH   Input PGN (default: data/games.pgn)
-    --db   PATH   SQLite output (default: data/tree.sqlite)
+    --pgn  PATH   Input PGN (default: <bucket>/games.pgn)
+    --db   PATH   SQLite output (default: <bucket>/tree.sqlite)
     --query MOVE… Walk the tree along these moves and print children at each step
 """
 
@@ -32,8 +35,22 @@ import chess.pgn
 # ---------------------------------------------------------------------------
 
 HERE = Path(__file__).parent
-DEFAULT_PGN = HERE / "data" / "games.pgn"
-DEFAULT_DB = HERE / "data" / "tree.sqlite"
+
+
+def resolve_bucket(key: str | None) -> Path:
+    """Bucket folder for this run.
+
+    A key resolves to data/<key>/ next to this script; without a key, a
+    script copied inside a bucket (data/<key>/) uses its own folder.
+    """
+    if key:
+        return HERE / "data" / key.strip().lower()
+    if HERE.parent.name == "data":
+        return HERE
+    raise SystemExit(
+        "Pass a bucket key (e.g. python tree_engine.py tttstanley) "
+        "or run from inside a bucket folder (data/<key>/)."
+    )
 
 # ---------------------------------------------------------------------------
 # Schema  (as specified)
@@ -284,16 +301,21 @@ def _print_children(children: list[dict], label: str = "") -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build / query the chess position tree")
-    parser.add_argument("--pgn", default=str(DEFAULT_PGN))
-    parser.add_argument("--db", default=str(DEFAULT_DB))
+    parser.add_argument(
+        "key", nargs="?",
+        help="Bucket key (data/<key>/); not needed when running inside a bucket folder",
+    )
+    parser.add_argument("--pgn", default=None, help="Input PGN (default: <bucket>/games.pgn)")
+    parser.add_argument("--db", default=None, help="SQLite output (default: <bucket>/tree.sqlite)")
     parser.add_argument(
         "--query", nargs="*", metavar="MOVE",
         help="Print tree stats along this move sequence",
     )
     args = parser.parse_args()
 
-    pgn_path = Path(args.pgn)
-    db_path = Path(args.db)
+    bucket = resolve_bucket(args.key)
+    pgn_path = Path(args.pgn) if args.pgn else bucket / "games.pgn"
+    db_path = Path(args.db) if args.db else bucket / "tree.sqlite"
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     if args.query is not None:

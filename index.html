@@ -2563,6 +2563,35 @@
         // GAME ANALYSIS
         // =====================================================================
 
+        /**
+         * Strip embedded annotations from a PGN so chess.js load_pgn can parse it:
+         * { … } comments ([%clk], [%eval], "best …", or empty "{ }" husks left by
+         * the header regex), ( … ) variations (nested), $n NAG codes, and
+         * ?! / ? / ?? glyphs. Also truncates at the first result token so a
+         * doubled/multi-game paste only analyzes the first game.
+         * The engine re-computes its own evals, so nothing is lost.
+         */
+        function sanitizePgnForEngine(pgn) {
+            // Split headers from movetext at the first blank line
+            let headers = '', body = pgn;
+            const parts = pgn.split(/\r?\n\s*\r?\n/);
+            if (parts.length > 1 && parts[0].trim().startsWith('[')) {
+                headers = parts[0];
+                body = parts.slice(1).join('\n\n');
+            }
+            body = body.replace(/\{[^}]*\}/g, ' ');           // comments
+            body = body.replace(/\$\d+/g, ' ');               // NAG codes
+            while (/\([^()]*\)/.test(body)) {                 // variations, innermost first
+                body = body.replace(/\([^()]*\)/g, ' ');
+            }
+            body = body.replace(/[!?]/g, '');                 // glyphs (never valid SAN chars)
+            // Truncate everything after the first game-result token
+            const resultMatch = body.match(/\s(1-0|0-1|1\/2-1\/2|\*)(?=\s|$)/);
+            if (resultMatch) body = body.slice(0, resultMatch.index + resultMatch[0].length);
+            body = body.replace(/\s+/g, ' ').trim();
+            return (headers ? headers.trim() + '\n\n' : '') + body;
+        }
+
         async function analyzeGame() {
             let pgn = document.getElementById('pgnInput').value.trim();
             if (!pgn) {
@@ -2570,13 +2599,19 @@
                 return;
             }
 
+            // Save original PGN for Chessis {Best:} extraction later
+            // (must happen BEFORE any stripping removes the {Best:} comments)
+            const originalPgnForChessis = pgn;
+            const hasChessisBestMoves = pgn.includes('{Best:');
+
+            // Strip clock/eval comments, glyphs, and variations that
+            // chess.js load_pgn cannot handle (annotated PGNs from ingest.py
+            // or chess.com analysis exports)
+            pgn = sanitizePgnForEngine(pgn);
+
             // Strip PGN headers (e.g. [Site "Chess.com"], [Date ...]) and update textarea
             pgn = pgn.replace(/\[[^\]]*\]\s*/g, '').trim();
             document.getElementById('pgnInput').value = pgn;
-
-            // Save original PGN for Chessis {Best:} extraction later
-            const originalPgnForChessis = pgn;
-            const hasChessisBestMoves = pgn.includes('{Best:');
 
             // Reset move tree and container (fresh state like a page refresh)
             window.moveTree = null;

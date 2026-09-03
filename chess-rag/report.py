@@ -2,18 +2,20 @@
 """
 Prototype: AI game report for a group of games from the same opening position.
 
-Usage:
+Usage (from inside a bucket folder, data/<key>/):
     python report.py <game_id> [game_id ...]
     python report.py 164380092682 171996841806 172074667356
-
-    # Or pass the position moves to auto-find all games that went through it:
     python report.py --position "d4 d5 e3 Nc6 Bd3 Nf6 f4"
 
+Usage (from chess-rag/ — point at a bucket with --key):
+    python report.py --key tttstanley --position "d4 d5"
+
 Output:
-    reports/<timestamp>_<position>/
+    <bucket>/reports/<timestamp>_<position>/
         run_meta.json      — position, games, timestamp
         <game_id>.md       — per-game report
         comparison.md      — cross-game comparison (wins vs losses)
+        report.html        — self-contained viewer (shareable on its own)
 
 Requires:
     pip install openai python-chess
@@ -46,23 +48,41 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 HERE = Path(__file__).parent
+# Reassigned in main() from the resolved bucket:
 RAW_DIR = HERE / "data" / "raw" / "chesscom"
 DB_PATH = HERE / "data" / "tree.sqlite"
 REPORTS_DIR = HERE / "reports"
-KNOWLEDGE_PATH = HERE.parent / "chess_knowledge.txt"  # root-level file
+
+
+def resolve_bucket(key: str | None) -> Path:
+    """Bucket folder for this run.
+
+    A key resolves to data/<key>/ next to this script; without a key, a
+    script copied inside a bucket (data/<key>/) uses its own folder.
+    """
+    if key:
+        return HERE / "data" / key.strip().lower()
+    if HERE.parent.name == "data":
+        return HERE
+    raise SystemExit(
+        "Pass --key <name> (e.g. python report.py --key tttstanley …) "
+        "or run from inside a bucket folder (data/<key>/)."
+    )
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def load_knowledge() -> str:
-    """Load chess_knowledge.txt as plain context string."""
-    if KNOWLEDGE_PATH.exists():
-        return KNOWLEDGE_PATH.read_text(encoding="utf-8")
-    # Fallback: look in the same directory
-    alt = HERE / "chess_knowledge.txt"
-    if alt.exists():
-        return alt.read_text(encoding="utf-8")
+    """Load chess_knowledge.txt as plain context string.
+
+    Walks up from this script's location so it works both from chess-rag/
+    and from a copied script inside a bucket (data/<key>/).
+    """
+    for base in (HERE, *HERE.parents):
+        path = base / "chess_knowledge.txt"
+        if path.exists():
+            return path.read_text(encoding="utf-8")
     print("[warn] chess_knowledge.txt not found — proceeding without theory context")
     return ""
 
@@ -300,14 +320,25 @@ def call_openai(client: OpenAI, prompt: str, model: str = "gpt-4o") -> str:
 # ---------------------------------------------------------------------------
 
 def main() -> None:
+    global RAW_DIR, DB_PATH, REPORTS_DIR
+
     parser = argparse.ArgumentParser(description="Generate AI game reports")
     parser.add_argument("game_ids", nargs="*", help="Game IDs to analyze")
+    parser.add_argument(
+        "--key", metavar="NAME",
+        help="Bucket key (data/<name>/); not needed when running inside a bucket folder",
+    )
     parser.add_argument(
         "--position", "-p", metavar="MOVES",
         help='SAN moves to auto-find all games (e.g. "d4 d5 e3 Nc6 Bd3 Nf6 f4")',
     )
     parser.add_argument("--model", default="gpt-4o", help="OpenAI model (default: gpt-4o)")
     args = parser.parse_args()
+
+    bucket = resolve_bucket(args.key)
+    RAW_DIR = bucket / "raw" / "chesscom"
+    DB_PATH = bucket / "tree.sqlite"
+    REPORTS_DIR = bucket / "reports"
 
     # Resolve game IDs
     game_ids = list(args.game_ids)
@@ -391,7 +422,8 @@ def main() -> None:
             f"# Game Report: {g['white']} vs {g['black']}\n"
             f"**Date:** {g['date']}  |  **Result:** {g['my_result']} as {g['my_color']}\n"
             f"**URL:** {g['url']}\n\n"
-            f"{report}\n",
+            f"{report}\n\n"
+            f"---\n\n## PGN\n\n```pgn\n{g['pgn'].strip()}\n```\n",
             encoding="utf-8",
         )
         print(f"    → {out_path.name}")
@@ -465,6 +497,8 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 .md-body em { color: #bbb; }
 .md-body a { color: #00d4ff; }
 .md-body code { background: #2a2a3e; padding: 1px 5px; border-radius: 3px; font-size: 0.87em; }
+.md-body pre { background: #1e1e30; padding: 12px 14px; border-radius: 4px; overflow-x: auto; font-size: 0.78rem; line-height: 1.5; margin-bottom: 10px; }
+.md-body pre code { background: none; padding: 0; color: #bbb; }
 .md-body hr { border: none; border-top: 1px solid #2a2a4e; margin: 14px 0; }
 .md-body blockquote { border-left: 3px solid #00d4ff; padding-left: 12px; color: #aaa; margin: 10px 0; }
 
@@ -521,6 +555,7 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
       <button onclick="pgnGoPrev()">◀</button>
       <button onclick="pgnGoNext()">▶</button>
       <button onclick="pgnGoEnd()">⏭</button>
+      <button onclick="pgnFlip()" title="Flip board">⇅</button>
     </div>
     <div class="pgn-comment" id="pgnComment"></div>
     <div class="pgn-moves" id="pgnMoves"></div>
@@ -578,8 +613,14 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 function simpleMarkdown(md) {
-  var lines = md.split('\n'), out = [], inList = false;
+  var lines = md.split('\n'), out = [], inList = false, inCode = false;
   lines.forEach(function(l) {
+    if (/^```/.test(l)) {
+      if (inCode) { out.push('</code></pre>'); inCode = false; }
+      else { if(inList){out.push('</ul>');inList=false;} out.push('<pre><code>'); inCode = true; }
+      return;
+    }
+    if (inCode) { out.push(escHtml(l)); return; }
     if (/^### (.+)/.test(l)) { if(inList){out.push('</ul>');inList=false;} out.push('<h3>'+escHtml(l.replace(/^### /,''))+'</h3>'); return; }
     if (/^## (.+)/.test(l))  { if(inList){out.push('</ul>');inList=false;} out.push('<h2>'+escHtml(l.replace(/^## /,''))+'</h2>'); return; }
     if (/^# (.+)/.test(l))   { if(inList){out.push('</ul>');inList=false;} out.push('<h1>'+escHtml(l.replace(/^# /,''))+'</h1>'); return; }
@@ -593,6 +634,7 @@ function simpleMarkdown(md) {
     out.push('<p>'+inlineMd(l)+'</p>');
   });
   if (inList) out.push('</ul>');
+  if (inCode) out.push('</code></pre>');
   return out.join('\n');
 }
 function inlineMd(s) {
@@ -774,6 +816,7 @@ function pgnGoStart() { pgnJumpToNode('root'); }
 function pgnGoEnd()   { var n = pgnCurrent||pgnRoot; while(n&&n.children.length) n=n.children[0]; if(n) pgnJumpToNode(n.nodeId); }
 function pgnGoPrev()  { if(pgnCurrent&&pgnCurrent.parent) pgnJumpToNode(pgnCurrent.parent.nodeId); }
 function pgnGoNext()  { if(pgnCurrent&&pgnCurrent.children.length) pgnJumpToNode(pgnCurrent.children[0].nodeId); }
+function pgnFlip()    { if (pgnBoard) pgnBoard.flip(); }
 
 document.addEventListener('keydown', function(e) {
   if (!document.getElementById('board-pane').classList.contains('visible')) return;

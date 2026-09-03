@@ -2,12 +2,19 @@
 """
 Generate tree_viewer.html — a self-contained interactive position-tree browser.
 
-Reads data/tree.sqlite + data/raw/chesscom/*.pgn, embeds everything as JSON,
-outputs an HTML file you can open directly in any browser (no server required).
+Reads <bucket>/tree.sqlite + <bucket>/raw/chesscom/*.pgn, embeds everything as
+JSON, outputs <bucket>/tree_viewer.html — a file you can open directly in any
+browser (no server required). Fully self-contained: safe to copy or send on
+its own.
 
-Usage:
+Usage (from chess-rag/, using a bucket key):
+    python tree_viz.py tttstanley
+
+Or from inside a bucket folder — no arguments needed:
     python tree_viz.py
-    python tree_viz.py --db data/tree.sqlite --out tree_viewer.html
+
+Overrides:
+    --db PATH  --pgn-dir PATH  --out PATH
 """
 
 import argparse
@@ -17,9 +24,22 @@ import sqlite3
 from pathlib import Path
 
 HERE = Path(__file__).parent
-DEFAULT_DB = HERE / "data" / "tree.sqlite"
-DEFAULT_PGN_DIR = HERE / "data" / "raw" / "chesscom"
-DEFAULT_OUT = HERE / "tree_viewer.html"
+
+
+def resolve_bucket(key: str | None) -> Path:
+    """Bucket folder for this run.
+
+    A key resolves to data/<key>/ next to this script; without a key, a
+    script copied inside a bucket (data/<key>/) uses its own folder.
+    """
+    if key:
+        return HERE / "data" / key.strip().lower()
+    if HERE.parent.name == "data":
+        return HERE
+    raise SystemExit(
+        "Pass a bucket key (e.g. python tree_viz.py tttstanley) "
+        "or run from inside a bucket folder (data/<key>/)."
+    )
 
 STARTING_KEY = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -"
 
@@ -272,6 +292,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <div id="controls">
   <button id="btn-back" disabled onclick="goBack()">← Back</button>
   <button onclick="goHome()">⌂ Root</button>
+  <button onclick="flipBoard()">⇅ Flip</button>
 </div>
 
 <div id="board-wrap"><div id="board"></div></div>
@@ -309,6 +330,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <button onclick="pgnGoPrev()">◀</button>
       <button onclick="pgnGoNext()">▶</button>
       <button onclick="pgnGoEnd()">⏭</button>
+      <button onclick="pgnFlip()" title="Flip board">⇅</button>
     </div>
     <div class="pgn-comment" id="pgnComment"></div>
     <div class="pgn-moves" id="pgnMoves"></div>
@@ -329,6 +351,7 @@ const PIECES = {
 let history = [];        // [{key, san}]
 let currentKey = STARTING_KEY;
 let lastUci = null;
+let flipped = false;
 
 // ── Board ─────────────────────────────────────────────────────────────────
 function fenToGrid(fen) {
@@ -350,15 +373,26 @@ function renderBoard(fen, uci) {
   const hlTo   = uci ? uci.slice(2,4) : null;
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
+      const rr = flipped ? 7 - r : r;
+      const ff = flipped ? 7 - f : f;
       const sq = document.createElement('div');
-      const sqName = String.fromCharCode(97+f) + (8-r);
-      sq.className = 'sq ' + ((r+f)%2===0 ? 'light' : 'dark');
+      const sqName = String.fromCharCode(97+ff) + (8-rr);
+      sq.className = 'sq ' + ((rr+ff)%2===0 ? 'light' : 'dark');
       if (sqName===hlFrom || sqName===hlTo) sq.classList.add('hl');
-      const p = grid[r][f];
+      const p = grid[rr][ff];
       if (p) sq.innerHTML = `<span class="${p === p.toUpperCase() ? 'wp' : 'bp'}">${PIECES[p] || ''}</span>`;
       board.appendChild(sq);
     }
   }
+  // File labels follow orientation
+  document.querySelectorAll('#coords-files .file-label').forEach((el, i) => {
+    el.textContent = String.fromCharCode(97 + (flipped ? 7 - i : i));
+  });
+}
+
+function flipBoard() {
+  flipped = !flipped;
+  update();
 }
 
 // ── Moves table ───────────────────────────────────────────────────────────
@@ -712,6 +746,7 @@ function pgnGoStart() { pgnJump('root'); }
 function pgnGoEnd()   { let n = pgnCurrent||pgnRoot; while(n&&n.children.length) n=n.children[0]; if(n) pgnJump(n.nodeId); }
 function pgnGoPrev()  { if(pgnCurrent?.parent) pgnJump(pgnCurrent.parent.nodeId); }
 function pgnGoNext()  { if(pgnCurrent?.children.length) pgnJump(pgnCurrent.children[0].nodeId); }
+function pgnFlip()    { if (pgnModalBoard) pgnModalBoard.flip(); }
 
 document.addEventListener('keydown', e => {
   if (!document.getElementById('pgnPanel').classList.contains('open')) return;
@@ -725,7 +760,7 @@ document.addEventListener('keydown', e => {
 """
 
 
-def generate(db_path: Path, pgn_dir: Path, out_path: Path) -> None:
+def generate(db_path: Path, pgn_dir: Path, out_path: Path, title: str) -> None:
     print(f"Loading tree from {db_path}…")
     tree = load_tree(db_path)
     print(f"  {len(tree)} positions with moves")
@@ -741,6 +776,7 @@ def generate(db_path: Path, pgn_dir: Path, out_path: Path) -> None:
     html = HTML_TEMPLATE.replace("__TREE_JSON__", tree_json)
     html = html.replace("__PGNS_JSON__", pgns_json)
     html = html.replace("__STARTING_KEY__", starting_json)
+    html = html.replace("My Chess Opening Tree", title)  # <title> and <h1>
 
     out_path.write_text(html, encoding="utf-8")
     size_kb = out_path.stat().st_size // 1024
@@ -750,19 +786,24 @@ def generate(db_path: Path, pgn_dir: Path, out_path: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate interactive position-tree viewer")
-    parser.add_argument("--db",  default=str(DEFAULT_DB))
-    parser.add_argument("--pgn-dir", default=str(DEFAULT_PGN_DIR))
-    parser.add_argument("--out", default=str(DEFAULT_OUT))
+    parser.add_argument(
+        "key", nargs="?",
+        help="Bucket key (data/<key>/); not needed when running inside a bucket folder",
+    )
+    parser.add_argument("--db",  default=None, help="default: <bucket>/tree.sqlite")
+    parser.add_argument("--pgn-dir", default=None, help="default: <bucket>/raw/chesscom")
+    parser.add_argument("--out", default=None, help="default: <bucket>/tree_viewer.html")
     args = parser.parse_args()
 
-    db_path  = Path(args.db)
-    pgn_dir  = Path(args.pgn_dir)
-    out_path = Path(args.out)
+    bucket   = resolve_bucket(args.key)
+    db_path  = Path(args.db) if args.db else bucket / "tree.sqlite"
+    pgn_dir  = Path(args.pgn_dir) if args.pgn_dir else bucket / "raw" / "chesscom"
+    out_path = Path(args.out) if args.out else bucket / "tree_viewer.html"
 
     if not db_path.exists():
         raise SystemExit(f"Database not found: {db_path}\nRun tree_engine.py first.")
 
-    generate(db_path, pgn_dir, out_path)
+    generate(db_path, pgn_dir, out_path, title=f"{bucket.name} — Chess Opening Tree")
 
 
 if __name__ == "__main__":

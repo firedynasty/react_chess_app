@@ -1,30 +1,58 @@
 #!/usr/bin/env python3
 """
-Phase 1 — Ingest: pull the last 100 Chess.com games into a local PGN store.
+Phase 1 — Ingest: pull the last 100 Chess.com games into a per-user bucket.
 
-Usage:
+Usage (from chess-rag/):
     python ingest.py <username>
     python ingest.py <username> --max 50
 
+Usage (from inside a bucket folder — incremental refresh, no args needed):
+    cd data/<username>
+    python ingest.py
+
+The username doubles as the bucket key. Everything lands in data/<username>/:
+    raw/chesscom/<game_id>.pgn   one annotated PGN per game
+    games.pgn                    merged, de-duplicated store
+    state.json                   last_fetched_at for incremental runs
+Plus copies of the pipeline scripts (ingest/tree_engine/tree_viz/report),
+making the bucket self-contained — cd in and run any script with no args.
+The bucket folder can be copied anywhere as-is (e.g. shared with a friend).
+
 On first run:
     Walks Chess.com archives newest → oldest until max_games collected.
-    Writes one annotated PGN per game to data/raw/chesscom/<game_id>.pgn.
-    Writes merged, de-duplicated data/games.pgn.
-    Records last_fetched_at in data/state.json.
 
 On subsequent runs:
     Only fetches games newer than last_fetched_at, merges with existing
     raw PGNs, then re-trims to the most recent max_games total.
+
+Engine annotation (on by default, requires a stockfish binary):
+    Each newly fetched PGN is run through Stockfish: played moves get
+    ?! / ? / ?? glyphs, refuted moves get the best line as a variation,
+    and every move gets a [%eval ±x.xx] comment. tree_viz/report viewers
+    render these variations automatically, and report.py's GPT prompt
+    includes them. Annotated games carry an [EngineAnalysis] header so
+    they are never re-analyzed. Flags: --no-analyze, --depth N,
+    --analyze-all (backfill existing PGNs).
 """
 
 import argparse
+import io
 import json
 import os
 import re
+import shutil
 import time
 from datetime import datetime, timezone
 
 import requests
+
+try:
+    import chess
+    import chess.engine
+    import chess.pgn
+    HAVE_CHESS = True
+except ImportError:
+    HAVE_CHESS = False
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -35,6 +63,38 @@ DATA_DIR = os.path.join(HERE, "data")
 RAW_CHESSCOM_DIR = os.path.join(DATA_DIR, "raw", "chesscom")
 GAMES_PGN_PATH = os.path.join(DATA_DIR, "games.pgn")
 STATE_PATH = os.path.join(DATA_DIR, "state.json")
+
+# Pipeline scripts copied into every bucket so it runs standalone.
+SCRIPTS_TO_COPY = ["ingest.py", "tree_engine.py", "tree_viz.py", "report.py"]
+
+# Engine annotation thresholds (centipawns lost, from the mover's perspective)
+BLUNDER_CP = 200      # ??
+MISTAKE_CP = 100      # ?
+INACCURACY_CP = 50    # ?!
+PV_LENGTH = 5         # moves of best line embedded as a variation
+
+NAG_GLYPHS = {1: "!", 2: "?", 3: "!!", 4: "??", 5: "!?", 6: "?!"}
+
+
+def use_bucket(bucket_dir: str) -> None:
+    """Point all storage paths at the bucket folder (called from main before any I/O)."""
+    global DATA_DIR, RAW_CHESSCOM_DIR, GAMES_PGN_PATH, STATE_PATH
+    DATA_DIR = bucket_dir
+    RAW_CHESSCOM_DIR = os.path.join(DATA_DIR, "raw", "chesscom")
+    GAMES_PGN_PATH = os.path.join(DATA_DIR, "games.pgn")
+    STATE_PATH = os.path.join(DATA_DIR, "state.json")
+
+
+def copy_scripts(bucket_dir: str) -> None:
+    """Copy the pipeline scripts into the bucket (keeps bucket copies in sync)."""
+    for name in SCRIPTS_TO_COPY:
+        src = os.path.join(HERE, name)
+        dst = os.path.join(bucket_dir, name)
+        if not os.path.exists(src):
+            continue
+        if os.path.abspath(src) == os.path.abspath(dst):
+            continue  # already running inside the bucket
+        shutil.copy2(src, dst)
 
 HEADERS = {
     "User-Agent": "chess-rag-ingest/1.0 (personal use)",
@@ -268,24 +328,177 @@ def rebuild_games_pgn(max_games: int) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Engine annotation (Stockfish)
+# ---------------------------------------------------------------------------
+
+def find_stockfish() -> str | None:
+    """Locate a stockfish binary."""
+    for cand in [shutil.which("stockfish"),
+                 "/opt/homebrew/bin/stockfish",
+                 "/usr/local/bin/stockfish"]:
+        if cand and os.path.exists(cand):
+            return cand
+    return None
+
+
+def _fmt_eval(cp_white: int) -> str:
+    """Format a White-POV centipawn score as PGN [%eval] value."""
+    if abs(cp_white) >= 9900:
+        n = 10000 - abs(cp_white)
+        return f"#{'' if cp_white > 0 else '-'}{n}"
+    return f"{cp_white / 100:.2f}"
+
+
+def annotate_pgn(engine, pgn_text: str, depth: int) -> str | None:
+    """
+    Return pgn_text with engine analysis embedded along the mainline:
+      - ?! / ? / ?? glyphs on played moves (by centipawn loss)
+      - the best line as a ( … ) variation when a move lost >= MISTAKE_CP
+      - a [%eval ±x.xx] comment on every move
+    Scores are normalized to White's perspective; losses are measured from
+    the mover's perspective (single pass, eval carried forward).
+    Returns None if the game can't be parsed.
+    """
+    game = chess.pgn.read_game(io.StringIO(pgn_text))
+    if game is None or not list(game.mainline_moves()):
+        return None
+
+    def evaluate(board) -> tuple[int, list]:
+        info = engine.analyse(board, chess.engine.Limit(depth=depth))
+        return info["score"].white().score(mate_score=10000), info.get("pv", [])
+
+    board = game.board()
+    prev_white, prev_pv = evaluate(board)
+
+    node = game
+    while node.variations:
+        next_node = node.variations[0]
+        move = next_node.move
+        mover_white = board.turn == chess.WHITE
+        pre_board = board.copy()
+        board.push(move)
+
+        cur_white, cur_pv = evaluate(board)
+        loss = (prev_white - cur_white) if mover_white else (cur_white - prev_white)
+
+        if loss >= BLUNDER_CP:
+            next_node.nags.add(chess.pgn.NAG_BLUNDER)
+        elif loss >= MISTAKE_CP:
+            next_node.nags.add(chess.pgn.NAG_MISTAKE)
+        elif loss >= INACCURACY_CP:
+            next_node.nags.add(chess.pgn.NAG_DUBIOUS_MOVE)
+
+        eval_tag = f"[%eval {_fmt_eval(cur_white)}]"
+        next_node.comment = (
+            f"{next_node.comment} {eval_tag}" if next_node.comment else eval_tag
+        )
+
+        # Refuted? Embed the best line as a variation from the same position.
+        if loss >= MISTAKE_CP and prev_pv and prev_pv[0] != move:
+            var = node.add_variation(prev_pv[0])
+            var.comment = f"best {_fmt_eval(prev_white)}"
+            pre_board.push(prev_pv[0])
+            cur_var = var
+            for m in prev_pv[1:PV_LENGTH]:
+                if m in pre_board.legal_moves:
+                    cur_var = cur_var.add_variation(m)
+                    pre_board.push(m)
+
+        prev_white, prev_pv = cur_white, cur_pv
+        node = next_node
+
+    game.headers["EngineAnalysis"] = f"stockfish depth {depth}"
+    exporter = chess.pgn.StringExporter(headers=True, variations=True, comments=True)
+    out = game.accept(exporter)
+    # python-chess writes NAGs as $n codes; convert to glyphs for viewer display
+    out = re.sub(r"\$(\d+)", lambda m: NAG_GLYPHS.get(int(m.group(1)), ""), out)
+    return out
+
+
+def annotate_games(paths: list[tuple[str, str]], depth: int) -> None:
+    """Annotate each (game_id, path) in place; skips files already annotated."""
+    if not paths:
+        return
+    if not HAVE_CHESS:
+        print("  [warn] python-chess not installed — skipping engine annotation")
+        return
+    sf_path = find_stockfish()
+    if not sf_path:
+        print("  [warn] stockfish binary not found — skipping engine annotation")
+        return
+
+    engine = chess.engine.SimpleEngine.popen_uci(sf_path)
+    try:
+        done = 0
+        for gid, path in paths:
+            with open(path) as f:
+                text = f.read()
+            if extract_header(text, "EngineAnalysis"):
+                continue
+            done += 1
+            print(f"  Annotating {done}: {gid} (depth {depth})…")
+            try:
+                annotated = annotate_pgn(engine, text, depth)
+            except Exception as e:
+                print(f"    [warn] annotation failed for {gid}: {e}")
+                continue
+            if annotated:
+                with open(path, "w") as f:
+                    f.write(annotated.rstrip() + "\n")
+    finally:
+        engine.quit()
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Ingest recent Chess.com games into local PGN store"
+        description="Ingest recent Chess.com games into a per-user bucket"
     )
-    parser.add_argument("username", help="Chess.com username")
+    parser.add_argument(
+        "username", nargs="?", help="Chess.com username "
+        "(optional when running inside an existing bucket folder)",
+    )
     parser.add_argument(
         "--max", type=int, default=100, metavar="N",
         help="Max games to keep (default: 100)",
     )
+    parser.add_argument(
+        "--depth", type=int, default=15, metavar="D",
+        help="Stockfish analysis depth (default: 15)",
+    )
+    parser.add_argument(
+        "--no-analyze", action="store_true",
+        help="Skip Stockfish annotation of fetched games",
+    )
+    parser.add_argument(
+        "--analyze-all", action="store_true",
+        help="Also annotate existing raw PGNs that lack analysis (slow first time)",
+    )
     args = parser.parse_args()
 
-    username = args.username.strip().lower()
+    # A copied script inside data/<key>/ treats its own folder as the bucket.
+    in_bucket = os.path.basename(os.path.dirname(HERE)) == "data"
+    if in_bucket:
+        use_bucket(HERE)
+    else:
+        if not args.username:
+            parser.error("username required (e.g. python ingest.py TTTstanley)")
+        use_bucket(os.path.join(HERE, "data", args.username.strip().lower()))
+
+    username = (args.username or "").strip().lower()
     max_games = args.max
 
     state = load_state()
+    if not username:
+        username = state.get("chesscom", {}).get("username", "")
+    if not username:
+        parser.error("no username given and none recorded in state.json yet")
+
+    print(f"Bucket: {DATA_DIR}")
+
     since_ts: int | None = state.get("chesscom", {}).get("last_fetched_at")
     existing_ids = load_existing_game_ids()
 
@@ -299,6 +512,7 @@ def main() -> None:
     print(f"  Retrieved {len(raw_games)} game(s) from Chess.com API")
 
     new_count = 0
+    new_ids: list[str] = []
     latest_end_time: int = since_ts or 0
 
     for game in raw_games:
@@ -317,12 +531,24 @@ def main() -> None:
         save_raw_pgn(game_id, pgn)
         existing_ids.add(game_id)
         new_count += 1
+        new_ids.append(game_id)
 
         end_time = game.get("end_time", 0)
         if end_time > latest_end_time:
             latest_end_time = end_time
 
     print(f"  Saved {new_count} new PGN file(s) to {RAW_CHESSCOM_DIR}")
+
+    if not args.no_analyze:
+        targets = [(gid, os.path.join(RAW_CHESSCOM_DIR, f"{gid}.pgn")) for gid in new_ids]
+        if args.analyze_all:
+            seen = set(new_ids)
+            targets += [
+                (gid, os.path.join(RAW_CHESSCOM_DIR, f"{gid}.pgn"))
+                for gid in sorted(load_existing_game_ids())
+                if gid not in seen
+            ]
+        annotate_games(targets, args.depth)
 
     trim_raw_store(max_games)
     rebuild_games_pgn(max_games)
@@ -332,6 +558,9 @@ def main() -> None:
     )
     save_state(state)
     print(f"  State saved → {STATE_PATH}")
+
+    copy_scripts(DATA_DIR)
+    print(f"  Pipeline scripts synced → {DATA_DIR}")
     print("Done.")
 
 
