@@ -42,6 +42,8 @@ import os
 import re
 import shutil
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 import requests
@@ -158,12 +160,13 @@ def fetch_chesscom_games(
     username: str,
     max_games: int = 100,
     since_timestamp: int | None = None,
+    months: int | None = None,
 ) -> list[dict]:
     """
-    Fetch up to max_games raw game dicts from Chess.com (newest first).
+    Fetch raw game dicts from Chess.com (newest first).
 
-    Walks the archives list from most recent month backward, stopping when
-    either max_games is reached or a game older than since_timestamp is seen.
+    Stops when max_games is reached, a game older than since_timestamp is seen,
+    or (if months is set) after walking that many monthly archives.
     Adds ARCHIVE_DELAY between each monthly archive request.
     """
     archives_url = f"https://api.chess.com/pub/player/{username}/games/archives"
@@ -175,6 +178,11 @@ def fetch_chesscom_games(
 
     if not archive_urls:
         return []
+
+    # --months: only look at the N most recent monthly archives
+    if months is not None:
+        archive_urls = archive_urls[-months:]
+        print(f"  Limiting to last {months} month(s): {archive_urls[0].split('/')[-2]}/{archive_urls[0].split('/')[-1]} → {archive_urls[-1].split('/')[-2]}/{archive_urls[-1].split('/')[-1]}")
 
     collected: list[dict] = []
 
@@ -294,29 +302,13 @@ def _sort_key(fname: str) -> int:
     return int(stem) if stem.isdigit() else 0
 
 
-def trim_raw_store(max_games: int) -> None:
-    """Remove oldest raw PGNs beyond max_games (by numeric game ID)."""
-    fnames = sorted(
-        [f for f in os.listdir(RAW_CHESSCOM_DIR) if f.endswith(".pgn")],
-        key=_sort_key,
-    )
-    excess = len(fnames) - max_games
-    if excess > 0:
-        for fname in fnames[:excess]:  # oldest first
-            os.remove(os.path.join(RAW_CHESSCOM_DIR, fname))
-        print(f"  Trimmed {excess} old game(s) to stay at {max_games} total")
-
-
-def rebuild_games_pgn(max_games: int) -> None:
-    """
-    Rebuild data/games.pgn from all raw/chesscom PGNs.
-    Sorted newest → oldest by numeric game ID. Capped at max_games.
-    """
+def rebuild_games_pgn() -> None:
+    """Rebuild data/games.pgn from all raw/chesscom PGNs, newest → oldest."""
     fnames = sorted(
         [f for f in os.listdir(RAW_CHESSCOM_DIR) if f.endswith(".pgn")],
         key=_sort_key,
         reverse=True,  # newest first
-    )[:max_games]
+    )
 
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(GAMES_PGN_PATH, "w") as out:
@@ -415,8 +407,54 @@ def annotate_pgn(engine, pgn_text: str, depth: int) -> str | None:
     return out
 
 
-def annotate_games(paths: list[tuple[str, str]], depth: int) -> None:
-    """Annotate each (game_id, path) in place; skips files already annotated."""
+def _annotate_worker(
+    paths: list[tuple[str, str]],
+    depth: int,
+    sf_path: str,
+    sf_threads: int,
+    counter: list,
+    counter_lock: threading.Lock,
+) -> None:
+    """Worker: opens its own Stockfish instance and annotates a slice of games."""
+    engine = chess.engine.SimpleEngine.popen_uci(sf_path)
+    if sf_threads > 1:
+        engine.configure({"Threads": sf_threads})
+    try:
+        for gid, path in paths:
+            with open(path) as f:
+                text = f.read()
+            if extract_header(text, "EngineAnalysis"):
+                continue
+            try:
+                annotated = annotate_pgn(engine, text, depth)
+            except Exception as e:
+                print(f"    [warn] annotation failed for {gid}: {e}")
+                continue
+            if annotated:
+                with open(path, "w") as f:
+                    f.write(annotated.rstrip() + "\n")
+            with counter_lock:
+                counter[0] += 1
+                print(f"  Annotated {counter[0]}: {gid} (depth {depth})")
+    finally:
+        engine.quit()
+
+
+def annotate_games(
+    paths: list[tuple[str, str]],
+    depth: int,
+    parallel: int = 1,
+    sf_threads: int = 1,
+) -> None:
+    """
+    Annotate each (game_id, path) in place; skips files already annotated.
+
+    parallel:   number of simultaneous Stockfish processes (default 1)
+    sf_threads: CPU threads per Stockfish instance (default 1)
+
+    Total CPU cores used ≈ parallel × sf_threads.
+    Example: --parallel 4 --sf-threads 4 uses ~16 cores.
+    """
     if not paths:
         return
     if not HAVE_CHESS:
@@ -427,26 +465,33 @@ def annotate_games(paths: list[tuple[str, str]], depth: int) -> None:
         print("  [warn] stockfish binary not found — skipping engine annotation")
         return
 
-    engine = chess.engine.SimpleEngine.popen_uci(sf_path)
-    try:
-        done = 0
-        for gid, path in paths:
-            with open(path) as f:
-                text = f.read()
-            if extract_header(text, "EngineAnalysis"):
-                continue
-            done += 1
-            print(f"  Annotating {done}: {gid} (depth {depth})…")
-            try:
-                annotated = annotate_pgn(engine, text, depth)
-            except Exception as e:
-                print(f"    [warn] annotation failed for {gid}: {e}")
-                continue
-            if annotated:
-                with open(path, "w") as f:
-                    f.write(annotated.rstrip() + "\n")
-    finally:
-        engine.quit()
+    # Filter already-annotated files up front
+    todo = [(gid, p) for gid, p in paths
+            if not extract_header(open(p).read(), "EngineAnalysis")]
+    if not todo:
+        print("  All games already annotated.")
+        return
+
+    print(f"  Annotating {len(todo)} game(s) — parallel={parallel} sf_threads={sf_threads} depth={depth}")
+
+    counter: list[int] = [0]
+    counter_lock = threading.Lock()
+
+    if parallel == 1:
+        _annotate_worker(todo, depth, sf_path, sf_threads, counter, counter_lock)
+        return
+
+    # Split work evenly across workers
+    chunk = max(1, len(todo) // parallel)
+    slices = [todo[i:i + chunk] for i in range(0, len(todo), chunk)]
+
+    with ThreadPoolExecutor(max_workers=parallel) as pool:
+        futures = [
+            pool.submit(_annotate_worker, s, depth, sf_path, sf_threads, counter, counter_lock)
+            for s in slices
+        ]
+        for f in as_completed(futures):
+            f.result()  # re-raise any worker exception
 
 
 # ---------------------------------------------------------------------------
@@ -462,12 +507,20 @@ def main() -> None:
         "(optional when running inside an existing bucket folder)",
     )
     parser.add_argument(
-        "--max", type=int, default=100, metavar="N",
-        help="Max games to keep (default: 100)",
+        "--max", type=int, default=None, metavar="N",
+        help="Max games to keep (default: 100, or unlimited when --months is set)",
+    )
+    parser.add_argument(
+        "--months", type=int, default=None, metavar="M",
+        help="Fetch only the last M months of archives (e.g. --months 6)",
     )
     parser.add_argument(
         "--depth", type=int, default=15, metavar="D",
         help="Stockfish analysis depth (default: 15)",
+    )
+    parser.add_argument(
+        "--full", action="store_true",
+        help="Ignore last_fetched_at and re-fetch from scratch (use with --months)",
     )
     parser.add_argument(
         "--no-analyze", action="store_true",
@@ -475,7 +528,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--analyze-all", action="store_true",
-        help="Also annotate existing raw PGNs that lack analysis (slow first time)",
+        help="Also annotate existing raw PGNs that lack analysis",
+    )
+    parser.add_argument(
+        "--parallel", type=int, default=1, metavar="N",
+        help="Number of simultaneous Stockfish processes (default: 1)",
+    )
+    parser.add_argument(
+        "--sf-threads", type=int, default=1, metavar="N",
+        help="CPU threads per Stockfish instance (default: 1)",
     )
     args = parser.parse_args()
 
@@ -489,7 +550,8 @@ def main() -> None:
         use_bucket(os.path.join(HERE, "data", args.username.strip().lower()))
 
     username = (args.username or "").strip().lower()
-    max_games = args.max
+    # No cap by default; --max adds an explicit ceiling if needed
+    max_games = args.max if args.max is not None else 10_000
 
     state = load_state()
     if not username:
@@ -499,16 +561,16 @@ def main() -> None:
 
     print(f"Bucket: {DATA_DIR}")
 
-    since_ts: int | None = state.get("chesscom", {}).get("last_fetched_at")
+    since_ts: int | None = None if args.full else state.get("chesscom", {}).get("last_fetched_at")
     existing_ids = load_existing_game_ids()
 
     if since_ts:
         when = datetime.fromtimestamp(since_ts, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
         print(f"Incremental run — fetching games newer than {when} for {username}")
     else:
-        print(f"First run — fetching up to {max_games} games for {username}")
+        print(f"{'Full' if args.full else 'First'} run — fetching all games for {username}")
 
-    raw_games = fetch_chesscom_games(username, max_games=max_games, since_timestamp=since_ts)
+    raw_games = fetch_chesscom_games(username, max_games=max_games, since_timestamp=since_ts, months=args.months)
     print(f"  Retrieved {len(raw_games)} game(s) from Chess.com API")
 
     new_count = 0
@@ -548,10 +610,9 @@ def main() -> None:
                 for gid in sorted(load_existing_game_ids())
                 if gid not in seen
             ]
-        annotate_games(targets, args.depth)
+        annotate_games(targets, args.depth, parallel=args.parallel, sf_threads=args.sf_threads)
 
-    trim_raw_store(max_games)
-    rebuild_games_pgn(max_games)
+    rebuild_games_pgn()
 
     state.setdefault("chesscom", {}).update(
         {"last_fetched_at": latest_end_time, "username": username}

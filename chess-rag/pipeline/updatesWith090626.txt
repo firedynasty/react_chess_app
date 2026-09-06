@@ -1,0 +1,44 @@
+Updates — 09/06/26
+==================
+
+ingest.py
+---------
+- Removed 100-game cap: trim_raw_store() deleted, rebuild_games_pgn() no longer
+  slices — all fetched games are kept in the bucket.
+- --months M flag: fetch only the last M monthly archives instead of guessing
+  a game count. Maps directly to Chess.com's archive structure (1 request/month).
+  Example: --months 36 pulls 3 years in ~18 seconds at 0.5s delay.
+- --full flag: ignores last_fetched_at timestamp in state.json so a fresh full
+  pull can be done without deleting state. Use with --months.
+  Example: python ingest.py jyan_500 --months 36 --no-analyze --full
+- --parallel N flag: runs N simultaneous Stockfish processes for annotation.
+- --sf-threads N flag: sets CPU threads per Stockfish instance.
+  Example: --parallel 4 --sf-threads 4 gives ~16x annotation speedup.
+- --max N now optional (default unlimited); use only if you want an explicit cap.
+
+
+python ingest.py tttstanley --months 36 --no-analyze --full
+
+python ingest.py tttstanley --analyze-all --depth 12 --parallel 4 --sf-threads 4
+
+then, 
+
+tree_viz.py
+-----------
+- Time control filter bar: All / Bullet / Blitz / Rapid / Classical / Daily
+  buttons. Classifies each game by TimeControl PGN header (Daily = moves/seconds
+  format with /, live games bucketed by base seconds).
+- Date range filter: two calendar date inputs (from/to). Stacks with time
+  control filter.
+- Last 10 toggle: caps games list and recomputes moves table W/D/L stats to
+  only the 10 most recent games at the current position (sorted by game ID desc).
+- All filters are combined — e.g. Blitz + date range + Last 10 all apply together.
+- ECO opening data: fetches hayatbiralem/eco.json (ecoA-E.json) from GitHub on
+  first run, cached locally as eco_openings.json (12,106 positions).
+  - Opening name label shown in gold below the filter bar as you navigate the
+    tree. Persists to last matched ECO position as you go deeper.
+  - Each game in the games list shows its ECO code + opening name + time control.
+  - ECO filter bar (A/B/C/D/E volume buttons + name search) wired up but hidden
+    by default (always All ECO). Can be re-enabled via CSS display:flex.
+- tc_category and opening fields added to PGNS data embedded in HTML.
+- ECO_MAP (position_key -> eco/name) embedded for tree navigator lookup.

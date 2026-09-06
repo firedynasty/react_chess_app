@@ -18,10 +18,24 @@ Overrides:
 """
 
 import argparse
+import io
 import json
 import re
 import sqlite3
 from pathlib import Path
+
+try:
+    import requests as _requests
+    HAVE_REQUESTS = True
+except ImportError:
+    HAVE_REQUESTS = False
+
+try:
+    import chess
+    import chess.pgn
+    HAVE_CHESS = True
+except ImportError:
+    HAVE_CHESS = False
 
 HERE = Path(__file__).parent
 
@@ -108,23 +122,125 @@ def _pgn_header(pgn: str, key: str) -> str:
     return m.group(1) if m else ""
 
 
-def load_pgns(pgn_dir: Path) -> dict:
+def _classify_tc(tc: str) -> str:
+    """Classify a PGN TimeControl string into bullet/blitz/rapid/classical/daily/unknown."""
+    if not tc or tc in ("-", "?", ""):
+        return "unknown"
+    if "/" in tc:
+        return "daily"
+    base = tc.split("+")[0]
+    try:
+        secs = int(base)
+    except ValueError:
+        return "unknown"
+    if secs < 180:
+        return "bullet"
+    if secs < 600:
+        return "blitz"
+    if secs < 1800:
+        return "rapid"
+    return "classical"
+
+
+# ---------------------------------------------------------------------------
+# ECO opening data
+# ---------------------------------------------------------------------------
+
+ECO_CACHE_PATH = HERE / "eco_openings.json"
+ECO_BASE_URL   = "https://raw.githubusercontent.com/hayatbiralem/eco.json/master/eco{}.json"
+ECO_LETTERS    = list("ABCDE")
+
+
+def _fen_to_key(fen: str) -> str:
+    """Strip halfmove + fullmove counters from a full FEN → 4-field position key."""
+    return " ".join(fen.split()[:4])
+
+
+def load_eco_data() -> dict:
     """
-    Returns {game_id: {pgn, white, black, result, date, my_color, my_result, url}}
+    Return {4_field_fen: {"eco": "B10", "name": "Caro-Kann Defense"}}.
+
+    Fetches ecoA–E.json from GitHub on first run and caches to eco_openings.json
+    next to this script. Delete the cache file to refresh.
     """
+    if ECO_CACHE_PATH.exists():
+        print(f"  ECO cache found → {ECO_CACHE_PATH}")
+        raw = json.loads(ECO_CACHE_PATH.read_text())
+        return raw
+
+    if not HAVE_REQUESTS:
+        print("  [warn] requests not installed — skipping ECO data (pip install requests)")
+        return {}
+
+    print("  Fetching ECO opening data from GitHub…")
+    merged: dict = {}
+    for letter in ECO_LETTERS:
+        url = ECO_BASE_URL.format(letter)
+        try:
+            resp = _requests.get(url, timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            for fen, entry in data.items():
+                key = _fen_to_key(fen)
+                merged[key] = {"eco": entry.get("eco", ""), "name": entry.get("name", "")}
+            print(f"    eco{letter}.json — {len(data)} entries")
+        except Exception as e:
+            print(f"  [warn] Could not fetch eco{letter}.json: {e}")
+
+    ECO_CACHE_PATH.write_text(json.dumps(merged, separators=(",", ":")))
+    print(f"  ECO data cached → {ECO_CACHE_PATH}  ({len(merged)} positions)")
+    return merged
+
+
+def _annotate_game_opening(pgn_text: str, eco_lookup: dict) -> tuple[str, str]:
+    """
+    Replay a game's moves and return (eco_code, opening_name) for the deepest
+    position that matches the ECO lookup. Returns ("", "") if no match.
+    """
+    if not HAVE_CHESS or not eco_lookup:
+        return "", ""
+    try:
+        game = chess.pgn.read_game(io.StringIO(pgn_text))
+        if game is None:
+            return "", ""
+        board = game.board()
+        best_eco, best_name = "", ""
+        for move in game.mainline_moves():
+            board.push(move)
+            key = " ".join(board.fen().split()[:4])
+            if key in eco_lookup:
+                best_eco = eco_lookup[key]["eco"]
+                best_name = eco_lookup[key]["name"]
+        return best_eco, best_name
+    except Exception:
+        return "", ""
+
+
+def load_pgns(pgn_dir: Path, eco_lookup: dict | None = None) -> dict:
+    """
+    Returns {game_id: {pgn, white, black, result, date, my_color, my_result,
+                       url, tc, tc_category, eco, opening}}
+    """
+    eco_lookup = eco_lookup or {}
     pgns: dict = {}
     for path in pgn_dir.glob("*.pgn"):
         game_id = path.stem
         text = path.read_text(encoding="utf-8")
+        tc = _pgn_header(text, "TimeControl")
+        eco_code, opening_name = _annotate_game_opening(text, eco_lookup)
         pgns[game_id] = {
-            "pgn": text,
-            "white":     _pgn_header(text, "White"),
-            "black":     _pgn_header(text, "Black"),
-            "result":    _pgn_header(text, "Result"),
-            "date":      _pgn_header(text, "Date") or _pgn_header(text, "EndDate"),
-            "my_color":  _pgn_header(text, "MyColor"),
-            "my_result": _pgn_header(text, "MyResult"),
-            "url":       _pgn_header(text, "Link") or _pgn_header(text, "Site"),
+            "pgn":         text,
+            "white":       _pgn_header(text, "White"),
+            "black":       _pgn_header(text, "Black"),
+            "result":      _pgn_header(text, "Result"),
+            "date":        _pgn_header(text, "Date") or _pgn_header(text, "EndDate"),
+            "my_color":    _pgn_header(text, "MyColor"),
+            "my_result":   _pgn_header(text, "MyResult"),
+            "url":         _pgn_header(text, "Link") or _pgn_header(text, "Site"),
+            "tc":          tc,
+            "tc_category": _classify_tc(tc),
+            "eco":         eco_code,
+            "opening":     opening_name,
         }
     return pgns
 
@@ -261,6 +377,44 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .btn-copy-one:hover { background: #00d4ff; color: #1a1a2e; }
   .btn-copy-one.copied { background: #28a745; border-color: #28a745; color: #fff; }
 
+  /* ── Filter bar ── */
+  #filter-bar {
+    display: flex; gap: 6px; margin-bottom: 8px;
+    flex-wrap: wrap; justify-content: center; align-items: center;
+  }
+  .filter-btn {
+    background: #0f3460; color: #aaa;
+    border: 1px solid #2a4080;
+    padding: 4px 12px; border-radius: 12px;
+    cursor: pointer; font-size: 0.8rem;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: #00d4ff; color: #00d4ff; }
+  .filter-btn.active { background: #00d4ff; color: #1a1a2e; border-color: #00d4ff; font-weight: 700; }
+  .filter-sep { color: #444; font-size: 0.85rem; padding: 0 2px; }
+  .date-input {
+    background: #0f3460; color: #ccc; border: 1px solid #2a4080;
+    padding: 4px 8px; border-radius: 5px; font-size: 0.8rem; cursor: pointer;
+  }
+  .date-input:focus { outline: none; border-color: #00d4ff; }
+  #filter-summary { font-size: 0.75rem; color: #888; text-align: center; margin-bottom: 10px; min-height: 1em; }
+
+  /* ── Opening label + ECO filter ── */
+  #opening-label {
+    font-size: 0.85rem; color: #ffd700; text-align: center;
+    margin-bottom: 6px; min-height: 1.2em; letter-spacing: 0.3px;
+  }
+  #opening-label .eco-code { color: #aaa; margin-right: 6px; font-size: 0.75rem; }
+  #eco-filter-bar {
+    display: none;
+  }
+  #opening-search {
+    background: #0f3460; color: #ccc; border: 1px solid #2a4080;
+    padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; width: 180px;
+  }
+  #opening-search:focus { outline: none; border-color: #ffd700; }
+  #opening-search::placeholder { color: #555; }
+
   /* PGN panel (fixed right, no veil) */
   #pgnPanel { display: none; position: fixed; top: 0; right: 0; width: 420px; height: 100vh; background: #12122a; border-left: 1px solid #2a2a4e; flex-direction: column; z-index: 100; box-shadow: -4px 0 16px rgba(0,0,0,0.4); }
   #pgnPanel.open { display: flex; }
@@ -294,6 +448,35 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <button onclick="goHome()">⌂ Root</button>
   <button onclick="flipBoard()">⇅ Flip</button>
 </div>
+
+<div id="filter-bar">
+  <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+  <button class="filter-btn" onclick="setFilter('bullet',this)">Bullet</button>
+  <button class="filter-btn" onclick="setFilter('blitz',this)">Blitz</button>
+  <button class="filter-btn" onclick="setFilter('rapid',this)">Rapid</button>
+  <button class="filter-btn" onclick="setFilter('classical',this)">Classical</button>
+  <button class="filter-btn" onclick="setFilter('daily',this)">Daily</button>
+  <span class="filter-sep">|</span>
+  <input class="date-input" type="date" id="date-from" onchange="update()" title="From date">
+  <span class="filter-sep">–</span>
+  <input class="date-input" type="date" id="date-to" onchange="update()" title="To date">
+  <button class="filter-btn" onclick="clearDates()" title="Clear dates">✕</button>
+  <span class="filter-sep">|</span>
+  <button class="filter-btn" id="btn-last10" onclick="toggleLast10(this)">Last 10</button>
+</div>
+<div id="filter-summary"></div>
+
+<div id="eco-filter-bar">
+  <button class="filter-btn active" onclick="setEcoFilter('all',this)">All ECO</button>
+  <button class="filter-btn" onclick="setEcoFilter('A',this)">A</button>
+  <button class="filter-btn" onclick="setEcoFilter('B',this)">B</button>
+  <button class="filter-btn" onclick="setEcoFilter('C',this)">C</button>
+  <button class="filter-btn" onclick="setEcoFilter('D',this)">D</button>
+  <button class="filter-btn" onclick="setEcoFilter('E',this)">E</button>
+  <input id="opening-search" type="text" placeholder="Search opening…" oninput="onOpeningSearch(this.value)">
+</div>
+
+<div id="opening-label"></div>
 
 <div id="board-wrap"><div id="board"></div></div>
 <div id="coords-files">
@@ -338,8 +521,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 </div>
 
 <script>
-const TREE = __TREE_JSON__;
-const PGNS = __PGNS_JSON__;
+const TREE        = __TREE_JSON__;
+const PGNS        = __PGNS_JSON__;
+const ECO_MAP     = __ECO_MAP_JSON__;
 const STARTING_KEY = __STARTING_KEY__;
 
 const PIECES = {
@@ -352,6 +536,92 @@ let history = [];        // [{key, san}]
 let currentKey = STARTING_KEY;
 let lastUci = null;
 let flipped = false;
+let activeFilter  = 'all';
+let activeEco     = 'all';
+let openingSearch = '';
+let last10Active  = false;
+
+// ── Filter helpers ────────────────────────────────────────────────────────
+function setFilter(cat, btn) {
+  activeFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  update();
+}
+
+function clearDates() {
+  document.getElementById('date-from').value = '';
+  document.getElementById('date-to').value = '';
+  update();
+}
+
+function toggleLast10(btn) {
+  last10Active = !last10Active;
+  btn.classList.toggle('active', last10Active);
+  update();
+}
+
+function setEcoFilter(vol, btn) {
+  activeEco = vol;
+  document.querySelectorAll('#eco-filter-bar .filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  update();
+}
+
+function onOpeningSearch(val) {
+  openingSearch = val.trim().toLowerCase();
+  update();
+}
+
+// PGN dates are YYYY.MM.DD — convert to YYYY-MM-DD for comparison with input values
+function pgnDateToIso(d) {
+  return d ? d.replace(/\./g, '-') : '';
+}
+
+function matchesFilter(id) {
+  const g = PGNS[id];
+  if (!g) return false;
+  // time control
+  if (activeFilter !== 'all' && g.tc_category !== activeFilter) return false;
+  // date range
+  const iso  = pgnDateToIso(g.date);
+  const from = document.getElementById('date-from').value;
+  const to   = document.getElementById('date-to').value;
+  if (from && iso && iso < from) return false;
+  if (to   && iso && iso > to)   return false;
+  // ECO volume (A–E)
+  if (activeEco !== 'all' && !(g.eco || '').startsWith(activeEco)) return false;
+  // opening name search
+  if (openingSearch && !(g.opening || '').toLowerCase().includes(openingSearch)) return false;
+  return true;
+}
+
+// Re-aggregate a child's stats using only filtered game IDs
+function filteredChild(c) {
+  const noFilters = activeFilter === 'all' &&
+      !document.getElementById('date-from').value &&
+      !document.getElementById('date-to').value &&
+      !last10Active;
+  if (noFilters) return c;
+  let ids = (c.ids || []).filter(id => matchesFilter(id));
+  ids.sort((a, b) => Number(b) - Number(a));  // newest first
+  if (last10Active) ids = ids.slice(0, 10);
+  let w = 0, d = 0, l = 0;
+  for (const id of ids) {
+    const g = PGNS[id];
+    if (!g) continue;
+    if (g.my_result === 'win')  w++;
+    else if (g.my_result === 'loss') l++;
+    else d++;
+  }
+  return { ...c, ids, g: ids.length, w, d, l };
+}
+
+function updateFilterSummary(totalShown, totalAll) {
+  const el = document.getElementById('filter-summary');
+  if (totalShown === totalAll) { el.textContent = ''; return; }
+  el.textContent = `Showing ${totalShown} of ${totalAll} games`;
+}
 
 // ── Board ─────────────────────────────────────────────────────────────────
 function fenToGrid(fen) {
@@ -403,10 +673,15 @@ function renderMoves(key) {
     el.innerHTML = '<p class="none">No recorded games from this position.</p>';
     return;
   }
+  const children = node.children.map(filteredChild).filter(c => c.g > 0);
+  if (!children.length) {
+    el.innerHTML = '<p class="none">No games match the current filter.</p>';
+    return;
+  }
   let html = `<table><thead><tr>
     <th>Move</th><th>Games</th><th>W / D / L</th><th>Score</th><th>Bar</th>
   </tr></thead><tbody>`;
-  for (const c of node.children) {
+  for (const c of children) {
     const pct  = c.g > 0 ? Math.round(100*c.w/c.g) : 0;
     const wPct = c.g > 0 ? (100*c.w/c.g).toFixed(1) : 0;
     const dPct = c.g > 0 ? (100*c.d/c.g).toFixed(1) : 0;
@@ -428,17 +703,19 @@ function renderMoves(key) {
 }
 
 // ── Games panel ───────────────────────────────────────────────────────────
-function gamesAtPosition(key) {
+function gamesAtPosition(key, filtered = true) {
   const node = TREE[key];
   if (!node) return [];
-  // Union of all game_ids across all children (games that were AT this position)
   const seen = new Set();
-  const ids = [];
+  let ids = [];
   for (const c of node.children) {
     for (const id of (c.ids || [])) {
-      if (!seen.has(id)) { seen.add(id); ids.push(id); }
+      if (!seen.has(id) && (!filtered || matchesFilter(id))) { seen.add(id); ids.push(id); }
     }
   }
+  // Sort newest first (Chess.com IDs are monotonically increasing)
+  ids.sort((a, b) => Number(b) - Number(a));
+  if (filtered && last10Active) ids = ids.slice(0, 10);
   return ids;
 }
 
@@ -454,12 +731,14 @@ function resultLabel(myResult) {
 }
 
 function renderGames(key) {
-  const ids = gamesAtPosition(key);
+  const ids    = gamesAtPosition(key, true);
+  const allIds = gamesAtPosition(key, false);
   const heading = document.getElementById('games-heading');
   const toolbar = document.getElementById('games-toolbar');
   const list    = document.getElementById('games-list');
 
   heading.textContent = `Games at this position (${ids.length})`;
+  updateFilterSummary(ids.length, allIds.length);
 
   if (!ids.length) {
     toolbar.style.display = 'none';
@@ -485,6 +764,7 @@ function renderGames(key) {
         <div class="meta">
           <span class="${rc}">${rl}</span>${asColor}
           &nbsp;·&nbsp;${g.date || '?'}
+          &nbsp;·&nbsp;<span style="color:#aaa;text-transform:capitalize">${g.tc_category || ''}</span>${g.tc ? ` (${g.tc})` : ''}
           ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">chess.com</a>` : ''}
         </div>
       </div>
@@ -544,7 +824,7 @@ function copySelected() {
 }
 
 function copyAll() {
-  const ids = gamesAtPosition(currentKey);
+  const ids = gamesAtPosition(currentKey, true);
   const text = ids.map(id => PGNS[id]?.pgn?.trim()).filter(Boolean).join('\n\n');
   navigator.clipboard.writeText(text).then(() => alert(`Copied ${ids.length} PGN(s) to clipboard.`));
 }
@@ -576,6 +856,15 @@ function goHome() {
   update();
 }
 
+function getCurrentOpening() {
+  // Return deepest ECO match along current path (current position first, then history)
+  if (ECO_MAP[currentKey]) return ECO_MAP[currentKey];
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (ECO_MAP[history[i].key]) return ECO_MAP[history[i].key];
+  }
+  return null;
+}
+
 function update() {
   const node = TREE[currentKey];
   const fen  = node ? node.fen : currentKey + ' 0 1';
@@ -586,6 +875,12 @@ function update() {
     moves ? `<span>${moves}</span>` : 'Starting position';
   document.getElementById('position-arg').textContent =
     moves ? `--position "${moves}"` : '';
+
+  const opening = getCurrentOpening();
+  const ol = document.getElementById('opening-label');
+  ol.innerHTML = opening
+    ? `<span class="eco-code">${opening.eco}</span>${opening.name}`
+    : '';
 
   renderMoves(currentKey);
   renderGames(currentKey);
@@ -761,20 +1056,29 @@ document.addEventListener('keydown', e => {
 
 
 def generate(db_path: Path, pgn_dir: Path, out_path: Path, title: str) -> None:
+    print(f"Loading ECO opening data…")
+    eco_lookup = load_eco_data()
+
     print(f"Loading tree from {db_path}…")
     tree = load_tree(db_path)
     print(f"  {len(tree)} positions with moves")
 
     print(f"Loading PGNs from {pgn_dir}…")
-    pgns = load_pgns(pgn_dir)
+    pgns = load_pgns(pgn_dir, eco_lookup)
     print(f"  {len(pgns)} games")
 
-    tree_json    = json.dumps(tree, separators=(",", ":"))
-    pgns_json    = json.dumps(pgns, separators=(",", ":"))
+    # Build position-key → opening map for the tree navigator
+    eco_map = {k: v for k, v in eco_lookup.items() if k in tree}
+    print(f"  {len(eco_map)} tree positions matched to ECO openings")
+
+    tree_json     = json.dumps(tree,    separators=(",", ":"))
+    pgns_json     = json.dumps(pgns,    separators=(",", ":"))
+    eco_map_json  = json.dumps(eco_map, separators=(",", ":"))
     starting_json = json.dumps(STARTING_KEY)
 
     html = HTML_TEMPLATE.replace("__TREE_JSON__", tree_json)
     html = html.replace("__PGNS_JSON__", pgns_json)
+    html = html.replace("__ECO_MAP_JSON__", eco_map_json)
     html = html.replace("__STARTING_KEY__", starting_json)
     html = html.replace("My Chess Opening Tree", title)  # <title> and <h1>
 
