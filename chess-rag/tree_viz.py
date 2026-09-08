@@ -503,6 +503,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0;
   }
   #op-modal-close:hover { color: #ccc; }
+  #op-pin-btn {
+    position: absolute; top: 10px; right: 44px;
+    background: none; border: 1px solid #444; color: #888;
+    padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  #op-pin-btn:hover { border-color: #ffd700; color: #ffd700; }
+  #op-pin-btn.pinned { color: #ffd700; border-color: #ffd700; }
+  #op-modal-toolbar {
+    display: none; align-items: center; gap: 8px;
+    padding: 6px 14px; border-bottom: 1px solid #1e1e38;
+    font-size: 0.78rem; flex-shrink: 0;
+  }
+  #op-modal-toolbar label { color: #aaa; cursor: pointer; }
+  .op-game-chk { cursor: pointer; accent-color: #00d4ff; flex-shrink: 0; }
+
+  /* ── Pinned opening tabs ── */
+  .op-tab-x { margin-left: 5px; font-size: 0.72rem; opacity: 0.55; }
+  .op-tab-x:hover { opacity: 1; color: #dc3545 !important; }
+
+  /* ── Together (combined) section ── */
+  #combined-section { width: 640px; margin-bottom: 24px; display: none; }
+  #combined-section h2 { font-size: 0.9rem; color: #00d4ff; margin-bottom: 8px; }
+  .combined-total-row td { font-weight: 700; color: #fff; border-top: 2px solid #2a2a4e; }
   #op-board-area {
     display: flex; gap: 16px; align-items: flex-start;
     padding: 12px 16px; border-bottom: 1px solid #1e1e38; flex-shrink: 0;
@@ -631,10 +655,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="openings-content"></div>
 </div>
 
+<div id="combined-section">
+  <h2 id="combined-heading">Together</h2>
+  <div id="combined-content"></div>
+</div>
+
 <!-- Opening detail modal -->
 <div id="op-modal-veil" onclick="closeOpModal(event)">
   <div id="op-modal" style="position:relative">
     <button id="op-modal-close" onclick="closeOpModal()">✕</button>
+    <button id="op-pin-btn" onclick="pinCurrentOp()">☆ Pin to nav</button>
     <div id="op-modal-head">
       <div id="op-modal-title"></div>
       <div id="op-modal-stats"></div>
@@ -646,6 +676,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div id="op-pos-raw" onclick="copyOpPosition()" title="Click to copy"></div>
         <div id="op-pos-hint"></div>
       </div>
+    </div>
+    <div id="op-modal-toolbar">
+      <label><input type="checkbox" id="op-chk-all" onchange="opToggleAll(this)"> All</label>
+      <button class="btn-copy-one" onclick="opCopySelected()">Copy selected PGNs</button>
     </div>
     <div id="op-modal-body"></div>
   </div>
@@ -694,6 +728,8 @@ let currentView   = 'tree';
 let opSortCol     = 'games';
 let opSortDir     = -1;   // -1 desc, +1 asc
 let _opRows       = [];   // last rendered openings rows (modal looks rows up by index)
+let _pinnedOps    = [];   // [{eco, name}] pinned to navbar
+let _currentOpKey = '';   // eco|name of the opening currently shown in the modal
 
 // ── Filter helpers ────────────────────────────────────────────────────────
 function setFilter(cat, btn) {
@@ -1000,8 +1036,10 @@ function setView(view, btn) {
   TREE_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showTree ? '' : 'none'; });
   document.querySelectorAll('.section').forEach(el => el.style.display = showTree ? '' : 'none');
   document.getElementById('games-section').style.display = showTree ? '' : 'none';
-  document.getElementById('openings-section').style.display = showTree ? 'none' : 'block';
-  if (!showTree) renderOpenings();
+  document.getElementById('openings-section').style.display = (view === 'openings') ? 'block' : 'none';
+  document.getElementById('combined-section').style.display = (view === 'together') ? 'block' : 'none';
+  if (view === 'openings') renderOpenings();
+  if (view === 'together') renderTogether();
 }
 
 // ── Openings stats ────────────────────────────────────────────────────────
@@ -1077,6 +1115,7 @@ function renderOpenings() {
   }
 
   let html = `<table><thead><tr>
+    <th style="width:32px"></th>
     <th class="op-sort" onclick="sortOpenings('eco')">ECO ${arr('eco')}</th>
     <th class="op-sort" onclick="sortOpenings('name')">Opening ${arr('name')}</th>
     <th class="op-sort" onclick="sortOpenings('games')">Games ${arr('games')}</th>
@@ -1091,9 +1130,12 @@ function renderOpenings() {
     const dPct = g ? (100 * r.d / g) : 0;
     const lPct = g ? (100 * r.l / g) : 0;
     const scoreColor = wPct >= 55 ? '#28a745' : wPct >= 45 ? '#aaa' : '#dc3545';
-    html += `<tr class="op-row" onclick="openOpModal(${i})">
+    const key = r.eco + '|' + r.name;
+    const pinned = _pinnedOps.some(p => p.eco === r.eco && p.name === r.name);
+    html += `<tr class="op-row${pinned ? ' op-checked' : ''}">
+      <td style="text-align:center;padding:0 6px"><input type="checkbox" class="op-chk" ${pinned ? 'checked' : ''} onclick="toggleOpPin(${i},event)"></td>
       <td><span class="eco-badge">${r.eco}</span></td>
-      <td class="op-name">${r.name}</td>
+      <td class="op-name" onclick="openOpModal(${i})" style="cursor:pointer">${r.name}</td>
       <td>${g}</td>
       <td>+${r.w} =${r.d} -${r.l}</td>
       <td class="score" style="color:${scoreColor}">${wPct.toFixed(0)}%</td>
@@ -1127,6 +1169,10 @@ function openOpModal(i) {
   const row = _opRows[i];
   if (!row) return;
   const { eco, name } = row;
+  _currentOpKey = eco + '|' + name;
+  const isPinned = _pinnedOps.some(p => p.eco === eco && p.name === name);
+  const pinBtn = document.getElementById('op-pin-btn');
+  if (pinBtn) { pinBtn.textContent = isPinned ? '★ Pinned' : '☆ Pin to nav'; pinBtn.classList.toggle('pinned', isPinned); }
 
   // Collect matching games respecting time control + date filters
   let ids = Object.entries(PGNS)
@@ -1188,6 +1234,7 @@ function openOpModal(i) {
     const rl = resultLabel(g.my_result);
     const asColor = g.my_color ? ` as ${g.my_color}` : '';
     html += `<div class="op-game-row">
+      <input type="checkbox" class="op-game-chk" data-id="${id}" onclick="event.stopPropagation()">
       <div class="op-game-info">
         <div class="players">${g.white} vs ${g.black}</div>
         <div class="meta">
@@ -1200,6 +1247,10 @@ function openOpModal(i) {
       <button class="btn-copy-one" onclick="openPgnModal('${id}')">View</button>
     </div>`;
   }
+  const toolbar = document.getElementById('op-modal-toolbar');
+  if (toolbar) toolbar.style.display = ids.length ? 'flex' : 'none';
+  const chkAll = document.getElementById('op-chk-all');
+  if (chkAll) chkAll.checked = false;
   document.getElementById('op-modal-body').innerHTML = html || '<p class="none" style="padding:8px">No games.</p>';
   document.getElementById('op-modal-veil').classList.add('open');
 }
@@ -1207,6 +1258,207 @@ function openOpModal(i) {
 function closeOpModal(e) {
   if (e && e.target !== document.getElementById('op-modal-veil')) return;
   document.getElementById('op-modal-veil').classList.remove('open');
+}
+
+// ── Pin / navbar ──────────────────────────────────────────────────────────
+function pinCurrentOp() {
+  if (!_currentOpKey) return;
+  const sep = _currentOpKey.indexOf('|');
+  const eco = _currentOpKey.slice(0, sep);
+  const name = _currentOpKey.slice(sep + 1);
+  const idx = _pinnedOps.findIndex(p => p.eco === eco && p.name === name);
+  if (idx >= 0) _pinnedOps.splice(idx, 1);
+  else _pinnedOps.push({ eco, name });
+  const isPinned = _pinnedOps.some(p => p.eco === eco && p.name === name);
+  const pinBtn = document.getElementById('op-pin-btn');
+  if (pinBtn) { pinBtn.textContent = isPinned ? '★ Pinned' : '☆ Pin to nav'; pinBtn.classList.toggle('pinned', isPinned); }
+  updatePinnedTabs();
+}
+
+function toggleOpPin(i, evt) {
+  evt.stopPropagation();
+  const r = _opRows[i];
+  if (!r) return;
+  const idx = _pinnedOps.findIndex(p => p.eco === r.eco && p.name === r.name);
+  if (idx >= 0) _pinnedOps.splice(idx, 1);
+  else _pinnedOps.push({ eco: r.eco, name: r.name });
+  // Update row highlight without full re-render
+  const chk = evt.target;
+  const row = chk.closest('tr');
+  if (row) row.classList.toggle('op-checked', idx < 0);
+  updatePinnedTabs();
+}
+
+function updatePinnedTabs() {
+  const viewTabs = document.getElementById('view-tabs');
+  viewTabs.querySelectorAll('.op-pinned-tab').forEach(t => t.remove());
+  const old = document.getElementById('tab-together');
+  if (old) old.remove();
+
+  _pinnedOps.forEach(({ eco, name }, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'view-tab op-pinned-tab';
+    const short = name.length > 22 ? name.slice(0, 20) + '…' : name;
+    btn.innerHTML = `<span class="eco-badge">${eco}</span> ${short} <span class="op-tab-x" onclick="unpinOp(${idx},event)">✕</span>`;
+    btn.onclick = function (e) {
+      if (e.target.classList.contains('op-tab-x')) return;
+      openOpByKey(eco + '|' + name);
+    };
+    viewTabs.appendChild(btn);
+  });
+
+  if (_pinnedOps.length >= 1) {
+    const btn = document.createElement('button');
+    btn.id = 'tab-together';
+    btn.className = 'view-tab';
+    btn.textContent = `Together (${_pinnedOps.length})`;
+    btn.onclick = function () { setView('together', this); };
+    viewTabs.appendChild(btn);
+  }
+
+  if (_pinnedOps.length === 0 && currentView === 'together') {
+    const opBtn = document.querySelector('.view-tab[onclick*="openings"]');
+    if (opBtn) setView('openings', opBtn);
+  }
+  if (currentView === 'together') renderTogether();
+}
+
+function unpinOp(idx, evt) {
+  evt.stopPropagation();
+  _pinnedOps.splice(idx, 1);
+  updatePinnedTabs();
+}
+
+function openOpByKey(key) {
+  const sep = key.indexOf('|');
+  const eco = key.slice(0, sep);
+  const name = key.slice(sep + 1);
+  // Ensure _opRows is populated (requires openings view to have rendered)
+  if (!_opRows.length) {
+    const opBtn = document.querySelector('.view-tab[onclick*="openings"]');
+    if (opBtn) setView('openings', opBtn);
+  }
+  const i = _opRows.findIndex(r => r.eco === eco && r.name === name);
+  if (i >= 0) openOpModal(i);
+}
+
+function renderTogether() {
+  const heading = document.getElementById('combined-heading');
+  const content = document.getElementById('combined-content');
+  if (!_pinnedOps.length) {
+    heading.textContent = 'Together';
+    content.innerHTML = '<p class="none">Pin openings using ☆ Pin to nav inside any opening\'s detail panel.</p>';
+    return;
+  }
+
+  let totalW = 0, totalD = 0, totalL = 0;
+  let tableHtml = `<table><thead><tr>
+    <th>ECO</th><th>Opening</th><th>Games</th><th>W / D / L</th>
+    <th>Win%</th><th>Bar</th>
+  </tr></thead><tbody>`;
+  const allGameRows = [];
+
+  for (const { eco, name } of _pinnedOps) {
+    let w = 0, d = 0, l = 0;
+    const ids = [];
+    for (const [id, g] of Object.entries(PGNS)) {
+      if (!matchesFilterOpenings(id)) continue;
+      if ((g.eco || '—') !== eco || (g.opening || 'Unknown') !== name) continue;
+      if (g.my_result === 'win') w++;
+      else if (g.my_result === 'loss') l++;
+      else d++;
+      ids.push(id);
+    }
+    totalW += w; totalD += d; totalL += l;
+    allGameRows.push(...ids.map(id => ({ id, eco })));
+    const g2 = w + d + l;
+    const wPct = g2 ? (100 * w / g2) : 0;
+    const dPct = g2 ? (100 * d / g2) : 0;
+    const lPct = g2 ? (100 * l / g2) : 0;
+    const sc = wPct >= 55 ? '#28a745' : wPct >= 45 ? '#aaa' : '#dc3545';
+    tableHtml += `<tr>
+      <td><span class="eco-badge">${eco}</span></td>
+      <td class="op-name">${name}</td>
+      <td>${g2}</td>
+      <td>+${w} =${d} -${l}</td>
+      <td class="score" style="color:${sc}">${wPct.toFixed(0)}%</td>
+      <td><div class="bar-wrap" style="min-width:100px">
+        <span class="bar-win" style="width:${wPct.toFixed(1)}%"></span><span
+              class="bar-draw" style="width:${dPct.toFixed(1)}%"></span><span
+              class="bar-loss" style="width:${lPct.toFixed(1)}%"></span>
+      </div></td>
+    </tr>`;
+  }
+
+  const tg = totalW + totalD + totalL;
+  const twPct = tg ? (100 * totalW / tg) : 0;
+  const tdPct = tg ? (100 * totalD / tg) : 0;
+  const tlPct = tg ? (100 * totalL / tg) : 0;
+  const tsc = twPct >= 55 ? '#28a745' : twPct >= 45 ? '#aaa' : '#dc3545';
+  tableHtml += `<tr class="combined-total-row">
+    <td colspan="2">Total</td>
+    <td>${tg}</td>
+    <td>+${totalW} =${totalD} -${totalL}</td>
+    <td class="score" style="color:${tsc}">${twPct.toFixed(0)}%</td>
+    <td><div class="bar-wrap" style="min-width:100px">
+      <span class="bar-win" style="width:${twPct.toFixed(1)}%"></span><span
+            class="bar-draw" style="width:${tdPct.toFixed(1)}%"></span><span
+            class="bar-loss" style="width:${tlPct.toFixed(1)}%"></span>
+    </div></td>
+  </tr></tbody></table>`;
+
+  heading.textContent = `Together — ${_pinnedOps.length} opening${_pinnedOps.length !== 1 ? 's' : ''} · ${tg} games · ${twPct.toFixed(1)}% win rate`;
+
+  allGameRows.sort((a, b) => Number(b.id) - Number(a.id));
+  let gHtml = '<h3 style="font-size:0.85rem;color:#aaa;margin:16px 0 8px">Games</h3>';
+  for (const { id, eco } of allGameRows) {
+    const g = PGNS[id];
+    if (!g) continue;
+    const rc = resultClass(g.my_result);
+    const rl = resultLabel(g.my_result);
+    const asColor = g.my_color ? ` as ${g.my_color}` : '';
+    gHtml += `<div class="op-game-row">
+      <input type="checkbox" class="op-game-chk" data-id="${id}" onclick="event.stopPropagation()">
+      <div class="op-game-info">
+        <div class="players"><span class="eco-badge" style="margin-right:5px">${eco}</span>${g.white} vs ${g.black}</div>
+        <div class="meta">
+          <span class="${rc}">${rl}</span>${asColor}
+          &nbsp;·&nbsp;${g.date || '?'}
+          &nbsp;·&nbsp;<span style="text-transform:capitalize">${g.tc_category || ''}</span>${g.tc ? ` (${g.tc})` : ''}
+          ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">chess.com</a>` : ''}
+        </div>
+      </div>
+      <button class="btn-copy-one" onclick="openPgnModal('${id}')">View</button>
+      <button class="btn-copy-one" onclick="copyGameId('${id}',this)">Copy ID</button>
+    </div>`;
+  }
+  content.innerHTML = tableHtml + gHtml;
+}
+
+// ── Modal game-row select / copy ──────────────────────────────────────────
+function opToggleAll(chk) {
+  document.querySelectorAll('#op-modal-body .op-game-chk').forEach(c => c.checked = chk.checked);
+}
+
+function opCopySelected() {
+  const ids = [...document.querySelectorAll('#op-modal-body .op-game-chk:checked')]
+    .map(c => c.dataset.id).filter(Boolean);
+  if (!ids.length) return;
+  const text = ids.map(id => PGNS[id]?.pgn).filter(Boolean).join('\n\n');
+  if (text) navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function copyGameId(id, btn) {
+  navigator.clipboard.readText().then(existing => {
+    const ids = existing ? existing.split(/\s+/).filter(Boolean) : [];
+    if (!ids.includes(id)) ids.push(id);
+    return navigator.clipboard.writeText(ids.join('\n'));
+  }).catch(() => navigator.clipboard.writeText(id)).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Appended!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+  });
 }
 
 function copyOpPosition() {
