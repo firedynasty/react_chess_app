@@ -192,34 +192,39 @@ def load_eco_data() -> dict:
     return merged
 
 
-def _annotate_game_opening(pgn_text: str, eco_lookup: dict) -> tuple[str, str]:
+def _annotate_game_opening(pgn_text: str, eco_lookup: dict) -> tuple[str, str, list, str]:
     """
-    Replay a game's moves and return (eco_code, opening_name) for the deepest
-    position that matches the ECO lookup. Returns ("", "") if no match.
+    Replay a game's moves and return (eco_code, opening_name, sans, fen) for the
+    deepest position that matches the ECO lookup. Returns ("", "", [], "") if no match.
     """
     if not HAVE_CHESS or not eco_lookup:
-        return "", ""
+        return "", "", [], ""
     try:
         game = chess.pgn.read_game(io.StringIO(pgn_text))
         if game is None:
-            return "", ""
+            return "", "", [], ""
         board = game.board()
-        best_eco, best_name = "", ""
+        best_eco, best_name, best_sans, best_fen = "", "", [], ""
+        sans_so_far: list[str] = []
         for move in game.mainline_moves():
+            sans_so_far.append(board.san(move))
             board.push(move)
             key = " ".join(board.fen().split()[:4])
             if key in eco_lookup:
-                best_eco = eco_lookup[key]["eco"]
+                best_eco  = eco_lookup[key]["eco"]
                 best_name = eco_lookup[key]["name"]
-        return best_eco, best_name
+                best_sans = list(sans_so_far)
+                best_fen  = board.fen()
+        return best_eco, best_name, best_sans, best_fen
     except Exception:
-        return "", ""
+        return "", "", [], ""
 
 
 def load_pgns(pgn_dir: Path, eco_lookup: dict | None = None) -> dict:
     """
     Returns {game_id: {pgn, white, black, result, date, my_color, my_result,
-                       url, tc, tc_category, eco, opening}}
+                       url, tc, tc_category, eco, opening,
+                       opening_moves, opening_fen}}
     """
     eco_lookup = eco_lookup or {}
     pgns: dict = {}
@@ -227,20 +232,22 @@ def load_pgns(pgn_dir: Path, eco_lookup: dict | None = None) -> dict:
         game_id = path.stem
         text = path.read_text(encoding="utf-8")
         tc = _pgn_header(text, "TimeControl")
-        eco_code, opening_name = _annotate_game_opening(text, eco_lookup)
+        eco_code, opening_name, opening_sans, opening_fen = _annotate_game_opening(text, eco_lookup)
         pgns[game_id] = {
-            "pgn":         text,
-            "white":       _pgn_header(text, "White"),
-            "black":       _pgn_header(text, "Black"),
-            "result":      _pgn_header(text, "Result"),
-            "date":        _pgn_header(text, "Date") or _pgn_header(text, "EndDate"),
-            "my_color":    _pgn_header(text, "MyColor"),
-            "my_result":   _pgn_header(text, "MyResult"),
-            "url":         _pgn_header(text, "Link") or _pgn_header(text, "Site"),
-            "tc":          tc,
-            "tc_category": _classify_tc(tc),
-            "eco":         eco_code,
-            "opening":     opening_name,
+            "pgn":           text,
+            "white":         _pgn_header(text, "White"),
+            "black":         _pgn_header(text, "Black"),
+            "result":        _pgn_header(text, "Result"),
+            "date":          _pgn_header(text, "Date") or _pgn_header(text, "EndDate"),
+            "my_color":      _pgn_header(text, "MyColor"),
+            "my_result":     _pgn_header(text, "MyResult"),
+            "url":           _pgn_header(text, "Link") or _pgn_header(text, "Site"),
+            "tc":            tc,
+            "tc_category":   _classify_tc(tc),
+            "eco":           eco_code,
+            "opening":       opening_name,
+            "opening_moves": opening_sans,
+            "opening_fen":   opening_fen,
         }
     return pgns
 
@@ -416,7 +423,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   #opening-search::placeholder { color: #555; }
 
   /* PGN panel (fixed right, no veil) */
-  #pgnPanel { display: none; position: fixed; top: 0; right: 0; width: 420px; height: 100vh; background: #12122a; border-left: 1px solid #2a2a4e; flex-direction: column; z-index: 100; box-shadow: -4px 0 16px rgba(0,0,0,0.4); }
+  #pgnPanel { display: none; position: fixed; top: 0; right: 0; width: 420px; height: 100vh; background: #12122a; border-left: 1px solid #2a2a4e; flex-direction: column; z-index: 300; box-shadow: -4px 0 16px rgba(0,0,0,0.4); }
   #pgnPanel.open { display: flex; }
   #pgn-header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #2a2a4e; flex-shrink: 0; }
   #pgn-caption { font-size: 0.78rem; color: #aaa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -437,10 +444,118 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .pgn-moves .variation-move { cursor: pointer; padding: 1px 3px; border-radius: 3px; font-weight: 500; color: #aaa; }
   .pgn-moves .variation-move:hover { background: #2a3a4a; }
   .pgn-moves .variation-move.current { background: #7a5d10; color: #fff; }
+
+  /* ── View tabs ── */
+  #view-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+  .view-tab {
+    background: #0f3460; color: #aaa;
+    border: 1px solid #2a4080;
+    padding: 5px 20px; border-radius: 5px;
+    cursor: pointer; font-size: 0.88rem; transition: all 0.15s;
+  }
+  .view-tab:hover { border-color: #00d4ff; color: #00d4ff; }
+  .view-tab.active { background: #00d4ff; color: #1a1a2e; border-color: #00d4ff; font-weight: 700; }
+
+  /* ── Openings stats table ── */
+  #openings-section { width: 640px; margin-bottom: 24px; display: none; }
+  #openings-section h2 { font-size: 0.9rem; color: #00d4ff; margin-bottom: 8px; }
+  #openings-search-wrap { margin-bottom: 10px; }
+  #openings-search {
+    background: #0f3460; color: #ccc; border: 1px solid #2a4080;
+    padding: 5px 12px; border-radius: 12px; font-size: 0.82rem; width: 220px;
+  }
+  #openings-search:focus { outline: none; border-color: #00d4ff; }
+  #openings-search::placeholder { color: #555; }
+  .op-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+  .op-sort:hover { color: #fff; }
+  .sort-arr { font-size: 0.65rem; margin-left: 2px; vertical-align: middle; }
+  .eco-badge {
+    display: inline-block; background: #0f3460; color: #00d4ff;
+    border: 1px solid #1a4a90; border-radius: 3px;
+    padding: 0 5px; font-size: 0.72rem; font-weight: 700;
+    font-family: monospace; white-space: nowrap;
+  }
+  .op-name { color: #e0e0e0; }
+  .op-row { cursor: pointer; transition: background 0.12s; }
+  .op-row:hover td { background: #16213e; }
+
+  /* ── Opening detail modal ── */
+  #op-modal-veil {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65); z-index: 200;
+    align-items: flex-start; justify-content: center;
+    padding-top: 60px;
+  }
+  #op-modal-veil.open { display: flex; }
+  #op-modal {
+    background: #12122a; border: 1px solid #2a2a4e;
+    border-radius: 8px; width: 560px; max-height: 78vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  }
+  #op-modal-head { padding: 14px 16px 10px; border-bottom: 1px solid #2a2a4e; flex-shrink: 0; }
+  #op-modal-title { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  #op-modal-stats { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .op-modal-bar-wrap { flex: 1; background: #2a2a3e; border-radius: 3px; height: 10px; overflow: hidden; }
+  #op-modal-close {
+    position: absolute; top: 10px; right: 12px;
+    background: none; border: none; color: #666;
+    font-size: 1.3rem; cursor: pointer; line-height: 1; padding: 0;
+  }
+  #op-modal-close:hover { color: #ccc; }
+  #op-board-area {
+    display: flex; gap: 16px; align-items: flex-start;
+    padding: 12px 16px; border-bottom: 1px solid #1e1e38; flex-shrink: 0;
+  }
+  #op-board-grid {
+    display: grid; grid-template-columns: repeat(8,1fr); grid-template-rows: repeat(8,1fr);
+    width: 240px; height: 240px; flex-shrink: 0;
+    border: 2px solid #444; border-radius: 3px; overflow: hidden;
+  }
+  #op-board-grid .sq { font-size: 1.5rem; }
+  #op-board-right { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+  #op-move-seq { font-size: 0.85rem; color: #ddd; line-height: 1.8; word-break: break-word; }
+  #op-move-seq .mn { color: #555; }
+  #op-pos-raw {
+    margin-top: 8px; font-family: monospace; font-size: 0.78rem; color: #00d4ff;
+    background: #0a0a1e; border: 1px solid #1a2a50; border-radius: 4px;
+    padding: 5px 10px; cursor: pointer; word-break: break-all; user-select: none;
+  }
+  #op-pos-raw:hover { border-color: #00d4ff; }
+  #op-pos-hint { font-size: 0.72rem; color: #888; margin-top: 4px; min-height: 1em; }
+  #op-modal-body { overflow-y: auto; padding: 10px 14px 14px; flex: 1; }
+  .op-game-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 8px; border-bottom: 1px solid #1e1e38;
+    font-size: 0.83rem;
+  }
+  .op-game-info { flex: 1; min-width: 0; }
+  .op-game-info .players { font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op-game-info .meta { color: #999; font-size: 0.75rem; margin-top: 1px; }
+
+  /* ── Tree position jump input ── */
+  #pos-input-wrap { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  #pos-input {
+    background: #0f3460; color: #ccc; border: 1px solid #2a4080;
+    padding: 5px 10px; border-radius: 5px; font-size: 0.8rem;
+    font-family: monospace; width: 260px;
+  }
+  #pos-input:focus { outline: none; border-color: #00d4ff; }
+  #pos-input::placeholder { color: #555; font-family: sans-serif; font-size: 0.78rem; }
+  #pos-go-btn { padding: 5px 12px; }
+  #pos-clear-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 0.85rem; padding: 0 4px; }
+  #pos-clear-btn:hover { color: #aaa; }
+  #pos-err { font-size: 0.72rem; color: #dc3545; min-height: 1em; margin-bottom: 4px; }
 </style>
 </head>
 <body>
 <h1>My Chess Opening Tree</h1>
+
+<div id="view-tabs">
+  <button class="view-tab active" onclick="setView('tree',this)">Opening Tree</button>
+  <button class="view-tab" onclick="setView('openings',this)">Openings Stats</button>
+</div>
+
 <div id="breadcrumb">Starting position</div>
 
 <div id="controls">
@@ -448,6 +563,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <button onclick="goHome()">⌂ Root</button>
   <button onclick="flipBoard()">⇅ Flip</button>
 </div>
+
+<div id="pos-input-wrap">
+  <input id="pos-input" type="text" placeholder="Jump to position: e4 e5 Nf3 …" onkeydown="if(event.key==='Enter')goToPos()">
+  <button id="pos-go-btn" onclick="goToPos()">Go</button>
+  <button id="pos-clear-btn" onclick="clearPos()" title="Clear">✕</button>
+</div>
+<div id="pos-err"></div>
 
 <div id="filter-bar">
   <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
@@ -501,6 +623,34 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="games-list"></div>
 </div>
 
+<div id="openings-section">
+  <h2 id="openings-heading">Opening Performance</h2>
+  <div id="openings-search-wrap">
+    <input id="openings-search" type="text" placeholder="Filter by opening name…" oninput="renderOpenings()">
+  </div>
+  <div id="openings-content"></div>
+</div>
+
+<!-- Opening detail modal -->
+<div id="op-modal-veil" onclick="closeOpModal(event)">
+  <div id="op-modal" style="position:relative">
+    <button id="op-modal-close" onclick="closeOpModal()">✕</button>
+    <div id="op-modal-head">
+      <div id="op-modal-title"></div>
+      <div id="op-modal-stats"></div>
+    </div>
+    <div id="op-board-area">
+      <div id="op-board-grid"></div>
+      <div id="op-board-right">
+        <div id="op-move-seq"></div>
+        <div id="op-pos-raw" onclick="copyOpPosition()" title="Click to copy"></div>
+        <div id="op-pos-hint"></div>
+      </div>
+    </div>
+    <div id="op-modal-body"></div>
+  </div>
+</div>
+
 <div id="pgnPanel">
   <div id="pgn-header">
     <span id="pgn-caption"></span>
@@ -540,6 +690,10 @@ let activeFilter  = 'all';
 let activeEco     = 'all';
 let openingSearch = '';
 let last10Active  = false;
+let currentView   = 'tree';
+let opSortCol     = 'games';
+let opSortDir     = -1;   // -1 desc, +1 asc
+let _opRows       = [];   // last rendered openings rows (modal looks rows up by index)
 
 // ── Filter helpers ────────────────────────────────────────────────────────
 function setFilter(cat, btn) {
@@ -635,25 +789,27 @@ function fenToGrid(fen) {
   });
 }
 
-function renderBoard(fen, uci) {
+function renderBoard(fen, uci, container) {
   const grid = fenToGrid(fen);
-  const board = document.getElementById('board');
-  board.innerHTML = '';
+  const el = container || document.getElementById('board');
+  el.innerHTML = '';
+  const isFlipped = container ? false : flipped;  // modal board always white-side down
   const hlFrom = uci ? uci.slice(0,2) : null;
   const hlTo   = uci ? uci.slice(2,4) : null;
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
-      const rr = flipped ? 7 - r : r;
-      const ff = flipped ? 7 - f : f;
+      const rr = isFlipped ? 7 - r : r;
+      const ff = isFlipped ? 7 - f : f;
       const sq = document.createElement('div');
       const sqName = String.fromCharCode(97+ff) + (8-rr);
       sq.className = 'sq ' + ((rr+ff)%2===0 ? 'light' : 'dark');
       if (sqName===hlFrom || sqName===hlTo) sq.classList.add('hl');
       const p = grid[rr][ff];
       if (p) sq.innerHTML = `<span class="${p === p.toUpperCase() ? 'wp' : 'bp'}">${PIECES[p] || ''}</span>`;
-      board.appendChild(sq);
+      el.appendChild(sq);
     }
   }
+  if (container) return;  // file labels only follow the main board
   // File labels follow orientation
   document.querySelectorAll('#coords-files .file-label').forEach((el, i) => {
     el.textContent = String.fromCharCode(97 + (flipped ? 7 - i : i));
@@ -833,6 +989,278 @@ function toggleAll(chk) {
   document.querySelectorAll('.game-chk').forEach(el => el.checked = chk.checked);
 }
 
+// ── View toggle ───────────────────────────────────────────────────────────
+const TREE_IDS = ['breadcrumb','controls','pos-input-wrap','pos-err','opening-label','board-wrap','coords-files'];
+
+function setView(view, btn) {
+  currentView = view;
+  document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const showTree = view === 'tree';
+  TREE_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = showTree ? '' : 'none'; });
+  document.querySelectorAll('.section').forEach(el => el.style.display = showTree ? '' : 'none');
+  document.getElementById('games-section').style.display = showTree ? '' : 'none';
+  document.getElementById('openings-section').style.display = showTree ? 'none' : 'block';
+  if (!showTree) renderOpenings();
+}
+
+// ── Openings stats ────────────────────────────────────────────────────────
+// Filter for the openings view: time control + dates only (no ECO/name search)
+function matchesFilterOpenings(id) {
+  const g = PGNS[id];
+  if (!g) return false;
+  if (activeFilter !== 'all' && g.tc_category !== activeFilter) return false;
+  const iso  = pgnDateToIso(g.date);
+  const from = document.getElementById('date-from').value;
+  const to   = document.getElementById('date-to').value;
+  if (from && iso && iso < from) return false;
+  if (to   && iso && iso > to)   return false;
+  return true;
+}
+
+function buildOpeningStats(nameFilter) {
+  const stats = {};
+  for (const [id, g] of Object.entries(PGNS)) {
+    if (!matchesFilterOpenings(id)) continue;
+    const name = g.opening || 'Unknown';
+    if (nameFilter && !name.toLowerCase().includes(nameFilter)) continue;
+    const eco = g.eco || '—';
+    const key = eco + '|' + name;
+    if (!stats[key]) stats[key] = { eco, name, w: 0, d: 0, l: 0 };
+    if (g.my_result === 'win')       stats[key].w++;
+    else if (g.my_result === 'loss') stats[key].l++;
+    else                             stats[key].d++;
+  }
+  return Object.values(stats);
+}
+
+function sortOpenings(col) {
+  if (opSortCol === col) opSortDir = -opSortDir;
+  else { opSortCol = col; opSortDir = (col === 'name' || col === 'eco') ? 1 : -1; }
+  renderOpenings();
+}
+
+function renderOpenings() {
+  const nameFilter = (document.getElementById('openings-search')?.value || '').trim().toLowerCase();
+  const rows = buildOpeningStats(nameFilter);
+  const heading = document.getElementById('openings-heading');
+  const content = document.getElementById('openings-content');
+
+  if (!rows.length) {
+    heading.textContent = 'Opening Performance';
+    content.innerHTML = '<p class="none">No games match the current filter.</p>';
+    _opRows = [];
+    return;
+  }
+
+  rows.sort((a, b) => {
+    const ga = a.w + a.d + a.l, gb = b.w + b.d + b.l;
+    if (opSortCol === 'games')  return opSortDir * (ga - gb);
+    if (opSortCol === 'winpct') {
+      const wa = ga ? a.w / ga : 0, wb = gb ? b.w / gb : 0;
+      return opSortDir * (wa - wb);
+    }
+    if (opSortCol === 'name') return opSortDir * a.name.localeCompare(b.name);
+    if (opSortCol === 'eco')  return opSortDir * a.eco.localeCompare(b.eco);
+    return 0;
+  });
+  _opRows = rows;
+
+  const totalGames  = rows.reduce((s, r) => s + r.w + r.d + r.l, 0);
+  const totalWins   = rows.reduce((s, r) => s + r.w, 0);
+  const totalWinPct = totalGames ? (100 * totalWins / totalGames).toFixed(1) : '0';
+  heading.textContent = `Opening Performance — ${rows.length} openings · ${totalGames} games · ${totalWinPct}% overall win rate`;
+
+  function arr(col) {
+    if (col !== opSortCol) return '<span class="sort-arr" style="opacity:0.25">▼</span>';
+    return `<span class="sort-arr">${opSortDir < 0 ? '▼' : '▲'}</span>`;
+  }
+
+  let html = `<table><thead><tr>
+    <th class="op-sort" onclick="sortOpenings('eco')">ECO ${arr('eco')}</th>
+    <th class="op-sort" onclick="sortOpenings('name')">Opening ${arr('name')}</th>
+    <th class="op-sort" onclick="sortOpenings('games')">Games ${arr('games')}</th>
+    <th>W / D / L</th>
+    <th class="op-sort" onclick="sortOpenings('winpct')">Win% ${arr('winpct')}</th>
+    <th>Bar</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach((r, i) => {
+    const g = r.w + r.d + r.l;
+    const wPct = g ? (100 * r.w / g) : 0;
+    const dPct = g ? (100 * r.d / g) : 0;
+    const lPct = g ? (100 * r.l / g) : 0;
+    const scoreColor = wPct >= 55 ? '#28a745' : wPct >= 45 ? '#aaa' : '#dc3545';
+    html += `<tr class="op-row" onclick="openOpModal(${i})">
+      <td><span class="eco-badge">${r.eco}</span></td>
+      <td class="op-name">${r.name}</td>
+      <td>${g}</td>
+      <td>+${r.w} =${r.d} -${r.l}</td>
+      <td class="score" style="color:${scoreColor}">${wPct.toFixed(0)}%</td>
+      <td><div class="bar-wrap" style="min-width:100px">
+        <span class="bar-win"  style="width:${wPct.toFixed(1)}%"></span><span
+              class="bar-draw" style="width:${dPct.toFixed(1)}%"></span><span
+              class="bar-loss" style="width:${lPct.toFixed(1)}%"></span>
+      </div></td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  content.innerHTML = html;
+}
+
+// ── Opening detail modal ──────────────────────────────────────────────────
+let _opModalMoves = [];   // SAN array for the opening shown in the modal
+
+function formatMoveSeq(sans) {
+  // ["d4","d5","c4"] → "1. d4 d5  2. c4"
+  if (!sans || !sans.length) return '(starting position)';
+  let out = '', moveNum = 1;
+  for (let i = 0; i < sans.length; i++) {
+    if (i % 2 === 0) out += `<span class="mn">${moveNum++}.</span> `;
+    out += sans[i];
+    out += (i % 2 === 0 && i + 1 < sans.length) ? ' ' : '  ';
+  }
+  return out.trim();
+}
+
+function openOpModal(i) {
+  const row = _opRows[i];
+  if (!row) return;
+  const { eco, name } = row;
+
+  // Collect matching games respecting time control + date filters
+  let ids = Object.entries(PGNS)
+    .filter(([id, g]) => g.eco === eco && g.opening === name && matchesFilterOpenings(id))
+    .map(([id]) => id);
+  ids.sort((a, b) => Number(b) - Number(a));  // newest first
+
+  // Most common move sequence among these games + its board position
+  const moveCounts = {};
+  for (const id of ids) {
+    const key = (PGNS[id].opening_moves || []).join(' ');
+    moveCounts[key] = (moveCounts[key] || 0) + 1;
+  }
+  const bestKey = Object.entries(moveCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  _opModalMoves = bestKey ? bestKey.split(' ') : [];
+  let fen = '';
+  for (const id of ids) {
+    if ((PGNS[id].opening_moves || []).join(' ') === bestKey && PGNS[id].opening_fen) {
+      fen = PGNS[id].opening_fen;
+      break;
+    }
+  }
+
+  document.getElementById('op-modal-title').innerHTML =
+    `<span class="eco-badge">${eco}</span> ${name}`;
+
+  // W/D/L stats bar (reuse the row's aggregate)
+  const { w, d, l } = row;
+  const total = w + d + l;
+  const wPct = total ? (100*w/total) : 0;
+  const dPct = total ? (100*d/total) : 0;
+  const lPct = total ? (100*l/total) : 0;
+  const scoreColor = wPct >= 55 ? '#28a745' : wPct >= 45 ? '#aaa' : '#dc3545';
+  document.getElementById('op-modal-stats').innerHTML = `
+    <span style="font-size:0.8rem;color:#aaa">${total} game${total!==1?'s':''}</span>
+    <span style="font-size:0.8rem;color:${scoreColor};font-weight:700">${wPct.toFixed(0)}% win</span>
+    <span style="font-size:0.75rem;color:#888">+${w} =${d} -${l}</span>
+    <div class="op-modal-bar-wrap">
+      <span class="bar-win"  style="display:inline-block;height:10px;width:${wPct.toFixed(1)}%"></span><span
+            class="bar-draw" style="display:inline-block;height:10px;width:${dPct.toFixed(1)}%"></span><span
+            class="bar-loss" style="display:inline-block;height:10px;width:${lPct.toFixed(1)}%"></span>
+    </div>`;
+
+  // Board + moves + copyable position string
+  renderBoard(fen || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', null,
+              document.getElementById('op-board-grid'));
+  document.getElementById('op-move-seq').innerHTML = formatMoveSeq(_opModalMoves);
+  document.getElementById('op-pos-raw').textContent =
+    _opModalMoves.length ? `--position "${_opModalMoves.join(' ')}"` : '(starting position)';
+  document.getElementById('op-pos-hint').textContent = _opModalMoves.length
+    ? 'click the position to copy — paste it in the tree tab' : '';
+
+  // Game rows
+  let html = '';
+  for (const id of ids) {
+    const g = PGNS[id];
+    if (!g) continue;
+    const rc = resultClass(g.my_result);
+    const rl = resultLabel(g.my_result);
+    const asColor = g.my_color ? ` as ${g.my_color}` : '';
+    html += `<div class="op-game-row">
+      <div class="op-game-info">
+        <div class="players">${g.white} vs ${g.black}</div>
+        <div class="meta">
+          <span class="${rc}">${rl}</span>${asColor}
+          &nbsp;·&nbsp;${g.date || '?'}
+          &nbsp;·&nbsp;<span style="text-transform:capitalize">${g.tc_category || ''}</span>${g.tc ? ` (${g.tc})` : ''}
+          ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">chess.com</a>` : ''}
+        </div>
+      </div>
+      <button class="btn-copy-one" onclick="openPgnModal('${id}')">View</button>
+    </div>`;
+  }
+  document.getElementById('op-modal-body').innerHTML = html || '<p class="none" style="padding:8px">No games.</p>';
+  document.getElementById('op-modal-veil').classList.add('open');
+}
+
+function closeOpModal(e) {
+  if (e && e.target !== document.getElementById('op-modal-veil')) return;
+  document.getElementById('op-modal-veil').classList.remove('open');
+}
+
+function copyOpPosition() {
+  if (!_opModalMoves.length) return;
+  navigator.clipboard.writeText(`--position "${_opModalMoves.join(' ')}"`).then(() => {
+    const hint = document.getElementById('op-pos-hint');
+    hint.textContent = 'copied!';
+    setTimeout(() => { hint.textContent = 'click the position to copy — paste it in the tree tab'; }, 1500);
+  });
+}
+
+// ── Position jump (tree view) ─────────────────────────────────────────────
+function parseSans(input) {
+  // Accept "d4 d5 c4", "1. d4 d5 2. c4", or a copied --position "d4 d5 c4" string
+  const s = input.trim().replace(/--?position\s*/i, '').replace(/["']/g, '');
+  return s.replace(/\d+\.{1,3}\s*/g, '').trim().split(/\s+/).filter(Boolean);
+}
+
+function navigateToPosition(posStr) {
+  const sans = parseSans(posStr);
+  let key = STARTING_KEY;
+  const newHistory = [];
+  let lastUciNav = null;
+  for (const san of sans) {
+    const node = TREE[key];
+    if (!node) break;
+    const child = node.children.find(c => c.san === san);
+    if (!child) {
+      document.getElementById('pos-err').textContent =
+        `"${san}" not found in tree after ${newHistory.map(h => h.san).join(' ') || 'start'}`;
+      return false;
+    }
+    newHistory.push({ key, san });
+    lastUciNav = child.uci;
+    key = child.next;
+  }
+  document.getElementById('pos-err').textContent = '';
+  history = newHistory;
+  currentKey = key;
+  lastUci = lastUciNav;
+  update();
+  return true;
+}
+
+function goToPos() {
+  navigateToPosition(document.getElementById('pos-input').value);
+}
+
+function clearPos() {
+  document.getElementById('pos-input').value = '';
+  document.getElementById('pos-err').textContent = '';
+  goHome();
+}
+
 // ── Navigation ────────────────────────────────────────────────────────────
 function navigate(nextKey, san, uci) {
   history.push({ key: currentKey, san });
@@ -885,6 +1313,11 @@ function update() {
   renderMoves(currentKey);
   renderGames(currentKey);
   document.getElementById('btn-back').disabled = history.length === 0;
+
+  // Keep position input in sync with navigation (unless being typed in)
+  const posInput = document.getElementById('pos-input');
+  if (posInput && !posInput.matches(':focus')) posInput.value = moves;
+  if (currentView === 'openings') renderOpenings();
 }
 
 update();
@@ -1044,10 +1477,14 @@ function pgnGoNext()  { if(pgnCurrent?.children.length) pgnJump(pgnCurrent.child
 function pgnFlip()    { if (pgnModalBoard) pgnModalBoard.flip(); }
 
 document.addEventListener('keydown', e => {
-  if (!document.getElementById('pgnPanel').classList.contains('open')) return;
+  const pgnOpen = document.getElementById('pgnPanel').classList.contains('open');
+  if (e.key === 'Escape') {
+    if (pgnOpen) closePgnModal(); else closeOpModal();
+    return;
+  }
+  if (!pgnOpen) return;
   if (e.key === 'ArrowRight') { e.preventDefault(); pgnGoNext(); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); pgnGoPrev(); }
-  else if (e.key === 'Escape') closePgnModal();
 });
 </script>
 </body>
