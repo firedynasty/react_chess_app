@@ -430,7 +430,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .pgn-close { background: none; border: none; color: #666; font-size: 1.2rem; cursor: pointer; padding: 0 4px; line-height: 1; flex-shrink: 0; }
   .pgn-close:hover { color: #ccc; }
   #pgn-body { display: flex; flex-direction: column; align-items: center; padding: 12px; flex: 1; overflow: hidden; }
-  #pgnModalBoard { width: 380px; height: 380px; flex-shrink: 0; }
+  #pgnModalBoard { width: 374px; height: 374px; flex-shrink: 0; }
   .pgn-controls { margin-top: 8px; display: flex; gap: 8px; justify-content: center; flex-shrink: 0; }
   .pgn-controls button { padding: 4px 12px; border-radius: 4px; border: 1px solid #444; background: #2a2a3a; color: #ccc; cursor: pointer; font-size: 1rem; }
   .pgn-controls button:hover { background: #3a3a4a; }
@@ -444,6 +444,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   .pgn-moves .variation-move { cursor: pointer; padding: 1px 3px; border-radius: 3px; font-weight: 500; color: #aaa; }
   .pgn-moves .variation-move:hover { background: #2a3a4a; }
   .pgn-moves .variation-move.current { background: #7a5d10; color: #fff; }
+
+  /* ── Eval bar ── */
+  #pgn-board-row { display: flex; align-items: flex-start; gap: 4px; flex-shrink: 0; }
+  #eval-bar-outer { display: flex; flex-direction: column; align-items: center; height: 374px; gap: 3px; flex-shrink: 0; }
+  #eval-bar-wrap { width: 14px; flex: 1; background: #d0d0d0; border-radius: 3px; position: relative; overflow: hidden; border: 1px solid #2a2a4e; }
+  #eval-bar-fill { position: absolute; bottom: 0; left: 0; right: 0; background: #111; transition: height 0.35s ease; height: 50%; }
+  #eval-score-label { font-size: 0.58rem; font-family: monospace; font-weight: 700; color: #888; text-align: center; }
 
   /* ── View tabs ── */
   #view-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
@@ -691,7 +698,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     <button class="pgn-close" onclick="closePgnModal()" title="Close">✕</button>
   </div>
   <div id="pgn-body">
-    <div id="pgnModalBoard"></div>
+    <div id="pgn-board-row">
+      <div id="eval-bar-outer">
+        <div id="eval-bar-wrap"><div id="eval-bar-fill"></div></div>
+        <div id="eval-score-label">—</div>
+      </div>
+      <div id="pgnModalBoard"></div>
+    </div>
     <div class="pgn-controls">
       <button onclick="pgnGoStart()">⏮</button>
       <button onclick="pgnGoPrev()">◀</button>
@@ -1647,7 +1660,7 @@ function pgnParse(pgnString) {
   const chess = new Chess(); try { chess.load(startFen); } catch(e) { chess.reset(); }
   const root = { san: null, fen: chess.fen(), moveNumber: 0, isBlackMove: false, comment: '', annotation: '', parent: null, children: [], nodeId: 'root' };
   pgnNodeRegistry = { root };
-  pgnParseTokens(pgnTokenize(pgnString.replace(/\[.*?\]/g, '').trim()), 0, chess, root, { n: 0 });
+  pgnParseTokens(pgnTokenize(pgnString.replace(/^\[.*?\]\s*$/gm, '').trim()), 0, chess, root, { n: 0 });
   return root;
 }
 
@@ -1721,12 +1734,50 @@ function pgnJump(nodeId) {
   const el = document.querySelector(`#pgnMoves [data-node-id="${nodeId}"]`);
   if (el) { el.classList.add('current'); el.scrollIntoView({ block: 'nearest' }); }
   document.getElementById('pgnComment').textContent = node.comment || '';
+  evalFromComment(node.comment);
 }
 function pgnGoStart() { pgnJump('root'); }
 function pgnGoEnd()   { let n = pgnCurrent||pgnRoot; while(n&&n.children.length) n=n.children[0]; if(n) pgnJump(n.nodeId); }
 function pgnGoPrev()  { if(pgnCurrent?.parent) pgnJump(pgnCurrent.parent.nodeId); }
 function pgnGoNext()  { if(pgnCurrent?.children.length) pgnJump(pgnCurrent.children[0].nodeId); }
 function pgnFlip()    { if (pgnModalBoard) pgnModalBoard.flip(); }
+
+// ── Eval bar ──────────────────────────────────────────────────────────────
+// Eval is already embedded in PGN comments as [%eval X.XX] or [%eval #N]
+
+function _updateEvalBar(score, mate) {
+  const fill = document.getElementById('eval-bar-fill');
+  const label = document.getElementById('eval-score-label');
+  if (!fill || !label) return;
+  let whitePct;
+  if (mate !== null) {
+    whitePct = mate > 0 ? 97 : 3;
+    label.textContent = (mate > 0 ? '+M' : '-M') + Math.abs(mate);
+    label.style.color = mate > 0 ? '#e0e0e0' : '#777';
+  } else {
+    // Sigmoid mapping: score=0 → 50%, score=+3 → ~82%, score=-3 → ~18%
+    whitePct = 100 / (1 + Math.exp(-score / 3));
+    const sign = score >= 0 ? '+' : '';
+    label.textContent = sign + score.toFixed(2);
+    label.style.color = score >= 0.2 ? '#d0d0d0' : score <= -0.2 ? '#777' : '#aaa';
+  }
+  fill.style.height = Math.max(3, Math.min(97, whitePct)) + '%';
+}
+
+function evalFromComment(comment) {
+  console.log('[eval] comment:', JSON.stringify(comment));
+  if (!comment) return;
+  const mateM = comment.match(/\[%eval #(-?\d+)\]/);
+  if (mateM) { console.log('[eval] mate', mateM[1]); _updateEvalBar(null, parseInt(mateM[1])); return; }
+  const cpM = comment.match(/\[%eval (-?[\d.]+)\]/);
+  if (cpM) { console.log('[eval] score', cpM[1]); _updateEvalBar(parseFloat(cpM[1]), null); return; }
+  console.log('[eval] no match, resetting');
+  // No eval in this comment (variation node or root) — reset to neutral
+  const fill = document.getElementById('eval-bar-fill');
+  const lbl = document.getElementById('eval-score-label');
+  if (fill) fill.style.height = '50%';
+  if (lbl) { lbl.textContent = '—'; lbl.style.color = '#888'; }
+}
 
 document.addEventListener('keydown', e => {
   const pgnOpen = document.getElementById('pgnPanel').classList.contains('open');
