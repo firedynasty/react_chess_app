@@ -242,6 +242,7 @@ def load_pgns(pgn_dir: Path, eco_lookup: dict | None = None) -> dict:
             "my_color":      _pgn_header(text, "MyColor"),
             "my_result":     _pgn_header(text, "MyResult"),
             "url":           _pgn_header(text, "Link") or _pgn_header(text, "Site"),
+            "source":        "lichess.org" if "lichess.org" in (_pgn_header(text, "Link") or _pgn_header(text, "Site") or "") else "chess.com",
             "tc":            tc,
             "tc_category":   _classify_tc(tc),
             "eco":           eco_code,
@@ -929,9 +930,14 @@ function resultClass(myResult) {
   if (myResult === 'loss') return 'result-loss';
   return 'result-draw';
 }
-function resultLabel(myResult) {
+function resultLabel(myResult, result) {
   if (myResult === 'win')  return 'Win';
   if (myResult === 'loss') return 'Loss';
+  if (myResult === 'draw') return 'Draw';
+  // No MyResult header (e.g. Lichess games) — show raw Result
+  if (result === '1-0')     return '1-0';
+  if (result === '0-1')     return '0-1';
+  if (result === '1/2-1/2') return '½-½';
   return 'Draw';
 }
 
@@ -960,17 +966,20 @@ function renderGames(key) {
     const g  = PGNS[id];
     if (!g) continue;
     const rc = resultClass(g.my_result);
-    const rl = resultLabel(g.my_result);
+    const rl = resultLabel(g.my_result, g.result);
     const asColor = g.my_color ? ` as ${g.my_color}` : '';
+    const winner = !g.my_result ? (g.result === '1-0' ? g.white : g.result === '0-1' ? g.black : '') : '';
+    const tcDisplay = g.tc && g.tc !== '-' && g.tc !== '?' ? ` (${g.tc})` : '';
+    const tcCat = g.tc_category && g.tc_category !== 'unknown' ? g.tc_category : '';
     html += `<div class="game-row">
       <input type="checkbox" class="game-chk" data-id="${id}">
       <div class="game-info">
         <div class="players">${g.white} vs ${g.black}</div>
         <div class="meta">
-          <span class="${rc}">${rl}</span>${asColor}
+          <span class="${rc}">${rl}</span>${winner ? ` ${winner}` : asColor}
           &nbsp;·&nbsp;${g.date || '?'}
-          &nbsp;·&nbsp;<span style="color:#aaa;text-transform:capitalize">${g.tc_category || ''}</span>${g.tc ? ` (${g.tc})` : ''}
-          ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">chess.com</a>` : ''}
+          ${tcCat ? `&nbsp;·&nbsp;<span style="color:#aaa;text-transform:capitalize">${tcCat}</span>${tcDisplay}` : ''}
+          ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">${g.source || 'chess.com'}</a>` : ''}
         </div>
       </div>
       <button class="btn-copy-one" onclick="openPgnModal('${id}')">View</button>
@@ -1244,17 +1253,20 @@ function openOpModal(i) {
     const g = PGNS[id];
     if (!g) continue;
     const rc = resultClass(g.my_result);
-    const rl = resultLabel(g.my_result);
+    const rl = resultLabel(g.my_result, g.result);
     const asColor = g.my_color ? ` as ${g.my_color}` : '';
+    const winner2 = !g.my_result ? (g.result === '1-0' ? g.white : g.result === '0-1' ? g.black : '') : '';
+    const tcDisplay2 = g.tc && g.tc !== '-' && g.tc !== '?' ? ` (${g.tc})` : '';
+    const tcCat2 = g.tc_category && g.tc_category !== 'unknown' ? g.tc_category : '';
     html += `<div class="op-game-row">
       <input type="checkbox" class="op-game-chk" data-id="${id}" onclick="event.stopPropagation()">
       <div class="op-game-info">
         <div class="players">${g.white} vs ${g.black}</div>
         <div class="meta">
-          <span class="${rc}">${rl}</span>${asColor}
+          <span class="${rc}">${rl}</span>${winner2 ? ` ${winner2}` : asColor}
           &nbsp;·&nbsp;${g.date || '?'}
-          &nbsp;·&nbsp;<span style="text-transform:capitalize">${g.tc_category || ''}</span>${g.tc ? ` (${g.tc})` : ''}
-          ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">chess.com</a>` : ''}
+          ${tcCat2 ? `&nbsp;·&nbsp;<span style="text-transform:capitalize">${tcCat2}</span>${tcDisplay2}` : ''}
+          ${g.url ? `&nbsp;·&nbsp;<a href="${g.url}" target="_blank" style="color:#00d4ff">${g.source || 'chess.com'}</a>` : ''}
         </div>
       </div>
       <button class="btn-copy-one" onclick="openPgnModal('${id}')">View</button>
@@ -1839,15 +1851,22 @@ def main() -> None:
     parser.add_argument("--out", default=None, help="default: <bucket>/tree_viewer.html")
     args = parser.parse_args()
 
-    bucket   = resolve_bucket(args.key)
-    db_path  = Path(args.db) if args.db else bucket / "tree.sqlite"
-    pgn_dir  = Path(args.pgn_dir) if args.pgn_dir else bucket / "raw" / "chesscom"
-    out_path = Path(args.out) if args.out else bucket / "tree_viewer.html"
+    if args.db and args.pgn_dir and args.out:
+        db_path  = Path(args.db)
+        pgn_dir  = Path(args.pgn_dir)
+        out_path = Path(args.out)
+        title    = f"{pgn_dir.parent.name} — Chess Opening Tree"
+    else:
+        bucket   = resolve_bucket(args.key)
+        db_path  = Path(args.db)      if args.db      else bucket / "tree.sqlite"
+        pgn_dir  = Path(args.pgn_dir) if args.pgn_dir else bucket / "raw" / "chesscom"
+        out_path = Path(args.out)     if args.out     else bucket / "tree_viewer.html"
+        title    = f"{bucket.name} — Chess Opening Tree"
 
     if not db_path.exists():
         raise SystemExit(f"Database not found: {db_path}\nRun tree_engine.py first.")
 
-    generate(db_path, pgn_dir, out_path, title=f"{bucket.name} — Chess Opening Tree")
+    generate(db_path, pgn_dir, out_path, title=title)
 
 
 if __name__ == "__main__":

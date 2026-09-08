@@ -1,0 +1,48 @@
+[Event "casual correspondence game"]
+[Site "https://lichess.org/lkkNueAJ"]
+[Date "2026.09.04"]
+[Round "-"]
+[White "FirebirdBot"]
+[Black "lichess AI level 2"]
+[Result "1-0"]
+[GameId "lkkNueAJ"]
+[UTCDate "2026.09.04"]
+[UTCTime "00:46:20"]
+[WhiteElo "1500"]
+[BlackElo "?"]
+[Variant "Standard"]
+[TimeControl "-"]
+[ECO "C20"]
+[Opening "King's Pawn Game: King's Head Opening"]
+[Termination "Normal"]
+[Annotator "lichess.org"]
+[EngineAnalysis "stockfish depth 15"]
+
+1. e4 { [%eval 0.29] } 1... e5 { [%eval 0.26] } 2. f3 ?
+{ C20 King's Pawn Game: King's Head Opening [%eval -0.88] } ( 2. Nf3
+{ best 0.26 } 2... Nc6 3. Bb5 a6 4. Bxc6 ) 2... Nf6 { [%eval -0.70] } 3. d4
+{ [%eval -0.60] } 3... exd4 { [%eval -0.74] } 4. Qxd4 { [%eval -0.66] } 4... c5
+?! { [%eval 0.06] } 5. Qf2 { [%eval -0.30] } 5... d5 { [%eval 0.00] } 6. exd5
+{ [%eval -0.14] } 6... Nxd5 { [%eval -0.18] } 7. Bd3 { [%eval -0.67] } 7... Bd7
+? { [%eval 0.66] } ( 7... Nb4 { best -0.67 } 8. Bb5+ N8c6 9. a3 Qa5 ) 8. Ne2
+?! { [%eval 0.13] } 8... Qb6 ?! { [%eval 0.92] } 9. Qg3 ? { [%eval -0.31] } (
+9. Nbc3 { best 0.92 } 9... Nxc3 10. Nxc3 Be6 11. f4 ) 9... Nc6
+{ [%eval -0.31] } 10. Be4 { [%eval -0.45] } 10... Be6 { [%eval -0.29] } 11. O-O
+{ [%eval -0.71] } 11... f5 ? { [%eval 0.50] } ( 11... Nd4 { best -0.71 } 12.
+Qf2 O-O-O 13. Kh1 Bd6 ) 12. Bd3 ?? { [%eval -4.29] } ( 12. Nf4 { best 0.50 }
+12... Nxf4 13. Bxc6+ Qxc6 14. Bxf4 ) 12... c4+ { [%eval -4.15] } 13. Kh1
+{ [%eval -4.29] } 13... Na5 ?? { [%eval -1.15] } ( 13... cxd3 { best -4.29 }
+14. cxd3 O-O-O 15. Nbc3 Nxc3 ) 14. Bxc4 ?? { [%eval -3.21] } ( 14. Be4
+{ best -1.15 } 14... fxe4 15. fxe4 Bd6 16. Qxg7 ) 14... Rc8 ?? { [%eval 3.29] }
+( 14... Nxc4 { best -3.21 } 15. Nbc3 Nxc3 16. Nxc3 Bd6 ) 15. Bd3 ?
+{ [%eval 1.97] } ( 15. Bxd5 { best 3.29 } 15... Bxd5 16. Nbc3 Be6 17. Nf4 )
+15... Nc4 ?! { [%eval 2.88] } 16. Nbc3 { [%eval 2.78] } 16... Nde3
+{ [%eval 2.92] } 17. Bxe3 ?! { [%eval 2.23] } 17... Qxb2 ?? { [%eval 6.34] } (
+17... Nxe3 { best 2.23 } 18. Rfe1 Kf7 19. Nf4 Bd6 ) 18. Rab1 { [%eval 6.03] }
+18... Nxe3 { [%eval 6.14] } 19. Rxb2 { [%eval 6.16] } 19... Bb4 ?
+{ [%eval 7.68] } ( 19... Nxf1 { best 6.16 } 20. Qe1 Bd7 21. Nd4+ Kd8 ) 20. Rxb4
+{ [%eval 7.80] } 20... Bd5 ?? { [%eval 10.09] } ( 20... Nxf1 { best 7.80 } 21.
+Qxg7 Rxc3 22. Qxh8+ Kd7 ) 21. Rxb7 ?? { [%eval 8.00] } ( 21. Qe5+
+{ best 10.09 } 21... Kf7 22. Qxe3 Rxc3 23. Nxc3 ) 21... Rg8 ?? { [%eval #3] } (
+21... Bxb7 { best 8.00 } 22. Qe5+ Kf7 23. Qxe3 Rhe8 ) 22. Qe5+ { [%eval #2] }
+22... Kf8 { [%eval #1] } 23. Qe7# { White wins by checkmate. [%eval #0] } 1-0

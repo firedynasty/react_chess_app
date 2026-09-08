@@ -1,0 +1,63 @@
+[Event "casual correspondence game"]
+[Site "https://lichess.org/JDekiJ7J"]
+[Date "2026.09.04"]
+[Round "-"]
+[White "lichess AI level 2"]
+[Black "FirebirdBot"]
+[Result "0-1"]
+[GameId "JDekiJ7J"]
+[UTCDate "2026.09.04"]
+[UTCTime "00:11:25"]
+[WhiteElo "?"]
+[BlackElo "1500"]
+[Variant "From Position"]
+[TimeControl "-"]
+[Termination "Normal"]
+[FEN "rn1qkbnr/pb1p1ppp/1pp1P3/8/2B1P3/8/PPP2PPP/RNBQK1NR w KQkq - 0 1"]
+[SetUp "1"]
+[Annotator "lichess.org"]
+[EngineAnalysis "stockfish depth 15"]
+
+1. Bf4 ?? { [%eval 0.39] } ( 1. exf7+ { best 8.87 } 1... Ke7 2. fxg8=N+ Rxg8 3.
+Bg5+ ) 1... fxe6 ?! { [%eval 1.29] } 2. a4 ?! { [%eval 0.71] } 2... Nf6
+{ [%eval 0.74] } 3. Nd2 { [%eval 0.63] } 3... d5 { [%eval 0.82] } 4. e5
+{ [%eval 0.45] } 4... dxc4 { [%eval 0.63] } 5. Ne2 ?? { [%eval -3.62] } ( 5.
+exf6 { best 0.63 } 5... Qxf6 6. Nh3 c3 7. bxc3 ) 5... Nd5 { [%eval -3.37] } 6.
+Bg3 { [%eval -3.62] } 6... Bc5 { [%eval -3.39] } 7. Nxc4 { [%eval -3.62] } 7...
+Qg5 { [%eval -3.47] } 8. Nd4 { [%eval -3.46] } 8... Bxd4 ?? { [%eval 0.27] } (
+8... Qg6 { best -3.46 } 9. O-O O-O 10. Nd6 Bxd4 ) 9. O-O ?? { [%eval -4.70] } (
+9. Nd6+ { best 0.27 } 9... Kd7 10. Qxd4 c5 11. Qd1 ) 9... O-O ?!
+{ [%eval -3.89] } 10. Qd3 ? { [%eval -5.39] } ( 10. Qxd4 { best -3.89 } 10...
+c5 11. Qe4 Bc6 12. f3 ) 10... Bc5 { [%eval -5.56] } 11. Rae1 { [%eval -5.84] }
+11... Nf4 ?! { [%eval -4.86] } 12. Qf3 ?? { [%eval -7.59] } ( 12. Bxf4
+{ best -4.86 } 12... Qxf4 13. Nd6 Bxd6 14. Qxd6 ) 12... Nd7 ??
+{ [%eval -5.50] } ( 12... Nh3+ { best -7.59 } 13. Kh1 Rxf3 14. Nd6 Na6 ) 13.
+Na3 ?? { [%eval -8.42] } ( 13. Qe4 { best -5.50 } 13... Qf5 14. Nd6 Bxd6 15.
+exd6 ) 13... Nxe5 ? { [%eval -6.89] } ( 13... Nh3+ { best -8.42 } 14. gxh3
+Rxf3 15. Rd1 Rf7 ) 14. Qd1 { [%eval -7.27] } 14... Bb4 ? { [%eval -6.21] } (
+14... Rad8 { best -7.27 } 15. Qc1 Nh3+ 16. Kh1 Qxc1 ) 15. Bxf4 ?!
+{ [%eval -7.00] } 15... Rxf4 { [%eval -6.97] } 16. h4 { [%eval -7.22] } 16...
+Rxh4 { [%eval -7.31] } 17. a5 ? { [%eval -8.97] } ( 17. Qe2 { best -7.31 }
+17... Bxe1 18. f4 Bb4 19. fxg5 ) 17... Qh6 { [%eval #-4] } 18. f4
+{ [%eval #-4] } 18... Bc5+ { [%eval #-3] } 19. Rf2 { [%eval #-1] } 19... Bxf2+
+?? { [%eval -10.38] } ( 19... Rh1# { best #-1 } ) 20. Kf1 ? { [%eval -11.76] }
+( 20. Kxf2 { best -10.38 } 20... Qxf4+ 21. Qf3 Nxf3 22. Re4 ) 20... Rxf4
+{ [%eval -11.41] } 21. g3 ?? { [%eval #-3] } ( 21. Re4 { best -11.41 } 21...
+Rxe4 22. axb6 Bc5 23. Qf3 ) 21... Bxe1+ { [%eval #-6] } 22. Kxe1
+{ [%eval #-5] } 22... Nf3+ ?? { [%eval -10.51] } ( 22... Re4+ { best #-5 } 23.
+Qe2 Nf3+ 24. Kf1 Qh1+ ) 23. Kf1 ?! { [%eval -11.14] } 23... Qh1+
+{ [%eval #-9] } 24. Ke2 { [%eval #-6] } 24... Qh2+ ?? { [%eval -10.78] } (
+24... Re4+ { best #-6 } 25. Kd3 Qxd1+ 26. Kc3 Re3+ ) 25. Kd3 { [%eval -11.21] }
+25... Ne5+ { [%eval #-10] } 26. Ke3 { [%eval #-1] } 26... Qxg3+ { [%eval #-5] }
+27. Ke2 { [%eval #-1] } 27... Re4+ { [%eval #-2] } 28. Kd2 { [%eval #-1] }
+28... Nc4+ ?? { [%eval -11.43] } ( 28... Qe3# { best #-1 } ) 29. Kc1 ?!
+{ [%eval -12.10] } 29... b5 ? { [%eval -10.46] } ( 29... Re1 { best -12.10 }
+30. Nxc4 Qf4+ 31. Nd2 Rxd1+ ) 30. a6 ?! { [%eval -11.31] } 30... Bxa6 ?!
+{ [%eval -10.78] } 31. c3 ?? { [%eval #-7] } ( 31. Nxc4 { best -10.78 } 31...
+bxc4 32. c3 Re1 33. Kc2 ) 31... Qe3+ ?? { [%eval -9.85] } ( 31... Re1
+{ best #-7 } 32. Nxc4 bxc4 33. Kc2 Qf2+ ) 32. Qd2 ?? { [%eval #-2] } ( 32. Kb1
+{ best -9.85 } 32... Qd2 33. Qxd2 Nxd2+ 34. Kc1 ) 32... Nxd2 { [%eval #-7] }
+33. Kc2 { [%eval #-4] } 33... Nc4 { [%eval #-8] } 34. Kb1 { [%eval #-8] } 34...
+Rd8 { [%eval #-6] } 35. Ka2 { [%eval #-5] } 35... Qc1 { [%eval #-3] } 36. b4
+{ [%eval #-1] } 36... Re2+ { [%eval #-1] } 37. Kb3 { [%eval #-1] } 37... Qb2#
+{ Black wins by checkmate. [%eval #-0] } 0-1

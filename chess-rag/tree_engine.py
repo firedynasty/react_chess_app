@@ -107,12 +107,21 @@ def _position_key(board: chess.Board) -> str:
 # ---------------------------------------------------------------------------
 
 def _game_id(game: chess.pgn.Game) -> str:
-    """Extract numeric game ID from the Link or Site PGN header."""
+    """Extract game ID from PGN headers, supporting Chess.com and Lichess."""
     for key in ("Link", "Site"):
         url = game.headers.get(key, "")
+        # Chess.com: /game/live/12345678 or /game/daily/12345678
         m = re.search(r"/game/(?:live|daily)/(\d+)", url)
         if m:
             return m.group(1)
+        # Lichess: https://lichess.org/JDekiJ7J
+        m = re.search(r"lichess\.org/([A-Za-z0-9_]+)", url)
+        if m:
+            return m.group(1)
+    # GameId header (Lichess exports include this)
+    gid = game.headers.get("GameId", "")
+    if gid:
+        return gid
     # Fallback: stable string from metadata
     return (
         f"{game.headers.get('Date', '?')}"
@@ -313,9 +322,13 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    bucket = resolve_bucket(args.key)
-    pgn_path = Path(args.pgn) if args.pgn else bucket / "games.pgn"
-    db_path = Path(args.db) if args.db else bucket / "tree.sqlite"
+    if args.pgn and args.db:
+        pgn_path = Path(args.pgn)
+        db_path  = Path(args.db)
+    else:
+        bucket   = resolve_bucket(args.key)
+        pgn_path = Path(args.pgn) if args.pgn else bucket / "games.pgn"
+        db_path  = Path(args.db)  if args.db  else bucket / "tree.sqlite"
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     if args.query is not None:

@@ -1,0 +1,60 @@
+[Event " Classical game"]
+[Site "https://lichess.org/ocg_6159a3ef"]
+[Date "2026.09.06"]
+[Round "?"]
+[White "Stockfish"]
+[Black "Anonymous"]
+[Result "1-0"]
+[Variant "Standard"]
+[WhiteElo "?"]
+[BlackElo "?"]
+[EngineAnalysis "stockfish depth 15"]
+
+1. Nf3 { [%eval 0.28] } 1... d5 { [%eval 0.19] } 2. d3 { [%eval -0.26] } 2...
+Nc6 { [%eval 0.07] } 3. e3 { [%eval -0.33] } 3... e5 { [%eval -0.27] } 4. a3
+{ [%eval -0.56] } 4... Nf6 { [%eval -0.48] } 5. Bd2 { [%eval -0.91] } 5... Bd6
+{ [%eval -0.87] } 6. h3 { [%eval -0.96] } 6... O-O { [%eval -0.90] } 7. d4 ?!
+{ [%eval -1.52] } 7... exd4 ?! { [%eval -0.98] } 8. Bd3 ?! { [%eval -1.75] }
+8... dxe3 { [%eval -1.77] } 9. Bxe3 { [%eval -1.66] } 9... Re8
+{ [%eval -1.61] } 10. Be2 ? { [%eval -3.31] } ( 10. O-O { best -1.61 } 10...
+h6 11. Re1 Ne5 12. Nxe5 ) 10... Be6 ?! { [%eval -2.42] } 11. Nc3
+{ [%eval -2.32] } 11... a6 { [%eval -2.20] } 12. Nd4 ?! { [%eval -2.98] } 12...
+Qd7 ?! { [%eval -2.18] } 13. b3 ? { [%eval -3.19] } ( 13. Qd2 { best -2.18 }
+13... Rad8 14. O-O-O Nxd4 15. Bxd4 ) 13... b5 ? { [%eval -2.00] } ( 13... Bf5
+{ best -3.19 } 14. g4 Be4 15. Nxe4 Nxe4 ) 14. Qd3 ?? { [%eval -4.02] } ( 14.
+Ncxb5 { best -2.00 } 14... Be5 15. Nc3 Bf5 16. O-O ) 14... b4 { [%eval -3.77] }
+15. Nb1 ? { [%eval -4.82] } ( 15. axb4 { best -3.77 } 15... Nxb4 16. Qd1 c5
+17. Nxe6 ) 15... a5 ? { [%eval -3.00] } ( 15... Nxd4 { best -4.82 } 16. Bxd4
+Bf5 17. Qd2 Ne4 ) 16. axb4 ? { [%eval -4.08] } ( 16. Nxc6 { best -3.00 } 16...
+Qxc6 17. O-O Qd7 18. axb4 ) 16... axb4 ? { [%eval -2.61] } ( 16... Nxb4
+{ best -4.08 } 17. Qd1 c5 18. Nxe6 Qxe6 ) 17. Rxa8 { [%eval -2.63] } 17... Rxa8
+{ [%eval -2.45] } 18. Bf3 ? { [%eval -3.66] } ( 18. Nxe6 { best -2.45 } 18...
+Qxe6 19. O-O h6 20. Rc1 ) 18... Ra1 ? { [%eval -2.56] } ( 18... Nxd4
+{ best -3.66 } 19. Qxd4 Bf5 20. O-O Bxc2 ) 19. Qd1 ?! { [%eval -3.37] } 19...
+Ne4 { [%eval -2.89] } 20. Nxe6 ?! { [%eval -3.85] } 20... Qxe6 ?!
+{ [%eval -3.27] } 21. Be2 ? { [%eval -5.06] } ( 21. Bxe4 { best -3.27 } 21...
+Qxe4 22. O-O d4 23. Bd2 ) 21... d4 { [%eval -4.96] } 22. Bg4 ?!
+{ [%eval -5.93] } 22... Qf6 { [%eval -6.10] } 23. O-O ?! { [%eval -6.75] }
+23... Nc3 ?? { [%eval -4.66] } ( 23... dxe3 { best -6.75 } 24. fxe3 Qe5 25. Rf4
+g5 ) 24. Nxc3 { [%eval -4.73] } 24... Rxd1 { [%eval -4.90] } 25. Nxd1
+{ [%eval -5.09] } 25... dxe3 { [%eval -4.78] } 26. Be2 ? { [%eval -6.13] } (
+26. Nxe3 { best -4.78 } 26... h5 27. Bc8 Nd4 28. Re1 ) 26... exf2+ ?!
+{ [%eval -5.52] } 27. Kh1 ?? { [%eval -8.92] } ( 27. Nxf2 { best -5.52 } 27...
+Kf8 28. Bc4 Qc3 29. Bxf7 ) 27... Qf4 { [%eval -9.20] } 28. g3 { [%eval -9.32] }
+28... Qxg3 ?? { [%eval -7.29] } ( 28... Qe4+ { best -9.32 } 29. Kh2 Qxe2 30.
+Rxf2 Qxd1 ) 29. Rxf2 { [%eval -7.71] } 29... Ne5 { [%eval -7.59] } 30. Bc4 ??
+{ [%eval #-4] } ( 30. c3 { best -7.59 } 30... Kf8 31. cxb4 Bxb4 32. Nb2 ) 30...
+Qxh3+ ?? { [%eval -8.18] } ( 30... Nf3 { best #-4 } 31. Bxf7+ Kh8 32. Rg2 Qxh3+
+) 31. Rh2 ?? { [%eval #-7] } 31... Qf3+ { [%eval #-6] } 32. Kg1 { [%eval #-6] }
+32... Qxd1+ { [%eval #-5] } 33. Kg2 { [%eval #-4] } 33... Nf3 ??
+{ [%eval -8.04] } ( 33... Qf3+ { best #-4 } 34. Kg1 Bc5+ 35. Rf2 Qxf2+ ) 34.
+Rh1 { [%eval -8.12] } 34... Qxc2+ ? { [%eval -6.81] } ( 34... Ne1+
+{ best -8.12 } 35. Rxe1 Qxe1 36. Bd3 Kf8 ) 35. Kxf3 { [%eval -6.97] } 35... h6
+?! { [%eval -6.31] } 36. Rf1 { [%eval -6.45] } 36... Qf5+ ?! { [%eval -5.95] }
+37. Ke2 { [%eval -6.30] } 37... Qc2+ { [%eval -6.53] } 38. Ke3
+{ [%eval -6.82] } 38... h5 { [%eval -6.37] } 39. Rxf7 ? { [%eval -7.66] } (
+39. Kf3 { best -6.37 } 39... g6 40. Rf2 Qc3+ 41. Ke2 ) 39... h4 ??
+{ [%eval -1.22] } ( 39... Bc5+ { best -7.66 } 40. Kf4 Qxc4+ 41. bxc4 Kxf7 ) 40.
+Rf2+ ?? { [%eval -7.27] } ( 40. Rf4+ { best -1.22 } 40... Qxc4 41. Rxc4 g5 42.
+Kf3 ) 40... Kh7 ?? { [%eval 4.18] } ( 40... Qxc4 { best -7.27 } 41. bxc4 Bc5+
+42. Ke2 Bxf2 ) 41. Rxc2 { [%eval 3.90] } 1-0

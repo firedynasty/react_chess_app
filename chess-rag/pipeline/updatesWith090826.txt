@@ -1,5 +1,3 @@
-
-
 Updates — 09/08/26
 ==================
 
@@ -24,7 +22,48 @@ tree_viz.py
 - Fixes: Escape closes the opening modal (PGN panel takes priority when both
   are open); PGN panel z-index raised above the modal veil so View works from
   inside the modal.
+- Eval bar in PGN viewer: 14px bar to the left of the board reads [%eval]
+  annotations already embedded in the annotated PGN by Stockfish. Dark fill
+  (#111) rises from the bottom for white's advantage; light background
+  (#d0d0d0) at top represents black's advantage. Sigmoid mapping used for
+  smooth 0-100% conversion (score / 3 factor). Handles mate scores (#N) with
+  a 97%/3% pin. Board shrunk from 380px to 374px to fit within the panel.
+  Root cause fix: pgnParse() was stripping all [...] patterns (including
+  inline [%eval] and [%clk] annotations) before tokenization. Fixed regex
+  to /^\[.*?\]\s*$/gm so only standalone PGN header lines are removed.
 
-Regenerate with the usual: python tree_engine.py tttstanley && python tree_viz.py tttstanley
+Regenerate with the usual: python tree_engine.py && python tree_viz.py
+(run from within data/tttstanley/ — no username argument needed when inside the bucket folder)
 
 
+annotate.py  (new script)
+--------------------------
+Standalone Stockfish annotator for PGNs that were not ingested through
+ingest.py (e.g. Lichess games, games played against the computer).
+
+- Annotates every .pgn in a directory with [%eval] comments, ?!/??/? glyphs,
+  and best-line variations — identical output to the main pipeline.
+- Skips files that already have [EngineAnalysis] header (safe to re-run).
+- --build flag: after annotation, merges PGNs into games.pgn, runs
+  tree_engine, and runs tree_viz — all in one command. No separate steps needed.
+- Supports Lichess and Chess.com game IDs (tree_engine._game_id updated to
+  handle lichess.org URLs including IDs with underscores, plus GameId header).
+- Game list display fixes for Lichess games (no MyColor/MyResult headers):
+    - Result shows raw "1-0" / "0-1" / "1/2-1/2" instead of defaulting to "Draw"
+    - Winner name shown after result (e.g. "1-0 FirebirdBot")
+    - Site label shows "lichess.org" instead of hardcoded "chess.com"
+    - TimeControl "-" (correspondence/no TC) hidden instead of shown as "(-)".
+
+Usage:
+    # Annotate + build tree viewer in one shot
+    python annotate.py against_computer/pgns/ --build
+
+    # With custom depth / parallelism
+    python annotate.py against_computer/pgns/ --depth 12 --parallel 2 --sf-threads 4 --build
+
+    # Annotate only (no tree rebuild)
+    python annotate.py against_computer/pgns/
+
+Note: "From Position" games (custom starting FEN) are annotated and appear in
+the games list but cannot appear in the opening tree — they start from a
+non-standard position.
