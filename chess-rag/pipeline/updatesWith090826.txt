@@ -1,0 +1,30 @@
+
+
+Updates — 09/08/26
+==================
+
+tree_viz.py
+-----------
+- Openings Stats tab: sortable W/D/L table per ECO+opening (Games, W/D/L,
+  Win%, bar) with an opening-name filter box. Respects the time control and
+  date filters. Text columns sort A-Z on first click, Games/Win% high-low.
+- Opening detail modal: click any table row -> board of the variation's
+  position, formatted move sequence (1. d4 d5 2. c4 Nc6), a click-to-copy
+  --position "..." string, W/D/L summary bar, and its game list with View
+  (PGN). Distinguishes variations that share one ECO code (e.g. two D07
+  Chigorin lines get different positions). Row clicks are index-based so
+  apostrophes in opening names can't break the onclick handler.
+- Position jump input (tree view): accepts d4 d5 c4, 1. d4 d5 2. c4, or a
+  pasted --position "d4 d5 c4" string and navigates the tree there. Stays in
+  sync with the breadcrumb; X button resets to root. Built for a two-tab
+  workflow: openings table in one browser tab, tree in the other, position
+  string carried across via clipboard.
+- PGNS data embedded in the HTML now includes opening_moves (SAN list to the
+  deepest ECO match) and opening_fen per game.
+- Fixes: Escape closes the opening modal (PGN panel takes priority when both
+  are open); PGN panel z-index raised above the modal veil so View works from
+  inside the modal.
+
+Regenerate with the usual: python tree_engine.py tttstanley && python tree_viz.py tttstanley
+
+
