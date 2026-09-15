@@ -650,7 +650,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <div id="games-toolbar" style="display:none">
     <label><input type="checkbox" id="chk-all" onchange="toggleAll(this)"> Select all</label>
     <button onclick="copySelected()">Copy selected PGN(s)</button>
+    <button onclick="copySelectedIds()">Copy selected ID(s)</button>
     <button onclick="copyAll()">Copy all PGN(s)</button>
+    <button onclick="copyAllIds()">Copy all ID(s)</button>
   </div>
   <div id="games-list"></div>
 </div>
@@ -1037,10 +1039,22 @@ function copySelected() {
   navigator.clipboard.writeText(text).then(() => alert(`Copied ${ids.length} PGN(s) to clipboard.`));
 }
 
+function copySelectedIds() {
+  const ids = [...new Set(selectedIds())];
+  if (!ids.length) { alert('Select at least one game first.'); return; }
+  navigator.clipboard.writeText(ids.join(' ')).then(() => alert(`Copied ${ids.length} ID(s) to clipboard.`));
+}
+
 function copyAll() {
   const ids = gamesAtPosition(currentKey, true);
   const text = ids.map(id => PGNS[id]?.pgn?.trim()).filter(Boolean).join('\n\n');
   navigator.clipboard.writeText(text).then(() => alert(`Copied ${ids.length} PGN(s) to clipboard.`));
+}
+
+function copyAllIds() {
+  const ids = [...new Set(gamesAtPosition(currentKey, true))];
+  if (!ids.length) { alert('No games at this position.'); return; }
+  navigator.clipboard.writeText(ids.join(' ')).then(() => alert(`Copied ${ids.length} ID(s) to clipboard.`));
 }
 
 function toggleAll(chk) {

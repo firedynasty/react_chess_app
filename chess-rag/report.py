@@ -474,6 +474,9 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 .nav-item { padding: 8px 14px; cursor: pointer; font-size: 0.82rem; border-left: 3px solid transparent; transition: background 0.15s; }
 .nav-item:hover { background: #1e2a4e; }
 .nav-item.active { background: #0f3460; border-left-color: #00d4ff; color: #00d4ff; }
+.nav-item.comparison { background: #16213e; border-left-color: #00d4ff; color: #00d4ff; font-weight: 700; font-size: 0.88rem; }
+.nav-item.comparison:hover { background: #1e2a4e; }
+.nav-item.comparison.active { background: #0f3460; }
 .nav-result { font-size: 0.7rem; margin-top: 2px; }
 .nav-result.win  { color: #28a745; }
 .nav-result.loss { color: #dc3545; }
@@ -574,7 +577,7 @@ function buildNav() {
   var nav = document.getElementById('nav-list');
   var html = '';
   if (REPORTS['comparison']) {
-    html += '<div class="nav-item" data-id="comparison" onclick="showReport(\'comparison\')">📊 Comparison</div>';
+    html += '<div class="nav-item comparison" data-id="comparison" onclick="showReport(\'comparison\')">👆 Click for Comparison</div>';
   }
   GAMES.forEach(function(g) {
     var rc = g.my_result === 'win' ? 'win' : g.my_result === 'loss' ? 'loss' : 'draw';
