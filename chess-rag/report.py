@@ -17,13 +17,29 @@ Output:
         comparison.md      — cross-game comparison (wins vs losses)
         report.html        — self-contained viewer (shareable on its own)
 
+Quantitative stats export (no OpenAI key needed, runs over every game in the bucket):
+    python report.py --key tttstanley --stats-csv
+    python report.py --key tttstanley --stats-csv --blunder-cp 150
+
+Output:
+    <bucket>/stats_games.csv     — one row per game: per-phase (opening/middlegame/
+                                    endgame) avg centipawn loss, time-management
+                                    aggregates, blunder count
+    <bucket>/stats_blunders.csv  — one row per detected mistake/blunder: phase,
+                                    centipawn loss, severity, a best-effort category
+                                    (hanging_piece / missed_tactic / positional_misjudgment /
+                                    endgame_technique), and whether it happened in time trouble
+    Import either CSV into Google Sheets via File > Import > Upload.
+
 Requires:
     pip install openai python-chess
-    export OPENAI_API_KEY=sk-...
+    export OPENAI_API_KEY=sk-...   (not needed for --stats-csv)
 """
 
 import argparse
+import csv
 import json
+import math
 import os
 import re
 import sqlite3
@@ -316,6 +332,275 @@ def call_openai(client: OpenAI, prompt: str, model: str = "gpt-4o") -> str:
 
 
 # ---------------------------------------------------------------------------
+# Phase / time-management / blunder stats → CSV (quantitative, no OpenAI call)
+#
+# Reads the %eval and %clk annotations already embedded in every PGN (written
+# by annotate.py) and computes, per game: average centipawn loss split by
+# opening/middlegame/endgame, time-management aggregates, and a list of
+# individual mistakes/blunders with a best-effort category tag. Output is two
+# CSVs meant to be imported into Google Sheets (File > Import) for pivoting —
+# this module never calls an LLM, so it's free and fast to run over an entire
+# bucket's games.
+# ---------------------------------------------------------------------------
+
+PIECE_VALUES = {chess.KNIGHT: 3, chess.BISHOP: 3, chess.ROOK: 5, chess.QUEEN: 9}
+
+# Endgame heuristic: once combined non-pawn material (both sides) drops to
+# this or below, treat the game as being in the endgame from that ply on.
+# Roughly "queens are off plus a couple of minor pieces traded" — an
+# approximation, not a formal definition.
+ENDGAME_MATERIAL_THRESHOLD = 14
+
+# (centipawn-loss-on-this-move >= threshold, severity label), checked in order
+BLUNDER_TIERS = [(300, "blunder"), (100, "mistake"), (50, "inaccuracy")]
+
+_EVAL_MATE_RE = re.compile(r"\[%eval #(-?\d+)\]")
+_EVAL_CP_RE   = re.compile(r"\[%eval (-?[\d.]+)\]")
+_CLK_RE       = re.compile(r"\[%clk (\d+):(\d{2}):(\d{2}(?:\.\d+)?)\]")
+
+
+def _non_pawn_material(board: "chess.Board") -> int:
+    """Combined non-pawn material for both sides (kings/pawns excluded)."""
+    total = 0
+    for piece_type, val in PIECE_VALUES.items():
+        total += val * len(board.pieces(piece_type, chess.WHITE))
+        total += val * len(board.pieces(piece_type, chess.BLACK))
+    return total
+
+
+def _side_material(board: "chess.Board", white: bool) -> int:
+    color = chess.WHITE if white else chess.BLACK
+    return sum(val * len(board.pieces(pt, color)) for pt, val in PIECE_VALUES.items())
+
+
+def _parse_eval_white_persp(comment: str) -> float | None:
+    """Centipawns from White's perspective, clipped to +-1000 (10 pawns); mate scores map to +-1000."""
+    m = _EVAL_MATE_RE.search(comment)
+    if m:
+        return math.copysign(1000.0, int(m.group(1)))
+    m = _EVAL_CP_RE.search(comment)
+    if m:
+        return max(-1000.0, min(1000.0, float(m.group(1)) * 100))
+    return None
+
+
+def _parse_clock_seconds(comment: str) -> float | None:
+    m = _CLK_RE.search(comment)
+    if not m:
+        return None
+    h, mnt, s = m.groups()
+    return int(h) * 3600 + int(mnt) * 60 + float(s)
+
+
+def _parse_time_control(tc: str) -> tuple[float, float]:
+    """'180+2' -> (180.0, 2.0). Unparseable/daily/unknown controls fall back to (300, 0)."""
+    if not tc or tc in ("-", "?") or "/" in tc:
+        return 300.0, 0.0
+    base = tc.split("+")[0]
+    inc = tc.split("+")[1] if "+" in tc else "0"
+    try:
+        return float(base), float(inc)
+    except ValueError:
+        return 300.0, 0.0
+
+
+def analyze_game_for_stats(
+    game_id: str, pgn_text: str, eco_lookup: dict, blunder_cp: int = 100
+) -> tuple[dict, list[dict]]:
+    """
+    Returns (game_row, blunder_rows) for one game.
+
+    game_row: one row summarizing the game — per-phase avg centipawn loss,
+      time-management aggregates, blunder count.
+    blunder_rows: one row per move by MY_COLOR whose centipawn loss cleared
+      the lowest BLUNDER_TIERS threshold, with a best-effort category tag.
+    """
+    game = chess.pgn.read_game(io.StringIO(pgn_text))
+    if game is None:
+        return {}, []
+
+    my_color = pgn_header(pgn_text, "MyColor")
+    my_result = pgn_header(pgn_text, "MyResult")
+    players = f"{pgn_header(pgn_text, 'White')} vs {pgn_header(pgn_text, 'Black')}"
+    date = pgn_header(pgn_text, "Date") or pgn_header(pgn_text, "EndDate")
+    tc = pgn_header(pgn_text, "TimeControl")
+    base_secs, inc_secs = _parse_time_control(tc)
+    my_is_white = my_color == "white"
+
+    _, _, opening_sans, _ = _annotate_game_opening(pgn_text, eco_lookup)
+    opening_ply_end = len(opening_sans)  # plies 1..opening_ply_end count as "opening"
+
+    # First pass: replay the mainline once, capturing per-ply state.
+    records = []
+    board = game.board()
+    for node in game.mainline():
+        move = node.move
+        mover_is_white = board.turn
+        san = board.san(move)
+        board.push(move)
+        records.append({
+            "san": san,
+            "mover_is_white": mover_is_white,
+            "comment": node.comment or "",
+            "board_after": board.copy(stack=False),
+        })
+
+    # Second pass: derive cp-loss / phase / time / blunders, with 1-ply lookahead
+    # (to detect "my move immediately lost material to the opponent's reply").
+    last_clock = {True: base_secs, False: base_secs}
+    prev_eval_white = 0.0
+    phase_loss = {"opening": [], "middlegame": [], "endgame": []}
+    my_think_times: list[float] = []
+    my_time_trouble_moves = 0
+    blunder_rows: list[dict] = []
+
+    for i, rec in enumerate(records):
+        ply = i + 1
+        mover_is_white = rec["mover_is_white"]
+        is_my_move = mover_is_white == my_is_white
+        eval_white = _parse_eval_white_persp(rec["comment"])
+        clk = _parse_clock_seconds(rec["comment"])
+        non_pawn_mat = _non_pawn_material(rec["board_after"])
+        phase = (
+            "opening" if ply <= opening_ply_end
+            else "endgame" if non_pawn_mat <= ENDGAME_MATERIAL_THRESHOLD
+            else "middlegame"
+        )
+
+        in_time_trouble = False
+        if clk is not None:
+            prev = last_clock[mover_is_white]
+            think_time = max(0.0, prev + inc_secs - clk)
+            last_clock[mover_is_white] = clk
+            in_time_trouble = clk < max(10.0, 0.1 * base_secs)
+            if is_my_move:
+                my_think_times.append(think_time)
+                if in_time_trouble:
+                    my_time_trouble_moves += 1
+
+        cp_loss = None
+        if eval_white is not None:
+            mover_before = prev_eval_white if mover_is_white else -prev_eval_white
+            mover_after  = eval_white if mover_is_white else -eval_white
+            cp_loss = max(0.0, mover_before - mover_after)
+
+        if is_my_move and cp_loss is not None:
+            phase_loss[phase].append(cp_loss)
+
+            severity = next((label for tier_cp, label in BLUNDER_TIERS if cp_loss >= tier_cp), None)
+            if severity and cp_loss >= blunder_cp:
+                # Did the opponent immediately capture material on their very next move?
+                my_mat_now = _side_material(rec["board_after"], my_is_white)
+                hung_piece = False
+                if i + 1 < len(records):
+                    my_mat_after_reply = _side_material(records[i + 1]["board_after"], my_is_white)
+                    hung_piece = (my_mat_now - my_mat_after_reply) >= 3
+
+                if hung_piece:
+                    category = "hanging_piece"
+                elif cp_loss >= 400:
+                    category = "missed_tactic"
+                elif phase == "endgame":
+                    category = "endgame_technique"
+                else:
+                    category = "positional_misjudgment"
+
+                blunder_rows.append({
+                    "game_id": game_id,
+                    "players": players,
+                    "date": date,
+                    "ply": ply,
+                    "move": rec["san"],
+                    "phase": phase,
+                    "cp_loss": round(cp_loss, 1),
+                    "severity": severity,
+                    "category": category,
+                    "clock_remaining_s": round(clk, 1) if clk is not None else "",
+                    "in_time_trouble": in_time_trouble,
+                    "my_color": my_color,
+                })
+
+        if eval_white is not None:
+            prev_eval_white = eval_white
+
+    def _avg(lst: list[float]) -> float | str:
+        return round(sum(lst) / len(lst), 1) if lst else ""
+
+    game_row = {
+        "game_id": game_id,
+        "players": players,
+        "date": date,
+        "my_color": my_color,
+        "my_result": my_result,
+        "tc": tc,
+        "opening_cp_loss_avg": _avg(phase_loss["opening"]),
+        "middlegame_cp_loss_avg": _avg(phase_loss["middlegame"]),
+        "endgame_cp_loss_avg": _avg(phase_loss["endgame"]),
+        "avg_think_time_s": _avg(my_think_times),
+        "time_trouble_moves": my_time_trouble_moves,
+        "blunder_count": len(blunder_rows),
+        "total_plies": len(records),
+    }
+    return game_row, blunder_rows
+
+
+def _load_eco_lookup() -> dict:
+    """Lazily import tree_viz.py (same directory) and return its ECO position lookup."""
+    global load_eco_data, _annotate_game_opening
+    sys.path.insert(0, str(HERE))
+    from tree_viz import load_eco_data, _annotate_game_opening
+    return load_eco_data()
+
+
+def write_stats_csvs(out_dir: Path, game_rows: list[dict], blunder_rows_all: list[dict]) -> None:
+    """Write stats_games.csv / stats_blunders.csv into `out_dir` (skips a file if its rows are empty)."""
+    games_csv = out_dir / "stats_games.csv"
+    blunders_csv = out_dir / "stats_blunders.csv"
+
+    if game_rows:
+        with open(games_csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(game_rows[0].keys()))
+            w.writeheader()
+            w.writerows(game_rows)
+        print(f"Wrote {len(game_rows)} game row(s) -> {games_csv}")
+    if blunder_rows_all:
+        with open(blunders_csv, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=list(blunder_rows_all[0].keys()))
+            w.writeheader()
+            w.writerows(blunder_rows_all)
+        print(f"Wrote {len(blunder_rows_all)} blunder row(s) -> {blunders_csv}")
+
+
+def run_stats_export(bucket: Path, blunder_cp: int = 100) -> None:
+    """Compute phase/time/blunder stats for every game in `bucket` and write two CSVs."""
+    eco_lookup = _load_eco_lookup()
+    raw_dir = bucket / "raw" / "chesscom"
+    pgn_files = sorted(raw_dir.glob("*.pgn"))
+    if not pgn_files:
+        sys.exit(f"No PGNs found in {raw_dir}")
+
+    print(f"Analyzing {len(pgn_files)} games in {raw_dir} for phase/time/blunder stats...")
+    game_rows, blunder_rows_all = [], []
+    for i, path in enumerate(pgn_files, 1):
+        gid = path.stem
+        text = path.read_text(encoding="utf-8")
+        try:
+            game_row, blunder_rows = analyze_game_for_stats(gid, text, eco_lookup, blunder_cp)
+        except Exception as e:
+            print(f"  [warn] {gid}: {e}")
+            continue
+        if game_row:
+            game_rows.append(game_row)
+            blunder_rows_all.extend(blunder_rows)
+        if i % 250 == 0:
+            print(f"  ...{i}/{len(pgn_files)}")
+
+    print()
+    write_stats_csvs(bucket, game_rows, blunder_rows_all)
+    print("Import either file into Google Sheets via File > Import > Upload.")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -333,12 +618,27 @@ def main() -> None:
         help='SAN moves to auto-find all games (e.g. "d4 d5 e3 Nc6 Bd3 Nf6 f4")',
     )
     parser.add_argument("--model", default="gpt-4o", help="OpenAI model (default: gpt-4o)")
+    parser.add_argument(
+        "--stats-csv", action="store_true",
+        help="Skip AI reports; compute phase/time/blunder stats for EVERY game in the "
+             "bucket and write stats_games.csv + stats_blunders.csv for Google Sheets import. "
+             "No OpenAI key needed.",
+    )
+    parser.add_argument(
+        "--blunder-cp", type=int, default=100, metavar="N",
+        help="Centipawn-loss threshold for the 'mistake' tier and above in --stats-csv "
+             "(default: 100; moves below this aren't recorded as blunder rows)",
+    )
     args = parser.parse_args()
 
     bucket = resolve_bucket(args.key)
     RAW_DIR = bucket / "raw" / "chesscom"
     DB_PATH = bucket / "tree.sqlite"
     REPORTS_DIR = bucket / "reports"
+
+    if args.stats_csv:
+        run_stats_export(bucket, blunder_cp=args.blunder_cp)
+        return
 
     # Resolve game IDs
     game_ids = list(args.game_ids)
@@ -398,7 +698,18 @@ def main() -> None:
     }
     (run_dir / "run_meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"\nRun folder: {run_dir}")
-    print(f"Analyzing {len(games)} game(s) with {args.model}...\n")
+
+    # ── Phase/time/blunder stats, scoped to just these games ───────────────
+    eco_lookup = _load_eco_lookup()
+    stat_game_rows, stat_blunder_rows = [], []
+    for g in games:
+        game_row, blunder_rows = analyze_game_for_stats(g["id"], g["pgn"], eco_lookup, args.blunder_cp)
+        if game_row:
+            stat_game_rows.append(game_row)
+            stat_blunder_rows.extend(blunder_rows)
+    write_stats_csvs(run_dir, stat_game_rows, stat_blunder_rows)
+
+    print(f"\nAnalyzing {len(games)} game(s) with {args.model}...\n")
 
     # ── Per-game reports ───────────────────────────────────────────────────
     for g in games:
@@ -448,7 +759,7 @@ def main() -> None:
 
     # ── Self-contained HTML viewer ─────────────────────────────────────────────
     print(f"\n  Generating report.html…")
-    generate_run_html(run_dir, games)
+    generate_run_html(run_dir, games, stat_game_rows, stat_blunder_rows)
 
     print(f"\nDone. All files in: {run_dir}")
     print(f"  Open:  open {run_dir / 'report.html'}")
@@ -527,6 +838,20 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 .pgn-moves .variation-move { cursor: pointer; padding: 1px 3px; border-radius: 3px; font-weight: 500; color: #aaa; }
 .pgn-moves .variation-move:hover { background: #2a3a4a; }
 .pgn-moves .variation-move.current { background: #7a5d10; color: #fff; }
+
+/* Stats tables (Game Stats / Blunders tabs) */
+.nav-item.stats-tab { background: #16213e; border-left-color: #ffd700; color: #ffd700; font-weight: 700; font-size: 0.85rem; }
+.nav-item.stats-tab:hover { background: #1e2a4e; }
+.nav-item.stats-tab.active { background: #0f3460; }
+.stats-hint { font-size: 0.78rem; color: #888; margin-bottom: 10px; }
+.stats-table-wrap { max-width: 100%; overflow-x: auto; }
+table.stats-table { border-collapse: collapse; font-size: 0.8rem; white-space: nowrap; }
+table.stats-table th, table.stats-table td { border: 1px solid #2a2a4e; padding: 5px 9px; text-align: left; }
+table.stats-table th { background: #16213e; color: #7ec8e3; position: sticky; top: 0; }
+table.stats-table tr:nth-child(even) td { background: #1e1e30; }
+table.stats-table tr:hover td { background: #22304e; }
+#copy-table-btn { background: #163060; color: #ffd700; border: 1px solid #ffd700; padding: 4px 13px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; flex-shrink: 0; }
+#copy-table-btn:hover { background: #ffd700; color: #1a1a2e; }
 </style>
 </head>
 <body>
@@ -539,6 +864,7 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 <div id="report-pane">
   <div id="toolbar">
     <span id="toolbar-title">Select a report</span>
+    <button id="copy-table-btn" style="display:none" onclick="copyStatsTable()">⧉ Copy table (paste into Sheets)</button>
     <button id="play-btn" style="display:none" onclick="openBoard()">▶ Play on board</button>
   </div>
   <div id="content-area">
@@ -569,6 +895,8 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 const GAMES   = __GAMES_JSON__;
 const PGNS    = __PGNS_JSON__;
 const REPORTS = __REPORTS_JSON__;
+const STATS_GAMES    = __STATS_GAMES_JSON__;
+const STATS_BLUNDERS = __STATS_BLUNDERS_JSON__;
 
 // ── Sidebar nav ──────────────────────────────────────────────────────────────
 var currentGameId = null;
@@ -578,6 +906,12 @@ function buildNav() {
   var html = '';
   if (REPORTS['comparison']) {
     html += '<div class="nav-item comparison" data-id="comparison" onclick="showReport(\'comparison\')">👆 Click for Comparison</div>';
+  }
+  if (STATS_GAMES.length) {
+    html += '<div class="nav-item stats-tab" data-id="stats-games" onclick="showReport(\'stats-games\')">📊 Game Stats</div>';
+  }
+  if (STATS_BLUNDERS.length) {
+    html += '<div class="nav-item stats-tab" data-id="stats-blunders" onclick="showReport(\'stats-blunders\')">⚠️ Blunders</div>';
   }
   GAMES.forEach(function(g) {
     var rc = g.my_result === 'win' ? 'win' : g.my_result === 'loss' ? 'loss' : 'draw';
@@ -595,10 +929,24 @@ function showReport(id) {
   document.querySelectorAll('.nav-item').forEach(function(el) {
     el.classList.toggle('active', el.dataset.id === id);
   });
-  document.getElementById('md-output').innerHTML = simpleMarkdown(REPORTS[id] || '_(no report)_');
   document.getElementById('content-area').scrollTop = 0;
-  var playBtn = document.getElementById('play-btn');
-  var title   = document.getElementById('toolbar-title');
+  var playBtn      = document.getElementById('play-btn');
+  var copyTableBtn = document.getElementById('copy-table-btn');
+  var title        = document.getElementById('toolbar-title');
+
+  if (id === 'stats-games' || id === 'stats-blunders') {
+    var rows = id === 'stats-games' ? STATS_GAMES : STATS_BLUNDERS;
+    document.getElementById('md-output').innerHTML =
+      '<div class="stats-hint">Click-drag to select the table, then Cmd/Ctrl+C — paste straight into a Google Sheets cell and it lands as a proper table. Or use the copy button in the toolbar.</div>'
+      + renderStatsTable(rows);
+    playBtn.style.display = 'none';
+    copyTableBtn.style.display = '';
+    title.textContent = id === 'stats-games' ? 'Game Stats' : 'Blunders';
+    return;
+  }
+
+  document.getElementById('md-output').innerHTML = simpleMarkdown(REPORTS[id] || '_(no report)_');
+  copyTableBtn.style.display = 'none';
   if (id !== 'comparison' && PGNS[id]) {
     playBtn.style.display = '';
     var g = PGNS[id];
@@ -609,6 +957,42 @@ function showReport(id) {
     playBtn.style.display = 'none';
     title.textContent = id === 'comparison' ? 'Comparison' : id;
   }
+}
+
+// ── Stats tables (Game Stats / Blunders) ────────────────────────────────────
+function escHtmlAttr(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderStatsTable(rows) {
+  if (!rows.length) return '<p>No rows.</p>';
+  var cols = Object.keys(rows[0]);
+  var html = '<div class="stats-table-wrap"><table class="stats-table" id="stats-table"><thead><tr>'
+    + cols.map(function(c) { return '<th>' + escHtmlAttr(c) + '</th>'; }).join('')
+    + '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    html += '<tr>' + cols.map(function(c) { return '<td>' + escHtmlAttr(r[c]) + '</td>'; }).join('') + '</tr>';
+  });
+  html += '</tbody></table></div>';
+  return html;
+}
+
+function copyStatsTable() {
+  var table = document.getElementById('stats-table');
+  if (!table) return;
+  var range = document.createRange();
+  range.selectNode(table);
+  var sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try {
+    document.execCommand('copy');
+    var btn = document.getElementById('copy-table-btn');
+    var orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = orig; }, 1500);
+  } catch (e) {
+    alert('Copy failed — select the table manually and press Cmd/Ctrl+C.');
+  }
+  sel.removeAllRanges();
 }
 
 // ── Markdown renderer ────────────────────────────────────────────────────────
@@ -837,8 +1221,13 @@ else if (GAMES.length) showReport(GAMES[0].id);
 """
 
 
-def generate_run_html(run_dir: Path, games: list[dict]) -> None:
-    """Generate report.html in the run folder with embedded PGNs and rendered reports."""
+def generate_run_html(
+    run_dir: Path,
+    games: list[dict],
+    stat_game_rows: list[dict] | None = None,
+    stat_blunder_rows: list[dict] | None = None,
+) -> None:
+    """Generate report.html in the run folder with embedded PGNs, rendered reports, and stats tables."""
 
     # Read per-game and comparison .md files
     reports: dict = {}
@@ -885,6 +1274,8 @@ def generate_run_html(run_dir: Path, games: list[dict]) -> None:
     html = html.replace("__GAMES_JSON__",   json.dumps(games_list,  separators=(",", ":")))
     html = html.replace("__PGNS_JSON__",    json.dumps(pgns,        separators=(",", ":")))
     html = html.replace("__REPORTS_JSON__", json.dumps(reports,     separators=(",", ":")))
+    html = html.replace("__STATS_GAMES_JSON__",    json.dumps(stat_game_rows or [],    separators=(",", ":")))
+    html = html.replace("__STATS_BLUNDERS_JSON__", json.dumps(stat_blunder_rows or [], separators=(",", ":")))
 
     out = run_dir / "report.html"
     out.write_text(html, encoding="utf-8")
