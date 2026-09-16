@@ -669,6 +669,11 @@
             <option value="15">15 games</option>
             <option value="20">20 games</option>
         </select>
+        <label for="chesscom-game-id">Game ID:</label>
+        <input type="text" id="chesscom-game-id" placeholder="e.g. 145008123821" inputmode="numeric">
+        <button type="button" id="open-game-btn" onclick="openChesscomGameById()">
+            🔗 Open Game
+        </button>
     </div>
 
     <!-- Lichess Import Section -->
@@ -5327,6 +5332,18 @@
             existing.forEach(el => el.remove());
         }
 
+        function openChesscomGameById() {
+            const gameIdInput = document.getElementById('chesscom-game-id');
+            const gameId = gameIdInput.value.trim();
+
+            if (!/^\d+$/.test(gameId)) {
+                showChesscomMessage('Enter a numeric Chess.com game ID.', 'error');
+                return;
+            }
+
+            window.open(`https://www.chess.com/game/live/${gameId}`, '_blank');
+        }
+
         async function fetchChesscomGames() {
             const lichessBar = document.getElementById('lichess-import-bar');
             if (lichessBar) lichessBar.style.display = 'none';
@@ -7870,6 +7887,13 @@
             document.getElementById('chesscom-username').addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     fetchChesscomGames();
+                }
+            });
+
+            // Enter key triggers opening game by ID
+            document.getElementById('chesscom-game-id').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    openChesscomGameById();
                 }
             });
 
