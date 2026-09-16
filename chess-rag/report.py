@@ -852,6 +852,27 @@ table.stats-table tr:nth-child(even) td { background: #1e1e30; }
 table.stats-table tr:hover td { background: #22304e; }
 #copy-table-btn { background: #163060; color: #ffd700; border: 1px solid #ffd700; padding: 4px 13px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; flex-shrink: 0; }
 #copy-table-btn:hover { background: #ffd700; color: #1a1a2e; }
+
+/* Report editor (edit markdown → download patched report.html) */
+#edit-btn { background: #163060; color: #9fe870; border: 1px solid #9fe870; padding: 4px 13px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; flex-shrink: 0; }
+#edit-btn:hover { background: #9fe870; color: #1a1a2e; }
+#save-btn { background: #9fe870; color: #1a1a2e; border: 1px solid #9fe870; padding: 4px 13px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; font-weight: 700; flex-shrink: 0; }
+#save-btn:hover { background: #c8ffa0; }
+#editor-wrap { display: none; margin-top: 20px; max-width: 780px; }
+#editor-wrap.visible { display: block; }
+#editor-label { font-size: 0.78rem; color: #888; margin-bottom: 6px; line-height: 1.5; }
+#md-editor { width: 100%; min-height: 280px; background: #12122a; color: #e0e0e0; border: 1px solid #2a2a4e; border-radius: 4px; padding: 10px 12px; font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 0.82rem; line-height: 1.5; resize: vertical; }
+.editor-btns { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.editor-btns button { padding: 5px 14px; border-radius: 4px; cursor: pointer; font-size: 0.78rem; }
+#save-html-btn { background: #163060; color: #9fe870; border: 1px solid #9fe870; }
+#save-html-btn:hover { background: #9fe870; color: #1a1a2e; }
+#direct-save-btn { background: #163060; color: #7ee787; border: 1px solid #7ee787; }
+#direct-save-btn:hover { background: #7ee787; color: #1a1a2e; }
+#copy-html-btn { background: #163060; color: #7ec8e3; border: 1px solid #7ec8e3; }
+#copy-html-btn:hover { background: #7ec8e3; color: #1a1a2e; }
+#cancel-edit-btn { background: #2a2a3a; color: #ccc; border: 1px solid #444; }
+#cancel-edit-btn:hover { background: #3a3a4a; }
+#editor-status { font-size: 0.75rem; color: #9fe870; }
 </style>
 </head>
 <body>
@@ -866,9 +887,22 @@ table.stats-table tr:hover td { background: #22304e; }
     <span id="toolbar-title">Select a report</span>
     <button id="copy-table-btn" style="display:none" onclick="copyStatsTable()">⧉ Copy table (paste into Sheets)</button>
     <button id="play-btn" style="display:none" onclick="openBoard()">▶ Play on board</button>
+    <button id="edit-btn" style="display:none" onclick="toggleEditor()">✏️ Edit</button>
+    <button id="save-btn" style="display:none" onclick="saveEdit(true)">💾 Save</button>
   </div>
   <div id="content-area">
     <div id="md-output" class="md-body"></div>
+    <div id="editor-wrap">
+      <div id="editor-label">Edit the markdown below. <strong>Save &amp; download HTML</strong> creates a NEW timestamped .html in Downloads with your changes baked in — nothing is overwritten. (<strong>Save directly to this file</strong>, Chrome/Edge only, optionally overwrites the file in place.) Regenerating with report.py rebuilds from the .md files and discards HTML-only edits.</div>
+      <textarea id="md-editor" spellcheck="false"></textarea>
+      <div class="editor-btns">
+        <button id="direct-save-btn" onclick="saveToFileDirect()" style="display:none">✅ Save directly to this file</button>
+        <button id="save-html-btn" onclick="saveEdit(true)">💾 Save &amp; download HTML</button>
+        <button id="copy-html-btn" onclick="saveEdit(false)">📋 Copy full HTML</button>
+        <button id="cancel-edit-btn" onclick="toggleEditor()">Cancel</button>
+        <span id="editor-status"></span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -892,9 +926,13 @@ table.stats-table tr:hover td { background: #22304e; }
 </div>
 
 <script>
+// Capture pristine page source before any DOM mutation (buildNav etc.) so the
+// editor can regenerate a patched report.html with edited reports baked in.
+var PAGE_SOURCE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
 const GAMES   = __GAMES_JSON__;
 const PGNS    = __PGNS_JSON__;
-const REPORTS = __REPORTS_JSON__;
+const REPORTS = /*REPORTS_JSON_BEGIN*/__REPORTS_JSON__/*REPORTS_JSON_END*/;
 const STATS_GAMES    = __STATS_GAMES_JSON__;
 const STATS_BLUNDERS = __STATS_BLUNDERS_JSON__;
 
@@ -925,6 +963,10 @@ function buildNav() {
 }
 
 function showReport(id) {
+  if (hasUnsavedEdits() && !confirm('You have unsaved edits — switch reports and discard them?')) {
+    return; // stay on current report; nav highlight not yet changed
+  }
+  if (editorVisible) setEditorVisible(false);
   currentGameId = id;
   document.querySelectorAll('.nav-item').forEach(function(el) {
     el.classList.toggle('active', el.dataset.id === id);
@@ -932,6 +974,7 @@ function showReport(id) {
   document.getElementById('content-area').scrollTop = 0;
   var playBtn      = document.getElementById('play-btn');
   var copyTableBtn = document.getElementById('copy-table-btn');
+  var editBtn      = document.getElementById('edit-btn');
   var title        = document.getElementById('toolbar-title');
 
   if (id === 'stats-games' || id === 'stats-blunders') {
@@ -941,12 +984,14 @@ function showReport(id) {
       + renderStatsTable(rows);
     playBtn.style.display = 'none';
     copyTableBtn.style.display = '';
+    editBtn.style.display = 'none';
     title.textContent = id === 'stats-games' ? 'Game Stats' : 'Blunders';
     return;
   }
 
   document.getElementById('md-output').innerHTML = simpleMarkdown(REPORTS[id] || '_(no report)_');
   copyTableBtn.style.display = 'none';
+  editBtn.style.display = '';
   if (id !== 'comparison' && PGNS[id]) {
     playBtn.style.display = '';
     var g = PGNS[id];
@@ -993,6 +1038,121 @@ function copyStatsTable() {
     alert('Copy failed — select the table manually and press Cmd/Ctrl+C.');
   }
   sel.removeAllRanges();
+}
+
+// ── Report editor (edit markdown → patched report.html) ─────────────────────
+var editorVisible = false;
+
+function hasUnsavedEdits() {
+  return editorVisible
+      && document.getElementById('md-editor').value !== (REPORTS[currentGameId] || '');
+}
+
+function setEditorVisible(v) {
+  editorVisible = v;
+  document.getElementById('editor-wrap').classList.toggle('visible', v);
+  document.getElementById('edit-btn').textContent = v ? '✏️ Close editor' : '✏️ Edit';
+  document.getElementById('save-btn').style.display = v ? '' : 'none';
+  if (v) {
+    document.getElementById('md-editor').value = REPORTS[currentGameId] || '';
+    document.getElementById('editor-status').textContent = '';
+  }
+}
+
+function toggleEditor() {
+  if (hasUnsavedEdits() && !confirm('You have unsaved edits — close the editor and discard them?')) return;
+  setEditorVisible(!editorVisible);
+}
+
+// Rebuild the full page source with the current REPORTS object spliced in.
+function buildPatchedSource() {
+  var beginMark = '/*REPORTS_JSON_BEGIN*/', endMark = '/*REPORTS_JSON_END*/';
+  var begin = PAGE_SOURCE.indexOf(beginMark), end = PAGE_SOURCE.indexOf(endMark);
+  if (begin === -1 || end === -1) return null;
+  begin += beginMark.length;
+  var json = JSON.stringify(REPORTS).replace(/</g, '\\u003c');
+  return PAGE_SOURCE.slice(0, begin) + json + PAGE_SOURCE.slice(end);
+}
+
+function saveEdit(download) {
+  var status = document.getElementById('editor-status');
+  var newText = document.getElementById('md-editor').value;
+  if (newText === (REPORTS[currentGameId] || '')) {
+    status.textContent = 'No changes in the textarea yet — type your edit first, then click Save.';
+    return;
+  }
+  REPORTS[currentGameId] = newText;
+  document.getElementById('md-output').innerHTML = simpleMarkdown(REPORTS[currentGameId]);
+  var src = buildPatchedSource();
+  if (!src) { status.textContent = 'Error: source markers not found — cannot patch.'; return; }
+  if (download) {
+    var d = new Date(), pad = function(n) { return (n < 10 ? '0' : '') + n; };
+    var fname = 'report_edited_' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate())
+              + '_' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()) + '.html';
+    var blob = new Blob([src], { type: 'text/html' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 5000);
+    status.textContent = 'Downloaded ' + fname + ' — that file contains your edit.';
+  } else if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(src).then(
+      function() { status.textContent = 'Copied! Paste over report.html in your editor.'; },
+      function() { fallbackCopyHtml(src); }
+    );
+  } else {
+    fallbackCopyHtml(src);
+  }
+}
+
+// Direct in-place save via File System Access API (Chrome/Edge only; button hidden otherwise)
+var saveFileHandle = null;
+if (window.showSaveFilePicker) document.getElementById('direct-save-btn').style.display = '';
+
+async function saveToFileDirect() {
+  var status = document.getElementById('editor-status');
+  var newText = document.getElementById('md-editor').value;
+  if (newText === (REPORTS[currentGameId] || '')) {
+    status.textContent = 'No changes in the textarea yet — type your edit first, then click Save.';
+    return;
+  }
+  REPORTS[currentGameId] = newText;
+  document.getElementById('md-output').innerHTML = simpleMarkdown(REPORTS[currentGameId]);
+  var src = buildPatchedSource();
+  if (!src) { status.textContent = 'Error: source markers not found — cannot patch.'; return; }
+  try {
+    if (!saveFileHandle) {
+      saveFileHandle = await window.showSaveFilePicker({
+        suggestedName: 'report.html',
+        types: [{ description: 'HTML file', accept: { 'text/html': ['.html'] } }]
+      });
+    }
+    var w = await saveFileHandle.createWritable();
+    await w.write(src);
+    await w.close();
+    status.textContent = 'Saved in place to ' + saveFileHandle.name + ' — reload the tab to see the saved file.';
+  } catch (e) {
+    if (e && e.name === 'AbortError') { status.textContent = 'Save cancelled.'; return; }
+    status.textContent = 'Direct save failed — use Save & download instead.';
+  }
+}
+
+function fallbackCopyHtml(text) {
+  var ed = document.getElementById('md-editor');
+  var keep = ed.value;
+  ed.value = text;
+  ed.select();
+  try {
+    document.execCommand('copy');
+    document.getElementById('editor-status').textContent = 'Copied! Paste over report.html in your editor.';
+  } catch (e) {
+    document.getElementById('editor-status').textContent = 'Copy blocked — the full HTML is in the textarea; select-all and copy manually.';
+    return; // leave full HTML in textarea for manual copy
+  }
+  ed.value = keep;
 }
 
 // ── Markdown renderer ────────────────────────────────────────────────────────
