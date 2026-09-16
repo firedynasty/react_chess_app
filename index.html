@@ -6536,22 +6536,42 @@
 
             // Get variations (sibling lines from the same parent)
             const variations = [];
+            const variationFens = []; // FEN right after each variation's first move, for eval lookup
             if (node.parent && node.parent.children.length > 1) {
                 const myIndex = node.parent.children.indexOf(node);
                 for (let v = 0; v < node.parent.children.length; v++) {
                     if (v === myIndex) continue;
                     const varNode = node.parent.children[v];
-                    // Serialize the variation line
+                    variationFens.push(varNode.fen || null);
+                    // Serialize the variation line (capped so a variation that
+                    // rejoins the mainline doesn't drag in later, unrelated moves —
+                    // e.g. real blunders made many moves after this one)
                     const varMoves = [];
                     let n = varNode;
-                    while (n) {
+                    let vCount = 0;
+                    while (n && vCount < 6) {
                         const label = n.isBlackMove
                             ? (varMoves.length === 0 ? `${n.moveNumber}...` : '')
                             : `${n.moveNumber}.`;
                         varMoves.push(`${label} ${n.san}${n.annotation || ''}`);
                         n = (n.children && n.children.length > 0) ? n.children[0] : null;
+                        vCount++;
                     }
                     variations.push(varMoves.join(' ').replace(/\s+/g, ' ').trim());
+                }
+            }
+
+            // If this move is a variation (shown in parentheses), identify the move
+            // that was actually played — the more-mainline sibling — so the coach
+            // prompt can compare the selected move against the game move honestly.
+            let gameMove = null;
+            if (node.depth > 0 && node.parent) {
+                const played = node.parent.children.find(c => c !== node && (c.depth || 0) < (node.depth || 0))
+                    || node.parent.children.find(c => c !== node);
+                if (played) {
+                    gameMove = played.isBlackMove
+                        ? `${played.moveNumber}...${played.san}`
+                        : `${played.moveNumber}. ${played.san}`;
                 }
             }
 
@@ -6581,7 +6601,9 @@
                 moveNumber: node.moveNumber,
                 isBlackMove: node.isBlackMove,
                 isVariation: node.depth > 0,
+                gameMove: gameMove,
                 variations: variations,
+                variationFens: variationFens,
                 mainContinuation: mainContinuation.join(' ').replace(/\s+/g, ' ').trim(),
                 annotatedPgn: annotatedPgn
             };
@@ -11029,6 +11051,72 @@ ${contentToAnalyze}`;
                 }
             };
 
+            // Material balance from a FEN, in pawns from White's perspective (positive = White up).
+            const materialFromFen = (fen) => {
+                if (!fen) return null;
+                const values = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+                let balance = 0;
+                for (const ch of fen.split(' ')[0]) {
+                    const v = values[ch.toLowerCase()];
+                    if (!v) continue;
+                    balance += (ch === ch.toLowerCase()) ? -v : v;
+                }
+                return balance;
+            };
+
+            // Plain-English material note so the coach never infers it from the eval.
+            const materialNote = (fen) => {
+                const bal = materialFromFen(fen);
+                if (bal === null) return null;
+                if (bal === 0) return 'material is equal';
+                const n = Math.abs(bal);
+                return `${bal > 0 ? 'White' : 'Black'} is up ${n} pawn${n === 1 ? '' : 's'}`;
+            };
+
+            // Plain-English reading of a centipawn eval given from White's perspective.
+            const evalInWords = (cp) => {
+                if (Math.abs(cp) < 20) return 'the position is essentially equal';
+                const pawns = (Math.abs(cp) / 100).toFixed(2);
+                return `${cp > 0 ? 'White' : 'Black'} is better by about ${pawns} pawns`;
+            };
+
+            // Build the closing instruction for a coach query about a single move.
+            // A selected VARIATION move (parenthesized — not what was played) gets a
+            // neutral comparison against the move actually played; a played move keeps
+            // the "why is it worse than the engine line" framing.
+            const buildCoachInstruction = (ctx, evalBefore, evalAfter) => {
+                if (ctx.isVariation) {
+                    const played = ctx.gameMove
+                        || (ctx.variations[0] || '').split(' ').slice(0, 2).join(' ')
+                        || 'the move actually played';
+                    let gapNote = '';
+                    if (evalAfter !== null && evalAfter !== undefined
+                        && ctx.variationFens && ctx.variationFens[0] && window.positionEvalMap) {
+                        const playedEval = window.positionEvalMap[ctx.variationFens[0]];
+                        if (playedEval !== null && playedEval !== undefined) {
+                            const gap = evalAfter - playedEval; // from White's perspective
+                            if (Math.abs(gap) <= 30) {
+                                gapNote = ` The evaluations after the two moves are within ${(Math.abs(gap) / 100).toFixed(2)} pawns of each other — they are essentially EQUAL in strength, so do NOT declare either move "correct" or "worse".`;
+                            } else {
+                                const favorsSelected = ctx.isBlackMove ? gap < 0 : gap > 0;
+                                gapNote = ` The evaluation favors ${favorsSelected ? ctx.move : played} by ${(Math.abs(gap) / 100).toFixed(2)} pawns — treat it as the better move and explain the concrete reason, while still explaining the idea behind the other move.`;
+                            }
+                        }
+                    }
+                    return `\nImportant: ${ctx.move} was NOT played in the game — it is a variation (shown in parentheses). The move actually played was ${played}; its line above is shown for comparison only, not as proof it is better.${gapNote}`
+                        + `\nYour job: give an honest, concrete comparison of ${ctx.move} versus ${played}.`
+                        + ` First explain the idea behind ${ctx.move} — what it attacks or undermines (e.g. a pawn chain), what plan it starts, which pieces and squares it involves.`
+                        + ` Then explain the idea behind ${played} the same way.`
+                        + ` If the evaluations are close, present the two moves as a strategic trade-off (for example pawn-structure play versus winning material) and explain what each side gives up — do NOT force a verdict that ${played} is better.`
+                        + ` If the evaluation clearly favors one move, explain the concrete reason (material, threats, king safety, piece activity, pawn structure).`
+                        + ` Name pieces and squares concretely. Do NOT invent variations beyond the lines given above.`;
+                }
+                if (ctx.variations.length > 0) {
+                    return `\nYour job: explain in concrete terms why ${ctx.move} is worse than the Stockfish best line above. You MUST treat the first move of that line as the correct alternative — name it explicitly and use it as THE answer. Do NOT suggest any other move as best. Do NOT invent variations. Name pieces and squares concretely. Focus on the tactical or positional reason the Stockfish move wins (material, threats, king safety, piece activity).`;
+                }
+                return `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles.`;
+            };
+
             // Analyze the currently selected move with coaching context
             const analyzeCurrentMove = async () => {
                 let ctx = window.getMoveContext ? window.getMoveContext() : null;
@@ -11088,11 +11176,20 @@ ${contentToAnalyze}`;
                 }
 
                 if (ctx.variations.length > 0) {
-                    query += `\n=== STOCKFISH BEST LINE (authoritative ground truth) ===\n`;
+                    // When the selected move is itself a variation, variations[0] is the
+                    // line that was actually played — present it as the game move, not
+                    // as authoritative engine truth.
+                    query += ctx.isVariation
+                        ? `\n=== LINE ACTUALLY PLAYED IN THE GAME (for comparison — NOT necessarily better than the selected move) ===\n`
+                        : `\n=== STOCKFISH BEST LINE (authoritative ground truth) ===\n`;
                     query += `${ctx.variations[0]}\n`;
-                    query += `=== END STOCKFISH BEST LINE ===\n`;
+                    query += ctx.isVariation
+                        ? `=== END PLAYED LINE ===\n`
+                        : `=== END STOCKFISH BEST LINE ===\n`;
                     if (ctx.variations.length > 1) {
-                        query += `\nOther variations (lower priority, context only — do NOT recommend these over the Stockfish best line above):\n`;
+                        query += ctx.isVariation
+                            ? `\nOther variations (context only):\n`
+                            : `\nOther variations (lower priority, context only — do NOT recommend these over the Stockfish best line above):\n`;
                         ctx.variations.slice(1).forEach((v, i) => {
                             query += `  ${i + 2}: ${v}\n`;
                         });
@@ -11100,22 +11197,68 @@ ${contentToAnalyze}`;
                 }
 
                 if (ctx.mainContinuation) {
-                    query += `\nThe game continued: ${ctx.mainContinuation}\n`;
+                    query += ctx.isVariation
+                        ? `\nIf ${ctx.move} were played, this line would likely continue (hypothetical — NOT what actually happened in the game): ${ctx.mainContinuation}\n`
+                        : `\nThe game continued: ${ctx.mainContinuation}\n`;
                 }
 
                 // Add eval context if available
                 const evalBefore = window.positionEvalMap && ctx.fenBefore ? window.positionEvalMap[ctx.fenBefore] : null;
                 const evalAfter = window.positionEvalMap && ctx.fenAfter ? window.positionEvalMap[ctx.fenAfter] : null;
                 if (evalBefore !== null && evalBefore !== undefined && evalAfter !== null && evalAfter !== undefined) {
-                    query += `\nStockfish evaluation: ${(evalBefore/100).toFixed(2)} → ${(evalAfter/100).toFixed(2)} (${((evalAfter - evalBefore)/100).toFixed(2)} swing, from White's perspective)\n`;
+                    query += `\nStockfish evaluation after ${ctx.move}: ${(evalBefore/100).toFixed(2)} → ${(evalAfter/100).toFixed(2)} (${((evalAfter - evalBefore)/100).toFixed(2)} swing, from White's perspective)\n`;
+                }
+                let otherEval = null;
+                let otherFirstMove = '';
+                if (ctx.variationFens && ctx.variationFens[0] && window.positionEvalMap) {
+                    const bestEval = window.positionEvalMap[ctx.variationFens[0]];
+                    if (bestEval !== null && bestEval !== undefined) {
+                        otherEval = bestEval;
+                        otherFirstMove = (ctx.variations[0] || '').split(' ').slice(0, 2).join(' ');
+                        query += ctx.isVariation
+                            ? `Stockfish evaluation after the played move (${otherFirstMove}): ${bestEval >= 0 ? '+' : ''}${(bestEval/100).toFixed(2)} (from White's perspective)\n`
+                            : `Stockfish evaluation after the best line's first move (${otherFirstMove}): ${bestEval >= 0 ? '+' : ''}${(bestEval/100).toFixed(2)} (from White's perspective)\n`;
+                    }
+                }
+
+                // Verified facts so the coach never reinterprets raw numbers —
+                // misreading the eval sign is a common failure (positive = White better).
+                const facts = [];
+                const matBefore = materialNote(ctx.fenBefore);
+                const matAfter = materialNote(ctx.fenAfter);
+                if (matBefore && matAfter && matBefore !== matAfter) {
+                    facts.push(`Material: before ${ctx.move}, ${matBefore}; after ${ctx.move}, ${matAfter}.`);
+                } else if (matAfter) {
+                    facts.push(`Material: ${matAfter}.`);
+                }
+                if (ctx.isVariation && ctx.variationFens && ctx.variationFens[0]) {
+                    const matPlayed = materialNote(ctx.variationFens[0]);
+                    if (matPlayed) facts.push(`Material after the played move (${ctx.gameMove || otherFirstMove}): ${matPlayed}.`);
+                }
+                if (evalAfter !== null && evalAfter !== undefined) {
+                    facts.push(`Eval after ${ctx.move}: ${evalAfter >= 0 ? '+' : ''}${(evalAfter/100).toFixed(2)} from White's perspective = ${evalInWords(evalAfter)}.`);
+                }
+                if (otherEval !== null) {
+                    const label = ctx.isVariation ? 'the played move' : "the best line's first move";
+                    facts.push(`Eval after ${label} (${otherFirstMove}): ${otherEval >= 0 ? '+' : ''}${(otherEval/100).toFixed(2)} from White's perspective = ${evalInWords(otherEval)}.`);
+                    if (evalAfter !== null && evalAfter !== undefined) {
+                        const gap = evalAfter - otherEval; // from White's perspective
+                        if (Math.abs(gap) <= 30) {
+                            facts.push(`VERDICT: the two moves are evaluated within ${(Math.abs(gap)/100).toFixed(2)} pawns of each other — essentially equal in strength.`);
+                        } else {
+                            const favorsSelected = ctx.isBlackMove ? gap < 0 : gap > 0;
+                            facts.push(`VERDICT: the evaluation favors ${favorsSelected ? ctx.move : otherFirstMove} by ${(Math.abs(gap)/100).toFixed(2)} pawns.`);
+                        }
+                    }
+                }
+                if (facts.length > 0) {
+                    query += `\n=== POSITION FACTS (verified — trust these over your own reading of the numbers above) ===\n`;
+                    facts.forEach(f => { query += `- ${f}\n`; });
+                    query += `=== END POSITION FACTS ===\n`;
                 }
 
                 query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
-                if (ctx.variations.length > 0) {
-                    query += `\nYour job: explain in concrete terms why ${ctx.move} is worse than the Stockfish best line above. You MUST treat the first move of that line as the correct alternative — name it explicitly and use it as THE answer. Do NOT suggest any other move as best. Do NOT invent variations. Name pieces and squares concretely. Focus on the tactical or positional reason the Stockfish move wins (material, threats, king safety, piece activity).`;
-                } else {
-                    query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles.`;
-                }
+                query += buildCoachInstruction(ctx, evalBefore, evalAfter);
 
                 // Append user's additional notes/questions if provided
                 const trimmedNotes = userNotes ? userNotes.trim() : '';
@@ -11125,9 +11268,11 @@ ${contentToAnalyze}`;
 
                 // Show user message in chat
                 const noteSuffix = trimmedNotes ? ` — "${trimmedNotes}"` : '';
-                const displayMsg = ctx.variations.length > 0
-                    ? `Analyze ${ctx.move}${ctx.annotation} and compare with variation(s)...${noteSuffix}`
-                    : `Analyze ${ctx.move}${ctx.annotation}...${noteSuffix}`;
+                const displayMsg = ctx.isVariation
+                    ? `Compare ${ctx.move}${ctx.annotation} with the played move ${ctx.gameMove || ''}...${noteSuffix}`
+                    : ctx.variations.length > 0
+                        ? `Analyze ${ctx.move}${ctx.annotation} and compare with variation(s)...${noteSuffix}`
+                        : `Analyze ${ctx.move}${ctx.annotation}...${noteSuffix}`;
 
                 setIsLoading(true);
                 setMessages(prev => [...prev, { role: 'user', content: displayMsg }]);
@@ -11223,8 +11368,10 @@ ${contentToAnalyze}`;
                     return;
                 }
 
-                // Ask the player why they played this move
-                const reasoning = prompt(`Why did you play ${ctx.move}? (e.g. "I thought the outpost was strong" — leave blank to skip)`);
+                // Ask the player why they played (or would play) this move
+                const reasoning = prompt(ctx.isVariation
+                    ? `Why would you play ${ctx.move}? (e.g. "it attacks the pawn chain" — leave blank to skip)`
+                    : `Why did you play ${ctx.move}? (e.g. "I thought the outpost was strong" — leave blank to skip)`);
                 if (reasoning === null) return; // user clicked Cancel — abort
 
                 let query = `Analyze this specific move: **${ctx.move}${ctx.annotation}**\n`;
@@ -11233,7 +11380,9 @@ ${contentToAnalyze}`;
 
                 const trimmedReasoning = reasoning ? reasoning.trim() : '';
                 if (trimmedReasoning) {
-                    query += `\nI played ${ctx.move} because: "${trimmedReasoning}"\nWhere did my reasoning break down? Was my thinking correct or flawed, and why?\n`;
+                    query += ctx.isVariation
+                        ? `\nI'm considering ${ctx.move} (a variation, not what was played) because: "${trimmedReasoning}"\nWas my thinking correct or flawed, and why?\n`
+                        : `\nI played ${ctx.move} because: "${trimmedReasoning}"\nWhere did my reasoning break down? Was my thinking correct or flawed, and why?\n`;
                 }
 
                 if (ctx.comment) {
@@ -11246,11 +11395,20 @@ ${contentToAnalyze}`;
                 }
 
                 if (ctx.variations.length > 0) {
-                    query += `\n=== STOCKFISH BEST LINE (authoritative ground truth) ===\n`;
+                    // When the selected move is itself a variation, variations[0] is the
+                    // line that was actually played — present it as the game move, not
+                    // as authoritative engine truth.
+                    query += ctx.isVariation
+                        ? `\n=== LINE ACTUALLY PLAYED IN THE GAME (for comparison — NOT necessarily better than the selected move) ===\n`
+                        : `\n=== STOCKFISH BEST LINE (authoritative ground truth) ===\n`;
                     query += `${ctx.variations[0]}\n`;
-                    query += `=== END STOCKFISH BEST LINE ===\n`;
+                    query += ctx.isVariation
+                        ? `=== END PLAYED LINE ===\n`
+                        : `=== END STOCKFISH BEST LINE ===\n`;
                     if (ctx.variations.length > 1) {
-                        query += `\nOther variations (lower priority, context only — do NOT recommend these over the Stockfish best line above):\n`;
+                        query += ctx.isVariation
+                            ? `\nOther variations (context only):\n`
+                            : `\nOther variations (lower priority, context only — do NOT recommend these over the Stockfish best line above):\n`;
                         ctx.variations.slice(1).forEach((v, i) => {
                             query += `  ${i + 2}: ${v}\n`;
                         });
@@ -11258,21 +11416,67 @@ ${contentToAnalyze}`;
                 }
 
                 if (ctx.mainContinuation) {
-                    query += `\nThe game continued: ${ctx.mainContinuation}\n`;
+                    query += ctx.isVariation
+                        ? `\nIf ${ctx.move} were played, this line would likely continue (hypothetical — NOT what actually happened in the game): ${ctx.mainContinuation}\n`
+                        : `\nThe game continued: ${ctx.mainContinuation}\n`;
                 }
 
                 const evalBefore = window.positionEvalMap && ctx.fenBefore ? window.positionEvalMap[ctx.fenBefore] : null;
                 const evalAfter = window.positionEvalMap && ctx.fenAfter ? window.positionEvalMap[ctx.fenAfter] : null;
                 if (evalBefore !== null && evalBefore !== undefined && evalAfter !== null && evalAfter !== undefined) {
-                    query += `\nStockfish evaluation: ${(evalBefore/100).toFixed(2)} → ${(evalAfter/100).toFixed(2)} (${((evalAfter - evalBefore)/100).toFixed(2)} swing, from White's perspective)\n`;
+                    query += `\nStockfish evaluation after ${ctx.move}: ${(evalBefore/100).toFixed(2)} → ${(evalAfter/100).toFixed(2)} (${((evalAfter - evalBefore)/100).toFixed(2)} swing, from White's perspective)\n`;
+                }
+                let otherEval = null;
+                let otherFirstMove = '';
+                if (ctx.variationFens && ctx.variationFens[0] && window.positionEvalMap) {
+                    const bestEval = window.positionEvalMap[ctx.variationFens[0]];
+                    if (bestEval !== null && bestEval !== undefined) {
+                        otherEval = bestEval;
+                        otherFirstMove = (ctx.variations[0] || '').split(' ').slice(0, 2).join(' ');
+                        query += ctx.isVariation
+                            ? `Stockfish evaluation after the played move (${otherFirstMove}): ${bestEval >= 0 ? '+' : ''}${(bestEval/100).toFixed(2)} (from White's perspective)\n`
+                            : `Stockfish evaluation after the best line's first move (${otherFirstMove}): ${bestEval >= 0 ? '+' : ''}${(bestEval/100).toFixed(2)} (from White's perspective)\n`;
+                    }
+                }
+
+                // Verified facts so the coach never reinterprets raw numbers —
+                // misreading the eval sign is a common failure (positive = White better).
+                const facts = [];
+                const matBefore = materialNote(ctx.fenBefore);
+                const matAfter = materialNote(ctx.fenAfter);
+                if (matBefore && matAfter && matBefore !== matAfter) {
+                    facts.push(`Material: before ${ctx.move}, ${matBefore}; after ${ctx.move}, ${matAfter}.`);
+                } else if (matAfter) {
+                    facts.push(`Material: ${matAfter}.`);
+                }
+                if (ctx.isVariation && ctx.variationFens && ctx.variationFens[0]) {
+                    const matPlayed = materialNote(ctx.variationFens[0]);
+                    if (matPlayed) facts.push(`Material after the played move (${ctx.gameMove || otherFirstMove}): ${matPlayed}.`);
+                }
+                if (evalAfter !== null && evalAfter !== undefined) {
+                    facts.push(`Eval after ${ctx.move}: ${evalAfter >= 0 ? '+' : ''}${(evalAfter/100).toFixed(2)} from White's perspective = ${evalInWords(evalAfter)}.`);
+                }
+                if (otherEval !== null) {
+                    const label = ctx.isVariation ? 'the played move' : "the best line's first move";
+                    facts.push(`Eval after ${label} (${otherFirstMove}): ${otherEval >= 0 ? '+' : ''}${(otherEval/100).toFixed(2)} from White's perspective = ${evalInWords(otherEval)}.`);
+                    if (evalAfter !== null && evalAfter !== undefined) {
+                        const gap = evalAfter - otherEval; // from White's perspective
+                        if (Math.abs(gap) <= 30) {
+                            facts.push(`VERDICT: the two moves are evaluated within ${(Math.abs(gap)/100).toFixed(2)} pawns of each other — essentially equal in strength.`);
+                        } else {
+                            const favorsSelected = ctx.isBlackMove ? gap < 0 : gap > 0;
+                            facts.push(`VERDICT: the evaluation favors ${favorsSelected ? ctx.move : otherFirstMove} by ${(Math.abs(gap)/100).toFixed(2)} pawns.`);
+                        }
+                    }
+                }
+                if (facts.length > 0) {
+                    query += `\n=== POSITION FACTS (verified — trust these over your own reading of the numbers above) ===\n`;
+                    facts.forEach(f => { query += `- ${f}\n`; });
+                    query += `=== END POSITION FACTS ===\n`;
                 }
 
                 query += `\nFull annotated game for context:\n${ctx.annotatedPgn}\n`;
-                if (ctx.variations.length > 0) {
-                    query += `\nYour job: explain in concrete terms why ${ctx.move} is worse than the Stockfish best line above. You MUST treat the first move of that line as the correct alternative — name it explicitly and use it as THE answer. Do NOT suggest any other move as best. Do NOT invent variations. Name pieces and squares concretely. Focus on the tactical or positional reason the Stockfish move wins (material, threats, king safety, piece activity).`;
-                } else {
-                    query += `\nPlease analyze this move in depth. Explain why ${evalAfter !== null && evalBefore !== null && evalAfter < evalBefore ? 'this move is worse than the alternative' : 'White is better or Black is better'}. Reference chess principles.`;
-                }
+                query += buildCoachInstruction(ctx, evalBefore, evalAfter);
 
                 // Fetch chess knowledge base and prepend as system context
                 let knowledgeBase = '';
