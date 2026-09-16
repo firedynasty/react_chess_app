@@ -1052,7 +1052,6 @@ function setEditorVisible(v) {
   editorVisible = v;
   document.getElementById('editor-wrap').classList.toggle('visible', v);
   document.getElementById('edit-btn').textContent = v ? '✏️ Close editor' : '✏️ Edit';
-  document.getElementById('save-btn').style.display = v ? '' : 'none';
   if (v) {
     document.getElementById('md-editor').value = REPORTS[currentGameId] || '';
     document.getElementById('editor-status').textContent = '';
@@ -1108,9 +1107,8 @@ function saveEdit(download) {
   }
 }
 
-// Direct in-place save via File System Access API (Chrome/Edge only; button hidden otherwise)
+// Direct in-place save via File System Access API (Chrome/Edge only; button hidden)
 var saveFileHandle = null;
-if (window.showSaveFilePicker) document.getElementById('direct-save-btn').style.display = '';
 
 async function saveToFileDirect() {
   var status = document.getElementById('editor-status');
