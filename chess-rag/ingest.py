@@ -14,9 +14,12 @@ The username doubles as the bucket key. Everything lands in data/<username>/:
     raw/chesscom/<game_id>.pgn   one annotated PGN per game
     games.pgn                    merged, de-duplicated store
     state.json                   last_fetched_at for incremental runs
-Plus copies of the pipeline scripts (ingest/tree_engine/tree_viz/report),
+Plus copies of the pipeline scripts (ingest/lichess_ingest/tree_engine/tree_viz/report),
 making the bucket self-contained — cd in and run any script with no args.
 The bucket folder can be copied anywhere as-is (e.g. shared with a friend).
+
+For Lichess games, run lichess_ingest.py against the same username — it shares
+this bucket's games.pgn and state.json (see lichess_ingest.py's own docstring).
 
 On first run:
     Walks Chess.com archives newest → oldest until max_games collected.
@@ -67,7 +70,10 @@ GAMES_PGN_PATH = os.path.join(DATA_DIR, "games.pgn")
 STATE_PATH = os.path.join(DATA_DIR, "state.json")
 
 # Pipeline scripts copied into every bucket so it runs standalone.
-SCRIPTS_TO_COPY = ["ingest.py", "tree_engine.py", "tree_viz.py", "report.py"]
+SCRIPTS_TO_COPY = [
+    "ingest.py", "lichess_ingest.py", "tree_engine.py", "lichess_tree_engine.py",
+    "tree_viz.py", "lichess_tree_viz.py", "report.py", "lichess_report.py",
+]
 
 # Engine annotation thresholds (centipawns lost, from the mover's perspective)
 BLUNDER_CP = 200      # ??
@@ -214,28 +220,6 @@ def fetch_chesscom_games(
 
 
 # ---------------------------------------------------------------------------
-# Lichess fetcher (stub — disabled pending lichess-org/api#667)
-# ---------------------------------------------------------------------------
-
-def fetch_lichess_games(
-    username: str,
-    max_games: int = 100,
-    since_timestamp: int | None = None,
-) -> list[dict]:
-    """
-    Stub for Lichess ingestion.
-
-    Will be implemented once lichess-org/api#667 is resolved.
-    The API endpoint is: GET https://lichess.org/api/games/user/{username}
-    with params: max, pgnInJson=true, opening=true, sort=dateDesc
-    """
-    raise NotImplementedError(
-        "Lichess fetcher is not yet enabled (see lichess-org/api#667). "
-        "Use Chess.com for now."
-    )
-
-
-# ---------------------------------------------------------------------------
 # Game dict → annotated PGN
 # ---------------------------------------------------------------------------
 
@@ -296,27 +280,44 @@ def load_existing_game_ids() -> set[str]:
     return {f[:-4] for f in os.listdir(RAW_CHESSCOM_DIR) if f.endswith(".pgn")}
 
 
-def _sort_key(fname: str) -> int:
-    """Numeric sort key for a game ID filename; Chess.com IDs are monotonically increasing."""
-    stem = fname[:-4]  # strip .pgn
-    return int(stem) if stem.isdigit() else 0
+def _pgn_timestamp(path: str) -> float:
+    """Sortable timestamp for a saved PGN, parsed from its UTCDate/UTCTime headers."""
+    with open(path) as f:
+        text = f.read()
+    date, time_ = extract_header(text, "UTCDate"), extract_header(text, "UTCTime")
+    if date and time_:
+        try:
+            dt = datetime.strptime(f"{date} {time_}", "%Y.%m.%d %H:%M:%S")
+            return dt.replace(tzinfo=timezone.utc).timestamp()
+        except ValueError:
+            pass
+    return 0.0
 
 
 def rebuild_games_pgn() -> None:
-    """Rebuild data/games.pgn from all raw/chesscom PGNs, newest → oldest."""
-    fnames = sorted(
-        [f for f in os.listdir(RAW_CHESSCOM_DIR) if f.endswith(".pgn")],
-        key=_sort_key,
-        reverse=True,  # newest first
-    )
+    """Rebuild data/games.pgn from every raw/<source>/*.pgn (chesscom, lichess, ...), newest → oldest."""
+    raw_root = os.path.join(DATA_DIR, "raw")
+    paths: list[str] = []
+    if os.path.exists(raw_root):
+        for source in os.listdir(raw_root):
+            source_dir = os.path.join(raw_root, source)
+            if not os.path.isdir(source_dir):
+                continue
+            paths += [
+                os.path.join(source_dir, f)
+                for f in os.listdir(source_dir)
+                if f.endswith(".pgn")
+            ]
+
+    paths.sort(key=_pgn_timestamp, reverse=True)  # newest first
 
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(GAMES_PGN_PATH, "w") as out:
-        for fname in fnames:
-            with open(os.path.join(RAW_CHESSCOM_DIR, fname)) as f:
+        for path in paths:
+            with open(path) as f:
                 out.write(f.read().strip() + "\n\n")
 
-    print(f"  Wrote {len(fnames)} games → {GAMES_PGN_PATH}")
+    print(f"  Wrote {len(paths)} games → {GAMES_PGN_PATH}")
 
 
 # ---------------------------------------------------------------------------
