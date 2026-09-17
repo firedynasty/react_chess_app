@@ -12,6 +12,10 @@ JSON, outputs <bucket>/tree_viewer.html — a file you can open directly in any
 browser (no server required). Fully self-contained: safe to copy or send on
 its own.
 
+Before loading, rebuilds tree.sqlite from <bucket>/games.pgn via
+lichess_tree_engine.build_tree() (idempotent — safe to rerun), so a fresh
+ingest is always reflected without a separate tree_engine.py step.
+
 Usage (from chess-rag/, using a bucket key):
     python lichess_tree_viz.py firebirdbot
 
@@ -29,6 +33,8 @@ import json
 import re
 import sqlite3
 from pathlib import Path
+
+import lichess_tree_engine
 
 try:
     import requests as _requests
@@ -1972,8 +1978,15 @@ def main() -> None:
             raw_root = bucket / "raw"
             pgn_dir = sorted(p for p in raw_root.iterdir() if p.is_dir()) if raw_root.exists() else []
 
-    if not db_path.exists():
-        raise SystemExit(f"Database not found: {db_path}\nRun tree_engine.py first.")
+    games_pgn = db_path.parent / "games.pgn"
+    if games_pgn.exists():
+        print(f"Syncing tree DB: {games_pgn} → {db_path}")
+        lichess_tree_engine.build_tree(games_pgn, db_path)
+    elif not db_path.exists():
+        raise SystemExit(
+            f"Database not found: {db_path}\nNo games.pgn found at {games_pgn} either "
+            "— run lichess_ingest.py first."
+        )
 
     generate(db_path, pgn_dir, out_path, title=title)
 
