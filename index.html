@@ -3278,6 +3278,71 @@
             return parts.join(' ');
         }
 
+        // Parse a PGN [%eval ...] comment value back into White-POV centipawns.
+        // Inverse of _fmtEvalTag — same mate_score=10000 convention.
+        function _parseEvalTag(raw) {
+            raw = raw.trim();
+            if (raw.startsWith('#')) {
+                const n = parseInt(raw.slice(1), 10);
+                return n >= 0 ? 10000 - n : -(10000 - Math.abs(n));
+            }
+            return Math.round(parseFloat(raw) * 100);
+        }
+
+        // Extract [%eval ...] values from a RAW (unparsed) PGN string, in left-to-right
+        // move order. parsePgnWithVariations() strips headers via a global /\[.*?\]/g
+        // that doesn't distinguish real PGN headers from [%eval]/[%clk] tags embedded in
+        // move comments, so those tags are already gone by the time a move tree exists —
+        // this must run on the original text instead. Node creation in
+        // parseTokensIntoTree() happens in strict left-to-right token order regardless of
+        // variation nesting (recursion just continues down the same flat token array), so
+        // this flat scan's Nth move lines up 1:1 with window.moveNodeRegistry's 'node-N'.
+        function extractRawPgnEvalsInOrder(pgnString) {
+            // Split off a real header block only (blank-line separated, PGN convention) so
+            // eval tags in the movetext are never mistaken for headers.
+            let body = pgnString;
+            const parts = pgnString.split(/\r?\n\s*\r?\n/);
+            if (parts.length > 1 && parts[0].trim().startsWith('[')) {
+                body = parts.slice(1).join('\n\n');
+            }
+
+            const tokens = tokenizePgn(body);
+            const evalTagRe = /\[%eval\s+([^\]]+)\]/;
+            const evals = [];
+            for (let i = 0; i < tokens.length; i++) {
+                const t = tokens[i];
+                if (t === '(' || t === ')' || t.startsWith('{')) continue;
+                if (/^\$\d+$/.test(t)) continue;
+                if (/^\d+\.+$/.test(t)) continue;
+                if (['1-0', '0-1', '1/2-1/2', '*'].includes(t)) continue;
+                // This token is a move — check the very next token for its eval comment
+                let cp = null;
+                const next = tokens[i + 1];
+                if (next && next.startsWith('{')) {
+                    const m = next.match(evalTagRe);
+                    if (m) cp = _parseEvalTag(m[1]);
+                }
+                evals.push(cp);
+            }
+            return evals;
+        }
+
+        // Zip extractRawPgnEvalsInOrder()'s results onto window.moveNodeRegistry's
+        // 'node-N' entries (populated by the parsePgnWithVariations() call that must
+        // precede this) so the eval bar reflects them immediately while navigating —
+        // no live "Get Eval" run needed.
+        function applyRawPgnEvalsToMoveTree(pgnString) {
+            const evals = extractRawPgnEvalsInOrder(pgnString);
+            let i = 0;
+            while (window.moveNodeRegistry && window.moveNodeRegistry['node-' + i]) {
+                const cp = evals[i];
+                if (cp !== null && cp !== undefined && !Number.isNaN(cp)) {
+                    window.positionEvalMap[window.moveNodeRegistry['node-' + i].fen] = cp;
+                }
+                i++;
+            }
+        }
+
         function copyPgnToClipboard() {
             // If we have a live move tree, serialize it (picks up inserted comments)
             let pgn;
@@ -3838,6 +3903,8 @@
             window.currentMoveNode = null;
             window.cycleVarSequence = [];
             window.cycleVarIndex = -1;
+            window.positionEvalMap = {};  // drop stale evals from any previous game
+            applyRawPgnEvalsToMoveTree(pgnString);  // pull any embedded [%eval] tags — no engine run needed
             renderMoveTable(window.moveTree);
 
             // Parse positions for navigation
@@ -3860,6 +3927,7 @@
                 posCountSpan.textContent = `1/${window.studyReportPositions.length}`;
             }
 
+            updateEvalBar(window.moveTree ? window.moveTree.fen : null);
             updateAllCommentsDisplay();
         }
 
