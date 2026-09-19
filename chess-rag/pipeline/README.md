@@ -38,6 +38,18 @@ python tree_engine.py tttstanley
 python tree_viz.py tttstanley
 ```
 
+Push to Supabase (run from `chess-rag/` root — `push_to_supabase.py` isn't
+copied into buckets). It re-scans the whole `raw/` folder and upserts on
+`(source, game_id)`, so running it after every ingest is safe and cheap —
+already-pushed games are just merged, only genuinely new ones insert:
+
+```bash
+python push_to_supabase.py data/tttstanley --username TTTstanley
+```
+
+Requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (env vars or
+`chess-rag/.env`, gitignored) — see `push_to_supabase.py`'s docstring.
+
 Generate AI reports (needs `OPENAI_API_KEY`):
 
 ```bash
@@ -105,3 +117,9 @@ new reports (that needs your `OPENAI_API_KEY`).
 - `pip install -r requirements.txt` (requests, python-chess, openai)
 - `stockfish` binary (`brew install stockfish`) — for annotation
 - `export OPENAI_API_KEY=sk-...` — only for `report.py`
+
+
+see, (base) ➜  chess-rag git:(main) ✗ python ingest.py TTTStanley
+
+
+so tree_viz.py needs tree_engine.py

@@ -1,0 +1,40 @@
+name: Sync chess games to Supabase
+
+on:
+  schedule:
+    - cron: '0 12 * * *'  # once a day, 12:00 UTC -- adjust as you like
+  workflow_dispatch: {}     # adds a manual "Run workflow" button
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chess-rag
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install minimal deps (skip heavy report.py extras)
+        run: pip install requests python-chess
+
+      - name: Fetch new Chess.com games (TTTstanley)
+        run: python ingest.py TTTstanley --months 2 --max 200 --no-analyze
+
+      - name: Fetch new Lichess games (FirebirdBot)
+        run: python lichess_ingest.py FirebirdBot --max 30 --no-analyze
+
+      - name: Push TTTstanley games to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python push_to_supabase.py data/tttstanley --username TTTstanley
+
+      - name: Push FirebirdBot games to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python push_to_supabase.py data/firebirdbot --username FirebirdBot

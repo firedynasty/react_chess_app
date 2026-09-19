@@ -3,3 +3,4 @@ reports/
 tree_viewer.html
 __pycache__/
 *.pyc
+.env
