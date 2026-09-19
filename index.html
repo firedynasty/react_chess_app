@@ -744,6 +744,21 @@
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
             </div>
 
+            <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <select id="sbGameSource" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                    <option value="chesscom">Chess.com</option>
+                    <option value="lichess">Lichess</option>
+                </select>
+                <input type="text" id="sbGameUsername" placeholder="username (optional)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px; width: 150px;">
+                <button id="sbFetchListBtn" onclick="sbFetchGameList()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Find Games</button>
+                <select id="sbGameSelect" disabled style="flex: 1; min-width: 220px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                    <option value="">— fetch games first —</option>
+                </select>
+                <button id="sbLoadGameBtn" onclick="sbLoadSelectedGame()" disabled style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Selected</button>
+                <button id="sbSaveGameBtn" onclick="sbSaveLoadedGame()" disabled style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to Supabase</button>
+            </div>
+            <div id="sbStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
+
             <div class="progress-bar" id="progressBar" style="display: none;">
                 <div class="progress-fill" id="progressFill"></div>
             </div>
@@ -3867,21 +3882,11 @@
         /**
          * Load PGN from textarea directly to board and move container
          */
-        async function loadPgnToBoard() {
-            let pgnString = '';
-            try {
-                pgnString = (await navigator.clipboard.readText()).trim();
-            } catch (err) {
-                // Fallback to textarea if clipboard access denied
-                const pgnTextarea = document.getElementById('pgnInput');
-                if (pgnTextarea && pgnTextarea.value.trim()) {
-                    pgnString = pgnTextarea.value.trim();
-                }
-            }
-            if (!pgnString) {
-                alert('No PGN in clipboard');
-                return;
-            }
+        function applyPgnStringToBoard(pgnString) {
+            // Any previously loaded Supabase game is no longer what's on the board.
+            window.supabaseLoadedGame = null;
+            const sbSaveBtn = document.getElementById('sbSaveGameBtn');
+            if (sbSaveBtn) sbSaveBtn.disabled = true;
 
             // Update analysisReportText with the PGN content
             const reportContainer = document.getElementById('analysisReportContainer');
@@ -3929,6 +3934,123 @@
 
             updateEvalBar(window.moveTree ? window.moveTree.fen : null);
             updateAllCommentsDisplay();
+        }
+
+        async function loadPgnToBoard() {
+            let pgnString = '';
+            try {
+                pgnString = (await navigator.clipboard.readText()).trim();
+            } catch (err) {
+                // Fallback to textarea if clipboard access denied
+                const pgnTextarea = document.getElementById('pgnInput');
+                if (pgnTextarea && pgnTextarea.value.trim()) {
+                    pgnString = pgnTextarea.value.trim();
+                }
+            }
+            if (!pgnString) {
+                alert('No PGN in clipboard');
+                return;
+            }
+            applyPgnStringToBoard(pgnString);
+        }
+
+        // =====================================================================
+        // LOAD / SAVE GAMES FROM SUPABASE (via /api/games)
+        // =====================================================================
+
+        window.supabaseLoadedGame = null; // { source, game_id } of the game currently on the board, if any
+
+        async function sbFetchGameList() {
+            const source = document.getElementById('sbGameSource').value;
+            const username = document.getElementById('sbGameUsername').value.trim();
+            const statusEl = document.getElementById('sbStatus');
+            const select = document.getElementById('sbGameSelect');
+            statusEl.textContent = 'Fetching…';
+            select.disabled = true;
+            select.innerHTML = '<option value="">— loading —</option>';
+            document.getElementById('sbLoadGameBtn').disabled = true;
+            try {
+                const params = new URLSearchParams({ action: 'list', source, limit: '100' });
+                if (username) params.set('username', username);
+                const r = await fetch('/api/games?' + params.toString());
+                const rows = await r.json();
+                if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
+                if (!rows.length) {
+                    select.innerHTML = '<option value="">No games found</option>';
+                    statusEl.textContent = 'No games found.';
+                    return;
+                }
+                select.innerHTML = '';
+                rows.forEach(function (g) {
+                    const opt = document.createElement('option');
+                    opt.value = JSON.stringify({ source: g.source, game_id: g.game_id });
+                    const date = g.played_at ? g.played_at.slice(0, 10) : '?';
+                    const outcome = g.my_result ? g.my_result.toUpperCase() : (g.result || '?');
+                    opt.textContent = date + ' — ' + (g.white || '?') + ' vs ' + (g.black || '?') +
+                        ' (' + outcome + ')' + (g.eco ? ' [' + g.eco + ']' : '');
+                    select.appendChild(opt);
+                });
+                select.disabled = false;
+                document.getElementById('sbLoadGameBtn').disabled = false;
+                statusEl.textContent = rows.length + ' game(s) found.';
+            } catch (e) {
+                select.innerHTML = '<option value="">— fetch games first —</option>';
+                statusEl.textContent = 'Fetch failed: ' + e.message;
+            }
+        }
+
+        async function sbLoadSelectedGame() {
+            const select = document.getElementById('sbGameSelect');
+            const statusEl = document.getElementById('sbStatus');
+            if (!select.value) return;
+            const { source, game_id } = JSON.parse(select.value);
+            statusEl.textContent = 'Loading…';
+            try {
+                const params = new URLSearchParams({ action: 'get', source, game_id });
+                const r = await fetch('/api/games?' + params.toString());
+                const row = await r.json();
+                if (!r.ok) throw new Error(row.error || ('HTTP ' + r.status));
+
+                applyPgnStringToBoard(row.pgn); // resets window.supabaseLoadedGame — set it after
+                window.currentLoadedPgn = row.pgn;
+                window.supabaseLoadedGame = { source, game_id };
+                document.getElementById('sbSaveGameBtn').disabled = false;
+                statusEl.textContent = 'Loaded ' + source + '/' + game_id + '.';
+                log('Loaded game from Supabase (' + source + '/' + game_id + ')', 'success');
+            } catch (e) {
+                statusEl.textContent = 'Load failed: ' + e.message;
+                log('Load from Supabase failed: ' + e.message, 'warning');
+            }
+        }
+
+        async function sbSaveLoadedGame() {
+            const statusEl = document.getElementById('sbStatus');
+            if (!window.supabaseLoadedGame) return;
+            const pgn = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
+            if (!pgn) {
+                log('No PGN available to save', 'warning');
+                return;
+            }
+            statusEl.textContent = 'Saving…';
+            try {
+                const r = await fetch('/api/games', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'save',
+                        source: window.supabaseLoadedGame.source,
+                        game_id: window.supabaseLoadedGame.game_id,
+                        pgn: pgn,
+                    }),
+                });
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+                statusEl.textContent = 'Saved.';
+                log('Saved changes back to Supabase', 'success');
+            } catch (e) {
+                statusEl.textContent = 'Save failed: ' + e.message;
+                log('Save to Supabase failed: ' + e.message, 'warning');
+            }
         }
 
         // =====================================================================
