@@ -1202,6 +1202,7 @@
             <button id="gdriveRowCopyBtn" style="background: #27ae60; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle;">Copy</button>
           </div>
           <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
+          <button id="downloadPgnBtn" onclick="downloadPgn()" style="background: #2980b9; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Download PGN</button>
           <button id="updateReportBtn" onclick="updateReportWithPgn()" style="display: none; background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
           <button id="loadFenBtn" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Load FEN</button>
           <button id="fenColorToggleBtn" style="background: #fff; color: #333; border: 2px solid #ccc; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">White</button>
@@ -3211,6 +3212,72 @@
             return parts.join(' ');
         }
 
+        // Format a White-POV centipawn score as a PGN [%eval] comment value.
+        // Mirrors chess-rag/ingest.py's _fmt_eval — positionEvalMap already encodes
+        // mate scores the same way (mate_score=10000), so no conversion is needed here.
+        function _fmtEvalTag(cpWhite) {
+            if (Math.abs(cpWhite) >= 9900) {
+                const n = 10000 - Math.abs(cpWhite);
+                return '#' + (cpWhite > 0 ? '' : '-') + n;
+            }
+            return '[%eval ' + (cpWhite / 100).toFixed(2) + ']';
+        }
+
+        // Same traversal as moveTreeToPgn(), but appends a [%eval ...] tag to each
+        // node's comment when window.positionEvalMap has an entry for that node's FEN.
+        // Kept separate from moveTreeToPgn() so copyPgnToClipboard() stays unaffected —
+        // eval tags are download-only.
+        function moveTreeToPgnWithEvals(rootNode) {
+            let parts = [];
+            const evalMap = window.positionEvalMap || {};
+
+            function writeMoveHead(node, needsMoveNumber) {
+                if (!node.isBlackMove) {
+                    parts.push(node.moveNumber + '.');
+                } else if (needsMoveNumber) {
+                    parts.push(node.moveNumber + '...');
+                }
+
+                parts.push(node.san + (node.annotation || ''));
+
+                let comment = node.comment || '';
+                if (node.fen && evalMap[node.fen] !== undefined) {
+                    const evalTag = _fmtEvalTag(evalMap[node.fen]);
+                    comment = comment ? comment + ' ' + evalTag : evalTag;
+                }
+                if (comment) {
+                    parts.push('{' + comment + '}');
+                }
+            }
+
+            function serializeNode(node, needsMoveNumber) {
+                if (!node || !node.san) return;
+                writeMoveHead(node, needsMoveNumber);
+                serializeChildren(node);
+            }
+
+            function serializeChildren(node) {
+                if (!node.children || node.children.length === 0) return;
+
+                const main = node.children[0];
+                writeMoveHead(main, false);
+
+                for (let v = 1; v < node.children.length; v++) {
+                    parts.push('(');
+                    serializeNode(node.children[v], true);
+                    parts.push(')');
+                }
+
+                serializeChildren(main);
+            }
+
+            if (rootNode.children && rootNode.children.length > 0) {
+                serializeNode(rootNode.children[0], true);
+            }
+
+            return parts.join(' ');
+        }
+
         function copyPgnToClipboard() {
             // If we have a live move tree, serialize it (picks up inserted comments)
             let pgn;
@@ -3238,6 +3305,33 @@
             }).catch(err => {
                 log('Failed to copy: ' + err.message, 'error');
             });
+        }
+
+        function triggerPgnFileDownload(pgnText) {
+            const filename = 'game_' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.pgn';
+            const blob = new Blob([pgnText], { type: 'application/x-chess-pgn' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function downloadPgn() {
+            let pgn;
+            if (window.moveTree) {
+                pgn = moveTreeToPgnWithEvals(window.moveTree);
+            } else {
+                pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations;
+            }
+
+            if (!pgn) {
+                log('No PGN available to download', 'warning');
+                return;
+            }
+
+            triggerPgnFileDownload(pgn);
+            log('PGN downloaded', 'success');
         }
 
         /**
