@@ -1185,7 +1185,7 @@
             <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <button onclick="document.getElementById('loadFenBtn').click()" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load FEN</button>
             <button onclick="document.getElementById('exportFenBtn').click()" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Export FEN</button>
-            <button onclick="document.getElementById('viewTextBtn').click()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">View Text</button>
+            <button id="showOpeningBtn" title="Look up the ECO opening for the currently loaded game" onclick="showOpeningToast()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📖 Opening</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -6064,6 +6064,68 @@
         window.moveTree = null;           // Root node of parsed move tree
         window.currentMoveNode = null;    // Currently selected node in the tree
         window.moveNodeRegistry = {};     // Map of nodeId -> MoveNode for fast lookup
+
+        // ── Toast notifications ─────────────────────────────────────────────
+        function showToast(message, durationMs) {
+            let container = document.getElementById('appToastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'appToastContainer';
+                container.style.cssText = 'position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:10000; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none;';
+                document.body.appendChild(container);
+            }
+            const toast = document.createElement('div');
+            toast.textContent = message;
+            toast.style.cssText = 'background:#0f3460; color:#a8d8ea; border:1px solid #1a3a6e; padding:10px 18px; border-radius:8px; font-size:14px; font-weight:bold; box-shadow:0 4px 16px rgba(0,0,0,0.5); opacity:0; transform:translateY(8px); transition:opacity 0.2s ease, transform 0.2s ease; max-width:80vw; text-align:center;';
+            container.appendChild(toast);
+            requestAnimationFrame(() => { toast.style.opacity = '1'; toast.style.transform = 'translateY(0)'; });
+            const ttl = durationMs || 3000;
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(8px)';
+                setTimeout(() => toast.remove(), 250);
+            }, ttl);
+        }
+
+        // ── Opening (ECO) lookup for the currently loaded PGN ───────────────
+        window._ecoOpeningsLookup = null; // lazy-loaded {4-field FEN: {eco, name}}
+        function ecoFenKey(fen) {
+            return fen.split(' ').slice(0, 4).join(' ');
+        }
+        async function loadEcoOpeningsLookup() {
+            if (window._ecoOpeningsLookup) return window._ecoOpeningsLookup;
+            const resp = await fetch('/chess-rag/eco_openings.json');
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            window._ecoOpeningsLookup = await resp.json();
+            return window._ecoOpeningsLookup;
+        }
+        async function showOpeningToast() {
+            if (!window.moveTree || !window.moveTree.children.length) {
+                showToast('No PGN loaded — load a game or make moves first.');
+                return;
+            }
+            let lookup;
+            try {
+                lookup = await loadEcoOpeningsLookup();
+            } catch (e) {
+                showToast('Could not load ECO opening data: ' + e.message);
+                return;
+            }
+            // Walk the mainline (children[0] at every branch) from the start,
+            // keeping the deepest position that matches a known ECO line.
+            let node = window.moveTree;
+            let best = null;
+            while (node) {
+                const entry = lookup[ecoFenKey(node.fen)];
+                if (entry) best = entry;
+                node = node.children && node.children[0];
+            }
+            if (best) {
+                showToast(best.eco + ' — ' + best.name);
+            } else {
+                showToast('No matching ECO opening found for this line.');
+            }
+        }
 
         // Cycle Var. state
         window.cycleVarSequence = [];     // Flat array of nodes to cycle through
