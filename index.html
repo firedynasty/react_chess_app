@@ -771,6 +771,7 @@
                 </select>
                 <button id="sbLoadGameBtn" onclick="sbLoadSelectedGame()" disabled style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Selected</button>
                 <button id="sbSaveGameBtn" onclick="sbSaveLoadedGame()" disabled style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to Supabase</button>
+                <button id="sbReanalyzeBtn" onclick="sbReanalyzeAndSave()" disabled title="Strip any stale eval/variations, run a fresh Stockfish pass, and save back to Supabase" style="background: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Re-analyze &amp; Save</button>
             </div>
             <div id="sbStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
 
@@ -4085,6 +4086,7 @@
                 // even if other edit flows resync window.currentLoadedPgn to headerless movetext.
                 window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn) };
                 document.getElementById('sbSaveGameBtn').disabled = false;
+                document.getElementById('sbReanalyzeBtn').disabled = false;
                 statusEl.textContent = 'Loaded ' + source + '/' + game_id + '.';
                 log('Loaded game from Supabase (' + source + '/' + game_id + ')', 'success');
             } catch (e) {
@@ -4128,6 +4130,219 @@
             } catch (e) {
                 statusEl.textContent = 'Save failed: ' + e.message;
                 log('Save to Supabase failed: ' + e.message, 'warning');
+            }
+        }
+
+        // =====================================================================
+        // RE-ANALYZE & SAVE — strip any stale eval/variation annotations from
+        // the loaded Supabase game (clocks are kept), run a fresh full-game
+        // Stockfish pass (per-move [%eval] + best-line variations on
+        // blunders/mistakes), and PATCH the result back to Supabase. Mirrors
+        // chess-rag/annotate.py's annotate_pgn() format/thresholds exactly, so
+        // games ingested by the GitHub Action (which doesn't run Stockfish)
+        // can be annotated from the browser instead of a local re-push.
+        // =====================================================================
+
+        const REANALYZE_BLUNDER_CP = 200;
+        const REANALYZE_MISTAKE_CP = 100;
+        const REANALYZE_INACCURACY_CP = 50;
+        const REANALYZE_PV_LENGTH = 5;
+
+        // Same value as _fmtEvalTag() but unwrapped — matches annotate.py's
+        // _fmt_eval(), used for "best X.XX" variation-start comments.
+        function _fmtEvalRaw(cpWhite) {
+            if (Math.abs(cpWhite) >= 9900) {
+                const n = 10000 - Math.abs(cpWhite);
+                return '#' + (cpWhite > 0 ? '' : '-') + n;
+            }
+            return (cpWhite / 100).toFixed(2);
+        }
+
+        // Remove [%eval ...] tags, "best ..." variation comments (they live
+        // inside the variation blocks removed below), (...) variation blocks,
+        // $n NAG codes, and ?!/?/??/!! glyphs from a movetext string — while
+        // preserving [%clk ...] comments, since a chess.com/lichess pull can't
+        // regenerate those once discarded. Safe on never-annotated movetext
+        // too (a no-op there, aside from dropping empty {} husks).
+        function stripEngineAnnotationsKeepClocks(movetext) {
+            let body = movetext;
+            while (/\([^()]*\)/.test(body)) {
+                body = body.replace(/\([^()]*\)/g, ' ');
+            }
+            body = body.replace(/\{([^}]*)\}/g, (m, inner) => {
+                const cleaned = inner.replace(/\[%eval[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+                return cleaned ? '{' + cleaned + '}' : '';
+            });
+            body = body.replace(/\$\d+/g, ' ');
+            body = body.replace(/[!?]+/g, '');
+            return body.replace(/\s+/g, ' ').trim();
+        }
+
+        // Convert a UCI move list (e.g. ["e2e4","e7e5",...]) to SAN starting
+        // from fen, stopping at the first illegal/unparseable move.
+        function uciListToSan(fen, pvUci, maxLen) {
+            const chess = new Chess(fen);
+            const sans = [];
+            for (const uci of (pvUci || []).slice(0, maxLen)) {
+                if (!uci || uci.length < 4) break;
+                const moveObj = { from: uci.slice(0, 2), to: uci.slice(2, 4) };
+                if (uci.length > 4) moveObj.promotion = uci.slice(4);
+                const move = chess.move(moveObj);
+                if (!move) break;
+                sans.push(move.san);
+            }
+            return sans;
+        }
+
+        async function sbReanalyzeAndSave() {
+            const statusEl = document.getElementById('sbStatus');
+            const btn = document.getElementById('sbReanalyzeBtn');
+            if (!window.supabaseLoadedGame) return;
+            if (!isReady) {
+                statusEl.textContent = 'Stockfish is not ready yet — wait a moment and try again.';
+                return;
+            }
+
+            const { source, game_id } = window.supabaseLoadedGame;
+            let headerBlock = window.supabaseLoadedGame.headerBlock || '';
+            const originalPgn = window.currentLoadedPgn ||
+                (window.moveTree ? moveTreeToPgn(window.moveTree) : '');
+            if (!originalPgn) {
+                statusEl.textContent = 'No PGN loaded to re-analyze.';
+                return;
+            }
+
+            btn.disabled = true;
+            document.getElementById('sbLoadGameBtn').disabled = true;
+            document.getElementById('sbSaveGameBtn').disabled = true;
+            statusEl.textContent = 'Stripping old annotations...';
+
+            try {
+                let movesOnly = originalPgn;
+                const parts = originalPgn.split(/\r?\n\s*\r?\n/);
+                if (parts.length > 1 && parts[0].trim().startsWith('[')) {
+                    movesOnly = parts.slice(1).join('\n\n');
+                }
+                movesOnly = stripEngineAnnotationsKeepClocks(movesOnly);
+
+                const resultMatch = movesOnly.match(/\s(1-0|0-1|1\/2-1\/2|\*)\s*$/);
+                const resultToken = resultMatch ? resultMatch[1] : null;
+                const bodyForParsing = resultMatch ? movesOnly.slice(0, resultMatch.index) : movesOnly;
+
+                // chess.js only needs the moves — strip surviving [%clk] comments
+                // just for this parse (they stay in the source movetext, which
+                // isn't reused for the rebuild below).
+                const forParse = bodyForParsing.replace(/\{[^}]*\}/g, ' ');
+                const chess = new Chess();
+                if (!chess.load_pgn(forParse)) {
+                    throw new Error("Could not parse this game's moves for re-analysis.");
+                }
+                const history = chess.history({ verbose: true });
+                if (history.length === 0) throw new Error('No moves found to analyze.');
+
+                chess.reset();
+                const startFen = chess.fen();
+                const fens = [];
+                for (const h of history) { chess.move(h.san); fens.push(chess.fen()); }
+                const allFens = [startFen, ...fens]; // allFens[i] = position BEFORE move i
+
+                statusEl.textContent = `Analyzing ${history.length} moves...`;
+                const depth = parseInt(document.getElementById('depth').value) || 15;
+                const pool = await getAnalysisPool();
+                const allResults = new Array(allFens.length).fill(null);
+                let nextIdx = 0, doneCount = 0;
+                await Promise.all(pool.map(async (w) => {
+                    while (nextIdx < allFens.length) {
+                        const i = nextIdx++;
+                        const sf = await analyzePositionOn(w, allFens[i], depth);
+                        const turn = allFens[i].split(' ')[1];
+                        allResults[i] = {
+                            evaluation: turn === 'w' ? sf.evaluation : -sf.evaluation,
+                            pvUci: sf.pvUci || [],
+                        };
+                        doneCount++;
+                        statusEl.textContent = `Analyzing... ${doneCount}/${allFens.length}`;
+                    }
+                }));
+
+                // Rebuild movetext: eval tag on every move, glyph + best-line
+                // variation on blunders/mistakes — same rule as annotate.py's
+                // annotate_pgn() (loss vs. the position's own prior PV).
+                statusEl.textContent = 'Building annotated PGN...';
+                const outParts = [];
+                for (let i = 0; i < history.length; i++) {
+                    const move = history[i];
+                    const moveNumber = Math.floor(i / 2) + 1;
+                    const isBlack = i % 2 === 1;
+
+                    const prev = allResults[i];
+                    const cur = allResults[i + 1];
+                    const prevWhite = prev ? prev.evaluation : 0;
+                    const curWhite = cur ? cur.evaluation : prevWhite;
+                    const loss = isBlack ? (curWhite - prevWhite) : (prevWhite - curWhite);
+
+                    let glyph = '';
+                    if (loss >= REANALYZE_BLUNDER_CP) glyph = '??';
+                    else if (loss >= REANALYZE_MISTAKE_CP) glyph = '?';
+                    else if (loss >= REANALYZE_INACCURACY_CP) glyph = '?!';
+
+                    outParts.push(isBlack ? (moveNumber + '...') : (moveNumber + '.'));
+                    outParts.push(move.san + glyph);
+                    outParts.push('{' + _fmtEvalTag(curWhite) + '}');
+
+                    const bestUci = prev && prev.pvUci ? prev.pvUci[0] : null;
+                    const playedUci = move.from + move.to + (move.promotion || '');
+                    if (loss >= REANALYZE_MISTAKE_CP && bestUci && bestUci !== playedUci) {
+                        const fenBefore = allFens[i];
+                        const varSan = uciListToSan(fenBefore, prev.pvUci, REANALYZE_PV_LENGTH);
+                        if (varSan.length > 0) {
+                            const varParts = ['('];
+                            let vMoveNumber = moveNumber, vIsBlack = isBlack;
+                            varParts.push(vIsBlack ? (vMoveNumber + '...') : (vMoveNumber + '.'));
+                            varParts.push(varSan[0]);
+                            varParts.push('{best ' + _fmtEvalRaw(prevWhite) + '}');
+                            for (let k = 1; k < varSan.length; k++) {
+                                vIsBlack = !vIsBlack;
+                                if (!vIsBlack) vMoveNumber++;
+                                varParts.push(vIsBlack ? (vMoveNumber + '...') : (vMoveNumber + '.'));
+                                varParts.push(varSan[k]);
+                            }
+                            varParts.push(')');
+                            outParts.push(varParts.join(' '));
+                        }
+                    }
+                }
+
+                if (/\[EngineAnalysis\s+"[^"]*"\]/.test(headerBlock)) {
+                    headerBlock = headerBlock.replace(/\[EngineAnalysis\s+"[^"]*"\]/, `[EngineAnalysis "stockfish depth ${depth}"]`);
+                } else if (headerBlock.trim()) {
+                    headerBlock = headerBlock.trim() + `\n[EngineAnalysis "stockfish depth ${depth}"]`;
+                }
+
+                const finalMovetext = outParts.join(' ') + (resultToken ? ' ' + resultToken : '');
+                const finalPgn = (headerBlock.trim() ? headerBlock.trim() + '\n\n' : '') + finalMovetext;
+
+                statusEl.textContent = 'Saving to Supabase...';
+                const r = await fetch('/api/games', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'save', source, game_id, pgn: finalPgn }),
+                });
+                const data = await r.json();
+                if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+
+                applyPgnStringToBoard(finalPgn); // resets window.supabaseLoadedGame — set it after
+                window.currentLoadedPgn = finalPgn;
+                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(finalPgn) };
+                document.getElementById('sbSaveGameBtn').disabled = false;
+                statusEl.textContent = `Re-analyzed and saved ${source}/${game_id} (depth ${depth}).`;
+                log('Re-analyzed and saved to Supabase (' + source + '/' + game_id + ')', 'success');
+            } catch (e) {
+                statusEl.textContent = 'Re-analyze failed: ' + e.message;
+                log('Re-analyze failed: ' + e.message, 'warning');
+            } finally {
+                btn.disabled = false;
+                document.getElementById('sbLoadGameBtn').disabled = false;
             }
         }
 
