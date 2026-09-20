@@ -17,6 +17,8 @@ Requires environment variables (export them, or put them in chess-rag/.env):
 """
 
 import argparse
+import io
+import json
 import os
 import re
 import sys
@@ -24,8 +26,16 @@ from datetime import datetime, timezone
 
 import requests
 
+try:
+    import chess
+    import chess.pgn
+    HAVE_CHESS = True
+except ImportError:
+    HAVE_CHESS = False
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 BATCH_SIZE = 200
+ECO_CACHE_PATH = os.path.join(HERE, "eco_openings.json")  # same file/format tree_viz.py builds
 
 
 def load_dotenv(path: str) -> None:
@@ -52,6 +62,42 @@ def load_dotenv(path: str) -> None:
 def extract_header(pgn: str, key: str) -> str | None:
     m = re.search(rf'\[{re.escape(key)}\s+"([^"]*)"\]', pgn)
     return m.group(1) if m else None
+
+
+def load_eco_lookup() -> dict:
+    """{4-field FEN: {"eco": "B10", "name": "..."}}, same cache tree_viz.py builds.
+
+    Read-only here -- if the cache doesn't exist yet, run tree_viz.py once
+    (any bucket) to fetch and cache it, or ECO derivation is just skipped.
+    """
+    if not os.path.exists(ECO_CACHE_PATH):
+        return {}
+    with open(ECO_CACHE_PATH) as f:
+        return json.load(f)
+
+
+def derive_eco_from_moves(pgn_text: str, eco_lookup: dict) -> str | None:
+    """Replay the game and return the ECO code for the deepest matching position.
+
+    Mirrors tree_viz.py's _annotate_game_opening -- needed because lichess PGNs
+    carry no [ECO] header at all (chess.com's do, so this is only a fallback).
+    """
+    if not HAVE_CHESS or not eco_lookup:
+        return None
+    try:
+        game = chess.pgn.read_game(io.StringIO(pgn_text))
+        if game is None:
+            return None
+        board = game.board()
+        best_eco = None
+        for move in game.mainline_moves():
+            board.push(move)
+            key = " ".join(board.fen().split()[:4])
+            if key in eco_lookup:
+                best_eco = eco_lookup[key]["eco"]
+        return best_eco
+    except Exception:
+        return None
 
 
 def parse_elo(raw: str | None) -> int | None:
@@ -88,11 +134,12 @@ def my_color_and_result(white: str | None, black: str | None, result: str | None
     return color, None
 
 
-def pgn_to_row(pgn: str, source: str, game_id: str, username: str) -> dict:
+def pgn_to_row(pgn: str, source: str, game_id: str, username: str, eco_lookup: dict) -> dict:
     white = extract_header(pgn, "White")
     black = extract_header(pgn, "Black")
     result = extract_header(pgn, "Result")
     my_color, my_result = my_color_and_result(white, black, result, username)
+    eco = extract_header(pgn, "ECO") or derive_eco_from_moves(pgn, eco_lookup)
 
     return {
         "source": source,
@@ -105,7 +152,7 @@ def pgn_to_row(pgn: str, source: str, game_id: str, username: str) -> dict:
         "result": result,
         "my_color": my_color,
         "my_result": my_result,
-        "eco": extract_header(pgn, "ECO"),
+        "eco": eco,
         "time_control": extract_header(pgn, "TimeControl"),
         "termination": extract_header(pgn, "Termination"),
         "played_at": parse_played_at(pgn),
@@ -114,6 +161,7 @@ def pgn_to_row(pgn: str, source: str, game_id: str, username: str) -> dict:
 
 
 def collect_rows(bucket_dir: str, username: str) -> list[dict]:
+    eco_lookup = load_eco_lookup()
     rows = []
     for source, subdir in (("chesscom", "chesscom"), ("lichess", "lichess")):
         raw_dir = os.path.join(bucket_dir, "raw", subdir)
@@ -125,7 +173,7 @@ def collect_rows(bucket_dir: str, username: str) -> list[dict]:
             game_id = name[:-4]
             with open(os.path.join(raw_dir, name)) as f:
                 pgn = f.read()
-            rows.append(pgn_to_row(pgn, source, game_id, username))
+            rows.append(pgn_to_row(pgn, source, game_id, username, eco_lookup))
     return rows
 
 
