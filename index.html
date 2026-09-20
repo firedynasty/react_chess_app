@@ -745,13 +745,28 @@
             </div>
 
             <div style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                <select id="sbGameSource" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
-                    <option value="chesscom">Chess.com</option>
-                    <option value="lichess">Lichess</option>
+                <select id="sbAccount" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                    <option value='{"source":"chesscom","username":"TTTstanley"}'>TTTstanley — Chess.com</option>
+                    <option value='{"source":"lichess","username":"FirebirdBot"}'>FirebirdBot — Lichess</option>
                 </select>
-                <input type="text" id="sbGameUsername" placeholder="username (optional)" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px; width: 150px;">
                 <button id="sbFetchListBtn" onclick="sbFetchGameList()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Find Games</button>
-                <select id="sbGameSelect" disabled style="flex: 1; min-width: 220px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                <select id="sbEcoFilter" disabled onchange="sbApplyFilters()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                    <option value="">All ECO</option>
+                </select>
+                <select id="sbColorFilter" disabled onchange="sbApplyFilters()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                    <option value="">All Colors</option>
+                    <option value="white">White</option>
+                    <option value="black">Black</option>
+                </select>
+                <label style="font-size: 12px; color: #888;">From
+                    <input type="date" id="sbDateFrom" onchange="sbApplyFilters()" style="padding: 5px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                </label>
+                <label style="font-size: 12px; color: #888;">To
+                    <input type="date" id="sbDateTo" onchange="sbApplyFilters()" style="padding: 5px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                </label>
+            </div>
+            <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <select id="sbGameSelect" disabled style="flex: 1; min-width: 260px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
                     <option value="">— fetch games first —</option>
                 </select>
                 <button id="sbLoadGameBtn" onclick="sbLoadSelectedGame()" disabled style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Selected</button>
@@ -3959,29 +3974,66 @@
         // =====================================================================
 
         window.supabaseLoadedGame = null; // { source, game_id } of the game currently on the board, if any
+        window.sbAllGames = []; // full lightweight game list for the currently selected account
 
         async function sbFetchGameList() {
-            const source = document.getElementById('sbGameSource').value;
-            const username = document.getElementById('sbGameUsername').value.trim();
+            const account = JSON.parse(document.getElementById('sbAccount').value);
             const statusEl = document.getElementById('sbStatus');
             const select = document.getElementById('sbGameSelect');
+            const ecoSel = document.getElementById('sbEcoFilter');
+            const colorSel = document.getElementById('sbColorFilter');
             statusEl.textContent = 'Fetching…';
             select.disabled = true;
-            select.innerHTML = '<option value="">— loading —</option>';
+            ecoSel.disabled = true;
+            colorSel.disabled = true;
             document.getElementById('sbLoadGameBtn').disabled = true;
+            select.innerHTML = '<option value="">— loading —</option>';
             try {
-                const params = new URLSearchParams({ action: 'list', source, limit: '100' });
-                if (username) params.set('username', username);
+                const params = new URLSearchParams({ action: 'list', source: account.source, username: account.username, limit: '5000' });
                 const r = await fetch('/api/games?' + params.toString());
                 const rows = await r.json();
                 if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
-                if (!rows.length) {
-                    select.innerHTML = '<option value="">No games found</option>';
-                    statusEl.textContent = 'No games found.';
-                    return;
-                }
+                window.sbAllGames = rows;
+
+                // ECO filter options, built from whatever codes are actually present
+                const ecos = [...new Set(rows.map(function (g) { return g.eco; }).filter(Boolean))].sort();
+                ecoSel.innerHTML = '<option value="">All ECO</option>' +
+                    ecos.map(function (e) { return '<option value="' + e + '">' + e + '</option>'; }).join('');
+                ecoSel.disabled = ecos.length === 0;
+                colorSel.disabled = rows.length === 0;
+
+                sbApplyFilters();
+            } catch (e) {
+                window.sbAllGames = [];
+                select.innerHTML = '<option value="">— fetch games first —</option>';
+                statusEl.textContent = 'Fetch failed: ' + e.message;
+            }
+        }
+
+        function sbApplyFilters() {
+            const select = document.getElementById('sbGameSelect');
+            const statusEl = document.getElementById('sbStatus');
+            const eco = document.getElementById('sbEcoFilter').value;
+            const color = document.getElementById('sbColorFilter').value;
+            const from = document.getElementById('sbDateFrom').value; // "YYYY-MM-DD" or ""
+            const to = document.getElementById('sbDateTo').value;
+
+            const filtered = window.sbAllGames.filter(function (g) {
+                if (eco && g.eco !== eco) return false;
+                if (color && g.my_color !== color) return false;
+                const iso = g.played_at ? g.played_at.slice(0, 10) : null;
+                if (from && (!iso || iso < from)) return false;
+                if (to && (!iso || iso > to)) return false;
+                return true;
+            });
+
+            if (!filtered.length) {
+                select.innerHTML = '<option value="">No games match filters</option>';
+                select.disabled = true;
+                document.getElementById('sbLoadGameBtn').disabled = true;
+            } else {
                 select.innerHTML = '';
-                rows.forEach(function (g) {
+                filtered.forEach(function (g) {
                     const opt = document.createElement('option');
                     opt.value = JSON.stringify({ source: g.source, game_id: g.game_id });
                     const date = g.played_at ? g.played_at.slice(0, 10) : '?';
@@ -3992,10 +4044,15 @@
                 });
                 select.disabled = false;
                 document.getElementById('sbLoadGameBtn').disabled = false;
-                statusEl.textContent = rows.length + ' game(s) found.';
-            } catch (e) {
-                select.innerHTML = '<option value="">— fetch games first —</option>';
-                statusEl.textContent = 'Fetch failed: ' + e.message;
+            }
+
+            if (window.sbAllGames.length) {
+                const wins = filtered.filter(function (g) { return g.my_result === 'win'; }).length;
+                const winPct = filtered.length ? (100 * wins / filtered.length).toFixed(0) : '0';
+                statusEl.textContent = filtered.length + ' of ' + window.sbAllGames.length +
+                    ' games shown — ' + winPct + '% win rate.';
+            } else {
+                statusEl.textContent = 'No games found.';
             }
         }
 
