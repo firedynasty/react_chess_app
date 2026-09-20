@@ -4056,6 +4056,17 @@
             }
         }
 
+        function extractPgnHeaderBlock(pgnString) {
+            // The leading [Tag "value"] block, up to the first blank line — same
+            // header/body split convention as extractRawPgnEvalsInOrder() uses.
+            if (!pgnString) return '';
+            const parts = pgnString.split(/\r?\n\s*\r?\n/);
+            if (parts.length > 1 && parts[0].trim().startsWith('[')) {
+                return parts[0].trim();
+            }
+            return '';
+        }
+
         async function sbLoadSelectedGame() {
             const select = document.getElementById('sbGameSelect');
             const statusEl = document.getElementById('sbStatus');
@@ -4070,7 +4081,9 @@
 
                 applyPgnStringToBoard(row.pgn); // resets window.supabaseLoadedGame — set it after
                 window.currentLoadedPgn = row.pgn;
-                window.supabaseLoadedGame = { source, game_id };
+                // Captured once here so a later save still has the original headers
+                // even if other edit flows resync window.currentLoadedPgn to headerless movetext.
+                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn) };
                 document.getElementById('sbSaveGameBtn').disabled = false;
                 statusEl.textContent = 'Loaded ' + source + '/' + game_id + '.';
                 log('Loaded game from Supabase (' + source + '/' + game_id + ')', 'success');
@@ -4083,11 +4096,19 @@
         async function sbSaveLoadedGame() {
             const statusEl = document.getElementById('sbStatus');
             if (!window.supabaseLoadedGame) return;
-            const pgn = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
-            if (!pgn) {
+            const movetext = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
+            if (!movetext) {
                 log('No PGN available to save', 'warning');
                 return;
             }
+            // moveTreeToPgn() returns movetext only, with no trailing result token
+            // (same as Copy/Download PGN) -- re-attach the original headers and
+            // result so Supabase's stored PGN stays complete and valid.
+            const headerBlock = window.supabaseLoadedGame.headerBlock;
+            const resultMatch = headerBlock && headerBlock.match(/\[Result\s+"([^"]*)"\]/);
+            const resultToken = resultMatch ? resultMatch[1] : null;
+            const fullMovetext = resultToken ? movetext + ' ' + resultToken : movetext;
+            const pgn = headerBlock ? headerBlock + '\n\n' + fullMovetext : fullMovetext;
             statusEl.textContent = 'Saving…';
             try {
                 const r = await fetch('/api/games', {
