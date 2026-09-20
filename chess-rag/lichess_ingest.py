@@ -32,6 +32,8 @@ raw/*/*.pgn path). Flags: --no-analyze, --depth N, --analyze-all.
 """
 
 import argparse
+import io
+import json
 import os
 import re
 from datetime import datetime, timezone
@@ -46,6 +48,50 @@ HEADERS_BASE = {
 LICHESS_TOKEN = os.environ.get("LICHESS_API_TOKEN")
 
 GAME_START_RE = re.compile(r"(?=^\[Event )", re.MULTILINE)
+
+
+def _repo_root() -> str:
+    """chess-rag/ root, whether running the root copy of this script or the
+    one synced into data/<username>/ (eco_openings.json lives only at root)."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    if os.path.basename(os.path.dirname(d)) == "data":
+        return os.path.dirname(os.path.dirname(d))
+    return d
+
+
+ECO_CACHE_PATH = os.path.join(_repo_root(), "eco_openings.json")
+
+
+def load_eco_lookup() -> dict:
+    """{4-field FEN: {"eco": "B10", "name": "..."}}, same cache tree_viz.py builds."""
+    if not os.path.exists(ECO_CACHE_PATH):
+        return {}
+    with open(ECO_CACHE_PATH) as f:
+        return json.load(f)
+
+
+def derive_eco_from_moves(pgn_text: str, eco_lookup: dict) -> str | None:
+    """Replay the game and return the ECO code for the deepest matching position.
+
+    Mirrors tree_viz.py's _annotate_game_opening -- needed because Lichess PGNs
+    carry no [ECO] header at all, unlike Chess.com's.
+    """
+    if not ingest.HAVE_CHESS or not eco_lookup:
+        return None
+    try:
+        game = ingest.chess.pgn.read_game(io.StringIO(pgn_text))
+        if game is None:
+            return None
+        board = game.board()
+        best_eco = None
+        for move in game.mainline_moves():
+            board.push(move)
+            key = " ".join(board.fen().split()[:4])
+            if key in eco_lookup:
+                best_eco = eco_lookup[key]["eco"]
+        return best_eco
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -115,12 +161,13 @@ def utc_ms(pgn: str) -> int | None:
         return None
 
 
-def build_annotated_pgn(pgn: str, my_username: str) -> str:
+def build_annotated_pgn(pgn: str, my_username: str, eco_lookup: dict) -> str:
     """
     Add the same metadata headers ingest.py's Chess.com pipeline injects, so
     tree_viz/report.py treat both sources uniformly.
 
-    Added headers: Source, MyColor, MyResult, OpponentUsername
+    Added headers: Source, MyColor, MyResult, OpponentUsername, ECO (derived
+    via move-replay -- Lichess PGNs carry no native [ECO] header)
     """
     white = ingest.extract_header(pgn, "White") or ""
     black = ingest.extract_header(pgn, "Black") or ""
@@ -144,6 +191,9 @@ def build_annotated_pgn(pgn: str, my_username: str) -> str:
         "MyResult": my_result,
         "OpponentUsername": opponent or "?",
     }
+    eco = derive_eco_from_moves(pgn, eco_lookup)
+    if eco:
+        extra["ECO"] = eco
     return ingest.inject_headers(pgn, extra)
 
 
@@ -240,6 +290,10 @@ def main() -> None:
     games = split_pgns(blob)
     print(f"  Retrieved {len(games)} game(s) from Lichess API")
 
+    eco_lookup = load_eco_lookup()
+    if not eco_lookup:
+        print(f"  [warn] ECO cache not found at {ECO_CACHE_PATH} -- games will be saved without ECO")
+
     new_ids: list[str] = []
     latest_ms = since_ms or 0
 
@@ -248,7 +302,7 @@ def main() -> None:
         if not game_id or game_id in existing_ids:
             continue
 
-        annotated = build_annotated_pgn(pgn, username)
+        annotated = build_annotated_pgn(pgn, username, eco_lookup)
         save_raw_pgn(game_id, annotated)
         existing_ids.add(game_id)
         new_ids.append(game_id)
