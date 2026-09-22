@@ -751,6 +751,7 @@
                     <option value='{"source":"chesscom","username":"jyan_500"}'>jyan_500 — Chess.com</option>
                 </select>
                 <button id="sbFetchListBtn" onclick="sbFetchGameList()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Find Games</button>
+                <input type="text" id="sbNameFilter" placeholder="Filter by opponent..." oninput="sbApplyFilters()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px; min-width: 150px;">
                 <select id="sbEcoFilter" disabled onchange="sbApplyFilters()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
                     <option value="">All ECO</option>
                 </select>
@@ -1176,27 +1177,24 @@
             <span id="board2MoveIndicatorMini" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap; background: transparent; padding: 4px 8px; border-radius: 4px;">Start</span>
             <span id="board2MovePlayedSanMini" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
-            <!-- Add Var. + depth radios (mirrors full nav; button proxied) -->
-            <span title="Depth for Add Var." style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0f3460; border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 13px; font-weight: bold;">
-                <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav-mini" value="12" onchange="setVariationDepth(this.value)">d12</label>
-                <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav-mini" value="15" checked onchange="setVariationDepth(this.value)">d15</label>
-            </span>
-            <button onclick="document.getElementById('analyze-variation-btn2').click()" title="Add variation at the current move (Tab)" style="padding: 10px 18px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
+            <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
+            <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
             <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <button onclick="document.getElementById('loadFenBtn').click()" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load FEN</button>
             <button onclick="document.getElementById('exportFenBtn').click()" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Export FEN</button>
             <button id="showOpeningBtn" title="Look up the ECO opening for the currently loaded game" onclick="showOpeningToast()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📖 Opening</button>
+            <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
             <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <button id="coachNoteBtn" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="openCoachNoteForCurrentMove()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
+            <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
             <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap;">Start</span>
             <span id="board2MovePlayedSan" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
-            <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button id="board2PrevMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
             <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace; white-space: nowrap;"></span>
             <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
@@ -1736,6 +1734,16 @@
             }
         }
         window.openCoachNoteForCurrentMove = openCoachNoteForCurrentMove;
+
+        function openChessCoachChatModal() {
+            document.getElementById('chessCoachChatModal').style.display = 'flex';
+        }
+        window.openChessCoachChatModal = openChessCoachChatModal;
+
+        function closeChessCoachChatModal() {
+            document.getElementById('chessCoachChatModal').style.display = 'none';
+        }
+        window.closeChessCoachChatModal = closeChessCoachChatModal;
 
         function copyTextViewFormatted() {
             if (!window.textViewRawContent) return;
@@ -3124,10 +3132,13 @@
         }
 
         async function analyzeLoadedGame() {
-            const pgn = window.currentLoadedPgn;
+            // currentLoadedPgn isn't set by every load path (e.g. "Load to Board"
+            // only builds window.moveTree), so fall back to reconstructing the
+            // PGN from the move tree that's actually on the board right now.
+            const pgn = window.currentLoadedPgn || (window.moveTree ? moveTreeToPgn(window.moveTree) : '');
             if (!pgn) {
-                log('No PGN loaded. Use "Load Annotated PGN" first.', 'error');
-                alert('No PGN loaded. Use "Load Annotated PGN" first.');
+                log('No PGN loaded. Load a game onto the board first.', 'error');
+                alert('No PGN loaded. Load a game onto the board first.');
                 return;
             }
             document.getElementById('pgnInput').value = pgn;
@@ -3954,18 +3965,23 @@
         }
 
         async function loadPgnToBoard() {
+            // The visible textarea reflects what the user is looking at, so it
+            // takes priority whenever it has content. Clipboard is only used as
+            // a convenience when the box is empty (previously this was backwards:
+            // clipboard silently won even when a different PGN sat in the box).
             let pgnString = '';
-            try {
-                pgnString = (await navigator.clipboard.readText()).trim();
-            } catch (err) {
-                // Fallback to textarea if clipboard access denied
-                const pgnTextarea = document.getElementById('pgnInput');
-                if (pgnTextarea && pgnTextarea.value.trim()) {
-                    pgnString = pgnTextarea.value.trim();
+            const pgnTextarea = document.getElementById('pgnInput');
+            if (pgnTextarea && pgnTextarea.value.trim()) {
+                pgnString = pgnTextarea.value.trim();
+            } else {
+                try {
+                    pgnString = (await navigator.clipboard.readText()).trim();
+                } catch (err) {
+                    // Clipboard access denied and textarea empty - nothing to load
                 }
             }
             if (!pgnString) {
-                alert('No PGN in clipboard');
+                alert('No PGN in clipboard or text box');
                 return;
             }
             applyPgnStringToBoard(pgnString);
@@ -4019,6 +4035,7 @@
             const color = document.getElementById('sbColorFilter').value;
             const from = document.getElementById('sbDateFrom').value; // "YYYY-MM-DD" or ""
             const to = document.getElementById('sbDateTo').value;
+            const name = document.getElementById('sbNameFilter').value.trim().toLowerCase();
 
             const filtered = window.sbAllGames.filter(function (g) {
                 if (eco && g.eco !== eco) return false;
@@ -4026,6 +4043,11 @@
                 const iso = g.played_at ? g.played_at.slice(0, 10) : null;
                 if (from && (!iso || iso < from)) return false;
                 if (to && (!iso || iso > to)) return false;
+                if (name) {
+                    const white = (g.white || '').toLowerCase();
+                    const black = (g.black || '').toLowerCase();
+                    if (!white.includes(name) && !black.includes(name)) return false;
+                }
                 return true;
             });
 
@@ -11479,8 +11501,13 @@ END OF GUIDE
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
-    <!-- Chess Coach Chat Container -->
-    <div class="panel" style="margin-top: 20px;" id="chess-chat-root"></div>
+    <!-- Chess Coach Chat Modal -->
+    <div id="chessCoachChatModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this) closeChessCoachChatModal()">
+      <div class="panel" style="max-width:900px; width:92%; max-height:85vh; overflow-y:auto; position:relative;">
+        <button onclick="closeChessCoachChatModal()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer; z-index:1;">✕</button>
+        <div id="chess-chat-root"></div>
+      </div>
+    </div>
 
     <!-- Log Panel -->
     <div class="panel" style="margin-top: 20px;">

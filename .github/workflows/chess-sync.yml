@@ -27,6 +27,9 @@ jobs:
       - name: Fetch new Lichess games (FirebirdBot)
         run: python lichess_ingest.py FirebirdBot --max 30 --no-analyze
 
+      - name: Fetch new Chess.com games (jyan_500)
+        run: python ingest.py jyan_500 --months 2 --max 200 --no-analyze
+
       - name: Push TTTstanley games to Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -38,3 +41,9 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python push_to_supabase.py data/firebirdbot --username FirebirdBot
+
+      - name: Push jyan_500 games to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python push_to_supabase.py data/jyan_500 --username jyan_500
