@@ -775,7 +775,41 @@
                 <button id="sbSaveGameBtn" onclick="sbSaveLoadedGame()" disabled style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to Supabase</button>
                 <button id="sbReanalyzeBtn" onclick="sbReanalyzeAndSave()" disabled title="Strip any stale eval/variations, run a fresh Stockfish pass, and save back to Supabase" style="background: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Re-analyze &amp; Save</button>
             </div>
+            <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <button id="sbAddToReportBtn" onclick="sbAddToReport()" disabled title="Add the selected game to the report list" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">+ Add to Report</button>
+                <button id="sbGenerateReportBtn" onclick="sbOpenReportModal()" disabled style="background: #00d4ff; color: #1a1a2e; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Generate Report (0)</button>
+                <button id="sbClearReportBtn" onclick="sbClearReportList()" disabled style="background: transparent; color: #888; border: 1px solid #444; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">Clear</button>
+                <select id="sbSavedReports" onchange="sbOpenSavedReport(this.value); this.value = '';" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px; max-width: 100%;">
+                    <option value="">Saved reports (0)</option>
+                </select>
+            </div>
+            <div id="sbReportList" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
             <div id="sbStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
+
+            <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
+                <div style="background: #16213e; border: 1px solid #2a2a4e; border-radius: 10px; width: min(1100px, 100%); height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
+                    <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #2a2a4e;">
+                        <h3 id="sbReportTitle" style="margin: 0; flex: 1; color: #00d4ff; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Game Report</h3>
+                        <button onclick="sbCopyReport()" style="background: #0f3460; color: #eee; border: 1px solid #444; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Copy Markdown</button>
+                        <button onclick="sbCloseReportModal()" title="Close (the report is kept)" style="background: transparent; color: #aaa; border: none; font-size: 20px; cursor: pointer; line-height: 1;">&times;</button>
+                    </div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid #2a2a4e; font-size: 12px; color: #888;">
+                        <input type="password" id="sbReportAccessCode" placeholder="Access code" style="padding: 5px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 12px; width: 130px;">
+                        <span>or</span>
+                        <input type="password" id="sbReportApiKey" placeholder="OpenAI API key" style="padding: 5px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 12px; width: 170px;">
+                        <select id="sbReportModel" style="padding: 5px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 12px;">
+                            <option value="gpt-4o">gpt-4o</option>
+                            <option value="gpt-4o-mini">gpt-4o-mini</option>
+                        </select>
+                        <button id="sbRunReportBtn" onclick="sbRunReport()" style="background: #28a745; color: white; border: none; padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">Run new report</button>
+                        <span id="sbReportProgress"></span>
+                    </div>
+                    <div style="flex: 1; min-height: 0; display: flex; flex-wrap: wrap; overflow: hidden;">
+                        <div id="sbReportNav" style="flex: 0 0 230px; max-width: 100%; max-height: 100%; overflow-y: auto; border-right: 1px solid #2a2a4e; padding: 6px 0;"></div>
+                        <div id="sbReportBody" style="flex: 1 1 300px; min-width: 0; height: 100%; padding: 16px; overflow-y: auto; color: #e0e0e0; font-size: 14px; line-height: 1.5;"></div>
+                    </div>
+                </div>
+            </div>
 
             <div class="progress-bar" id="progressBar" style="display: none;">
                 <div class="progress-fill" id="progressFill"></div>
@@ -1186,6 +1220,8 @@
             <button onclick="document.getElementById('exportFenBtn').click()" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Export FEN</button>
             <button id="showOpeningBtn" title="Look up the ECO opening for the currently loaded game" onclick="showOpeningToast()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📖 Opening</button>
             <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
+            <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
+            <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1231,7 +1267,7 @@
             <span id="gdriveRowPreviewText" style="color: #aed581; font-family: monospace; font-size: 13px; max-width: 700px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;"></span>
             <button id="gdriveRowCopyBtn" style="background: #27ae60; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle;">Copy</button>
           </div>
-          <button id="copyPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
+          <button id="copyBoardPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
           <button id="downloadPgnBtn" onclick="downloadPgn()" style="background: #2980b9; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Download PGN</button>
           <button id="updateReportBtn" onclick="updateReportWithPgn()" style="display: none; background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
           <button id="loadFenBtn" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Load FEN</button>
@@ -3401,14 +3437,17 @@
             }
 
             navigator.clipboard.writeText(pgn).then(() => {
-                const btn = document.getElementById('copyPgnBtn');
-                const originalText = btn.textContent;
-                btn.textContent = 'Copied!';
-                btn.style.background = '#2ecc71';
-                setTimeout(() => {
-                    btn.textContent = originalText;
-                    btn.style.background = '#27ae60';
-                }, 1500);
+                // Full nav button plus its mini-nav proxy
+                ['copyBoardPgnBtn', 'copyBoardPgnBtnMini'].forEach(id => {
+                    const btn = document.getElementById(id);
+                    if (!btn) return;
+                    btn.textContent = 'Copied!';
+                    btn.style.background = '#2ecc71';
+                    setTimeout(() => {
+                        btn.textContent = 'Copy PGN';
+                        btn.style.background = '#27ae60';
+                    }, 1500);
+                });
                 log('PGN copied to clipboard', 'success');
             }).catch(err => {
                 log('Failed to copy: ' + err.message, 'error');
@@ -4005,6 +4044,7 @@
             ecoSel.disabled = true;
             colorSel.disabled = true;
             document.getElementById('sbLoadGameBtn').disabled = true;
+            document.getElementById('sbAddToReportBtn').disabled = true;
             select.innerHTML = '<option value="">— loading —</option>';
             try {
                 const params = new URLSearchParams({ action: 'list', source: account.source, username: account.username, limit: '5000' });
@@ -4055,6 +4095,7 @@
                 select.innerHTML = '<option value="">No games match filters</option>';
                 select.disabled = true;
                 document.getElementById('sbLoadGameBtn').disabled = true;
+                document.getElementById('sbAddToReportBtn').disabled = true;
             } else {
                 select.innerHTML = '';
                 filtered.forEach(function (g) {
@@ -4068,6 +4109,7 @@
                 });
                 select.disabled = false;
                 document.getElementById('sbLoadGameBtn').disabled = false;
+                document.getElementById('sbAddToReportBtn').disabled = false;
             }
 
             if (window.sbAllGames.length) {
@@ -4117,6 +4159,330 @@
                 log('Load from Supabase failed: ' + e.message, 'warning');
             }
         }
+
+        // ---------------------------------------------------------------------
+        // Multi-game AI report (web port of chess-rag/report.py via /api/game-report)
+        // ---------------------------------------------------------------------
+
+        window.sbReportList = []; // [{ source, game_id, label }]
+        try { window.sbReportList = JSON.parse(localStorage.getItem('sbReportList') || '[]'); } catch (e) { }
+
+        function sbRenderReportList() {
+            const listEl = document.getElementById('sbReportList');
+            const n = window.sbReportList.length;
+            listEl.innerHTML = '';
+            window.sbReportList.forEach(function (g, i) {
+                const chip = document.createElement('span');
+                chip.style.cssText = 'background: #0f3460; border: 1px solid #2a2a4e; border-radius: 12px; padding: 3px 4px 3px 10px; font-size: 12px; color: #ddd; display: inline-flex; align-items: center; gap: 4px;';
+                chip.textContent = g.label;
+                const x = document.createElement('button');
+                x.textContent = '×';
+                x.title = 'Remove';
+                x.style.cssText = 'background: none; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 0 4px;';
+                x.onclick = function () { window.sbReportList.splice(i, 1); sbSaveReportList(); };
+                chip.appendChild(x);
+                listEl.appendChild(chip);
+            });
+            const genBtn = document.getElementById('sbGenerateReportBtn');
+            genBtn.textContent = 'Generate Report (' + n + ')';
+            genBtn.disabled = n === 0;
+            document.getElementById('sbClearReportBtn').disabled = n === 0;
+        }
+
+        function sbSaveReportList() {
+            try { localStorage.setItem('sbReportList', JSON.stringify(window.sbReportList)); } catch (e) { }
+            sbRenderReportList();
+        }
+
+        function sbAddToReport() {
+            const select = document.getElementById('sbGameSelect');
+            if (!select.value) return;
+            const { source, game_id } = JSON.parse(select.value);
+            if (window.sbReportList.some(function (g) { return g.source === source && g.game_id === game_id; })) {
+                document.getElementById('sbStatus').textContent = 'Already in the report list.';
+                return;
+            }
+            const label = select.options[select.selectedIndex].textContent;
+            window.sbReportList.push({ source, game_id, label });
+            sbSaveReportList();
+        }
+
+        function sbClearReportList() {
+            window.sbReportList = [];
+            sbSaveReportList();
+        }
+
+        // A report run: { id, created, model, sections: [{ title, md, compare?, game?, pgn?, annotated? }] }.
+        // The current one survives closing the modal; finished runs are kept in
+        // localStorage (newest first) and reopened from the Saved reports dropdown.
+        window.sbCurrentReport = null;
+        window.sbReportActive = 0;
+        const SB_SAVED_REPORTS_MAX = 20;
+
+        function sbLoadSavedReports() {
+            try { return JSON.parse(localStorage.getItem('sbSavedReports') || '[]'); } catch (e) { return []; }
+        }
+
+        function sbPersistReport(report) {
+            const saved = sbLoadSavedReports().filter(function (r) { return r.id !== report.id; });
+            saved.unshift(report);
+            try {
+                localStorage.setItem('sbSavedReports', JSON.stringify(saved.slice(0, SB_SAVED_REPORTS_MAX)));
+            } catch (e) {
+                log('Could not save report to browser storage: ' + e.message, 'warning');
+            }
+            sbRenderSavedReportsSelect();
+        }
+
+        function sbReportLabel(report) {
+            const games = report.sections.filter(function (s) { return s.game; });
+            const count = function (re) { return games.filter(function (s) { return re.test(s.title); }).length; };
+            const d = new Date(report.created);
+            const pad = function (n) { return String(n).padStart(2, '0'); };
+            const when = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+            return when + ' — ' + games.length + ' game' +
+                (games.length === 1 ? '' : 's') + ' (' + count(/\(WIN\)/) + 'W ' + count(/\(LOSS\)/) + 'L ' +
+                count(/\(DRAW\)/) + 'D)';
+        }
+
+        function sbRenderSavedReportsSelect() {
+            const sel = document.getElementById('sbSavedReports');
+            const saved = sbLoadSavedReports();
+            sel.innerHTML = '<option value="">Saved reports (' + saved.length + ')</option>' +
+                saved.map(function (r) {
+                    return '<option value="' + r.id + '">' + sbEscape(sbReportLabel(r)) + '</option>';
+                }).join('');
+            sel.disabled = saved.length === 0;
+        }
+
+        function sbEscape(t) {
+            return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function sbOpenSavedReport(id) {
+            const report = sbLoadSavedReports().find(function (r) { return r.id === id; });
+            if (!report) return;
+            window.sbCurrentReport = report;
+            window.sbReportActive = 0;
+            sbShowReportModal();
+        }
+
+        function sbOpenReportModal() {
+            // Reopen whatever report was last on screen; the intro only shows before any run
+            sbShowReportModal();
+        }
+
+        function sbShowReportModal() {
+            try {
+                document.getElementById('sbReportAccessCode').value = localStorage.getItem('sbReportAccessCode') || '';
+            } catch (e) { }
+            const n = window.sbReportList.length;
+            const runBtn = document.getElementById('sbRunReportBtn');
+            runBtn.textContent = 'Run new report (' + n + ' game' + (n === 1 ? '' : 's') + ')';
+            if (!runBtn.dataset.running) runBtn.disabled = n === 0;
+            sbRenderReport();
+            document.getElementById('sbReportModal').style.display = 'flex';
+        }
+
+        function sbCloseReportModal() {
+            document.getElementById('sbReportModal').style.display = 'none';
+        }
+
+        function sbReportMarkdown(report) {
+            return report.sections.filter(function (s) { return s.md; }).map(function (s) {
+                return '## ' + s.title + '\n\n' + s.md +
+                    (s.pgn ? '\n\n### PGN\n\n```pgn\n' + s.pgn.trim() + '\n```' : '');
+            }).join('\n\n---\n\n');
+        }
+
+        function sbCopyReport() {
+            if (!window.sbCurrentReport) return;
+            navigator.clipboard.writeText(sbReportMarkdown(window.sbCurrentReport)).then(function () {
+                document.getElementById('sbReportProgress').textContent = 'Copied.';
+            });
+        }
+
+        function sbRenderReport() {
+            const nav = document.getElementById('sbReportNav');
+            const body = document.getElementById('sbReportBody');
+            const titleEl = document.getElementById('sbReportTitle');
+            const report = window.sbCurrentReport;
+
+            if (!report) {
+                titleEl.textContent = 'Game Report';
+                nav.innerHTML = '';
+                nav.style.display = 'none';
+                body.innerHTML = '<div style="color: #888;">Games queued for the next report:</div><ul>' +
+                    window.sbReportList.map(function (g) { return '<li>' + sbEscape(g.label) + '</li>'; }).join('') +
+                    '</ul><div style="color: #888;">Games without engine evals are annotated with Stockfish first, ' +
+                    'then analyzed one by one' + (window.sbReportList.length >= 2 ? ', plus a wins-vs-losses comparison' : '') +
+                    '. Press Run.</div>';
+                return;
+            }
+
+            titleEl.textContent = 'Game Report — ' + sbReportLabel(report) + ' · ' + report.model;
+            nav.style.display = '';
+            const active = Math.min(window.sbReportActive, report.sections.length - 1);
+            nav.innerHTML = report.sections.map(function (s, i) {
+                const color = s.compare ? '#00d4ff' : /\(WIN\)/.test(s.title) ? '#28a745' : /\(LOSS\)/.test(s.title) ? '#dc3545' : '#aaa';
+                const isActive = i === active;
+                return '<div onclick="sbSelectReportSection(' + i + ')" style="padding: 8px 12px; cursor: pointer; font-size: 12px; line-height: 1.35; ' +
+                    'border-left: 3px solid ' + (isActive ? '#00d4ff' : 'transparent') + '; background: ' + (isActive ? '#0f3460' : 'transparent') + '; color: ' + color + ';' +
+                    (s.compare ? ' font-weight: bold;' : '') + '">' + sbEscape(s.title) +
+                    (s.md ? '' : ' <span style="color: #888;">…</span>') + '</div>';
+            }).join('');
+
+            const s = report.sections[active];
+            let html = '<h2 style="color: #00d4ff; font-size: 16px; margin-top: 0;">' + sbEscape(s.title) + '</h2>';
+            if (s.game) {
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;">' +
+                    '<button onclick="sbLoadReportGameOnBoard(' + active + ')"' + (s.pgn ? '' : ' disabled') +
+                    ' style="background: #163060; color: #7ec8e3; border: 1px solid #7ec8e3; padding: 4px 13px; border-radius: 4px; cursor: pointer; font-size: 12px;">▶ Go to board</button>' +
+                    '<span style="font-size: 12px; color: ' + (s.annotated ? '#28a745' : '#e67e22') + ';">' +
+                    (s.pgn ? (s.annotated ? 'Stockfish-annotated PGN' : 'PGN has no engine evals') : 'PGN not fetched') + '</span></div>';
+            }
+            html += s.md ? marked.parse(s.md) : '<p style="color: #888;"><em>Generating…</em></p>';
+            if (s.pgn) {
+                html += '<hr style="border: none; border-top: 1px solid #2a2a4e; margin: 18px 0 12px;">' +
+                    '<h3 style="color: #7ec8e3; font-size: 14px; margin: 0 0 8px;">PGN</h3>' +
+                    '<pre style="white-space: pre-wrap; word-break: break-word; background: #1e1e30; padding: 10px 12px; border-radius: 4px; font-size: 12px; color: #bbb;">' +
+                    sbEscape(s.pgn.trim()) + '</pre>';
+            }
+            body.innerHTML = html;
+        }
+
+        // Sidebar click: show that section and, for a game, swap it onto the main
+        // board + move table right away (modal stays open for clicking through).
+        function sbSelectReportSection(i) {
+            window.sbReportActive = i;
+            sbRenderReport();
+            const s = window.sbCurrentReport && window.sbCurrentReport.sections[i];
+            const onBoard = window.supabaseLoadedGame;
+            if (s && s.pgn && !(onBoard && onBoard.source === s.game.source && onBoard.game_id === s.game.game_id &&
+                window.currentLoadedPgn === s.pgn)) {
+                sbLoadReportGameOnBoard(i, true);
+            }
+        }
+
+        function sbLoadReportGameOnBoard(i, keepOpen) {
+            const s = window.sbCurrentReport && window.sbCurrentReport.sections[i];
+            if (!s || !s.pgn) return;
+            applyPgnStringToBoard(s.pgn); // resets window.supabaseLoadedGame — set it after
+            window.currentLoadedPgn = s.pgn;
+            window.supabaseLoadedGame = { source: s.game.source, game_id: s.game.game_id, headerBlock: extractPgnHeaderBlock(s.pgn) };
+            document.getElementById('sbSaveGameBtn').disabled = false;
+            document.getElementById('sbReanalyzeBtn').disabled = false;
+            document.getElementById('sbStatus').textContent = 'Loaded ' + s.game.source + '/' + s.game.game_id + ' from report.';
+            if (!keepOpen) sbCloseReportModal();
+        }
+
+        async function sbRunReport() {
+            const games = window.sbReportList.slice();
+            if (!games.length) return;
+            const accessCode = document.getElementById('sbReportAccessCode').value.trim();
+            const apiKey = document.getElementById('sbReportApiKey').value.trim();
+            const model = document.getElementById('sbReportModel').value;
+            const progressEl = document.getElementById('sbReportProgress');
+            const runBtn = document.getElementById('sbRunReportBtn');
+            if (!accessCode && !apiKey) {
+                progressEl.textContent = 'Enter an access code or API key.';
+                return;
+            }
+            try { localStorage.setItem('sbReportAccessCode', accessCode); } catch (e) { }
+
+            async function post(payload) {
+                const r = await fetch('/api/game-report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.assign({
+                        model, apiKey: apiKey || undefined, accessCode: apiKey ? undefined : accessCode,
+                    }, payload)),
+                });
+                const data = await r.json().catch(function () { return { error: 'HTTP ' + r.status }; });
+                if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+                return data;
+            }
+
+            // Comparison first (when 2+ games), then per-game sections — same
+            // order report.html shows them in. Each section fills in as it lands.
+            const report = { id: String(Date.now()), created: new Date().toISOString(), model, sections: [] };
+            if (games.length >= 2) {
+                report.sections.push({ title: 'Comparison (' + games.length + ' games)', md: null, compare: true });
+            }
+            games.forEach(function (g) {
+                report.sections.push({ title: g.label, md: null, game: { source: g.source, game_id: g.game_id } });
+            });
+            window.sbCurrentReport = report;
+            window.sbReportActive = 0;
+            // Only repaint when this run is still the one on screen (a saved
+            // report may have been opened meanwhile)
+            const render = function () { if (window.sbCurrentReport === report) sbRenderReport(); };
+
+            runBtn.disabled = true;
+            runBtn.dataset.running = '1';
+            render();
+
+            // Stockfish-annotate any game whose PGN has no [%eval] tags yet, so the
+            // LLM works from real eval swings instead of guessing from bare moves.
+            // Sequential: the games share one analysis worker pool. The annotated
+            // PGN is saved back to Supabase so the next report reuses it.
+            const gameSections = report.sections.filter(function (s) { return s.game; });
+            for (let gi = 0; gi < gameSections.length; gi++) {
+                const s = gameSections[gi];
+                const tag = 'Game ' + (gi + 1) + '/' + gameSections.length + ': ';
+                try {
+                    progressEl.textContent = tag + 'fetching PGN…';
+                    const r = await fetch('/api/games?' + new URLSearchParams({ action: 'get', source: s.game.source, game_id: s.game.game_id }));
+                    const row = await r.json();
+                    if (!r.ok) throw new Error(row.error || ('HTTP ' + r.status));
+                    s.pgn = row.pgn;
+                    s.annotated = /\[%eval /.test(row.pgn);
+                    if (!s.annotated) {
+                        if (!isReady) throw new Error('Stockfish is not ready yet');
+                        const annotated = await sbAnnotatePgn(row.pgn, extractPgnHeaderBlock(row.pgn), function (msg) {
+                            progressEl.textContent = tag + 'Stockfish — ' + msg;
+                        });
+                        s.pgn = annotated.pgn;
+                        s.annotated = true;
+                        progressEl.textContent = tag + 'saving annotated PGN…';
+                        const sr = await fetch('/api/games', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'save', source: s.game.source, game_id: s.game.game_id, pgn: s.pgn }),
+                        });
+                        if (!sr.ok) log('Annotated ' + s.game.game_id + ' but saving to Supabase failed', 'warning');
+                    }
+                } catch (e) {
+                    // Falls back to the stored (unannotated) PGN, or the server fetching it itself
+                    log('Report: could not annotate ' + s.game.game_id + ': ' + e.message, 'warning');
+                }
+                render();
+            }
+
+            let done = 0;
+            progressEl.textContent = '0 / ' + report.sections.length + ' done…';
+
+            await Promise.all(report.sections.map(async function (s) {
+                try {
+                    const data = s.compare
+                        ? await post({ action: 'compare', games: gameSections.map(function (g) { return { source: g.game.source, game_id: g.game.game_id, pgn: g.pgn }; }) })
+                        : await post({ action: 'game', source: s.game.source, game_id: s.game.game_id, pgn: s.pgn });
+                    s.md = data.content;
+                    if (data.game && data.game.url) s.md = '[' + data.game.url + '](' + data.game.url + ')\n\n' + s.md;
+                } catch (e) {
+                    s.md = '**Error:** ' + e.message;
+                }
+                done++;
+                progressEl.textContent = done + ' / ' + report.sections.length + ' done' + (done < report.sections.length ? '…' : '. Saved.');
+                render();
+            }));
+            sbPersistReport(report);
+            delete runBtn.dataset.running;
+            runBtn.disabled = window.sbReportList.length === 0;
+        }
+
+        sbRenderSavedReportsSelect();
+        sbRenderReportList();
 
         async function sbSaveLoadedGame() {
             const statusEl = document.getElementById('sbStatus');
@@ -4217,6 +4583,116 @@
             return sans;
         }
 
+        // Strip any stale engine annotations from `originalPgn`, run a fresh Stockfish
+        // pass, and return the rebuilt PGN (eval tag on every move, glyph + best line
+        // on mistakes). Shared by Re-analyze & Save and the multi-game report.
+        async function sbAnnotatePgn(originalPgn, headerBlock, onProgress) {
+            let movesOnly = originalPgn;
+            const parts = originalPgn.split(/\r?\n\s*\r?\n/);
+            if (parts.length > 1 && parts[0].trim().startsWith('[')) {
+                movesOnly = parts.slice(1).join('\n\n');
+            }
+            movesOnly = stripEngineAnnotationsKeepClocks(movesOnly);
+
+            const resultMatch = movesOnly.match(/\s(1-0|0-1|1\/2-1\/2|\*)\s*$/);
+            const resultToken = resultMatch ? resultMatch[1] : null;
+            const bodyForParsing = resultMatch ? movesOnly.slice(0, resultMatch.index) : movesOnly;
+
+            // chess.js only needs the moves — strip surviving [%clk] comments
+            // just for this parse (they stay in the source movetext, which
+            // isn't reused for the rebuild below).
+            const forParse = bodyForParsing.replace(/\{[^}]*\}/g, ' ');
+            const chess = new Chess();
+            if (!chess.load_pgn(forParse)) {
+                throw new Error("Could not parse this game's moves for re-analysis.");
+            }
+            const history = chess.history({ verbose: true });
+            if (history.length === 0) throw new Error('No moves found to analyze.');
+
+            chess.reset();
+            const startFen = chess.fen();
+            const fens = [];
+            for (const h of history) { chess.move(h.san); fens.push(chess.fen()); }
+            const allFens = [startFen, ...fens]; // allFens[i] = position BEFORE move i
+
+            onProgress(`Analyzing ${history.length} moves...`);
+            const depth = parseInt(document.getElementById('depth').value) || 15;
+            const pool = await getAnalysisPool();
+            const allResults = new Array(allFens.length).fill(null);
+            let nextIdx = 0, doneCount = 0;
+            await Promise.all(pool.map(async (w) => {
+                while (nextIdx < allFens.length) {
+                    const i = nextIdx++;
+                    const sf = await analyzePositionOn(w, allFens[i], depth);
+                    const turn = allFens[i].split(' ')[1];
+                    allResults[i] = {
+                        evaluation: turn === 'w' ? sf.evaluation : -sf.evaluation,
+                        pvUci: sf.pvUci || [],
+                    };
+                    doneCount++;
+                    onProgress(`Analyzing... ${doneCount}/${allFens.length}`);
+                }
+            }));
+
+            // Rebuild movetext: eval tag on every move, glyph + best-line
+            // variation on blunders/mistakes — same rule as annotate.py's
+            // annotate_pgn() (loss vs. the position's own prior PV).
+            onProgress('Building annotated PGN...');
+            const outParts = [];
+            for (let i = 0; i < history.length; i++) {
+                const move = history[i];
+                const moveNumber = Math.floor(i / 2) + 1;
+                const isBlack = i % 2 === 1;
+
+                const prev = allResults[i];
+                const cur = allResults[i + 1];
+                const prevWhite = prev ? prev.evaluation : 0;
+                const curWhite = cur ? cur.evaluation : prevWhite;
+                const loss = isBlack ? (curWhite - prevWhite) : (prevWhite - curWhite);
+
+                let glyph = '';
+                if (loss >= REANALYZE_BLUNDER_CP) glyph = '??';
+                else if (loss >= REANALYZE_MISTAKE_CP) glyph = '?';
+                else if (loss >= REANALYZE_INACCURACY_CP) glyph = '?!';
+
+                outParts.push(isBlack ? (moveNumber + '...') : (moveNumber + '.'));
+                outParts.push(move.san + glyph);
+                outParts.push('{' + _fmtEvalTag(curWhite) + '}');
+
+                const bestUci = prev && prev.pvUci ? prev.pvUci[0] : null;
+                const playedUci = move.from + move.to + (move.promotion || '');
+                if (loss >= REANALYZE_MISTAKE_CP && bestUci && bestUci !== playedUci) {
+                    const fenBefore = allFens[i];
+                    const varSan = uciListToSan(fenBefore, prev.pvUci, REANALYZE_PV_LENGTH);
+                    if (varSan.length > 0) {
+                        const varParts = ['('];
+                        let vMoveNumber = moveNumber, vIsBlack = isBlack;
+                        varParts.push(vIsBlack ? (vMoveNumber + '...') : (vMoveNumber + '.'));
+                        varParts.push(varSan[0]);
+                        varParts.push('{best ' + _fmtEvalRaw(prevWhite) + '}');
+                        for (let k = 1; k < varSan.length; k++) {
+                            vIsBlack = !vIsBlack;
+                            if (!vIsBlack) vMoveNumber++;
+                            varParts.push(vIsBlack ? (vMoveNumber + '...') : (vMoveNumber + '.'));
+                            varParts.push(varSan[k]);
+                        }
+                        varParts.push(')');
+                        outParts.push(varParts.join(' '));
+                    }
+                }
+            }
+
+            if (/\[EngineAnalysis\s+"[^"]*"\]/.test(headerBlock)) {
+                headerBlock = headerBlock.replace(/\[EngineAnalysis\s+"[^"]*"\]/, `[EngineAnalysis "stockfish depth ${depth}"]`);
+            } else if (headerBlock.trim()) {
+                headerBlock = headerBlock.trim() + `\n[EngineAnalysis "stockfish depth ${depth}"]`;
+            }
+
+            const finalMovetext = outParts.join(' ') + (resultToken ? ' ' + resultToken : '');
+            const finalPgn = (headerBlock.trim() ? headerBlock.trim() + '\n\n' : '') + finalMovetext;
+            return { pgn: finalPgn, depth };
+        }
+
         async function sbReanalyzeAndSave() {
             const statusEl = document.getElementById('sbStatus');
             const btn = document.getElementById('sbReanalyzeBtn');
@@ -4241,109 +4717,9 @@
             statusEl.textContent = 'Stripping old annotations...';
 
             try {
-                let movesOnly = originalPgn;
-                const parts = originalPgn.split(/\r?\n\s*\r?\n/);
-                if (parts.length > 1 && parts[0].trim().startsWith('[')) {
-                    movesOnly = parts.slice(1).join('\n\n');
-                }
-                movesOnly = stripEngineAnnotationsKeepClocks(movesOnly);
-
-                const resultMatch = movesOnly.match(/\s(1-0|0-1|1\/2-1\/2|\*)\s*$/);
-                const resultToken = resultMatch ? resultMatch[1] : null;
-                const bodyForParsing = resultMatch ? movesOnly.slice(0, resultMatch.index) : movesOnly;
-
-                // chess.js only needs the moves — strip surviving [%clk] comments
-                // just for this parse (they stay in the source movetext, which
-                // isn't reused for the rebuild below).
-                const forParse = bodyForParsing.replace(/\{[^}]*\}/g, ' ');
-                const chess = new Chess();
-                if (!chess.load_pgn(forParse)) {
-                    throw new Error("Could not parse this game's moves for re-analysis.");
-                }
-                const history = chess.history({ verbose: true });
-                if (history.length === 0) throw new Error('No moves found to analyze.');
-
-                chess.reset();
-                const startFen = chess.fen();
-                const fens = [];
-                for (const h of history) { chess.move(h.san); fens.push(chess.fen()); }
-                const allFens = [startFen, ...fens]; // allFens[i] = position BEFORE move i
-
-                statusEl.textContent = `Analyzing ${history.length} moves...`;
-                const depth = parseInt(document.getElementById('depth').value) || 15;
-                const pool = await getAnalysisPool();
-                const allResults = new Array(allFens.length).fill(null);
-                let nextIdx = 0, doneCount = 0;
-                await Promise.all(pool.map(async (w) => {
-                    while (nextIdx < allFens.length) {
-                        const i = nextIdx++;
-                        const sf = await analyzePositionOn(w, allFens[i], depth);
-                        const turn = allFens[i].split(' ')[1];
-                        allResults[i] = {
-                            evaluation: turn === 'w' ? sf.evaluation : -sf.evaluation,
-                            pvUci: sf.pvUci || [],
-                        };
-                        doneCount++;
-                        statusEl.textContent = `Analyzing... ${doneCount}/${allFens.length}`;
-                    }
-                }));
-
-                // Rebuild movetext: eval tag on every move, glyph + best-line
-                // variation on blunders/mistakes — same rule as annotate.py's
-                // annotate_pgn() (loss vs. the position's own prior PV).
-                statusEl.textContent = 'Building annotated PGN...';
-                const outParts = [];
-                for (let i = 0; i < history.length; i++) {
-                    const move = history[i];
-                    const moveNumber = Math.floor(i / 2) + 1;
-                    const isBlack = i % 2 === 1;
-
-                    const prev = allResults[i];
-                    const cur = allResults[i + 1];
-                    const prevWhite = prev ? prev.evaluation : 0;
-                    const curWhite = cur ? cur.evaluation : prevWhite;
-                    const loss = isBlack ? (curWhite - prevWhite) : (prevWhite - curWhite);
-
-                    let glyph = '';
-                    if (loss >= REANALYZE_BLUNDER_CP) glyph = '??';
-                    else if (loss >= REANALYZE_MISTAKE_CP) glyph = '?';
-                    else if (loss >= REANALYZE_INACCURACY_CP) glyph = '?!';
-
-                    outParts.push(isBlack ? (moveNumber + '...') : (moveNumber + '.'));
-                    outParts.push(move.san + glyph);
-                    outParts.push('{' + _fmtEvalTag(curWhite) + '}');
-
-                    const bestUci = prev && prev.pvUci ? prev.pvUci[0] : null;
-                    const playedUci = move.from + move.to + (move.promotion || '');
-                    if (loss >= REANALYZE_MISTAKE_CP && bestUci && bestUci !== playedUci) {
-                        const fenBefore = allFens[i];
-                        const varSan = uciListToSan(fenBefore, prev.pvUci, REANALYZE_PV_LENGTH);
-                        if (varSan.length > 0) {
-                            const varParts = ['('];
-                            let vMoveNumber = moveNumber, vIsBlack = isBlack;
-                            varParts.push(vIsBlack ? (vMoveNumber + '...') : (vMoveNumber + '.'));
-                            varParts.push(varSan[0]);
-                            varParts.push('{best ' + _fmtEvalRaw(prevWhite) + '}');
-                            for (let k = 1; k < varSan.length; k++) {
-                                vIsBlack = !vIsBlack;
-                                if (!vIsBlack) vMoveNumber++;
-                                varParts.push(vIsBlack ? (vMoveNumber + '...') : (vMoveNumber + '.'));
-                                varParts.push(varSan[k]);
-                            }
-                            varParts.push(')');
-                            outParts.push(varParts.join(' '));
-                        }
-                    }
-                }
-
-                if (/\[EngineAnalysis\s+"[^"]*"\]/.test(headerBlock)) {
-                    headerBlock = headerBlock.replace(/\[EngineAnalysis\s+"[^"]*"\]/, `[EngineAnalysis "stockfish depth ${depth}"]`);
-                } else if (headerBlock.trim()) {
-                    headerBlock = headerBlock.trim() + `\n[EngineAnalysis "stockfish depth ${depth}"]`;
-                }
-
-                const finalMovetext = outParts.join(' ') + (resultToken ? ' ' + resultToken : '');
-                const finalPgn = (headerBlock.trim() ? headerBlock.trim() + '\n\n' : '') + finalMovetext;
+                const annotated = await sbAnnotatePgn(originalPgn, headerBlock, function (msg) { statusEl.textContent = msg; });
+                const finalPgn = annotated.pgn;
+                const depth = annotated.depth;
 
                 statusEl.textContent = 'Saving to Supabase...';
                 const r = await fetch('/api/games', {
@@ -7862,8 +8238,10 @@
                 log('No PGN loaded on board', 'warn');
                 return;
             }
-            const btn = document.getElementById('getEvalBtn');
-            if (btn) { btn.disabled = true; btn.textContent = 'Getting Eval…'; }
+            // Full button plus its mini-nav proxy — keep both in sync
+            const btns = ['getEvalBtn', 'getEvalBtnMini'].map(id => document.getElementById(id)).filter(Boolean);
+            const setBtns = (text, disabled) => btns.forEach(b => { b.textContent = text; b.disabled = disabled; });
+            setBtns('Getting Eval…', true);
 
             const GET_EVAL_DEPTH = 12;
             window.positionEvalMap = window.positionEvalMap || {};
@@ -7898,12 +8276,12 @@
                             window.positionEvalMap[node.fen] = 0;
                         }
                         doneCount++;
-                        if (btn) btn.textContent = `Getting Eval… ${doneCount}/${todo.length}`;
+                        setBtns(`Getting Eval… ${doneCount}/${todo.length}`, true);
                     }
                 }));
             }
 
-            if (btn) { btn.disabled = false; btn.textContent = 'Get Eval'; }
+            setBtns('Get Eval', false);
             log('Evals loaded!', 'success');
 
             // Update bar for current position
