@@ -786,6 +786,20 @@
             <div id="sbReportList" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
             <div id="sbStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
 
+            <!-- Google Doc game notes — append-only scratchpad for the game currently on the board -->
+            <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <button id="gnSignInBtn" onclick="gnSignIn()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">G Sign In</button>
+                <button id="gnRecentBtn" onclick="gnToggleRecentDropdown()" disabled title="Pick a recent Google Doc to append notes to" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Recent ▾</button>
+                <span id="gnDocName" style="font-size: 12px; color: #888; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+            </div>
+            <textarea id="gnNoteInput" placeholder="Note about the loaded game… (the game label and a separator line are added automatically)" style="margin-top: 8px; width: 100%; height: 70px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; padding: 10px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; resize: vertical;"></textarea>
+            <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <button id="gnSaveBtn" onclick="gnAppendNote()" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Append Note to Doc</button>
+                <span id="gnStatus" style="font-size: 12px; color: #888;"></span>
+            </div>
+            <!-- Positioned via getBoundingClientRect() from gnRecentBtn in JS, not CSS top/left -->
+            <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
+
             <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
                 <div style="background: #16213e; border: 1px solid #2a2a4e; border-radius: 10px; width: min(1100px, 100%); height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
                     <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #2a2a4e;">
@@ -4149,7 +4163,7 @@
                 window.currentLoadedPgn = row.pgn;
                 // Captured once here so a later save still has the original headers
                 // even if other edit flows resync window.currentLoadedPgn to headerless movetext.
-                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn) };
+                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn), label: select.options[select.selectedIndex].textContent };
                 document.getElementById('sbSaveGameBtn').disabled = false;
                 document.getElementById('sbReanalyzeBtn').disabled = false;
                 statusEl.textContent = 'Loaded ' + source + '/' + game_id + '.';
@@ -4369,7 +4383,7 @@
             if (!s || !s.pgn) return;
             applyPgnStringToBoard(s.pgn); // resets window.supabaseLoadedGame — set it after
             window.currentLoadedPgn = s.pgn;
-            window.supabaseLoadedGame = { source: s.game.source, game_id: s.game.game_id, headerBlock: extractPgnHeaderBlock(s.pgn) };
+            window.supabaseLoadedGame = { source: s.game.source, game_id: s.game.game_id, headerBlock: extractPgnHeaderBlock(s.pgn), label: s.title };
             document.getElementById('sbSaveGameBtn').disabled = false;
             document.getElementById('sbReanalyzeBtn').disabled = false;
             document.getElementById('sbStatus').textContent = 'Loaded ' + s.game.source + '/' + s.game.game_id + ' from report.';
@@ -4702,7 +4716,7 @@
                 return;
             }
 
-            const { source, game_id } = window.supabaseLoadedGame;
+            const { source, game_id, label } = window.supabaseLoadedGame;
             let headerBlock = window.supabaseLoadedGame.headerBlock || '';
             const originalPgn = window.currentLoadedPgn ||
                 (window.moveTree ? moveTreeToPgn(window.moveTree) : '');
@@ -4732,7 +4746,7 @@
 
                 applyPgnStringToBoard(finalPgn); // resets window.supabaseLoadedGame — set it after
                 window.currentLoadedPgn = finalPgn;
-                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(finalPgn) };
+                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(finalPgn), label };
                 document.getElementById('sbSaveGameBtn').disabled = false;
                 statusEl.textContent = `Re-analyzed and saved ${source}/${game_id} (depth ${depth}).`;
                 log('Re-analyzed and saved to Supabase (' + source + '/' + game_id + ')', 'success');
@@ -13491,6 +13505,206 @@ ${contentToAnalyze}`;
             gdriveSetStatus('');
         };
 
+    })();
+    </script>
+
+    <!-- Google Doc Game Notes — sign in, pick a recent Doc, append a note about the loaded game -->
+    <script>
+    (function() {
+        // Same OAuth client ID already used elsewhere in this repo (REACT_APP_GOOGLE_CLIENT_ID)
+        // and across vercel_flashcards (googlenotes.html / imageNotes.html).
+        var GN_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
+        var GN_LAST_DOC_KEY = 'chessAnalysis:lastGDoc'; // {id, name} — remembered across reloads
+        var gnAccessToken = null;
+        var gnTokenClient = null;
+        var gnTargetDoc = null; // { id, name } — append TARGET only; its content is never fetched or shown
+        var gnDismissListener = null;
+
+        function gnSetStatus(msg) {
+            var el = document.getElementById('gnStatus');
+            if (el) el.textContent = msg || '';
+        }
+
+        function gnInitClient() {
+            if (window.google && window.google.accounts) {
+                gnTokenClient = window.google.accounts.oauth2.initTokenClient({
+                    client_id: GN_CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/drive',
+                    callback: function (resp) {
+                        if (resp.access_token) {
+                            gnAccessToken = resp.access_token;
+                            document.getElementById('gnSignInBtn').textContent = 'G Sign Out';
+                            document.getElementById('gnRecentBtn').disabled = false;
+                            gnSetStatus('Signed in to Google');
+                            gnRestoreLastTargetDoc();
+                        } else {
+                            gnSetStatus('Google sign-in failed: ' + (resp.error || 'unknown error'));
+                        }
+                    }
+                });
+            } else {
+                setTimeout(gnInitClient, 100);
+            }
+        }
+        gnInitClient();
+
+        function gnRestoreLastTargetDoc() {
+            try {
+                var last = JSON.parse(localStorage.getItem(GN_LAST_DOC_KEY) || 'null');
+                if (last && last.id) {
+                    gnTargetDoc = last;
+                    document.getElementById('gnDocName').textContent = '→ ' + last.name;
+                }
+            } catch (e) { }
+        }
+        gnRestoreLastTargetDoc();
+
+        window.gnSignIn = function () {
+            if (gnAccessToken) {
+                try { window.google.accounts.oauth2.revoke(gnAccessToken); } catch (e) { }
+                gnAccessToken = null;
+                document.getElementById('gnSignInBtn').textContent = 'G Sign In';
+                document.getElementById('gnRecentBtn').disabled = true;
+                gnCloseRecentDropdown();
+                gnSetStatus('Signed out of Google');
+                // gnTargetDoc / chessAnalysis:lastGDoc are left alone — signing back in resumes the same target.
+            } else if (gnTokenClient) {
+                gnTokenClient.requestAccessToken();
+            } else {
+                gnSetStatus('Google API not loaded yet. Try again.');
+            }
+        };
+
+        window.gnToggleRecentDropdown = function () {
+            var dropdown = document.getElementById('gnRecentDropdown');
+            if (!dropdown.hidden) { gnCloseRecentDropdown(); return; }
+            gnFetchRecentFiles();
+        };
+
+        function gnFetchRecentFiles() {
+            var btn = document.getElementById('gnRecentBtn');
+            btn.textContent = 'Loading…';
+            var q = encodeURIComponent("mimeType='application/vnd.google-apps.document' and trashed=false");
+            var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+                '&orderBy=viewedByMeTime+desc&pageSize=10&fields=files(id,name,viewedByMeTime)';
+            fetch(url, { headers: { Authorization: 'Bearer ' + gnAccessToken } })
+                .then(function (r) { return r.json(); })
+                .then(function (data) { gnOpenRecentDropdown(data.files || []); })
+                .catch(function (err) { gnSetStatus('Error fetching recent files: ' + err.message); })
+                .finally(function () { btn.textContent = 'Recent ▾'; });
+        }
+
+        function gnOpenRecentDropdown(files) {
+            var dropdown = document.getElementById('gnRecentDropdown');
+            dropdown.innerHTML = '';
+            var rect = document.getElementById('gnRecentBtn').getBoundingClientRect();
+            var left = Math.min(rect.left, window.innerWidth - 320 - 8);
+            dropdown.style.top = (rect.bottom + 4) + 'px';
+            dropdown.style.left = Math.max(8, left) + 'px';
+            if (files.length === 0) {
+                var empty = document.createElement('div');
+                empty.style.cssText = 'padding:8px 10px; font-size:12px; color:#94a3b8;';
+                empty.textContent = 'No recent Docs found';
+                dropdown.appendChild(empty);
+            } else {
+                files.forEach(function (f) {
+                    var item = document.createElement('button');
+                    item.type = 'button';
+                    item.textContent = f.name;
+                    item.style.cssText = 'display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:12px; cursor:pointer; word-break:break-word;';
+                    item.addEventListener('click', function () {
+                        gnSelectTargetDoc(f.id, f.name);
+                        gnCloseRecentDropdown();
+                    });
+                    dropdown.appendChild(item);
+                });
+            }
+            dropdown.hidden = false;
+            if (!gnDismissListener) {
+                setTimeout(function () {
+                    gnDismissListener = function (e) {
+                        var dd = document.getElementById('gnRecentDropdown');
+                        var btn = document.getElementById('gnRecentBtn');
+                        if (dd && !dd.contains(e.target) && e.target !== btn) gnCloseRecentDropdown();
+                    };
+                    document.addEventListener('click', gnDismissListener);
+                }, 0);
+            }
+        }
+        function gnCloseRecentDropdown() {
+            var dropdown = document.getElementById('gnRecentDropdown');
+            dropdown.hidden = true;
+            if (gnDismissListener) {
+                document.removeEventListener('click', gnDismissListener);
+                gnDismissListener = null;
+            }
+        }
+
+        // Sets the append TARGET only — no content is fetched or shown.
+        function gnSelectTargetDoc(fileId, fileName) {
+            gnTargetDoc = { id: fileId, name: fileName };
+            document.getElementById('gnDocName').textContent = '→ ' + fileName;
+            try { localStorage.setItem(GN_LAST_DOC_KEY, JSON.stringify(gnTargetDoc)); } catch (e) { }
+            gnSetStatus('Ready to append to "' + fileName + '"');
+        }
+
+        // Appends text to the END of the target Doc — never touches or replaces
+        // whatever's already in the doc. Returns a Promise.
+        function gnAppendToGoogleDoc(text) {
+            if (!gnAccessToken) return Promise.reject(new Error('Sign in with Google first'));
+            if (!gnTargetDoc) return Promise.reject(new Error('Pick a Recent Google Doc first'));
+            return fetch('https://docs.googleapis.com/v1/documents/' + gnTargetDoc.id, {
+                headers: { Authorization: 'Bearer ' + gnAccessToken }
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('Doc read failed (HTTP ' + r.status + ')');
+                    return r.json();
+                })
+                .then(function (doc) {
+                    var endIndex = doc.body.content[doc.body.content.length - 1].endIndex;
+                    var normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    var insertAt = Math.max(1, endIndex - 1);
+                    var toInsert = (endIndex > 2 ? '\n\n' : '') + normalized;
+                    return fetch('https://docs.googleapis.com/v1/documents/' + gnTargetDoc.id + ':batchUpdate', {
+                        method: 'POST',
+                        headers: { Authorization: 'Bearer ' + gnAccessToken, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requests: [{ insertText: { location: { index: insertAt }, text: toInsert } }] }),
+                    });
+                })
+                .then(function (r) {
+                    if (!r.ok) return r.json().then(function (err) { throw new Error((err.error && err.error.message) || ('HTTP ' + r.status)); });
+                });
+        }
+
+        // Builds "<game label>\n-----------------------------\n<typed note>" —
+        // window.supabaseLoadedGame.label is set by both load paths (dropdown
+        // select and report-modal click), so this is the one place to read it.
+        function gnBuildNoteText(userText) {
+            var game = window.supabaseLoadedGame;
+            var label = (game && game.label) || 'Untitled game';
+            return label + '\n-----------------------------\n' + userText;
+        }
+
+        window.gnAppendNote = function () {
+            var input = document.getElementById('gnNoteInput');
+            var text = input.value.trim();
+            if (!text) { gnSetStatus('Type a note first'); return; }
+            if (!window.supabaseLoadedGame) { gnSetStatus('Load a game first'); return; }
+            var btn = document.getElementById('gnSaveBtn');
+            btn.disabled = true;
+            gnSetStatus('Appending…');
+            gnAppendToGoogleDoc(gnBuildNoteText(text))
+                .then(function () {
+                    input.value = '';
+                    gnSetStatus('Appended to "' + gnTargetDoc.name + '"');
+                })
+                .catch(function (err) {
+                    gnSetStatus('Append failed: ' + err.message);
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                });
+        };
     })();
     </script>
 
