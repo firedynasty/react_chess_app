@@ -952,6 +952,16 @@
     <div id="supabase_fens_pgns">
       <div id="pzSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
         <div style="color: #888; margin-bottom: 8px;">Supabase Puzzles (FENs / PGNs)</div>
+        <div style=" display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <select id="pzSaveCategorySelect" onchange="pzToggleNewCategoryInput()" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
+            <option value="__new__">+ New category…</option>
+          </select>
+          <input type="text" id="pzNewCategoryInput" placeholder="New category name (e.g. mate_in_5)..." style="min-width: 180px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <input type="text" id="pzNoteInput" placeholder="Note (e.g. win a pawn)..." style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <button onclick="pzSavePuzzle()" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save FEN / PGN to Supabase</button>
+          <button id="pzDeleteBtn" onclick="pzDeletePuzzle()" title="Delete the puzzle currently selected in the dropdown from Supabase" style="padding: 8px 18px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">🗑️ Delete Loaded FEN/PGN</button>
+        </div>
+        <div id="pzStatus" style="margin: 6px 0 10px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 12px; color: #888;"></div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
           <select id="pzCategorySelect" onchange="pzLoadPuzzlesForCategory()" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
             <option value="">Loading categories…</option>
@@ -969,16 +979,6 @@
           </label>
         </div>
         <div id="pzNoteDisplay" style="display: none; margin-top: 8px; padding: 10px; background: #0f3460; border-radius: 5px; color: #eee; font-size: 14px;"></div>
-        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-          <select id="pzSaveCategorySelect" onchange="pzToggleNewCategoryInput()" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
-            <option value="__new__">+ New category…</option>
-          </select>
-          <input type="text" id="pzNewCategoryInput" placeholder="New category name (e.g. mate_in_5)..." style="min-width: 180px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-          <input type="text" id="pzNoteInput" placeholder="Note (e.g. win a pawn)..." style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-          <button onclick="pzSavePuzzle()" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save FEN / PGN to Supabase</button>
-          <button id="pzDeleteBtn" onclick="pzDeletePuzzle()" title="Delete the puzzle currently selected in the dropdown from Supabase" style="padding: 8px 18px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">🗑️ Delete Loaded FEN/PGN</button>
-        </div>
-        <div id="pzStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
       </div>
     </div>
     <!-- Hidden (not removed): JS still binds to these button IDs. Replace with supabase_fens_pgns content later. -->
@@ -1277,8 +1277,7 @@
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
             <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
-            <button onclick="document.getElementById('loadFenBtn').click()" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load FEN</button>
-            <button onclick="document.getElementById('exportFenBtn').click()" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Export FEN</button>
+            <button onclick="document.getElementById('lichessLinksBtn').click()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Lichess Links</button>
             <button id="showOpeningBtn" title="Look up the ECO opening for the currently loaded game" onclick="showOpeningToast()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📖 Opening</button>
             <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
