@@ -939,7 +939,50 @@
     </div>
 
     <!-- Report Loading Controls (horizontal layout) -->
-    <div id="reportControls" style="margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+    <!-- PGN of moves dropped on the board (Lichess "From Position" format), built from the move tree -->
+    <div id="pzPgnSection" style="margin: 12px auto 0; max-width: 1200px;">
+      <textarea id="pzMoveHistoryTextArea" readonly rows="1" placeholder="Moves you drop on the board appear here as a Lichess-style From Position PGN..." style="display: block; width: 100%; box-sizing: border-box; height: 80px; min-height: 26px; padding: 3px 8px; border: 2px solid #17a2b8; border-radius: 5px; font-family: monospace; font-size: 12px; line-height: 1.3; background: #0f3460; color: #eee; resize: vertical;"></textarea>
+      <div style="display: flex; gap: 8px; margin-top: 6px;">
+        <button onclick="pzCopyPgn()" style="padding: 6px 14px; background: #0f3460; color: #eee; border: 1px solid #17a2b8; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">📋 Copy PGN</button>
+        <button onclick="pzPastePgn()" style="padding: 6px 14px; background: #0f3460; color: #eee; border: 1px solid #17a2b8; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">📥 Paste PGN</button>
+        <button onclick="pzClearPgn()" style="padding: 6px 14px; background: rgba(244,67,54,0.3); color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">🗑️ Clear PGN</button>
+        <button onclick="pzResetPgnFen()" style="padding: 6px 14px; background: rgba(255,152,0,0.3); color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">↺ Reset FEN</button>
+      </div>
+    </div>
+    <div id="supabase_fens_pgns">
+      <div id="pzSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
+        <div style="color: #888; margin-bottom: 8px;">Supabase Puzzles (FENs / PGNs)</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <select id="pzCategorySelect" onchange="pzLoadPuzzlesForCategory()" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
+            <option value="">Loading categories…</option>
+          </select>
+          <select id="pzPuzzleSelect" disabled onchange="pzLoadSelectedPuzzle()" style="flex: 1; min-width: 220px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">— pick a category first —</option>
+          </select>
+          <button id="pzPrevBtn" onclick="pzStep(-1)" disabled style="padding: 8px 16px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px; font-weight: bold;">◀ Prev</button>
+          <button id="pzNextBtn" onclick="pzStep(1)" disabled style="padding: 8px 16px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px; font-weight: bold;">Next ▶</button>
+          <button onclick="pzCyclePrev()" title="Step back one position in the loaded FEN/PGN (wraps to the end)" style="padding: 8px 16px; background: rgba(233,30,99,0.3); color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">Prev &#128260;</button>
+          <button onclick="pzCycleBoard()" title="Step forward one position in the loaded FEN/PGN (wraps to the start)" style="padding: 8px 16px; background: rgba(233,30,99,0.3); color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">&#128260; Cycle Board</button>
+          <button id="pzRevealBtn" onclick="pzToggleNote()" disabled style="padding: 8px 16px; background: #3ecf8e; color: #08341f; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px; font-weight: bold;">👁 Reveal Note</button>
+          <label style="display: flex; align-items: center; gap: 4px; color: #aaa; font-size: 12px; cursor: pointer;" title="Show each puzzle's note automatically as you step through with Next / Prev">
+            <input type="checkbox" id="pzAutoNoteToggle" onchange="pzSetAutoNote(this.checked)"> Auto-reveal notes
+          </label>
+        </div>
+        <div id="pzNoteDisplay" style="display: none; margin-top: 8px; padding: 10px; background: #0f3460; border-radius: 5px; color: #eee; font-size: 14px;"></div>
+        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <select id="pzSaveCategorySelect" onchange="pzToggleNewCategoryInput()" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
+            <option value="__new__">+ New category…</option>
+          </select>
+          <input type="text" id="pzNewCategoryInput" placeholder="New category name (e.g. mate_in_5)..." style="min-width: 180px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <input type="text" id="pzNoteInput" placeholder="Note (e.g. win a pawn)..." style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <button onclick="pzSavePuzzle()" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save FEN / PGN to Supabase</button>
+          <button id="pzDeleteBtn" onclick="pzDeletePuzzle()" title="Delete the puzzle currently selected in the dropdown from Supabase" style="padding: 8px 18px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">🗑️ Delete Loaded FEN/PGN</button>
+        </div>
+        <div id="pzStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
+      </div>
+    </div>
+    <!-- Hidden (not removed): JS still binds to these button IDs. Replace with supabase_fens_pgns content later. -->
+    <div id="reportControls" style="display: none; margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; align-items: center; gap: 12px; flex-wrap: wrap;">
       <button id="loadAnalysisReport" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Load Analysis Report (from clipboard)</button>
       <button id="dbLoginBtn" style="background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">DB Login</button>
       <button id="dbFilesBtn" style="display: none; background: #0061fe; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">DB Files</button>
@@ -4043,6 +4086,340 @@
             }
             applyPgnStringToBoard(pgnString);
         }
+
+        // ============================================================
+        // SUPABASE PUZZLES (FENs / PGNs) — ported from vercel_fen_saver, via /api/puzzles
+        // category dropdown -> puzzle dropdown -> board; save form posts the board's FEN back.
+        // ============================================================
+        window.pzPuzzlesByCategory = {}; // category -> [{id, category, note, fen}]
+
+        function pzEsc(t) {
+            return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        function pzIsPgn(text) { return /\[FEN\s+"/.test(text || ''); }
+
+        function pzIsValidFen(text) {
+            try { return !!new Chess().load((text || '').trim()); } catch (e) { return false; } // chess.js 0.10 returns false, doesn't throw
+        }
+
+        // Used when LOADING: a row that is not a bare FEN and has no [FEN "..."] header (e.g. a plain "1. e4 e5 2. Nf3")
+        // is wrapped as a From Position PGN from the standard start so it still loads.
+        function pzNormalizePgn(text) {
+            text = (text || '').replace(/\r\n?/g, '\n').trim();
+            if (!text || pzIsPgn(text) || pzIsValidFen(text)) return text;
+            const body = text.replace(/^\s*\[[^\]]*\]\s*$/gm, '').trim(); // drop [Event ...] style tag lines
+            if (!body) return text;
+            return '[Variant "From Position"]\n[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"]\n\n' + body;
+        }
+
+        function pzStartFen(text) {
+            const m = (text || '').match(/\[FEN\s+"([^"]+)"\]/);
+            return m ? m[1] : (text || '');
+        }
+
+        function pzSetNavDisabled(disabled) {
+            ['pzPrevBtn', 'pzNextBtn', 'pzRevealBtn'].forEach(id => { document.getElementById(id).disabled = disabled; });
+        }
+
+        // opts: { noLoad } fill dropdowns without loading a puzzle onto the board; { skipList } also skip filling the puzzle list
+        async function pzLoadCategories(opts) {
+            const browseSel = document.getElementById('pzCategorySelect');
+            const saveSel = document.getElementById('pzSaveCategorySelect');
+            if (!browseSel || !saveSel) return;
+            try {
+                const res = await fetch('/api/puzzles?action=categories');
+                const categories = await res.json();
+                if (!res.ok) throw new Error(categories.error || 'Request failed');
+
+                const opts = categories.map(c => `<option value="${pzEsc(c)}">${pzEsc(c)}</option>`).join('');
+                browseSel.innerHTML = categories.length ? opts : '<option value="">No categories yet</option>';
+                saveSel.innerHTML = opts + '<option value="__new__">+ New category…</option>';
+                if (categories.length) saveSel.value = categories[0];
+                pzToggleNewCategoryInput();
+                if (categories.length && !(opts && opts.skipList)) pzLoadPuzzlesForCategory(opts);
+            } catch (err) {
+                browseSel.innerHTML = '<option value="">Failed to load</option>';
+                showToast('Loading puzzle categories failed: ' + err.message);
+            }
+        }
+
+        async function pzLoadPuzzlesForCategory(opts) {
+            // opts (optional): { noLoad: true } refreshes the dropdown without loading a puzzle onto the board;
+            // { selectId } selects that puzzle. (onchange passes an Event, which has neither.)
+            const noLoad = !!(opts && opts.noLoad === true);
+            const selectId = opts && opts.selectId;
+            const category = document.getElementById('pzCategorySelect').value;
+            const puzzleSel = document.getElementById('pzPuzzleSelect');
+            pzHideNote();
+            pzSetNavDisabled(true);
+            puzzleSel.disabled = true;
+            if (!category) {
+                puzzleSel.innerHTML = '<option value="">— pick a category first —</option>';
+                return;
+            }
+            puzzleSel.innerHTML = '<option value="">Loading…</option>';
+            try {
+                const res = await fetch('/api/puzzles?action=list&category=' + encodeURIComponent(category));
+                const puzzles = await res.json();
+                if (!res.ok) throw new Error(puzzles.error || 'Request failed');
+
+                window.pzPuzzlesByCategory[category] = puzzles;
+                if (!puzzles.length) {
+                    puzzleSel.innerHTML = '<option value="">No puzzles in this category</option>';
+                    return;
+                }
+                puzzleSel.innerHTML = puzzles.map((p, i) => {
+                    const isPgn = pzIsPgn(p.fen);
+                    const text = pzStartFen(p.fen);
+                    return `<option value="${p.id}">${i + 1} ${isPgn ? '▶ PGN' : '· FEN'} — ${pzEsc(text.slice(0, 24))}${text.length > 24 ? '…' : ''}</option>`;
+                }).join('');
+                puzzleSel.disabled = false;
+                pzSetNavDisabled(false);
+                if (selectId != null) puzzleSel.value = String(selectId);
+                if (!noLoad) pzLoadSelectedPuzzle();
+            } catch (err) {
+                puzzleSel.innerHTML = '<option value="">Failed to load</option>';
+                showToast('Loading puzzles failed: ' + err.message);
+            }
+        }
+
+        function pzCurrentPuzzle() {
+            const category = document.getElementById('pzCategorySelect').value;
+            const id = document.getElementById('pzPuzzleSelect').value;
+            return (window.pzPuzzlesByCategory[category] || []).find(p => String(p.id) === String(id)) || null;
+        }
+
+        function pzLoadSelectedPuzzle() {
+            const puzzle = pzCurrentPuzzle();
+            pzHideNote();
+            if (!puzzle) { document.getElementById('pzRevealBtn').disabled = true; return; }
+            document.getElementById('pzRevealBtn').disabled = false;
+            if (window.pzAutoNote) pzShowNote();
+
+            const text = pzNormalizePgn(puzzle.fen); // also rescues rows saved as a plain PGN
+            let variant;
+            if (pzIsPgn(text)) {
+                variant = text; // PGN with [FEN "..."] header (+ moves)
+            } else if (pzIsValidFen(text)) {
+                variant = `[Variant "From Position"]\n[FEN "${text}"]\n\n`;
+            } else {
+                showToast('Saved FEN / PGN is not readable'); return;
+            }
+            window.loadedFenVariants = [variant];
+            window.loadFenVariantByIndex(0);
+            pzClearPgn(true);
+        }
+
+        function pzStep(delta) {
+            const sel = document.getElementById('pzPuzzleSelect');
+            if (sel.disabled || !sel.options.length) return;
+            sel.selectedIndex = (sel.selectedIndex + delta + sel.options.length) % sel.options.length;
+            pzLoadSelectedPuzzle();
+        }
+
+        function pzHideNote() {
+            const el = document.getElementById('pzNoteDisplay');
+            if (!el) return;
+            el.style.display = 'none';
+            el.textContent = '';
+        }
+
+        function pzShowNote() {
+            const el = document.getElementById('pzNoteDisplay');
+            const puzzle = pzCurrentPuzzle();
+            el.textContent = (puzzle && puzzle.note) ? puzzle.note : 'No note for this puzzle.';
+            el.style.display = 'block';
+        }
+
+        function pzToggleNote() {
+            const el = document.getElementById('pzNoteDisplay');
+            if (el.style.display !== 'none') pzHideNote(); else pzShowNote();
+        }
+
+        // Auto-reveal: show the note whenever a puzzle loads (Next / Prev / dropdown). Remembered per browser.
+        window.pzAutoNote = false;
+        try { window.pzAutoNote = localStorage.getItem('pzAutoNote') === 'true'; } catch (e) {}
+        document.addEventListener('DOMContentLoaded', function() {
+            const cb = document.getElementById('pzAutoNoteToggle');
+            if (cb) cb.checked = window.pzAutoNote;
+        });
+
+        function pzSetAutoNote(on) {
+            window.pzAutoNote = !!on;
+            try { localStorage.setItem('pzAutoNote', window.pzAutoNote); } catch (e) {}
+            if (window.pzAutoNote && pzCurrentPuzzle()) pzShowNote();
+        }
+
+        function pzToggleNewCategoryInput() {
+            const sel = document.getElementById('pzSaveCategorySelect');
+            document.getElementById('pzNewCategoryInput').style.display = sel.value === '__new__' ? '' : 'none';
+        }
+
+        // Full FEN (with side to move / castling) of the position currently on board2
+        function pzCurrentBoardFen() {
+            const node = window.currentMoveNode || window.moveTree;
+            return node && node.fen ? node.fen : '';
+        }
+
+        async function pzSavePuzzle() {
+            const statusEl = document.getElementById('pzStatus');
+            const sel = document.getElementById('pzSaveCategorySelect');
+            const category = sel.value === '__new__' ? document.getElementById('pzNewCategoryInput').value.trim() : sel.value;
+            const note = document.getElementById('pzNoteInput').value.trim();
+            // PGN box has text -> save the PGN (it carries the [FEN] header); otherwise save the board FEN
+            const boxText = document.getElementById('pzMoveHistoryTextArea').value.trim();
+            const isPgn = !!boxText;
+            const fen = isPgn ? boxText : pzCurrentBoardFen(); // saved exactly as shown in the box
+
+            if (!category) { showToast('Enter a category name'); return; }
+            if (!fen) { showToast('No position on the board to save'); return; }
+
+            statusEl.textContent = isPgn ? 'Saving PGN…' : 'Saving…';
+            try {
+                const res = await fetch('/api/puzzles', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'save', category, note, fen })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Save failed');
+
+                statusEl.textContent = 'Saved ' + (isPgn ? 'PGN' : 'FEN') + ' to "' + category + '".';
+                document.getElementById('pzNoteInput').value = '';
+                pzClearPgn(true); // empty the PGN box (and its recording base); the board is left alone
+                showToast(isPgn ? 'PGN saved!' : 'Puzzle saved!');
+
+                // Refresh the lists and select the new puzzle, but leave the board / move table alone
+                const savedId = data.puzzle && data.puzzle.id;
+                await pzLoadCategories({ noLoad: true, skipList: true }); // caller fills the puzzle list itself
+                document.getElementById('pzCategorySelect').value = category;
+                await pzLoadPuzzlesForCategory({ noLoad: true, selectId: savedId });
+                document.getElementById('pzSaveCategorySelect').value = category;
+                pzToggleNewCategoryInput();
+            } catch (err) {
+                statusEl.textContent = '';
+                showToast('Save failed: ' + err.message);
+            }
+        }
+
+        // Step through the loaded FEN/PGN's positions via the move tree, wrapping at the ends
+        function pzCycleBoard() {
+            const node = window.currentMoveNode;
+            if (!window.moveTree) { showToast('No positions to cycle. Load a puzzle first.'); return; }
+            if (!node || (node.children && node.children.length)) board2NextMove();
+            else jumpToRoot(); // end of the line -> back to the start
+        }
+
+        function pzCyclePrev() {
+            if (!window.moveTree) { showToast('No positions to cycle. Load a puzzle first.'); return; }
+            if (window.currentMoveNode) { board2PrevMove(); return; }
+            // at the start -> jump to the last move of the main line
+            let n = window.moveTree;
+            while (n.children && n.children.length) n = n.children[0];
+            if (n !== window.moveTree) jumpToNode(n.nodeId);
+        }
+
+        async function pzDeletePuzzle() {
+            const puzzle = pzCurrentPuzzle();
+            if (!puzzle) { showToast('Load a puzzle from the Supabase dropdown first'); return; }
+
+            const statusEl = document.getElementById('pzStatus');
+            const category = puzzle.category;
+            const kind = pzIsPgn(puzzle.fen) ? 'PGN' : 'FEN';
+            const label = puzzle.note ? '\n\nNote: ' + puzzle.note.slice(0, 120) : '';
+            if (!confirm('Delete this ' + kind + ' puzzle from "' + category + '"? This cannot be undone.' + label)) return;
+
+            statusEl.textContent = 'Deleting…';
+            try {
+                const res = await fetch('/api/puzzles?id=' + encodeURIComponent(puzzle.id), { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Delete failed');
+
+                statusEl.textContent = 'Deleted ' + kind + ' puzzle from "' + category + '".';
+                showToast(kind + ' puzzle deleted');
+
+                await pzLoadCategories();
+                const browseSel = document.getElementById('pzCategorySelect');
+                // stay in the same category unless it is now empty and gone
+                if ([...browseSel.options].some(o => o.value === category)) browseSel.value = category;
+                await pzLoadPuzzlesForCategory();
+            } catch (err) {
+                statusEl.textContent = '';
+                showToast('Delete failed: ' + err.message);
+            }
+        }
+
+        // ── Drop-recorded PGN (Lichess "From Position") — view of the move tree ──
+        // Header FEN = position before the first dropped move; moves = path from there to the current node.
+        // It is re-based on: first drop after a new load, Clear PGN, Reset FEN, or a drop off the recorded line.
+        window.pzPgnBase = null; // { tree, node }
+
+        function pzRenderPgn() {
+            const ta = document.getElementById('pzMoveHistoryTextArea');
+            if (!ta) return;
+            const base = window.pzPgnBase;
+            if (!base) { ta.value = ''; return; }
+            const path = [];
+            let n = window.currentMoveNode || window.moveTree;
+            while (n && n !== base.node) { path.unshift(n); n = n.parent; }
+            if (n !== base.node) { ta.value = ''; return; }
+            let text = '[Variant "From Position"]\n[FEN "' + base.node.fen + '"]';
+            if (path.length) {
+                text += '\n\n' + path.map((nd, i) =>
+                    nd.isBlackMove ? (i === 0 ? nd.moveNumber + '... ' : '') + nd.san : nd.moveNumber + '. ' + nd.san
+                ).join(' ');
+            }
+            ta.value = text;
+        }
+
+        function pzIsAncestorOrSelf(anc, node) {
+            for (let n = node; n; n = n.parent) if (n === anc) return true;
+            return false;
+        }
+
+        // Called after a drop / click-move / castle; nodeBefore = the node the move was played from
+        window.pzRecordDrop = function(nodeBefore) {
+            if (!nodeBefore) return;
+            const base = window.pzPgnBase;
+            if (!base || base.tree !== window.moveTree || !pzIsAncestorOrSelf(base.node, nodeBefore)) {
+                window.pzPgnBase = { tree: window.moveTree, node: nodeBefore };
+            }
+            pzRenderPgn();
+        };
+
+        function pzClearPgn(silent) {
+            window.pzPgnBase = null;
+            pzRenderPgn();
+            if (!silent) showToast('PGN cleared');
+        }
+
+        function pzResetPgnFen() {
+            const node = window.currentMoveNode || window.moveTree;
+            if (!node) return;
+            window.pzPgnBase = { tree: window.moveTree, node: node };
+            pzRenderPgn();
+            showToast('Header FEN reset to the board');
+        }
+
+        // Fills the PGN box from the clipboard and nothing else (no board / move-tree change)
+        async function pzPastePgn() {
+            let text;
+            try { text = await navigator.clipboard.readText(); }
+            catch (e) { showToast('Clipboard access denied'); return; }
+            text = (text || '').replace(/\r\n?/g, '\n').trim();
+            if (!text) { showToast('Clipboard is empty'); return; }
+            document.getElementById('pzMoveHistoryTextArea').value = text;
+        }
+
+        function pzCopyPgn() {
+            const text = document.getElementById('pzMoveHistoryTextArea').value.trim();
+            if (!text) { showToast('No PGN to copy'); return; }
+            navigator.clipboard.writeText(text).then(() => showToast('PGN copied!'));
+        }
+
+        // On page load, fill the dropdowns but don't put a puzzle on the board until the user picks / steps to one
+        document.addEventListener('DOMContentLoaded', () => pzLoadCategories({ noLoad: true }));
 
         // =====================================================================
         // LOAD / SAVE GAMES FROM SUPABASE (via /api/games)
@@ -9118,6 +9495,7 @@
                     for (var i = 0; i < node.children.length; i++) {
                         if (node.children[i].san === move.san) {
                             jumpToNode(node.children[i].nodeId);
+                            if (window.pzRecordDrop) window.pzRecordDrop(node);
                             return;
                         }
                     }
@@ -9175,6 +9553,7 @@
                 playMoveSound(move.san);
                 syncTreeAndRender(newNode);
                 window.board2.position(chess.fen());
+                if (window.pzRecordDrop) window.pzRecordDrop(node);
             };
 
             // Close castle menu when clicking elsewhere
@@ -14068,7 +14447,10 @@ ${contentToAnalyze}`;
 
             // Default behavior when not in sf game mode
             if (typeof window.handleBoardDrop === 'function') {
-                return window.handleBoardDrop(source, target, piece);
+                const nodeBefore = window.currentMoveNode || window.moveTree;
+                const result = window.handleBoardDrop(source, target, piece);
+                if (result !== 'snapback' && window.pzRecordDrop) window.pzRecordDrop(nodeBefore);
+                return result;
             }
         }
 
