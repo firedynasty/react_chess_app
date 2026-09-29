@@ -1076,6 +1076,10 @@
           </div>
         </div>
         <p style="color: #888; font-size: 12px; margin: 0 0 8px 0; font-style: italic; display: none;">Note: Chess piece images will load fully when choosing 'Next'</p>
+        <label style="display: flex; align-items: center; gap: 6px; width: 400px; margin-bottom: 4px; color: #aaa; font-size: 12px; font-family: monospace; cursor: pointer;">
+          <input type="checkbox" id="variationArrowsToggle" checked onchange="setVariationArrowsEnabled(this.checked)">
+          Variation arrows
+        </label>
         <!-- Eval bar (horizontal, tanh-scaled) -->
         <div id="evalBarWrap" style="width: 400px; margin-bottom: 4px;">
           <div id="evalBarH" style="width: 100%; height: 12px; background: #111; border-radius: 3px; overflow: hidden; position: relative; display: flex;">
@@ -8354,8 +8358,23 @@
             svg.appendChild(line);
         }
 
+        let variationArrowsEnabled = true;
+        try { variationArrowsEnabled = localStorage.getItem('variationArrowsEnabled') !== 'false'; } catch (e) {}
+        (function syncVariationArrowsToggle() {
+            const cb = document.getElementById('variationArrowsToggle');
+            if (cb) cb.checked = variationArrowsEnabled;
+        })();
+
+        function setVariationArrowsEnabled(on) {
+            variationArrowsEnabled = !!on;
+            try { localStorage.setItem('variationArrowsEnabled', variationArrowsEnabled); } catch (e) {}
+            if (variationArrowsEnabled) drawVariationArrows(window.currentMoveNode);
+            else clearBoard2Arrows();
+        }
+
         function drawVariationArrows(node) {
             clearBoard2Arrows();
+            if (!variationArrowsEnabled) return;
             if (!node || !node.parent) return;
             const parent = node.parent;
             if (!parent.children || parent.children.length <= 1) return;
