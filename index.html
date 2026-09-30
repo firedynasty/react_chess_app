@@ -752,6 +752,8 @@
                 </select>
                 <button id="sbFetchListBtn" onclick="sbFetchGameList()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Find Games</button>
                 <input type="text" id="sbNameFilter" placeholder="Filter by opponent..." oninput="sbApplyFilters()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px; min-width: 150px;">
+                <input type="text" id="sbGameIdInput" placeholder="Load by game ID..." onkeydown="if(event.key==='Enter') sbLoadGameByIdInput()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px; min-width: 150px;">
+                <button id="sbLoadGameByIdBtn" onclick="sbLoadGameByIdInput()" title="Fetch straight from Supabase by game_id — no need to Find Games first" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Game</button>
                 <select id="sbEcoFilter" disabled onchange="sbApplyFilters()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
                     <option value="">All ECO</option>
                 </select>
@@ -766,6 +768,10 @@
                 <label style="font-size: 12px; color: #888;">To
                     <input type="date" id="sbDateTo" onchange="sbApplyFilters()" style="padding: 5px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
                 </label>
+            </div>
+            <div style="margin-top: 4px; font-size: 12px; color: #888;">
+                Deep link a game: append <code style="color: #ddd;">?game_id=&lt;id&gt;</code> or just <code style="color: #ddd;">?&lt;id&gt;</code> to the URL — auto-loads on page open.
+                Source is guessed from the ID (digits only = chesscom, else lichess); override with <code style="color: #ddd;">&amp;source=chesscom</code> or <code style="color: #ddd;">&amp;source=lichess</code> — those are the only two.
             </div>
             <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                 <select id="sbGameSelect" disabled style="flex: 1; min-width: 260px; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
@@ -784,7 +790,7 @@
                 </select>
             </div>
             <div id="sbReportList" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
-            <div id="sbStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
+            <div id="sbStatus" style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; font-size: 14px; font-weight: bold; color: #eee;"></div>
 
             <!-- Google Doc game notes — append-only scratchpad for the game currently on the board -->
             <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -4028,7 +4034,10 @@
             window.pgnVariants = [];
             window.allVariants = [];
             window.allFileSections = [];
-            window.updateFileSectionHeader(-1); // Hide file section header
+            // updateFileSectionHeader is defined inside window.onload, so it
+            // may not exist yet if this runs from a DOMContentLoaded-timed
+            // caller (e.g. the ?game_id= auto-loader) that beats onload.
+            if (window.updateFileSectionHeader) window.updateFileSectionHeader(-1); // Hide file section header
 
             // Parse with variation support and render move table
             window.moveTree = window.parsePgnWithVariations(pgnString);
@@ -4417,8 +4426,10 @@
             navigator.clipboard.writeText(text).then(() => showToast('PGN copied!'));
         }
 
-        // On page load, fill the dropdowns but don't put a puzzle on the board until the user picks / steps to one
-        document.addEventListener('DOMContentLoaded', () => pzLoadCategories({ noLoad: true }));
+        // Auto-load on page open disabled — was firing alongside the ?game_id=
+        // deep-link loader and adding noise while debugging it. pzLoadCategories
+        // still works manually (e.g. call it from devtools, or wire a button).
+        // document.addEventListener('DOMContentLoaded', () => pzLoadCategories({ noLoad: true }));
 
         // =====================================================================
         // LOAD / SAVE GAMES FROM SUPABASE (via /api/games)
@@ -4527,11 +4538,11 @@
             return '';
         }
 
-        async function sbLoadSelectedGame() {
-            const select = document.getElementById('sbGameSelect');
+        // Shared by the dropdown ("Load Selected"), the game-ID box, and the
+        // ?game_id URL param — anywhere we have a source+game_id and want it
+        // fetched from Supabase and applied to the board.
+        async function sbLoadGameByIdAndSource(source, game_id, label) {
             const statusEl = document.getElementById('sbStatus');
-            if (!select.value) return;
-            const { source, game_id } = JSON.parse(select.value);
             statusEl.textContent = 'Loading…';
             try {
                 const params = new URLSearchParams({ action: 'get', source, game_id });
@@ -4543,16 +4554,93 @@
                 window.currentLoadedPgn = row.pgn;
                 // Captured once here so a later save still has the original headers
                 // even if other edit flows resync window.currentLoadedPgn to headerless movetext.
-                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn), label: select.options[select.selectedIndex].textContent };
+                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn), label: label || (source + '/' + game_id) };
                 document.getElementById('sbSaveGameBtn').disabled = false;
                 document.getElementById('sbReanalyzeBtn').disabled = false;
                 statusEl.textContent = 'Loaded ' + source + '/' + game_id + '.';
                 log('Loaded game from Supabase (' + source + '/' + game_id + ')', 'success');
+                return true;
             } catch (e) {
                 statusEl.textContent = 'Load failed: ' + e.message;
                 log('Load from Supabase failed: ' + e.message, 'warning');
+                return false;
             }
         }
+
+        async function sbLoadSelectedGame() {
+            const select = document.getElementById('sbGameSelect');
+            if (!select.value) return;
+            const { source, game_id } = JSON.parse(select.value);
+            await sbLoadGameByIdAndSource(source, game_id, select.options[select.selectedIndex].textContent);
+        }
+
+        // Chess.com game IDs are purely numeric (e.g. 184586042034); Lichess
+        // IDs are short alphanumeric codes — enough to disambiguate for the
+        // two sources this app tracks, without asking for it explicitly.
+        function sbInferSourceFromGameId(gameId) {
+            return /^\d+$/.test(gameId) ? 'chesscom' : 'lichess';
+        }
+
+        async function sbLoadGameByIdInput() {
+            const input = document.getElementById('sbGameIdInput');
+            const gameId = input.value.trim();
+            if (!gameId) return;
+            await sbLoadGameByIdAndSource(sbInferSourceFromGameId(gameId), gameId);
+        }
+
+        // Deep-link support: /?game_id=184586042034 (optionally &source=chesscom
+        // or &source=lichess to skip the digits-only guess), or the bare form
+        // /?184586042034 with no key at all.
+        //
+        // window.board2 and window.updateFileSectionHeader are both defined
+        // inside window.onload, which fires after DOMContentLoaded — so at the
+        // moment this runs, onload may still be in flight. Ping every 100ms
+        // (visibly, via #sbStatus, like a metronome's remote-poll status) until
+        // both exist, then load. console.log calls are left in on purpose so
+        // this is debuggable from devtools if it still doesn't fire.
+        function sbLoadGameFromUrlParam() {
+            const search = window.location.search;
+            console.log('[sbLoadGameFromUrlParam] location.search =', JSON.stringify(search));
+            if (search.length <= 1) return; // no "?" or empty
+            const raw = search.slice(1);
+            let gameId, source;
+            if (raw.includes('=')) {
+                const params = new URLSearchParams(search);
+                gameId = params.get('game_id') || params.get('gameId');
+                source = params.get('source');
+            } else {
+                gameId = decodeURIComponent(raw.split('&')[0]);
+            }
+            if (!gameId) { console.log('[sbLoadGameFromUrlParam] no gameId parsed, aborting'); return; }
+            if (!source) source = sbInferSourceFromGameId(gameId);
+            console.log('[sbLoadGameFromUrlParam] parsed', { gameId, source });
+            const input = document.getElementById('sbGameIdInput');
+            if (input) input.value = gameId;
+
+            let attempt = 0;
+            const maxAttempts = 100; // ~10s at 100ms
+            const statusEl = document.getElementById('sbStatus');
+            const timer = setInterval(function ping() {
+                attempt++;
+                const ready = !!(window.board2 && window.updateFileSectionHeader);
+                console.log('[sbLoadGameFromUrlParam] ping', attempt, 'ready =', ready,
+                    { board2: !!window.board2, updateFileSectionHeader: !!window.updateFileSectionHeader });
+                if (statusEl && !ready) statusEl.textContent = 'Waiting for board to finish loading… (' + attempt + ')';
+
+                if (ready) {
+                    clearInterval(timer);
+                    console.log('[sbLoadGameFromUrlParam] board ready, loading', gameId);
+                    sbLoadGameByIdAndSource(source, gameId);
+                } else if (attempt >= maxAttempts) {
+                    clearInterval(timer);
+                    console.warn('[sbLoadGameFromUrlParam] gave up after', attempt, 'attempts');
+                    if (statusEl) statusEl.textContent = 'Board never finished loading — could not auto-load game_id=' + gameId;
+                    log('Board never finished initializing — could not auto-load game_id=' + gameId, 'warning');
+                }
+            }, 100);
+        }
+        window.sbLoadGameFromUrlParam = sbLoadGameFromUrlParam; // callable from devtools for debugging
+        document.addEventListener('DOMContentLoaded', sbLoadGameFromUrlParam);
 
         // ---------------------------------------------------------------------
         // Multi-game AI report (web port of chess-rag/report.py via /api/game-report)
