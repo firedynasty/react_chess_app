@@ -808,7 +808,8 @@
                 <div style="background: #16213e; border: 1px solid #2a2a4e; border-radius: 10px; width: min(1100px, 100%); height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
                     <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #2a2a4e;">
                         <h3 id="sbReportTitle" style="margin: 0; flex: 1; color: #00d4ff; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Game Report</h3>
-                        <button onclick="sbCopyReport()" style="background: #0f3460; color: #eee; border: 1px solid #444; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Copy Markdown</button>
+                        <button id="sbCopySectionBtn" onclick="sbCopyReportSection()" title="Copy the section selected in the sidebar (with its game link)" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">Copy Selected</button>
+                        <button onclick="sbCopyReport()" title="Copy the whole report" style="background: #0f3460; color: #eee; border: 1px solid #444; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;">Copy All</button>
                         <button onclick="sbCloseReportModal()" title="Close (the report is kept)" style="background: transparent; color: #aaa; border: none; font-size: 20px; cursor: pointer; line-height: 1;">&times;</button>
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid #2a2a4e; font-size: 12px; color: #888;">
@@ -4582,12 +4583,16 @@
 
         // Production deep link for the Supabase game on the board (null if none).
         // &source= is appended only when the digits-only guess would be wrong.
+        function sbBuildGameLink(source, gameId) {
+            let url = 'https://react-chess-app-1.vercel.app/?game_id=' + encodeURIComponent(gameId);
+            if (sbInferSourceFromGameId(gameId) !== source) url += '&source=' + source;
+            return url;
+        }
+        window.sbBuildGameLink = sbBuildGameLink;
+
         function sbGetGameLink() {
             const g = window.supabaseLoadedGame;
-            if (!g) return null;
-            let url = 'https://react-chess-app-1.vercel.app/?game_id=' + encodeURIComponent(g.game_id);
-            if (sbInferSourceFromGameId(g.game_id) !== g.source) url += '&source=' + g.source;
-            return url;
+            return g ? sbBuildGameLink(g.source, g.game_id) : null;
         }
         window.sbGetGameLink = sbGetGameLink;
         window.sbLoadGameByIdAndSource = sbLoadGameByIdAndSource;
@@ -4790,9 +4795,49 @@
 
         function sbReportMarkdown(report) {
             return report.sections.filter(function (s) { return s.md; }).map(function (s) {
-                return '## ' + s.title + '\n\n' + s.md +
+                return '## ' + s.title + '\n\n' + sbDeepLinkify(s.md, report) +
                     (s.pgn ? '\n\n### PGN\n\n```pgn\n' + s.pgn.trim() + '\n```' : '');
             }).join('\n\n---\n\n');
+        }
+
+        // Swaps chess.com / Lichess game URLs in report text for this app's
+        // ?game_id= deep links. chess.com: any /game/live|daily/<digits> URL.
+        // Lichess: only IDs of games in the report (a bare lichess.org/<8 chars>
+        // pattern would also match /analysis and /training).
+        function sbDeepLinkify(md, report) {
+            if (!md) return md;
+            md = md.replace(/https?:\/\/(?:www\.)?chess\.com\/(?:game\/)?(?:live|daily)\/(?:game\/)?(\d+)\/?/gi, function (m, id) {
+                return sbBuildGameLink('chesscom', id);
+            });
+            const ids = {};
+            ((report && report.sections) || []).forEach(function (sec) {
+                if (sec.game && sec.game.source === 'lichess') ids[sec.game.game_id] = true;
+            });
+            return md.replace(/https?:\/\/(?:www\.)?lichess\.org\/([A-Za-z0-9]{8})(?:[A-Za-z0-9]{4})?(?:\/(?:white|black))?(?![A-Za-z0-9\/])/g, function (m, id) {
+                return ids[id] ? sbBuildGameLink('lichess', id) : m;
+            });
+        }
+
+        // Selected sidebar section as markdown: heading, body, then the game link
+        // (a comparison section lists every game's link instead).
+        function sbCopyReportSection() {
+            const report = window.sbCurrentReport;
+            if (!report) return;
+            const active = Math.min(window.sbReportActive, report.sections.length - 1);
+            const sec = report.sections[active];
+            if (!sec || !sec.md) return;
+            let text = '## ' + sec.title + '\n\n' + sbDeepLinkify(sec.md, report);
+            if (sec.game) {
+                text += '\n\nGame link: ' + sbBuildGameLink(sec.game.source, sec.game.game_id);
+            } else {
+                const links = report.sections.filter(function (x) { return x.game; }).map(function (x) {
+                    return '- ' + x.title + ': ' + sbBuildGameLink(x.game.source, x.game.game_id);
+                });
+                if (links.length) text += '\n\nGame links:\n' + links.join('\n');
+            }
+            navigator.clipboard.writeText(text).then(function () {
+                document.getElementById('sbReportProgress').textContent = 'Copied "' + sec.title + '".';
+            });
         }
 
         function sbCopyReport() {
@@ -4841,7 +4886,7 @@
                     '<span style="font-size: 12px; color: ' + (s.annotated ? '#28a745' : '#e67e22') + ';">' +
                     (s.pgn ? (s.annotated ? 'Stockfish-annotated PGN' : 'PGN has no engine evals') : 'PGN not fetched') + '</span></div>';
             }
-            html += s.md ? marked.parse(s.md) : '<p style="color: #888;"><em>Generating…</em></p>';
+            html += s.md ? marked.parse(sbDeepLinkify(s.md, report)) : '<p style="color: #888;"><em>Generating…</em></p>';
             if (s.pgn) {
                 html += '<hr style="border: none; border-top: 1px solid #2a2a4e; margin: 18px 0 12px;">' +
                     '<h3 style="color: #7ec8e3; font-size: 14px; margin: 0 0 8px;">PGN</h3>' +
