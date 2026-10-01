@@ -4571,13 +4571,20 @@
             return /^\d+$/.test(gameId) ? 'chesscom' : 'lichess';
         }
 
-        // Copies the production deep link for the Supabase game on the board.
+        // Production deep link for the Supabase game on the board (null if none).
         // &source= is appended only when the digits-only guess would be wrong.
-        function sbCopyGameLink() {
+        function sbGetGameLink() {
             const g = window.supabaseLoadedGame;
-            if (!g) return;
+            if (!g) return null;
             let url = 'https://react-chess-app-1.vercel.app/?game_id=' + encodeURIComponent(g.game_id);
             if (sbInferSourceFromGameId(g.game_id) !== g.source) url += '&source=' + g.source;
+            return url;
+        }
+        window.sbGetGameLink = sbGetGameLink;
+
+        function sbCopyGameLink() {
+            const url = sbGetGameLink();
+            if (!url) return;
             navigator.clipboard.writeText(url).then(() => showToast('Link copied: ' + url));
         }
 
@@ -13151,9 +13158,11 @@ ${contentToAnalyze}`;
                     alert('No messages to copy');
                     return;
                 }
-                const chatText = messages
+                let chatText = messages
                     .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
                     .join('\n\n');
+                const gameLink = window.sbGetGameLink && window.sbGetGameLink();
+                if (gameLink) chatText += '\n\nGame link: ' + gameLink;
                 try {
                     await navigator.clipboard.writeText(chatText);
                     alert('Chat copied to clipboard!');
