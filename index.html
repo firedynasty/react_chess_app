@@ -13268,7 +13268,16 @@ ${contentToAnalyze}`;
 
             return (
                 <div>
-                    <h2 style={{ color: '#00d4ff', marginTop: 0 }}>Chess Coach Chat</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                        <h2 style={{ color: '#00d4ff', margin: 0 }}>Chess Coach Chat</h2>
+                        <button
+                            title="Close Chess Coach Chat"
+                            onClick={() => window.closeChessCoachChatModal && window.closeChessCoachChatModal()}
+                            style={{ padding: '8px 14px', borderRadius: '6px', border: 'none', fontSize: '13px', fontWeight: 500, cursor: 'pointer', background: '#e91e63', color: 'white', whiteSpace: 'nowrap' }}
+                        >
+                            Exit Modal
+                        </button>
+                    </div>
 
                     {/* Navbar-style controls */}
                     <div style={styles.navbar}>
