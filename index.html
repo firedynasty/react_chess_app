@@ -795,6 +795,15 @@
             <div style="margin-top: 10px;">
                 <button id="sbCopyLinkBtn" onclick="sbCopyGameLink()" disabled title="Copy a deep link (?game_id=...) to the game currently loaded from Supabase" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Copy Game Link</button>
             </div>
+            <!-- Google Doc loader — sign in + Recent; picking a Doc loads its text into the coach-note source (window.textViewRawContent) so the ⭐ button works -->
+            <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                <button id="gnSignInBtn" onclick="gnSignIn()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">G Sign In</button>
+                <button id="gnRecentBtn" onclick="gnToggleRecentDropdown()" disabled title="Pick a recent Google Doc to load as coach analysis" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Recent ▾</button>
+                <span id="gnDocName" style="font-size: 12px; color: #888; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+                <span id="gnStatus" style="font-size: 12px; color: #888;"></span>
+            </div>
+            <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
+
             <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
                 <div style="background: #16213e; border: 1px solid #2a2a4e; border-radius: 10px; width: min(1100px, 100%); height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
                     <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #2a2a4e;">
@@ -4581,6 +4590,8 @@
             return url;
         }
         window.sbGetGameLink = sbGetGameLink;
+        window.sbLoadGameByIdAndSource = sbLoadGameByIdAndSource;
+        window.sbInferSourceFromGameId = sbInferSourceFromGameId;
 
         function sbCopyGameLink() {
             const url = sbGetGameLink();
@@ -14022,6 +14033,166 @@ ${contentToAnalyze}`;
             gdriveSetStatus('');
         };
 
+    })();
+    </script>
+
+    <!-- Google Doc loader — sign in, pick a recent Doc, load its text as the coach-note source -->
+    <script>
+    (function() {
+        var GN_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
+        var gnAccessToken = null;
+        var gnTokenClient = null;
+        var gnDismissListener = null;
+
+        function gnSetStatus(msg) {
+            var el = document.getElementById('gnStatus');
+            if (el) el.textContent = msg || '';
+        }
+
+        function gnInitClient() {
+            if (window.google && window.google.accounts) {
+                gnTokenClient = window.google.accounts.oauth2.initTokenClient({
+                    client_id: GN_CLIENT_ID,
+                    scope: 'https://www.googleapis.com/auth/drive.readonly',
+                    callback: function (resp) {
+                        if (resp.access_token) {
+                            gnAccessToken = resp.access_token;
+                            document.getElementById('gnSignInBtn').textContent = 'G Sign Out';
+                            document.getElementById('gnRecentBtn').disabled = false;
+                            gnSetStatus('Signed in to Google');
+                        } else {
+                            gnSetStatus('Google sign-in failed: ' + (resp.error || 'unknown error'));
+                        }
+                    }
+                });
+            } else {
+                setTimeout(gnInitClient, 100);
+            }
+        }
+        gnInitClient();
+
+        window.gnSignIn = function () {
+            if (gnAccessToken) {
+                try { window.google.accounts.oauth2.revoke(gnAccessToken); } catch (e) { }
+                gnAccessToken = null;
+                document.getElementById('gnSignInBtn').textContent = 'G Sign In';
+                document.getElementById('gnRecentBtn').disabled = true;
+                gnCloseRecentDropdown();
+                gnSetStatus('Signed out of Google');
+            } else if (gnTokenClient) {
+                gnTokenClient.requestAccessToken();
+            } else {
+                gnSetStatus('Google API not loaded yet. Try again.');
+            }
+        };
+
+        window.gnToggleRecentDropdown = function () {
+            var dropdown = document.getElementById('gnRecentDropdown');
+            if (!dropdown.hidden) { gnCloseRecentDropdown(); return; }
+            gnFetchRecentFiles();
+        };
+
+        function gnFetchRecentFiles() {
+            var btn = document.getElementById('gnRecentBtn');
+            btn.textContent = 'Loading…';
+            var q = encodeURIComponent("mimeType='application/vnd.google-apps.document' and trashed=false");
+            var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+                '&orderBy=viewedByMeTime+desc&pageSize=10&fields=files(id,name,viewedByMeTime)';
+            fetch(url, { headers: { Authorization: 'Bearer ' + gnAccessToken } })
+                .then(function (r) { return r.json(); })
+                .then(function (data) { gnOpenRecentDropdown(data.files || []); })
+                .catch(function (err) { gnSetStatus('Error fetching recent files: ' + err.message); })
+                .finally(function () { btn.textContent = 'Recent ▾'; });
+        }
+
+        function gnOpenRecentDropdown(files) {
+            var dropdown = document.getElementById('gnRecentDropdown');
+            dropdown.innerHTML = '';
+            var rect = document.getElementById('gnRecentBtn').getBoundingClientRect();
+            var left = Math.min(rect.left, window.innerWidth - 320 - 8);
+            dropdown.style.top = (rect.bottom + 4) + 'px';
+            dropdown.style.left = Math.max(8, left) + 'px';
+            if (files.length === 0) {
+                var empty = document.createElement('div');
+                empty.style.cssText = 'padding:8px 10px; font-size:12px; color:#94a3b8;';
+                empty.textContent = 'No recent Docs found';
+                dropdown.appendChild(empty);
+            } else {
+                files.forEach(function (f) {
+                    var item = document.createElement('button');
+                    item.type = 'button';
+                    item.textContent = f.name;
+                    item.style.cssText = 'display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:12px; cursor:pointer; word-break:break-word;';
+                    item.addEventListener('click', function () {
+                        gnCloseRecentDropdown();
+                        gnLoadDoc(f.id, f.name);
+                    });
+                    dropdown.appendChild(item);
+                });
+            }
+            dropdown.hidden = false;
+            if (!gnDismissListener) {
+                setTimeout(function () {
+                    gnDismissListener = function (e) {
+                        var dd = document.getElementById('gnRecentDropdown');
+                        var btn = document.getElementById('gnRecentBtn');
+                        if (dd && !dd.contains(e.target) && e.target !== btn) gnCloseRecentDropdown();
+                    };
+                    document.addEventListener('click', gnDismissListener);
+                }, 0);
+            }
+        }
+        function gnCloseRecentDropdown() {
+            var dropdown = document.getElementById('gnRecentDropdown');
+            dropdown.hidden = true;
+            if (gnDismissListener) {
+                document.removeEventListener('click', gnDismissListener);
+                gnDismissListener = null;
+            }
+        }
+
+        // Last ?game_id= URL in the text wins (a Doc may have several appended chats).
+        // Same source rule as the page's own ?game_id= param.
+        function gnFindGameLink(text) {
+            var matches = text.match(/https?:\/\/\S*?[?&]game_?id=[^\s&)]+(?:&source=\w+)?/gi);
+            if (!matches) return null;
+            try {
+                var u = new URL(matches[matches.length - 1]);
+                var gameId = u.searchParams.get('game_id') || u.searchParams.get('gameid') || u.searchParams.get('gameId');
+                if (!gameId) return null;
+                return { gameId: gameId, source: u.searchParams.get('source') || window.sbInferSourceFromGameId(gameId) };
+            } catch (e) { return null; }
+        }
+
+        // Exports the Doc as plain text and hands it to the coach-note parser
+        // (getCoachMoveNotes re-parses whenever window.textViewRawContent changes).
+        function gnLoadDoc(fileId, fileName) {
+            gnSetStatus('Loading "' + fileName + '"…');
+            fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=text/plain', {
+                headers: { Authorization: 'Bearer ' + gnAccessToken }
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.text();
+                })
+                .then(function (text) {
+                    // If the Doc carries a "Game link: ...?game_id=<id>" line (as written by
+                    // Copy Chat), load that game first — loading a game may reset the text
+                    // view, so the coach text is applied only after it finishes.
+                    var link = gnFindGameLink(text);
+                    var loading = link ? window.sbLoadGameByIdAndSource(link.source, link.gameId) : Promise.resolve();
+                    return loading.then(function () {
+                        window.textViewRawContent = text;
+                        window.textViewTitle = fileName;
+                        document.getElementById('gnDocName').textContent = '→ ' + fileName;
+                        if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+                        gnSetStatus('Loaded "' + fileName + '" as coach analysis' + (link ? ' + game ' + link.gameId : ''));
+                    });
+                })
+                .catch(function (err) {
+                    gnSetStatus('Load failed: ' + err.message);
+                });
+        }
     })();
     </script>
 
