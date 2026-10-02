@@ -1278,6 +1278,7 @@
             <button onclick="document.getElementById('board2PrevMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
+            <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
@@ -1300,7 +1301,7 @@
             <span id="board2VariationIndicator" style="font-weight: bold; color: #4a4a4a; font-family: monospace; white-space: nowrap;"></span>
             <button id="board2NextMove" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
           </div>
-          <span id="variation-depth-nav" title="Depth for Add Var." style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; background: #0f3460; border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 13px; font-weight: bold;">
+          <span id="variation-depth-nav" title="Depth for Add Var." hidden style="display: none; align-items: center; gap: 8px; padding: 6px 10px; background: #0f3460; border: 1px solid #00d4ff; border-radius: 6px; color: #00d4ff; font-size: 13px; font-weight: bold;">
                 <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav" value="12" onchange="setVariationDepth(this.value)">d12</label>
                 <label style="display: inline-flex; align-items: center; gap: 3px; cursor: pointer;"><input type="radio" name="variation-depth-nav" value="15" checked onchange="setVariationDepth(this.value)">d15</label>
             </span>
@@ -1704,8 +1705,9 @@
             // is optional — leading bullet, list number ("1." or "1)"), ** bold
             // (before or after the list number), and a "Move"/"move" word —
             // then "4... e5" (also "4… e5" or "4...e5") or "9. Qxd4".
-            // Require "Eval" on the line so body sentences starting with a bare move
-            // (e.g. "12. Nd2 helps to reinforce...") don't split an entry.
+            // Require "Eval" or an eval pair like "(-0.24 → -0.02)" on the line so body
+            // sentences starting with a bare move (e.g. "12. Nd2 helps to reinforce...")
+            // don't split an entry.
             var blackRe = /^\s*(?:[-*•]\s*)?(?:\*\*)?(?:\d+[\.)]\s*)?(?:\*\*)?(?:[Mm]ove:?\s+)?(\d+)\s*(?:\.\.\.|…)\s*([A-Za-z][A-Za-z0-9x=+#-]*)/;
             var whiteRe = /^\s*(?:[-*•]\s*)?(?:\*\*)?(?:\d+[\.)]\s*)?(?:\*\*)?(?:[Mm]ove:?\s+)?(\d+)\.\s+([A-Za-z][A-Za-z0-9x=+#-]*)/;
             var currentKey = null, currentSan = null, currentLabel = null, buf = [];
@@ -1720,7 +1722,7 @@
                 var m = line.match(blackRe);
                 var isBlack = true;
                 if (!m) { m = line.match(whiteRe); isBlack = false; }
-                if (m && /eval/i.test(line)) {
+                if (m && /eval|\(\s*[-+−]?\d+(?:\.\d+)?\s*(?:→|->|to)\s*[-+−]?\d/i.test(line)) {
                     flush();
                     var dots = isBlack ? '...' : '.';
                     currentKey = m[1] + dots;
@@ -4589,6 +4591,29 @@
             return url;
         }
         window.sbBuildGameLink = sbBuildGameLink;
+
+        // Opponent's username for the game on the board, from the PGN headers.
+        // "Me" = the account selected in #sbAccount, else any account in that
+        // list. Returns '' when it can't tell (no game, or neither player matches).
+        function sbGetOpponentName() {
+            const g = window.supabaseLoadedGame;
+            const hdr = g && g.headerBlock;
+            if (!hdr) return '';
+            const tag = function (n) { const m = hdr.match(new RegExp('\\[' + n + '\\s+"([^"]*)"\\]')); return m ? m[1] : ''; };
+            const white = tag('White'), black = tag('Black');
+            const sel = document.getElementById('sbAccount');
+            const mine = [];
+            try { mine.push(JSON.parse(sel.value).username.toLowerCase()); } catch (e) { }
+            Array.from(sel ? sel.options : []).forEach(function (o) {
+                try { mine.push(JSON.parse(o.value).username.toLowerCase()); } catch (e) { }
+            });
+            for (let i = 0; i < mine.length; i++) {
+                if (white.toLowerCase() === mine[i]) return black;
+                if (black.toLowerCase() === mine[i]) return white;
+            }
+            return '';
+        }
+        window.sbGetOpponentName = sbGetOpponentName;
 
         function sbGetGameLink() {
             const g = window.supabaseLoadedGame;
@@ -13208,17 +13233,46 @@ ${contentToAnalyze}`;
                 }
             };
 
+            // Chat transcript + the loaded game's deep link (shared by Copy Chat and Save as new Doc)
+            const buildChatText = () => {
+                let chatText = messages
+                    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+                    .join('\n\n');
+                const gameLink = window.sbGetGameLink && window.sbGetGameLink();
+                if (gameLink) chatText += '\n\nGame link: ' + gameLink;
+                return chatText;
+            };
+
+            // Save chat as a new Google Doc in Drive/Documents/notes/hobbies/chess/games
+            const [savingDoc, setSavingDoc] = useState(false);
+            const saveChatAsNewDoc = async () => {
+                if (messages.length === 0) {
+                    alert('No messages to save');
+                    return;
+                }
+                if (!window.gnSaveNewDoc) {
+                    alert('Google Drive saving is not available');
+                    return;
+                }
+                setSavingDoc(true);
+                try {
+                    const opp = window.sbGetOpponentName && window.sbGetOpponentName();
+                    const doc = await window.gnSaveNewDoc(buildChatText(), opp ? 'vs ' + opp : '');
+                    alert('Saved new Google Doc: ' + doc.name);
+                } catch (err) {
+                    alert('Save to Google Docs failed: ' + err.message);
+                } finally {
+                    setSavingDoc(false);
+                }
+            };
+
             // Copy chat
             const copyChat = async () => {
                 if (messages.length === 0) {
                     alert('No messages to copy');
                     return;
                 }
-                let chatText = messages
-                    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
-                    .join('\n\n');
-                const gameLink = window.sbGetGameLink && window.sbGetGameLink();
-                if (gameLink) chatText += '\n\nGame link: ' + gameLink;
+                const chatText = buildChatText();
                 try {
                     await navigator.clipboard.writeText(chatText);
                     alert('Chat copied to clipboard!');
@@ -13465,6 +13519,16 @@ ${contentToAnalyze}`;
                             style={{ ...styles.button, background: '#28a745', color: 'white' }}
                         >
                             Copy Chat
+                        </button>
+
+                        {/* Save as new Google Doc (named with date/time) */}
+                        <button
+                            onClick={saveChatAsNewDoc}
+                            disabled={savingDoc}
+                            title="Save this chat as a new Google Doc in Drive: Documents/notes/hobbies/chess/games"
+                            style={{ ...styles.button, background: '#6c5ce7', color: 'white', opacity: savingDoc ? 0.6 : 1 }}
+                        >
+                            {savingDoc ? 'Saving…' : 'Save as New Doc'}
                         </button>
 
                         {/* Clear Chat */}
@@ -14088,6 +14152,7 @@ ${contentToAnalyze}`;
         var gnAccessToken = null;
         var gnTokenClient = null;
         var gnDismissListener = null;
+        var gnAuthWaiters = []; // resolved when a token arrives (see gnEnsureSignedIn)
 
         function gnSetStatus(msg) {
             var el = document.getElementById('gnStatus');
@@ -14098,15 +14163,17 @@ ${contentToAnalyze}`;
             if (window.google && window.google.accounts) {
                 gnTokenClient = window.google.accounts.oauth2.initTokenClient({
                     client_id: GN_CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/drive.readonly',
+                    scope: 'https://www.googleapis.com/auth/drive', // read Docs for Recent + create new Docs in the chess/games folder
                     callback: function (resp) {
                         if (resp.access_token) {
                             gnAccessToken = resp.access_token;
                             document.getElementById('gnSignInBtn').textContent = 'G Sign Out';
                             document.getElementById('gnRecentBtn').disabled = false;
                             gnSetStatus('Signed in to Google');
+                            gnAuthWaiters.splice(0).forEach(function (w) { w.resolve(); });
                         } else {
                             gnSetStatus('Google sign-in failed: ' + (resp.error || 'unknown error'));
+                            gnAuthWaiters.splice(0).forEach(function (w) { w.reject(new Error('Google sign-in failed: ' + (resp.error || 'unknown error'))); });
                         }
                     }
                 });
@@ -14195,6 +14262,81 @@ ${contentToAnalyze}`;
                 gnDismissListener = null;
             }
         }
+
+        // ---- Save as a new Google Doc in My Drive/Documents/notes/hobbies/chess/games ----
+        var GN_SAVE_PATH = ['Documents', 'notes', 'hobbies', 'chess', 'games'];
+        var GN_SAVE_FOLDER_KEY = 'chessAnalysis:saveFolderId';
+
+        // Resolves once a token exists, prompting Google sign-in if needed (call from a click).
+        window.gnEnsureSignedIn = function () {
+            if (gnAccessToken) return Promise.resolve();
+            if (!gnTokenClient) return Promise.reject(new Error('Google API not loaded yet. Try again.'));
+            return new Promise(function (resolve, reject) {
+                gnAuthWaiters.push({ resolve: resolve, reject: reject });
+                gnTokenClient.requestAccessToken();
+            });
+        };
+
+        function gnDriveJson(url, opts) {
+            opts = opts || {};
+            opts.headers = Object.assign({ Authorization: 'Bearer ' + gnAccessToken }, opts.headers || {});
+            return fetch(url, opts).then(function (r) {
+                if (!r.ok) return r.json().catch(function () { return {}; }).then(function (e) {
+                    throw new Error((e.error && e.error.message) || ('HTTP ' + r.status));
+                });
+                return r.json();
+            });
+        }
+
+        // Walks the path by folder name from My Drive root; never creates folders.
+        function gnResolveSaveFolder() {
+            var cached = null;
+            try { cached = localStorage.getItem(GN_SAVE_FOLDER_KEY); } catch (e) { }
+            var verify = cached
+                ? gnDriveJson('https://www.googleapis.com/drive/v3/files/' + cached + '?fields=id,trashed')
+                    .then(function (f) { return f.trashed ? null : f.id; }).catch(function () { return null; })
+                : Promise.resolve(null);
+            return verify.then(function (id) {
+                if (id) return id;
+                return GN_SAVE_PATH.reduce(function (chain, name) {
+                    return chain.then(function (parentId) {
+                        var q = "'" + parentId + "' in parents and name='" + name.replace(/'/g, "\\'") +
+                            "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+                        return gnDriveJson('https://www.googleapis.com/drive/v3/files?fields=files(id,name)&q=' + encodeURIComponent(q))
+                            .then(function (data) {
+                                if (!data.files || !data.files.length) throw new Error('Folder not found in Drive: ' + GN_SAVE_PATH.join('/') + ' (missing "' + name + '")');
+                                return data.files[0].id;
+                            });
+                    });
+                }, Promise.resolve('root')).then(function (folderId) {
+                    try { localStorage.setItem(GN_SAVE_FOLDER_KEY, folderId); } catch (e) { }
+                    return folderId;
+                });
+            });
+        }
+
+        // Creates a new Google Doc named "<date time> <label>" from plain text.
+        // Resolves to { id, name, url }.
+        window.gnSaveNewDoc = function (text, label) {
+            var d = new Date();
+            function p2(n) { return (n < 10 ? '0' : '') + n; }
+            var stamp = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + '.' + p2(d.getMinutes());
+            var name = (stamp + ' ' + (label || 'chess coach chat')).replace(/[\/\\\0]/g, '-').trim();
+            return window.gnEnsureSignedIn()
+                .then(gnResolveSaveFolder)
+                .then(function (folderId) {
+                    var boundary = 'gnboundary' + Date.now();
+                    var meta = { name: name, mimeType: 'application/vnd.google-apps.document', parents: [folderId] };
+                    var body = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
+                        '\r\n--' + boundary + '\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n' + text + '\r\n--' + boundary + '--';
+                    return gnDriveJson('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
+                        body: body
+                    });
+                })
+                .then(function (f) { return { id: f.id, name: f.name, url: f.webViewLink }; });
+        };
 
         // Last ?game_id= URL in the text wins (a Doc may have several appended chats).
         // Same source rule as the page's own ?game_id= param.
