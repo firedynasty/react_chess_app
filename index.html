@@ -802,6 +802,14 @@
                 <span id="gnDocName" style="font-size: 12px; color: #888; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
                 <span id="gnStatus" style="font-size: 12px; color: #888;"></span>
             </div>
+            <!-- Append row: shown once a Doc is loaded via Recent ▾; notes go to the END of that Doc -->
+            <div id="gnAppendRow" hidden style="margin-top: 8px;">
+                <textarea id="gnNoteInput" placeholder="Note to append to the loaded Doc… (the game label and a separator line are added automatically)" style="width: 100%; height: 60px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; padding: 10px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; resize: vertical;"></textarea>
+                <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                    <button id="gnInsertMoveBtn" onclick="gnInsertMoveRef()" title="Insert the current move (e.g. **11... Nh5** — ) into the note at the cursor" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">+ Move</button>
+                    <button id="gnAppendBtn" onclick="gnAppendNote()" title="Append the note to the end of the loaded Google Doc" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Append Note to Doc</button>
+                </div>
+            </div>
             <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
 
             <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
@@ -1278,6 +1286,7 @@
             <button onclick="document.getElementById('board2PrevMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
+            <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) cycleVariationStepOut();" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
             <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
@@ -1696,10 +1705,12 @@
             var map = {};
             if (!markdown) return map;
             var startMatch = markdown.match(/^#{1,4}\s*Why the Bad Moves Were Bad.*$/im);
-            if (!startMatch) return map;
-            var rest = markdown.slice(startMatch.index + startMatch[0].length);
-            var endMatch = rest.match(/^#{1,4}\s/m);
-            var section = endMatch ? rest.slice(0, endMatch.index) : rest;
+            var section = '';
+            if (startMatch) {
+                var rest = markdown.slice(startMatch.index + startMatch[0].length);
+                var endMatch = rest.match(/^#{1,4}\s/m);
+                section = endMatch ? rest.slice(0, endMatch.index) : rest;
+            }
 
             // Entry header: the AI's format varies run to run, so every decoration
             // is optional — leading bullet, list number ("1." or "1)"), ** bold
@@ -1734,6 +1745,43 @@
                 }
             });
             flush();
+
+            // Second pass — standalone bold-move header lines ANYWHERE in the doc.
+            // "Append Move Note" / "+ Move" write these below the report (outside the
+            // section above), e.g. "**20. Rf5?**" or "**20. Rf5** — my note" on a line
+            // that starts with the bold move. Only a leading bold move qualifies, so
+            // section entries ("1. **3. Bd3 ...**") and body text never match.
+            // Existing keys (from the main section) always win.
+            var soloRe = /^\s*\*\*(\d+)(\.\.\.|\.)\s+([A-Za-z][A-Za-z0-9x=+#-]*)[?!]{0,2}\*\*(?:\s*\([^()]*\))?(?:\s*[—:–-].*)?$/;
+            var cur2 = null, san2 = null, label2 = null, buf2 = [];
+            function flush2() {
+                if (cur2 && buf2.length && !map[cur2]) {
+                    map[cur2] = { label: label2, san: san2, text: buf2.join('\n').trim() };
+                }
+            }
+            markdown.split('\n').forEach(function(line) {
+                var sm = line.match(soloRe);
+                if (sm) {
+                    flush2();
+                    cur2 = sm[1] + sm[2];
+                    san2 = sm[3];
+                    label2 = sm[1] + sm[2] + ' ' + sm[3];
+                    buf2 = [line];
+                } else if (cur2 && (/^#{1,4}\s/.test(line) || /^\s*-{5,}\s*$/.test(line))) {
+                    // A separator right after the header ("**20. Rf5** — \n-----\n<body>")
+                    // is decorative — skip it and keep collecting the note body.
+                    var bodyStarted = buf2.slice(1).some(function (l) { return l.trim(); });
+                    if (/^\s*-{5,}\s*$/.test(line) && !bodyStarted) {
+                        // skip the separator line, stay in the entry
+                    } else {
+                        flush2(); // a new heading or separator line ends the appended note
+                        cur2 = null; san2 = null; label2 = null; buf2 = [];
+                    }
+                } else if (cur2) {
+                    buf2.push(line);
+                }
+            });
+            flush2();
             return map;
         }
 
@@ -7963,15 +8011,10 @@
                 }
             }
 
-            // Reduce board opacity when viewing a variation
+            // Being inside a variation used to dim the board (opacity 0.75); now
+            // the variation glow below marks it, so the board stays full strength.
             const boardContainer = document.getElementById('myBoard2');
-            if (boardContainer) {
-                if (currentEl && currentEl.classList.contains('variation-move')) {
-                    boardContainer.style.opacity = '0.75';
-                } else {
-                    boardContainer.style.opacity = '1';
-                }
-            }
+            if (boardContainer) boardContainer.style.opacity = '1';
 
             // Update other displays
             updateMaterialDisplay(node.fen);
@@ -8019,19 +8062,19 @@
                     indicator.style.color = '#eee';
                 }
 
-                // Apply annotation colors (overrides variation gray)
-                if (node.annotation) {
-                    if (node.annotation.includes('??')) {
-                        indicator.style.background = '#ff4444'; // Blunder - bright red
-                        indicator.style.color = '#1a1a2e';
-                    } else if (node.annotation.includes('?') && !node.annotation.includes('!?')) {
-                        indicator.style.background = '#ff69b4'; // Mistake - hot pink
-                        indicator.style.color = '#1a1a2e';
-                    } else if (node.annotation.includes('?!')) {
-                        indicator.style.background = '#ffd700'; // Dubious - yellow
-                        indicator.style.color = '#1a1a2e';
-                    }
+                // Apply annotation colors (overrides variation gray) — to the move
+                // indicator AND the board border, so the board itself shows the
+                // move's quality while variations use a box-shadow instead.
+                const boardBorderColor = node.annotation
+                    ? (node.annotation.includes('??') ? '#ff4444'
+                        : (node.annotation.includes('?') && !node.annotation.includes('!?')) ? '#ff69b4'
+                        : node.annotation.includes('?!') ? '#ffd700' : null)
+                    : null;
+                if (boardBorderColor) {
+                    indicator.style.background = boardBorderColor;
+                    indicator.style.color = '#1a1a2e';
                 }
+                if (boardContainer) boardContainer.style.border = boardBorderColor ? '4px solid ' + boardBorderColor : 'none';
                 // Sync mini indicator
                 const miniInd = document.getElementById('board2MoveIndicatorMini');
                 if (miniInd) {
@@ -8072,15 +8115,21 @@
             const nextBtn = document.getElementById('board2NextMove');
             if (varIndicator) {
                 const hasSiblingVariations = node.parent && node.parent.children && node.parent.children.length > 1;
-                if (hasSiblingVariations) {
+                const isInVariation = currentEl && currentEl.classList.contains('variation-move');
+                if (hasSiblingVariations || isInVariation) {
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
-                    if (boardContainer) boardContainer.style.border = '4px solid #ffd700';
-                    drawVariationArrows(node);
+                    // Gray glow while viewing a variation line (including its first
+                    // move — the branch node is the main-line move before it);
+                    // yellow only on a main-line move that branches.
+                    if (boardContainer) boardContainer.style.boxShadow = isInVariation
+                        ? '0 0 10px 3px rgba(170, 170, 170, 0.7)'
+                        : '0 0 10px 3px rgba(255, 215, 0, 0.7)';
+                    if (hasSiblingVariations) drawVariationArrows(node); else clearBoard2Arrows();
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
-                    if (boardContainer) boardContainer.style.border = 'none';
+                    if (boardContainer) boardContainer.style.boxShadow = 'none';
                     clearBoard2Arrows();
                 }
             }
@@ -8391,6 +8440,7 @@
             if (boardContainer) {
                 boardContainer.style.opacity = '1';
                 boardContainer.style.border = 'none';
+                boardContainer.style.boxShadow = 'none';
             }
 
             // Clear variation arrows and move highlights
@@ -8446,11 +8496,11 @@
                 if (window.moveTree.children && window.moveTree.children.length > 1) {
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
-                    if (boardContainer) boardContainer.style.border = '4px solid #ffd700';
+                    if (boardContainer) boardContainer.style.boxShadow = '0 0 10px 3px rgba(255, 215, 0, 0.7)';
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
-                    if (boardContainer) boardContainer.style.border = 'none';
+                    if (boardContainer) boardContainer.style.boxShadow = 'none';
                 }
             }
         }
@@ -8588,19 +8638,19 @@
                 }
             }
 
-            // Apply annotation colors (same as moveContainer)
-            if (annotation) {
-                if (annotation.includes('??')) {
-                    indicator.style.background = '#ff4444'; // Blunder - bright red
-                    indicator.style.color = '#1a1a2e';
-                } else if (annotation.includes('?') && !annotation.includes('!?')) {
-                    indicator.style.background = '#ff69b4'; // Mistake - hot pink
-                    indicator.style.color = '#1a1a2e';
-                } else if (annotation.includes('?!')) {
-                    indicator.style.background = '#ffd700'; // Dubious - yellow
-                    indicator.style.color = '#1a1a2e';
-                }
+            // Apply annotation colors (same as moveContainer) — to the indicator
+            // and the board border (variations use the board's box-shadow instead).
+            const srBorderColor = annotation
+                ? (annotation.includes('??') ? '#ff4444'
+                    : (annotation.includes('?') && !annotation.includes('!?')) ? '#ff69b4'
+                    : annotation.includes('?!') ? '#ffd700' : null)
+                : null;
+            if (srBorderColor) {
+                indicator.style.background = srBorderColor;
+                indicator.style.color = '#1a1a2e';
             }
+            const srBoard = document.getElementById('myBoard2');
+            if (srBoard) srBoard.style.border = srBorderColor ? '4px solid ' + srBorderColor : 'none';
 
             // Sync mini indicator
             const miniIndicator = document.getElementById('board2MoveIndicatorMini');
@@ -11354,11 +11404,13 @@
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
                 } else if (e.key === 'ArrowUp') {
-                    // ArrowUp = Cycle Var (same as Cycle Var. button)
-                    cycleVariationStepOut();
+                    // ArrowUp = exit the variation from ANY move in it, back to the
+                    // main-line move it branched from. On the main line (nothing to
+                    // exit) it falls back to Cycle Var., which enters the variation.
+                    if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
                     e.preventDefault();
-                } else if (e.key === 'Tab' || (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey)) {
-                    // Tab or / = same as Cycle Var.: enter the variation, step through its
+                } else if (e.key === 'Tab') {
+                    // Tab = same as Cycle Var.: enter the variation, step through its
                     // moves, then return to the main-line move it branched from.
                     // If neither applies (no variation exists), Tab adds a variation
                     // (same as the Add Var. button; Escape removes one).
@@ -11372,6 +11424,9 @@
                         }
                         e.preventDefault();
                     }
+                } else if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // / = Cycle Var. only — never triggers Stockfish Add Var.
+                    if (cycleVariationStepOut()) e.preventDefault();
                 } else if (e.key === 'Enter') {
                     // Enter = open the coach note for the current move (gold star only).
                     // Always preventDefault so Enter never activates the focused
@@ -12562,12 +12617,15 @@ End with a Socratic question about a specific position to help me learn.`
                 }
             }, [messages]);
 
-            // Sync latest coach report into the Text View modal (View Text button)
+            // Sync latest FULL-GAME coach report into the Text View modal (View Text
+            // button). Only a report with the per-move section ("Why the Bad Moves
+            // Were Bad") may replace window.textViewRawContent — a single-move
+            // "Ask Coach" answer must NOT wipe coach notes loaded from a Google Doc.
             useEffect(() => {
                 const lastAssistant = [...messages].reverse().find(
                     m => m.role === 'assistant' && !m.content.startsWith('Error:')
                 );
-                if (lastAssistant) {
+                if (lastAssistant && /^#{1,4}\s*Why the Bad Moves Were Bad/im.test(lastAssistant.content)) {
                     window.textViewRawContent = lastAssistant.content;
                     window.textViewTitle = 'AI Coach Analysis';
                     if (window.updateCoachNoteButton) window.updateCoachNoteButton();
@@ -12943,14 +13001,6 @@ ${contentToAnalyze}`;
                     setMessages(prev => [...prev, { role: 'assistant', content: data.content }]);
                     setChatEnabled(true);
                     setLastCoachQuery(query);  // save for "Reanalyze with Higher Model"
-
-                    // Push response into chatNotesPanel near the board
-                    const chatNotesContent = document.getElementById('chatNotesContent');
-                    const chatNotesPanel = document.getElementById('chatNotesPanel');
-                    if (chatNotesContent && chatNotesPanel) {
-                        chatNotesContent.innerHTML = marked.parse(data.content);
-                        chatNotesPanel.style.display = 'block';
-                    }
                 } catch (err) {
                     setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
                 } finally {
@@ -12992,13 +13042,6 @@ ${contentToAnalyze}`;
                         { role: 'assistant', content: data.content }
                     ]);
                     setChatEnabled(true);
-
-                    const chatNotesContent = document.getElementById('chatNotesContent');
-                    const chatNotesPanel = document.getElementById('chatNotesPanel');
-                    if (chatNotesContent && chatNotesPanel) {
-                        chatNotesContent.innerHTML = marked.parse(data.content);
-                        chatNotesPanel.style.display = 'block';
-                    }
                 } catch (err) {
                     setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
                 } finally {
@@ -13199,21 +13242,6 @@ ${contentToAnalyze}`;
                     if (data.error) throw new Error(data.error);
 
                     setMessages([...newMessages, { role: 'assistant', content: data.content }]);
-
-                    // Append the follow-up Q&A to chatNotesPanel near the board
-                    const chatNotesContent = document.getElementById('chatNotesContent');
-                    const chatNotesPanel = document.getElementById('chatNotesPanel');
-                    if (chatNotesContent && chatNotesPanel) {
-                        const followUp = document.createElement('div');
-                        followUp.style.borderTop = '1px solid #444';
-                        followUp.style.marginTop = '12px';
-                        followUp.style.paddingTop = '10px';
-                        followUp.innerHTML =
-                            `<p style="color:#00d4ff;font-weight:600;margin:0 0 6px;">You: ${userMessage.content.replace(/</g, '&lt;')}</p>` +
-                            marked.parse(data.content);
-                        chatNotesContent.appendChild(followUp);
-                        chatNotesPanel.style.display = 'block';
-                    }
                 } catch (error) {
                     console.error('Error:', error);
                     setMessages([...newMessages, {
@@ -13263,6 +13291,67 @@ ${contentToAnalyze}`;
                     alert('Save to Google Docs failed: ' + err.message);
                 } finally {
                     setSavingDoc(false);
+                }
+            };
+
+            // Append chat to the end of the Google Doc loaded via Recent ▾
+            const [appendingDoc, setAppendingDoc] = useState(false);
+            const appendChatToLoadedDoc = async () => {
+                if (messages.length === 0) {
+                    alert('No messages to save');
+                    return;
+                }
+                if (!window.gnAppendToLoadedDoc) {
+                    alert('Google Drive saving is not available');
+                    return;
+                }
+                setAppendingDoc(true);
+                try {
+                    const doc = await window.gnAppendToLoadedDoc(buildChatText());
+                    alert('Appended chat to: ' + doc.name);
+                } catch (err) {
+                    alert('Append failed: ' + err.message);
+                } finally {
+                    setAppendingDoc(false);
+                }
+            };
+
+            // Append just the last Ask-Coach Q&A (the selected move's analysis) to the loaded Doc
+            const [appendingNote, setAppendingNote] = useState(false);
+            const appendMoveNoteToDoc = async () => {
+                // Walk back to the last assistant answer and the user question before it
+                let i = messages.length - 1;
+                while (i >= 0 && messages[i].role !== 'assistant') i--;
+                if (i < 0) {
+                    alert('No coach answer to save yet — ask about a move first');
+                    return;
+                }
+                let j = i - 1;
+                while (j >= 0 && messages[j].role !== 'user') j--;
+                const pair = j >= 0 ? [messages[j], messages[i]] : [messages[i]];
+                // Header the ⭐ parser can find after the Doc is reloaded: the first
+                // bold move in the Q&A (e.g. **20. Rf5?**) on its own line.
+                const moveM = pair.map(msg => msg.content).join('\n')
+                    .match(/\*\*(\d+(?:\.\.\.|\.)\s*[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2})\*\*/);
+                let text = '-----------------------------';
+                if (moveM) text += '\n**' + moveM[1] + '**\n';
+                text += '\n' + pair
+                    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+                    .join('\n\n');
+                const gameLink = window.sbGetGameLink && window.sbGetGameLink();
+                if (gameLink) text += '\n\nGame link: ' + gameLink;
+                if (!window.gnAppendToLoadedDoc) {
+                    alert('Google Drive saving is not available');
+                    return;
+                }
+                setAppendingNote(true);
+                try {
+                    const doc = await window.gnAppendToLoadedDoc(text);
+                    alert('Appended move note to: ' + doc.name);
+                } catch (err) {
+                    alert('Append failed: ' + err.message);
+                } finally {
+                    setAppendingNote(false);
                 }
             };
 
@@ -13529,6 +13618,26 @@ ${contentToAnalyze}`;
                             style={{ ...styles.button, background: '#6c5ce7', color: 'white', opacity: savingDoc ? 0.6 : 1 }}
                         >
                             {savingDoc ? 'Saving…' : 'Save as New Doc'}
+                        </button>
+
+                        {/* Append chat to the end of the Doc loaded via Recent ▾ */}
+                        <button
+                            onClick={appendChatToLoadedDoc}
+                            disabled={appendingDoc}
+                            title="Append this chat to the end of the Google Doc loaded via Recent ▾"
+                            style={{ ...styles.button, background: '#5a4bd1', color: 'white', opacity: appendingDoc ? 0.6 : 1 }}
+                        >
+                            {appendingDoc ? 'Appending…' : 'Append to Doc'}
+                        </button>
+
+                        {/* Append only the last Ask-Coach Q&A (the selected move) to the loaded Doc */}
+                        <button
+                            onClick={appendMoveNoteToDoc}
+                            disabled={appendingNote}
+                            title="Append the last Ask-Coach question + answer (for the selected move) to the end of the Google Doc loaded via Recent ▾"
+                            style={{ ...styles.button, background: '#e91e63', color: 'white', opacity: appendingNote ? 0.6 : 1 }}
+                        >
+                            {appendingNote ? 'Appending…' : 'Append Move Note'}
                         </button>
 
                         {/* Clear Chat */}
@@ -14153,6 +14262,7 @@ ${contentToAnalyze}`;
         var gnTokenClient = null;
         var gnDismissListener = null;
         var gnAuthWaiters = []; // resolved when a token arrives (see gnEnsureSignedIn)
+        var gnLoadedDoc = null; // { id, name } — the Doc loaded via Recent ▾; notes append to its end
 
         function gnSetStatus(msg) {
             var el = document.getElementById('gnStatus');
@@ -14371,7 +14481,9 @@ ${contentToAnalyze}`;
                     return loading.then(function () {
                         window.textViewRawContent = text;
                         window.textViewTitle = fileName;
+                        gnLoadedDoc = { id: fileId, name: fileName };
                         document.getElementById('gnDocName').textContent = '→ ' + fileName;
+                        document.getElementById('gnAppendRow').hidden = false;
                         if (window.updateCoachNoteButton) window.updateCoachNoteButton();
                         gnSetStatus('Loaded "' + fileName + '" as coach analysis' + (link ? ' + game ' + link.gameId : ''));
                     });
@@ -14380,6 +14492,91 @@ ${contentToAnalyze}`;
                     gnSetStatus('Load failed: ' + err.message);
                 });
         }
+
+        // ---- Append text to the currently LOADED Doc ----
+
+        window.gnGetLoadedDoc = function () { return gnLoadedDoc; };
+
+        // Inserts text at the END of the loaded Doc — never touches or replaces
+        // whatever's already in the doc. Resolves to gnLoadedDoc. Rejects when
+        // no Doc has been loaded via Recent ▾.
+        window.gnAppendToLoadedDoc = function (text) {
+            if (!gnLoadedDoc) return Promise.reject(new Error('Load a Google Doc first (Recent ▾)'));
+            return window.gnEnsureSignedIn()
+                .then(function () {
+                    return gnDriveJson('https://docs.googleapis.com/v1/documents/' + gnLoadedDoc.id);
+                })
+                .then(function (doc) {
+                    var endIndex = doc.body.content[doc.body.content.length - 1].endIndex;
+                    var normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                    var insertAt = Math.max(1, endIndex - 1);
+                    var toInsert = (endIndex > 2 ? '\n\n' : '') + normalized;
+                    return gnDriveJson('https://docs.googleapis.com/v1/documents/' + gnLoadedDoc.id + ':batchUpdate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requests: [{ insertText: { location: { index: insertAt }, text: toInsert } }] })
+                    });
+                })
+                .then(function () { return gnLoadedDoc; });
+        };
+
+        // Current board move as "11... Nh5" / "4. f4", or '' at the root.
+        function gnCurrentMoveLabel() {
+            var node = window.currentMoveNode;
+            if (!node || node.nodeId === 'root') return '';
+            return node.moveNumber + (node.isBlackMove ? '...' : '.') + ' ' + (node.san || '');
+        }
+
+        // + Move button: the header goes at the TOP of the note (first line), not
+        // at the cursor — existing text stays below it. If the first line is
+        // already a bare + Move header ("**20. Rf5** — " with nothing typed yet),
+        // it is replaced, so re-clicking after navigating swaps the move instead
+        // of stacking headers.
+        window.gnInsertMoveRef = function () {
+            var input = document.getElementById('gnNoteInput');
+            var label = gnCurrentMoveLabel();
+            if (!label) { gnSetStatus('No move on the board to reference'); return; }
+            var header = '**' + label + '** — ';
+            var bareTop = /^\s*\*\*\d+(?:\.\.\.|\.)\s+[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*\s*[—:–-]?\s*(\n|$)/;
+            var m = input.value.match(bareTop);
+            if (m) {
+                input.value = header + input.value.slice(m[0].length - (m[1] === '\n' ? 1 : 0));
+            } else {
+                input.value = header + (input.value.trim() ? '\n' : '') + input.value;
+            }
+            input.focus();
+            input.selectionStart = input.selectionEnd = header.length; // right after "— "
+        };
+
+        // Append Note button: "-----------------------------\n<game label>\n\n<typed note>".
+        window.gnAppendNote = function () {
+            var input = document.getElementById('gnNoteInput');
+            var text = input.value.trim();
+            if (!text) { gnSetStatus('Type a note first'); return; }
+            // The note needs a + Move header line ("**20. Rf5** — ...") or the ⭐
+            // won't recognize it when the Doc is reloaded.
+            if (!/^\s*\*\*\d+(?:\.\.\.|\.)\s+[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*/m.test(text)) {
+                gnSetStatus('Click + Move first to tag the move for ⭐');
+                alert('Click "+ Move" first to add the move you want this note to show in ⭐.');
+                return;
+            }
+            var game = window.supabaseLoadedGame;
+            var noteText = '-----------------------------\n' + ((game && game.label) || 'Untitled game') + '\n\n' + text;
+            var btn = document.getElementById('gnAppendBtn');
+            btn.disabled = true;
+            gnSetStatus('Appending…');
+            window.gnAppendToLoadedDoc(noteText)
+                .then(function (doc) {
+                    input.value = '';
+                    gnSetStatus('Appended to "' + doc.name + '"');
+                })
+                .catch(function (err) {
+                    gnSetStatus('Append failed: ' + err.message);
+                })
+                .finally(function () {
+                    btn.disabled = false;
+                });
+        };
     })();
     </script>
 
@@ -14970,9 +15167,10 @@ ${contentToAnalyze}`;
             }
         }
 
-        // Save and clear the yellow variation border
+        // Save and clear the annotation border / variation glow
         var savedBorder = boardContainer ? boardContainer.style.border : '';
-        if (boardContainer) boardContainer.style.border = 'none';
+        var savedShadow = boardContainer ? boardContainer.style.boxShadow : '';
+        if (boardContainer) { boardContainer.style.border = 'none'; boardContainer.style.boxShadow = 'none'; }
 
         // Save and reset board opacity
         var savedOpacity = boardContainer ? boardContainer.style.opacity : '1';
@@ -15061,6 +15259,7 @@ ${contentToAnalyze}`;
         // Restore original state
         if (boardContainer) {
             boardContainer.style.border = savedBorder;
+            boardContainer.style.boxShadow = savedShadow;
             boardContainer.style.opacity = savedOpacity;
         }
         window.board2.position(positions[savedIndex], false);
