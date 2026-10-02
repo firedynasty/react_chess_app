@@ -807,6 +807,7 @@
                 <textarea id="gnNoteInput" placeholder="Note to append to the loaded Doc… (the game label and a separator line are added automatically)" style="width: 100%; height: 60px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; padding: 10px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; resize: vertical;"></textarea>
                 <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                     <button id="gnInsertMoveBtn" onclick="gnInsertMoveRef()" title="Insert the current move (e.g. **11... Nh5** — ) into the note at the cursor" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">+ Move</button>
+                    <button id="gnBulletizeBtn" onclick="gnBulletizeNote()" title="Reformat the note into '- ' bullet lines, 2 sentences each (headings, bullets, numbered lines and chess move dots are preserved)" style="background: #6c5ce7; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">• Bullets</button>
                     <button id="gnAppendBtn" onclick="gnAppendNote()" title="Append the note to the end of the loaded Google Doc" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Append Note to Doc</button>
                 </div>
             </div>
@@ -1754,7 +1755,7 @@
             // the section pass above skips — are still picked up. Body text never matches
             // (it doesn't start with the bold move). Existing keys (from the main
             // section) always win.
-            var soloRe = /^\s*(?:\d+[\.)]\s*)?\*\*(\d+)(\.\.\.|\.)\s+([A-Za-z][A-Za-z0-9x=+#-]*)[?!]{0,2}\*\*(?:\s*\([^()]*\))?(?:\s*[—:–-].*)?\s*$/;
+            var soloRe = /^\s*(?:\d+[\.)]\s*)?\*\*(\d+)(\.\.\.|\.)\s*([A-Za-z][A-Za-z0-9x=+#-]*)[?!]{0,2}\*\*(?:\s*\([^()]*\))?(?:\s*[—:–-].*)?\s*$/;
             var cur2 = null, san2 = null, label2 = null, buf2 = [];
             function flush2() {
                 if (cur2 && buf2.length && !map[cur2]) {
@@ -13299,28 +13300,6 @@ ${contentToAnalyze}`;
                 }
             };
 
-            // Append chat to the end of the Google Doc loaded via Recent ▾
-            const [appendingDoc, setAppendingDoc] = useState(false);
-            const appendChatToLoadedDoc = async () => {
-                if (messages.length === 0) {
-                    alert('No messages to save');
-                    return;
-                }
-                if (!window.gnAppendToLoadedDoc) {
-                    alert('Google Drive saving is not available');
-                    return;
-                }
-                setAppendingDoc(true);
-                try {
-                    const doc = await window.gnAppendToLoadedDoc(buildChatText());
-                    alert('Appended chat to: ' + doc.name);
-                } catch (err) {
-                    alert('Append failed: ' + err.message);
-                } finally {
-                    setAppendingDoc(false);
-                }
-            };
-
             // Append just the last Ask-Coach Q&A (the selected move's analysis) to the loaded Doc
             const [appendingNote, setAppendingNote] = useState(false);
             const appendMoveNoteToDoc = async () => {
@@ -13341,7 +13320,9 @@ ${contentToAnalyze}`;
                 let text = '-----------------------------';
                 if (moveM) text += '\n**' + moveM[1] + '**\n';
                 text += '\n' + pair
-                    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
+                    .map(msg => msg.role === 'user'
+                        ? 'User: ' + msg.content
+                        : 'Assistant:\n' + (window.gnBulletizeText ? window.gnBulletizeText(msg.content) : msg.content))
                     .join('\n\n');
                 const gameLink = window.sbGetGameLink && window.sbGetGameLink();
                 if (gameLink) text += '\n\nGame link: ' + gameLink;
@@ -13623,16 +13604,6 @@ ${contentToAnalyze}`;
                             style={{ ...styles.button, background: '#6c5ce7', color: 'white', opacity: savingDoc ? 0.6 : 1 }}
                         >
                             {savingDoc ? 'Saving…' : 'Save as New Doc'}
-                        </button>
-
-                        {/* Append chat to the end of the Doc loaded via Recent ▾ */}
-                        <button
-                            onClick={appendChatToLoadedDoc}
-                            disabled={appendingDoc}
-                            title="Append this chat to the end of the Google Doc loaded via Recent ▾"
-                            style={{ ...styles.button, background: '#5a4bd1', color: 'white', opacity: appendingDoc ? 0.6 : 1 }}
-                        >
-                            {appendingDoc ? 'Appending…' : 'Append to Doc'}
                         </button>
 
                         {/* Append only the last Ask-Coach Q&A (the selected move) to the loaded Doc */}
@@ -14532,6 +14503,68 @@ ${contentToAnalyze}`;
             return node.moveNumber + (node.isBlackMove ? '...' : '.') + ' ' + (node.san || '');
         }
 
+        // Bulletize: regroup plain-text paragraphs into "- " bullet lines, a
+        // couple of sentences each (like the parse_* helper pages, but in place).
+        // Chess move numbers are shielded before sentence splitting so "20. Rf5"
+        // and "20... Rde8" don't break apart; decimals like 1.05 have no space
+        // after the dot so the lazy sentence match already skips them. Lines
+        // that are already structured — headings, bullets, **move** headers,
+        // code/FEN lines, separators — pass through untouched; numbered
+        // outline lines ("1. **Material…**:") become "- " bullets.
+        window.gnBulletizeText = function (text, perBullet) {
+            if (!text) return text;
+            var group = perBullet || 2;
+            var SH = '\u0001';
+            function shield(s) {
+                return s
+                    .replace(/(\d+)\.\.\./g, '$1' + SH + SH + SH)
+                    .replace(/(\d+)\.\s+(?=[KQRBN][a-h1-8x=+#]|[a-h][1-8x=+#])/g, '$1' + SH + ' ');
+            }
+            function unshield(s) { return s.split(SH).join('.'); }
+            function splitSentences(s) {
+                var m = shield(s).match(/.*?[.!?]+["')\]]*(?=\s|$)|.+$/g);
+                return (m || []).map(function (x) { return unshield(x.trim()); }).filter(Boolean);
+            }
+            function isStructural(line) {
+                return /^\s*(?:[-*•]\s+|#{1,6}\s|\*\*\d+(?:\.\.\.|\.)\s|`|-{5,}\s*$)/.test(line);
+            }
+            var out = [], para = [];
+            function flush() {
+                if (!para.length) return;
+                var sentences = splitSentences(para.join(' '));
+                for (var i = 0; i < sentences.length; i += group) {
+                    out.push('- ' + sentences.slice(i, i + group).join(' '));
+                }
+                para = [];
+            }
+            text.replace(/\r\n/g, '\n').split('\n').forEach(function (line) {
+                var numbered = line.match(/^(\s*)\d+[\.)]\s+(.*)$/);
+                // Numbered outline lines become "- " bullets too — except a
+                // list-numbered move header ("10. **20. Rf5**"), which the ⭐
+                // parser keys on and must stay exactly as-is.
+                if (numbered && !/^\*\*\d/.test(numbered[2])) {
+                    flush();
+                    out.push(numbered[1] + '- ' + numbered[2]);
+                } else if (!line.trim() || isStructural(line)) {
+                    flush();
+                    out.push(line);
+                } else {
+                    para.push(line.trim());
+                }
+            });
+            flush();
+            return out.join('\n');
+        };
+
+        // • Bullets button: bulletize the note textarea in place.
+        window.gnBulletizeNote = function () {
+            var input = document.getElementById('gnNoteInput');
+            if (!input.value.trim()) { gnSetStatus('Paste some text first'); return; }
+            input.value = window.gnBulletizeText(input.value);
+            gnSetStatus('Formatted into bullets');
+            input.focus();
+        };
+
         // + Move button: the header goes at the TOP of the note (first line), not
         // at the cursor — existing text stays below it. If the first line is
         // already a bare + Move header ("**20. Rf5** — " with nothing typed yet),
@@ -14542,7 +14575,7 @@ ${contentToAnalyze}`;
             var label = gnCurrentMoveLabel();
             if (!label) { gnSetStatus('No move on the board to reference'); return; }
             var header = '**' + label + '** — ';
-            var bareTop = /^\s*\*\*\d+(?:\.\.\.|\.)\s+[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*\s*[—:–-]?\s*(\n|$)/;
+            var bareTop = /^\s*\*\*\d+(?:\.\.\.|\.)\s*[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*\s*[—:–-]?\s*(\n|$)/;
             var m = input.value.match(bareTop);
             if (m) {
                 input.value = header + input.value.slice(m[0].length - (m[1] === '\n' ? 1 : 0));
@@ -14560,7 +14593,7 @@ ${contentToAnalyze}`;
             if (!text) { gnSetStatus('Type a note first'); return; }
             // The note needs a + Move header line ("**20. Rf5** — ...") or the ⭐
             // won't recognize it when the Doc is reloaded.
-            if (!/^\s*\*\*\d+(?:\.\.\.|\.)\s+[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*/m.test(text)) {
+            if (!/^\s*\*\*\d+(?:\.\.\.|\.)\s*[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*/m.test(text)) {
                 gnSetStatus('Click + Move first to tag the move for ⭐');
                 alert('Click "+ Move" first to add the move you want this note to show in ⭐.');
                 return;
