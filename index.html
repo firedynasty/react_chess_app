@@ -1875,6 +1875,54 @@
                     btn.style.boxShadow = 'none';
                 }
             });
+            // Board badge: gold ring around the destination square plus a
+            // ★ dot in its corner, so a move with a note is visible
+            // on the board itself, not just on the button
+            var svg = document.getElementById('board2ArrowSvg');
+            if (svg) {
+                svg.querySelectorAll('.note-badge').forEach(function(el) { el.remove(); });
+                var node = hasNote && window.currentMoveNode;
+                if (node && node.san && node.parent && node.parent.fen) {
+                    try {
+                        var tempChess = new Chess(node.parent.fen);
+                        var mv = tempChess.move(node.san, { sloppy: true });
+                        if (mv) {
+                            var c = board2SquareToCoords(mv.to);
+                            var NS = 'http://www.w3.org/2000/svg';
+                            var ring = document.createElementNS(NS, 'rect');
+                            ring.setAttribute('x', c.x - 23);
+                            ring.setAttribute('y', c.y - 23);
+                            ring.setAttribute('width', 46);
+                            ring.setAttribute('height', 46);
+                            ring.setAttribute('rx', 6);
+                            ring.setAttribute('fill', 'none');
+                            ring.setAttribute('stroke', '#ffd700');
+                            ring.setAttribute('stroke-width', 3);
+                            ring.classList.add('note-badge');
+                            svg.appendChild(ring);
+                            var dot = document.createElementNS(NS, 'circle');
+                            dot.setAttribute('cx', c.x + 14);
+                            dot.setAttribute('cy', c.y - 14);
+                            dot.setAttribute('r', 10);
+                            dot.setAttribute('fill', '#ffd700');
+                            dot.setAttribute('stroke', '#1a1a2e');
+                            dot.setAttribute('stroke-width', 1.5);
+                            dot.classList.add('note-badge');
+                            svg.appendChild(dot);
+                            var star = document.createElementNS(NS, 'text');
+                            star.setAttribute('x', c.x + 14);
+                            star.setAttribute('y', c.y - 14);
+                            star.setAttribute('text-anchor', 'middle');
+                            star.setAttribute('dominant-baseline', 'central');
+                            star.setAttribute('font-size', 12);
+                            star.setAttribute('fill', '#1a1a2e');
+                            star.textContent = '★';
+                            star.classList.add('note-badge');
+                            svg.appendChild(star);
+                        }
+                    } catch (e) { /* badge is best-effort */ }
+                }
+            }
         }
         window.updateCoachNoteButton = updateCoachNoteButton;
 
@@ -8725,7 +8773,7 @@
 
         function clearMoveHighlights() {
             const svg = document.getElementById('board2ArrowSvg');
-            if (svg) svg.querySelectorAll('.move-highlight').forEach(el => el.remove());
+            if (svg) svg.querySelectorAll('.move-highlight, .note-badge').forEach(el => el.remove());
         }
 
         window.highlightLastMove = highlightLastMove;
@@ -15308,6 +15356,7 @@ ${contentToAnalyze}`;
         } else {
             clearMoveHighlights();
         }
+        if (window.updateCoachNoteButton) window.updateCoachNoteButton();
         updateBoard2MoveIndicator(savedIndex);
 
         btn.disabled = false;
