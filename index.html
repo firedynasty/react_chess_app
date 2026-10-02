@@ -799,6 +799,8 @@
             <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                 <button id="gnSignInBtn" onclick="gnSignIn()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">G Sign In</button>
                 <button id="gnRecentBtn" onclick="gnToggleRecentDropdown()" disabled title="Pick a recent Google Doc to load as coach analysis" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Recent ▾</button>
+                <button id="gnGamesBtn" onclick="gnToggleGamesDropdown()" disabled title="List Docs in the chess/games folder — filtered by the name input when it has text (10 most recent matches), otherwise sorted by name" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Games ▾</button>
+                <input id="gnGamesFilter" onkeydown="if(event.key==='Enter')gnQueryGamesDropdown()" placeholder="games filter (name)…" title="Filter the Games ▾ list by Doc name (e.g. an opponent's name); press Enter to search" style="width: 130px; background: #0f3460; border: 1px solid #00d4ff; color: #eee; padding: 6px 8px; border-radius: 6px; font-size: 12px;">
                 <span id="gnDocName" style="font-size: 12px; color: #888; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
                 <span id="gnStatus" style="font-size: 12px; color: #888;"></span>
             </div>
@@ -812,6 +814,7 @@
                 </div>
             </div>
             <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
+            <div id="gnGamesDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
 
             <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
                 <div style="background: #16213e; border: 1px solid #2a2a4e; border-radius: 10px; width: min(1100px, 100%); height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
@@ -1159,7 +1162,7 @@
             </defs>
           </svg>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">PageDown = Next | ⌘[ = Back | Tab or / = cycle variation (adds one if none) | Esc = clear variation | Enter = ⭐ coach note</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves (⌘[ = back) | ↓ or Enter = ⭐ coach note | ↑ = close note / exit variation | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -11458,10 +11461,23 @@
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
                 } else if (e.key === 'ArrowUp') {
+                    // If the coach note / text view modal is open, ArrowUp closes it
+                    // (Escape does the same) instead of exiting the variation
+                    const tvModalUp = document.getElementById('textViewModal');
+                    if (tvModalUp && tvModalUp.style.display !== 'none') {
+                        tvModalUp.style.display = 'none';
+                        e.preventDefault();
+                        return;
+                    }
                     // ArrowUp = exit the variation from ANY move in it, back to the
                     // main-line move it branched from. On the main line (nothing to
                     // exit) it falls back to Cycle Var., which enters the variation.
                     if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
+                    e.preventDefault();
+                } else if (e.key === 'ArrowDown') {
+                    // ArrowDown = open the coach note modal (same as the ⭐ button)
+                    const coachBtn = document.getElementById('coachNoteBtn');
+                    if (coachBtn) coachBtn.click();
                     e.preventDefault();
                 } else if (e.key === 'Tab') {
                     // Tab = same as Cycle Var.: enter the variation, step through its
@@ -14303,6 +14319,7 @@ ${contentToAnalyze}`;
                             gnAccessToken = resp.access_token;
                             document.getElementById('gnSignInBtn').textContent = 'G Sign Out';
                             document.getElementById('gnRecentBtn').disabled = false;
+                            document.getElementById('gnGamesBtn').disabled = false;
                             gnSetStatus('Signed in to Google');
                             gnAuthWaiters.splice(0).forEach(function (w) { w.resolve(); });
                         } else {
@@ -14323,7 +14340,8 @@ ${contentToAnalyze}`;
                 gnAccessToken = null;
                 document.getElementById('gnSignInBtn').textContent = 'G Sign In';
                 document.getElementById('gnRecentBtn').disabled = true;
-                gnCloseRecentDropdown();
+                document.getElementById('gnGamesBtn').disabled = true;
+                gnCloseDropdowns();
                 gnSetStatus('Signed out of Google');
             } else if (gnTokenClient) {
                 gnTokenClient.requestAccessToken();
@@ -14333,9 +14351,17 @@ ${contentToAnalyze}`;
         };
 
         window.gnToggleRecentDropdown = function () {
-            var dropdown = document.getElementById('gnRecentDropdown');
-            if (!dropdown.hidden) { gnCloseRecentDropdown(); return; }
+            var wasOpen = !document.getElementById('gnRecentDropdown').hidden;
+            gnCloseDropdowns();
+            if (wasOpen) return;
             gnFetchRecentFiles();
+        };
+
+        window.gnToggleGamesDropdown = function () {
+            var wasOpen = !document.getElementById('gnGamesDropdown').hidden;
+            gnCloseDropdowns();
+            if (wasOpen) return;
+            gnFetchGamesFiles();
         };
 
         function gnFetchRecentFiles() {
@@ -14346,22 +14372,53 @@ ${contentToAnalyze}`;
                 '&orderBy=viewedByMeTime+desc&pageSize=10&fields=files(id,name,viewedByMeTime)';
             fetch(url, { headers: { Authorization: 'Bearer ' + gnAccessToken } })
                 .then(function (r) { return r.json(); })
-                .then(function (data) { gnOpenRecentDropdown(data.files || []); })
+                .then(function (data) { gnOpenFilesDropdown('gnRecentDropdown', 'gnRecentBtn', data.files || [], 'No recent Docs found'); })
                 .catch(function (err) { gnSetStatus('Error fetching recent files: ' + err.message); })
                 .finally(function () { btn.textContent = 'Recent ▾'; });
         }
 
-        function gnOpenRecentDropdown(files) {
-            var dropdown = document.getElementById('gnRecentDropdown');
+        // Re-query the games list with the current filter text (Enter in the input)
+        window.gnQueryGamesDropdown = function () {
+            gnCloseDropdowns();
+            gnFetchGamesFiles();
+        };
+
+        // Docs in the chess/games save folder: with filter text, 10 most recent
+        // name matches; without it, sorted by name (a large folder stays navigable)
+        function gnFetchGamesFiles() {
+            var btn = document.getElementById('gnGamesBtn');
+            var filterEl = document.getElementById('gnGamesFilter');
+            var filter = filterEl ? filterEl.value.trim() : '';
+            btn.textContent = 'Loading…';
+            gnResolveSaveFolder()
+                .then(function (folderId) {
+                    var q = "'" + folderId + "' in parents and mimeType='application/vnd.google-apps.document' and trashed=false";
+                    if (filter) q += " and name contains '" + filter.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+                    var url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
+                        '&orderBy=' + (filter ? 'modifiedTime+desc' : 'name') +
+                        '&pageSize=10&fields=files(id,name,modifiedTime)';
+                    return fetch(url, { headers: { Authorization: 'Bearer ' + gnAccessToken } })
+                        .then(function (r) { return r.json(); });
+                })
+                .then(function (data) {
+                    gnOpenFilesDropdown('gnGamesDropdown', 'gnGamesBtn', data.files || [],
+                        filter ? 'No games Docs matching "' + filter + '"' : 'No Docs in the games folder');
+                })
+                .catch(function (err) { gnSetStatus('Error fetching games folder: ' + err.message); })
+                .finally(function () { btn.textContent = 'Games ▾'; });
+        }
+
+        function gnOpenFilesDropdown(dropdownId, btnId, files, emptyMsg) {
+            var dropdown = document.getElementById(dropdownId);
             dropdown.innerHTML = '';
-            var rect = document.getElementById('gnRecentBtn').getBoundingClientRect();
+            var rect = document.getElementById(btnId).getBoundingClientRect();
             var left = Math.min(rect.left, window.innerWidth - 320 - 8);
             dropdown.style.top = (rect.bottom + 4) + 'px';
             dropdown.style.left = Math.max(8, left) + 'px';
             if (files.length === 0) {
                 var empty = document.createElement('div');
                 empty.style.cssText = 'padding:8px 10px; font-size:12px; color:#94a3b8;';
-                empty.textContent = 'No recent Docs found';
+                empty.textContent = emptyMsg;
                 dropdown.appendChild(empty);
             } else {
                 files.forEach(function (f) {
@@ -14370,7 +14427,7 @@ ${contentToAnalyze}`;
                     item.textContent = f.name;
                     item.style.cssText = 'display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:12px; cursor:pointer; word-break:break-word;';
                     item.addEventListener('click', function () {
-                        gnCloseRecentDropdown();
+                        gnCloseDropdowns();
                         gnLoadDoc(f.id, f.name);
                     });
                     dropdown.appendChild(item);
@@ -14380,17 +14437,20 @@ ${contentToAnalyze}`;
             if (!gnDismissListener) {
                 setTimeout(function () {
                     gnDismissListener = function (e) {
-                        var dd = document.getElementById('gnRecentDropdown');
-                        var btn = document.getElementById('gnRecentBtn');
-                        if (dd && !dd.contains(e.target) && e.target !== btn) gnCloseRecentDropdown();
+                        ['gnRecentDropdown', 'gnGamesDropdown'].forEach(function (id) {
+                            var dd = document.getElementById(id);
+                            if (dd && !dd.hidden && !dd.contains(e.target)) gnCloseDropdowns();
+                        });
                     };
                     document.addEventListener('click', gnDismissListener);
                 }, 0);
             }
         }
-        function gnCloseRecentDropdown() {
-            var dropdown = document.getElementById('gnRecentDropdown');
-            dropdown.hidden = true;
+        function gnCloseDropdowns() {
+            ['gnRecentDropdown', 'gnGamesDropdown'].forEach(function (id) {
+                var dd = document.getElementById(id);
+                if (dd) dd.hidden = true;
+            });
             if (gnDismissListener) {
                 document.removeEventListener('click', gnDismissListener);
                 gnDismissListener = null;
