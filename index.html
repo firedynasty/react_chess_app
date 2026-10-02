@@ -1749,10 +1749,12 @@
             // Second pass — standalone bold-move header lines ANYWHERE in the doc.
             // "Append Move Note" / "+ Move" write these below the report (outside the
             // section above), e.g. "**20. Rf5?**" or "**20. Rf5** — my note" on a line
-            // that starts with the bold move. Only a leading bold move qualifies, so
-            // section entries ("1. **3. Bd3 ...**") and body text never match.
-            // Existing keys (from the main section) always win.
-            var soloRe = /^\s*\*\*(\d+)(\.\.\.|\.)\s+([A-Za-z][A-Za-z0-9x=+#-]*)[?!]{0,2}\*\*(?:\s*\([^()]*\))?(?:\s*[—:–-].*)?$/;
+            // that starts with the bold move. An optional leading list number is allowed
+            // ("10. **20. Rf5**") so numbered report entries without an eval pair — which
+            // the section pass above skips — are still picked up. Body text never matches
+            // (it doesn't start with the bold move). Existing keys (from the main
+            // section) always win.
+            var soloRe = /^\s*(?:\d+[\.)]\s*)?\*\*(\d+)(\.\.\.|\.)\s+([A-Za-z][A-Za-z0-9x=+#-]*)[?!]{0,2}\*\*(?:\s*\([^()]*\))?(?:\s*[—:–-].*)?\s*$/;
             var cur2 = null, san2 = null, label2 = null, buf2 = [];
             function flush2() {
                 if (cur2 && buf2.length && !map[cur2]) {
@@ -1767,9 +1769,12 @@
                     san2 = sm[3];
                     label2 = sm[1] + sm[2] + ' ' + sm[3];
                     buf2 = [line];
-                } else if (cur2 && (/^#{1,4}\s/.test(line) || /^\s*-{5,}\s*$/.test(line))) {
+                } else if (cur2 && (/^#{1,2}\s/.test(line) || /^\s*-{5,}\s*$/.test(line))) {
                     // A separator right after the header ("**20. Rf5** — \n-----\n<body>")
                     // is decorative — skip it and keep collecting the note body.
+                    // Only # / ## headings end the entry: appended chat analyses use ###
+                    // sub-headings ("### Analysis of the Move 20. Rf5") that belong to
+                    // the note body, while report sections ("## Missed Tactics") don't.
                     var bodyStarted = buf2.slice(1).some(function (l) { return l.trim(); });
                     if (/^\s*-{5,}\s*$/.test(line) && !bodyStarted) {
                         // skip the separator line, stay in the entry
