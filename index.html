@@ -7300,7 +7300,7 @@
                 ${openingDisplay}
                 <p><strong>Time Control:</strong> ${meta.time_class} (${meta.time_control})</p>
                 <p><strong>Result:</strong> ${meta.result}</p>
-                ${meta.url ? `<p><a href="${meta.url}" target="_blank">View on Chess.com ↗</a></p>` : ''}
+                ${meta.url ? `<p>${meta.url.split('/').pop().split('?')[0]}</p>` : ''}
             `;
 
             // Insert opening as comment after first move
