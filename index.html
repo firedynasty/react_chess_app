@@ -793,7 +793,7 @@
             <div id="sbStatus" style="margin-top: 6px; padding: 6px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; font-size: 14px; font-weight: bold; color: #eee;"></div>
 
             <div style="margin-top: 10px;">
-                <button id="sbCopyLinkBtn" onclick="sbCopyGameLink()" disabled title="Copy a deep link (?game_id=...) to the game currently loaded from Supabase" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Copy Game Link</button>
+                <span id="sbGameLink" title="Deep link (?game_id=...) to the game currently loaded from Supabase" style="font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></span>
             </div>
             <!-- Google Doc loader — sign in + Recent; picking a Doc loads its text into the coach-note source (window.textViewRawContent) so the ⭐ button works -->
             <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -811,6 +811,8 @@
                     <button id="gnInsertMoveBtn" onclick="gnInsertMoveRef()" title="Insert the current move (e.g. **11... Nh5** — ) into the note at the cursor" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">+ Move</button>
                     <button id="gnBulletizeBtn" onclick="gnBulletizeNote()" title="Reformat the note into '- ' bullet lines, 2 sentences each (headings, bullets, numbered lines and chess move dots are preserved)" style="background: #6c5ce7; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">• Bullets</button>
                     <button id="gnAppendBtn" onclick="gnAppendNote()" title="Append the note to the end of the loaded Google Doc" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Append Note to Doc</button>
+                    <button id="gnOcrBtn" onclick="gnOcrPickImage()" title="OCR an image with OpenAI (gpt-4o-mini) — the extracted text lands in the note box for review, then Append sends it to the Doc. You can also paste an image straight into the note box." style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">📷 OCR</button>
+                    <input type="file" id="gnOcrFileInput" accept="image/*" hidden>
                 </div>
             </div>
             <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
@@ -4124,6 +4126,7 @@
         function applyPgnStringToBoard(pgnString) {
             // Any previously loaded Supabase game is no longer what's on the board.
             window.supabaseLoadedGame = null;
+            if (window.sbRefreshGameLink) window.sbRefreshGameLink();
             const sbSaveBtn = document.getElementById('sbSaveGameBtn');
             if (sbSaveBtn) sbSaveBtn.disabled = true;
 
@@ -4663,7 +4666,7 @@
                 window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn), label: label || (source + '/' + game_id) };
                 document.getElementById('sbSaveGameBtn').disabled = false;
                 document.getElementById('sbReanalyzeBtn').disabled = false;
-                document.getElementById('sbCopyLinkBtn').disabled = false;
+                sbRefreshGameLink();
                 statusEl.textContent = 'Loaded ' + source + '/' + game_id + '.';
                 log('Loaded game from Supabase (' + source + '/' + game_id + ')', 'success');
                 return true;
@@ -4728,11 +4731,12 @@
         window.sbLoadGameByIdAndSource = sbLoadGameByIdAndSource;
         window.sbInferSourceFromGameId = sbInferSourceFromGameId;
 
-        function sbCopyGameLink() {
-            const url = sbGetGameLink();
-            if (!url) return;
-            navigator.clipboard.writeText(url).then(() => showToast('Link copied: ' + url));
+        // Shows the deep link for the game on the board (blank when none).
+        function sbRefreshGameLink() {
+            const el = document.getElementById('sbGameLink');
+            if (el) el.textContent = sbGetGameLink() || '';
         }
+        window.sbRefreshGameLink = sbRefreshGameLink;
 
         async function sbLoadGameByIdInput() {
             const input = document.getElementById('sbGameIdInput');
@@ -5045,6 +5049,7 @@
             applyPgnStringToBoard(s.pgn); // resets window.supabaseLoadedGame — set it after
             window.currentLoadedPgn = s.pgn;
             window.supabaseLoadedGame = { source: s.game.source, game_id: s.game.game_id, headerBlock: extractPgnHeaderBlock(s.pgn), label: s.title };
+            sbRefreshGameLink();
             document.getElementById('sbSaveGameBtn').disabled = false;
             document.getElementById('sbReanalyzeBtn').disabled = false;
             document.getElementById('sbStatus').textContent = 'Loaded ' + s.game.source + '/' + s.game.game_id + ' from report.';
@@ -5408,6 +5413,7 @@
                 applyPgnStringToBoard(finalPgn); // resets window.supabaseLoadedGame — set it after
                 window.currentLoadedPgn = finalPgn;
                 window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(finalPgn), label };
+                sbRefreshGameLink();
                 document.getElementById('sbSaveGameBtn').disabled = false;
                 statusEl.textContent = `Re-analyzed and saved ${source}/${game_id} (depth ${depth}).`;
                 log('Re-analyzed and saved to Supabase (' + source + '/' + game_id + ')', 'success');
@@ -14723,6 +14729,123 @@ ${contentToAnalyze}`;
                     btn.disabled = false;
                 });
         };
+
+        // ---- OCR an image into the note box (OpenAI gpt-4o-mini vision) ----
+        // The extracted text lands in gnNoteInput for review; the existing
+        // Append Note to Doc button then sends it to the loaded Google Doc.
+
+        // Downscale to OpenAI's high-res vision limit (1568px long edge) so
+        // phone photos don't blow up token cost; small images pass through.
+        function gnImageToDataUrl(file) {
+            return new Promise(function (resolve, reject) {
+                var img = new Image();
+                var url = URL.createObjectURL(file);
+                img.onload = function () {
+                    URL.revokeObjectURL(url);
+                    var MAX = 1568;
+                    var w = img.naturalWidth, h = img.naturalHeight;
+                    var scale = Math.min(1, MAX / Math.max(w, h));
+                    if (scale === 1) {
+                        var fr = new FileReader();
+                        fr.onload = function () { resolve(fr.result); };
+                        fr.onerror = function () { reject(new Error('Could not read the image file')); };
+                        fr.readAsDataURL(file);
+                        return;
+                    }
+                    var canvas = document.createElement('canvas');
+                    canvas.width = Math.round(w * scale);
+                    canvas.height = Math.round(h * scale);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.onerror = function () { reject(new Error('That file does not look like an image')); };
+                img.src = url;
+            });
+        }
+
+        // Shared credential: the report feature's access code (or the user's
+        // own OpenAI key — anything starting with sk- goes as userApiKey).
+        function gnOcrCredential() {
+            var key = '';
+            try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
+            if (!key) {
+                key = (prompt('OCR needs an access code (or your own OpenAI API key, sk-…):') || '').trim();
+                if (key) { try { localStorage.setItem('sbReportAccessCode', key); } catch (e) { } }
+            }
+            return key;
+        }
+
+        window.gnOcrImageFile = function (file) {
+            if (!file) return;
+            var key = gnOcrCredential();
+            if (!key) { gnSetStatus('OCR cancelled — no access code'); return; }
+            gnSetStatus('OCR: reading image…');
+            gnImageToDataUrl(file)
+                .then(function (dataUrl) {
+                    gnSetStatus('OCR: extracting text…');
+                    return fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'gpt-4o-mini',
+                            accessCode: key.indexOf('sk-') === 0 ? undefined : key,
+                            userApiKey: key.indexOf('sk-') === 0 ? key : undefined,
+                            messages: [{
+                                role: 'user',
+                                content: [
+                                    { type: 'text', text: 'Extract all text from this image exactly as written. Preserve line breaks, lists, headings, and any chess notation. Return only the extracted text — no commentary.' },
+                                    { type: 'image_url', image_url: { url: dataUrl } }
+                                ]
+                            }]
+                        })
+                    }).then(function (r) {
+                        return r.json().catch(function () { return {}; }).then(function (data) {
+                            if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+                            return data.content || '';
+                        });
+                    });
+                })
+                .then(function (text) {
+                    text = text.trim();
+                    if (!text) { gnSetStatus('OCR found no text in the image'); return; }
+                    var input = document.getElementById('gnNoteInput');
+                    input.value = input.value.trim() ? input.value.replace(/\s+$/, '') + '\n\n' + text : text;
+                    input.focus();
+                    gnSetStatus('OCR done — review the note, + Move to tag it, then Append');
+                })
+                .catch(function (err) {
+                    gnSetStatus('OCR failed: ' + err.message);
+                });
+        };
+
+        window.gnOcrPickImage = function () {
+            var fi = document.getElementById('gnOcrFileInput');
+            if (fi) fi.click();
+        };
+
+        // Wire the hidden file input, and let a pasted screenshot in the note
+        // box go straight to OCR instead of being dropped as binary junk.
+        (function gnWireOcr() {
+            var fi = document.getElementById('gnOcrFileInput');
+            if (fi) fi.addEventListener('change', function () {
+                var f = fi.files && fi.files[0];
+                fi.value = '';
+                if (f) window.gnOcrImageFile(f);
+            });
+            var input = document.getElementById('gnNoteInput');
+            if (input) input.addEventListener('paste', function (e) {
+                var items = e.clipboardData && e.clipboardData.items;
+                if (!items) return;
+                for (var i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image/') === 0) {
+                        e.preventDefault();
+                        var f = items[i].getAsFile();
+                        if (f) window.gnOcrImageFile(f);
+                        return;
+                    }
+                }
+            });
+        })();
     })();
     </script>
 
