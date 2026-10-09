@@ -740,6 +740,7 @@
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
                 <button id="loadCurrentBtn" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Current</button>
                 <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
+                <button id="dbPgnBtn" title="Sign in to Dropbox, then pick a .pgn file to load to the board" style="background: #0061fe; color: white;">Dropbox PGN</button>
                 <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
             </div>
@@ -1565,10 +1566,12 @@
       <div style="padding: 15px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <h3 style="margin: 0; color: #0061fe; font-size: 16px;">Dropbox Files</h3>
+          <button id="dropboxSidebarLogout" style="background: #6c757d; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: auto; margin-right: 8px;">Sign out</button>
           <button id="closeDropboxSidebar" style="background: #dc3545; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;">&times;</button>
         </div>
         <div style="display: flex; gap: 6px; margin-bottom: 12px;">
           <input type="text" id="dropboxSearchInput" placeholder="Search folders..." style="flex: 1; padding: 8px; border-radius: 6px; border: 1px solid #333; background: #1a1a2e; color: white; font-size: 13px;">
+          <button id="dropboxPasteBtn" title="Paste a Dropbox path from the clipboard and go" style="background: #17a2b8; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">Paste</button>
           <button id="dropboxSearchBtn" style="background: #0061fe; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 13px;">Search</button>
         </div>
         <div id="dropboxSaveRow" style="display: none; margin-bottom: 12px; padding: 10px; background: #1a2744; border-radius: 6px; border: 1px solid #0061fe;">
@@ -2081,6 +2084,7 @@
                     }
                     // Fallback redirect flow: set token on this page directly
                     window.dropboxAccessToken = data.access_token;
+                    try { sessionStorage.setItem('dropbox_token', data.access_token); } catch (e) {}
                     window.history.replaceState({}, document.title, redirectUri);
                     updateDropboxButtons();
                 } else {
@@ -2104,6 +2108,7 @@
                 } catch { /* ignore */ }
             }
             window.dropboxAccessToken = null;
+            try { sessionStorage.removeItem('dropbox_token'); } catch (e) {}
             window.dropboxCurrentFilePath = null;
             window.dropboxFolderPath = '';
             window.dropboxFolderFiles = [];
@@ -2118,6 +2123,8 @@
             const filesBtn = document.getElementById('dbFilesBtn');
             const logoutBtn = document.getElementById('dbLogoutBtn');
             const saveBtn = document.getElementById('dbSaveBtn');
+            const pgnBtn = document.getElementById('dbPgnBtn');
+            if (pgnBtn) pgnBtn.textContent = window.dropboxAccessToken ? 'Dropbox PGN \u25BE' : 'Dropbox PGN (sign in)';
             if (window.dropboxAccessToken) {
                 loginBtn.style.display = 'none';
                 filesBtn.style.display = '';
@@ -2136,7 +2143,13 @@
             if (!query.trim() || !window.dropboxAccessToken) return;
             const q = query.trim();
             if (q.startsWith('/')) {
-                // Direct path navigation — open the folder directly
+                // Direct path to a file — load it; otherwise open it as a folder
+                const fileMatch = q.match(/\/([^\/]+\.(pgn|txt))$/i);
+                if (fileMatch) {
+                    if (/\.pgn$/i.test(q)) dropboxLoadPgn(q, fileMatch[1]);
+                    else dropboxLoadFile(q, fileMatch[1]);
+                    return;
+                }
                 dropboxLoadFolder(q.replace(/\/+$/, '') || '');
                 return;
             }
@@ -2241,6 +2254,48 @@
                 closeDropboxSidebar();
             } catch (err) {
                 setDropboxStatus('Error: ' + err.message);
+            }
+        }
+
+        // Download a .pgn from Dropbox, put it in the PGN box, and load it like the Load to Board button
+        async function dropboxLoadPgn(path, fileName) {
+            if (!window.dropboxAccessToken) return;
+            setDropboxStatus(`Loading ${fileName}...`);
+            try {
+                const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${window.dropboxAccessToken}`,
+                        'Dropbox-API-Arg': JSON.stringify({ path }),
+                    },
+                });
+                if (res.status === 401) {
+                    // Token expired or revoked — drop it so the button asks for sign-in again
+                    window.dropboxAccessToken = null;
+                    try { sessionStorage.removeItem('dropbox_token'); } catch (e) {}
+                    updateDropboxButtons();
+                    throw new Error('Dropbox session expired — sign in again');
+                }
+                if (!res.ok) throw new Error('Download failed');
+                const pgn = (await res.text()).trim();
+                if (!pgn) throw new Error('File is empty');
+                const pgnTextarea = document.getElementById('pgnInput');
+                if (pgnTextarea) pgnTextarea.value = pgn;
+                await loadPgnToBoard();
+                setDropboxStatus(`Loaded ${fileName}`);
+                closeDropboxSidebar();
+            } catch (err) {
+                setDropboxStatus('Error: ' + err.message);
+            }
+        }
+
+        // "Dropbox PGN" button: sign in first if needed, otherwise open the file picker
+        function dropboxPgnButtonClick() {
+            if (window.dropboxAccessToken) {
+                openDropboxSidebar();
+            } else {
+                window.dropboxOpenAfterSignIn = true;
+                dropboxSignIn();
             }
         }
 
@@ -2396,10 +2451,12 @@
                 div.addEventListener('click', () => {
                     if (item.isFolder) {
                         dropboxLoadFolder(item.path);
+                    } else if (/\.pgn$/i.test(item.name)) {
+                        dropboxLoadPgn(item.path, item.name);
                     } else if (item.name.endsWith('.txt')) {
                         dropboxLoadFile(item.path, item.name);
                     } else {
-                        setDropboxStatus(`Cannot open "${item.name}" — only .txt files supported`);
+                        setDropboxStatus(`Cannot open "${item.name}" — only .pgn and .txt files supported`);
                     }
                 });
                 list.appendChild(div);
@@ -2415,18 +2472,27 @@
             if (event.origin !== window.location.origin) return;
             if (event.data && event.data.dropboxToken) {
                 window.dropboxAccessToken = event.data.dropboxToken;
+                try { sessionStorage.setItem('dropbox_token', event.data.dropboxToken); } catch (e) {}
                 updateDropboxButtons();
+                if (window.dropboxOpenAfterSignIn) {
+                    window.dropboxOpenAfterSignIn = false;
+                    openDropboxSidebar();
+                }
             }
         });
 
         // Wire up Dropbox buttons on DOM ready
         document.addEventListener('DOMContentLoaded', function() {
+            // Restore this tab's sign-in (lasts until the tab closes), like vercel_fen_saver
+            try { window.dropboxAccessToken = sessionStorage.getItem('dropbox_token') || null; } catch (e) {}
             // Handle OAuth redirect if returning from Dropbox (fallback redirect flow)
             handleDropboxOAuthRedirect();
 
             document.getElementById('dbLoginBtn').addEventListener('click', dropboxSignIn);
             document.getElementById('dbFilesBtn').addEventListener('click', openDropboxSidebar);
             document.getElementById('dbLogoutBtn').addEventListener('click', dropboxSignOut);
+            document.getElementById('dbPgnBtn').addEventListener('click', dropboxPgnButtonClick);
+            document.getElementById('dropboxSidebarLogout').addEventListener('click', dropboxSignOut);
             document.getElementById('dbSaveBtn').addEventListener('click', dropboxSaveReport);
             updateDropboxButtons();
             document.getElementById('closeDropboxSidebar').addEventListener('click', closeDropboxSidebar);
@@ -2435,6 +2501,16 @@
                 if (e.key === 'Enter') dropboxConfirmSave();
             });
 
+            document.getElementById('dropboxPasteBtn').addEventListener('click', async function() {
+                const input = document.getElementById('dropboxSearchInput');
+                try {
+                    input.value = (await navigator.clipboard.readText()).trim();
+                } catch (err) {
+                    setDropboxStatus('Clipboard access denied — paste with Cmd+V instead');
+                    return;
+                }
+                dropboxSearch(input.value);
+            });
             document.getElementById('dropboxSearchBtn').addEventListener('click', function() {
                 const query = document.getElementById('dropboxSearchInput').value;
                 dropboxSearch(query);
