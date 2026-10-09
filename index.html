@@ -1125,7 +1125,7 @@
     <!-- Board and Move Table (side by side) -->
     <div id="boardMainFlex" style="display: flex; gap: 15px; flex-wrap: nowrap; margin: 20px auto; max-width: 1200px; align-items: flex-start;">
       <!-- Chess Board -->
-      <div id="boardSection" style="flex-shrink: 0;">
+      <div id="boardSection" style="flex-shrink: 0; width: 400px;">
         <!-- Material Display -->
         <div id="materialDisplay" style="display: flex; justify-content: space-between; align-items: center; width: 400px; margin-bottom: 8px; font-size: 18px; min-height: 24px;">
           <div style="display: flex; align-items: center;">
@@ -8390,6 +8390,22 @@
                 moveTableEl.appendChild(inlineContainer);
             }
 
+            // Map each comment to a ply (half-move) number, like a dictionary keyed by move label,
+            // then highlight the first comment at or after the current position.
+            const plyOf = (n, isBlack) => n * 2 - (isBlack ? 0 : 1);
+            const curNode = window.currentMoveNode;
+            let curPly = 0;
+            if (curNode && curNode.moveNumber) curPly = plyOf(curNode.moveNumber, curNode.isBlackMove);
+            else if (currentFlatIndex !== undefined && currentFlatIndex !== null) curPly = currentFlatIndex + 1;
+            let highlightIdx = -1;
+            let bestPly = Infinity;
+            comments.forEach((c, i) => {
+                if (c.nodeId && c.nodeId === currentNodeId) { highlightIdx = i; bestPly = -1; return; }
+                if (bestPly === -1 || c.isMainLine === false) return;
+                const ply = c.flatIndex !== undefined ? c.flatIndex + 1 : plyOf(c.moveNumber, c.isBlackMove);
+                if (ply >= curPly && ply < bestPly) { bestPly = ply; highlightIdx = i; }
+            });
+
             comments.forEach((c, idx) => {
                 const commentDiv = document.createElement('div');
                 commentDiv.style.padding = '4px 8px';
@@ -8398,8 +8414,7 @@
                 commentDiv.style.cursor = 'pointer';
 
                 // Check if this is the current comment
-                const isCurrent = (c.nodeId && c.nodeId === currentNodeId) ||
-                                  (c.flatIndex !== undefined && c.flatIndex === currentFlatIndex);
+                const isCurrent = idx === highlightIdx;
 
                 if (isCurrent) {
                     commentDiv.style.background = '#0f3460';
@@ -8440,19 +8455,16 @@
 
                 // Also append an inline entry to the moveTable comments container
                 if (inlineContainer) {
-                    // Add comma separator between entries
-                    if (idx > 0) {
-                        const sep = document.createElement('span');
-                        sep.style.color = '#555';
-                        sep.textContent = ', ';
-                        inlineContainer.appendChild(sep);
-                    }
-                    const inlineEntry = document.createElement('span');
+                    const inlineEntry = document.createElement('div');
                     inlineEntry.style.cursor = 'pointer';
-                    inlineEntry.style.padding = '2px 4px';
-                    inlineEntry.style.borderRadius = '3px';
+                    inlineEntry.style.padding = '5px 10px';
+                    inlineEntry.style.marginBottom = '4px';
+                    inlineEntry.style.borderRadius = '4px';
+                    inlineEntry.style.background = 'rgba(0, 0, 0, 0.3)';
+                    inlineEntry.style.borderLeft = '3px solid transparent';
                     if (isCurrent) {
-                        inlineEntry.style.background = '#0f3460';
+                        inlineEntry.style.background = 'rgba(0, 0, 0, 0.55)';
+                        inlineEntry.style.borderLeft = '3px solid #ffd700';
                     }
                     const inlineLabel = document.createElement('span');
                     const inlineAnnotationColor = getAnnotationColor(c.annotation);
