@@ -742,7 +742,6 @@
                 <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
                 <button id="dbPgnBtn" title="Sign in to Dropbox, then pick a .pgn file to load to the board" style="background: #0061fe; color: white;">Dropbox PGN</button>
                 <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
-                <button id="aiCommentsBtn" onclick="aiCommentKeyMoves()" title="Ask the AI for fresh one-line comments on the key moves of the game on the board and wrap them into the PGN as { comments } (cheesecake style — Copy PGN / Download then carry them)" style="background: #9b59b6; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">AI Comments</button>
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
             </div>
 
@@ -781,7 +780,7 @@
                 </select>
                 <button id="sbLoadGameBtn" onclick="sbLoadSelectedGame()" disabled style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Selected</button>
                 <button id="sbSaveGameBtn" onclick="sbSaveLoadedGame()" disabled style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to Supabase</button>
-                <button id="sbReanalyzeBtn" onclick="sbReanalyzeAndSave()" disabled title="Strip any stale eval/variations, run a fresh Stockfish pass, and save back to Supabase" style="background: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Re-analyze &amp; Save</button>
+                <button id="sbReanalyzeBtn" onclick="sbReanalyze()" disabled title="Strip any stale eval/variations and run a fresh Stockfish pass on the loaded game — does NOT save; AI it / AI Comments first, then Save to Supabase" style="background: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Re-analyze</button>
             </div>
             <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                 <button id="sbAddToReportBtn" onclick="sbAddToReport()" disabled title="Add the selected game to the report list" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">+ Add to Report</button>
@@ -5295,6 +5294,7 @@
         async function aiCommentKeyMoves() {
             const btn = document.getElementById('aiCommentsBtn');
             if (!window.moveTree) { showToast('Load a game to the board first'); return; }
+            // (button lives in the coach modal; React may re-render it away mid-call)
 
             let key = '';
             try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
@@ -5306,9 +5306,9 @@
 
             // Eval tags included so the model can see the real turning points
             const pgn = moveTreeToPgnWithEvals(window.moveTree);
-            btn.disabled = true;
-            const origText = btn.textContent;
-            btn.textContent = 'Commenting…';
+            if (btn) btn.disabled = true;
+            const origText = btn ? btn.textContent : '';
+            if (btn) btn.textContent = 'Commenting…';
             try {
                 const r = await fetch('/api/chat', {
                     method: 'POST',
@@ -5341,8 +5341,8 @@
                 showToast('AI comments failed: ' + e.message);
                 log('AI comments failed: ' + e.message, 'warning');
             } finally {
-                btn.disabled = false;
-                btn.textContent = origText;
+                const btnNow = document.getElementById('aiCommentsBtn');
+                if (btnNow) { btnNow.disabled = false; btnNow.textContent = origText || btnNow.textContent; }
             }
         }
 
@@ -5551,7 +5551,10 @@
             return { pgn: finalPgn, depth };
         }
 
-        async function sbReanalyzeAndSave() {
+        // Re-analyze WITHOUT saving: the save step is the separate orange
+        // "Save to Supabase" button, so the AI steps can happen in between —
+        // Re-analyze -> coach analysis -> AI Comments (graft) -> Save.
+        async function sbReanalyze() {
             const statusEl = document.getElementById('sbStatus');
             const btn = document.getElementById('sbReanalyzeBtn');
             if (!window.supabaseLoadedGame) return;
@@ -5579,22 +5582,13 @@
                 const finalPgn = annotated.pgn;
                 const depth = annotated.depth;
 
-                statusEl.textContent = 'Saving to Supabase...';
-                const r = await fetch('/api/games', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'save', source, game_id, pgn: finalPgn }),
-                });
-                const data = await r.json();
-                if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
-
                 applyPgnStringToBoard(finalPgn); // resets window.supabaseLoadedGame — set it after
                 window.currentLoadedPgn = finalPgn;
                 window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(finalPgn), label };
                 sbRefreshGameLink();
                 document.getElementById('sbSaveGameBtn').disabled = false;
-                statusEl.textContent = `Re-analyzed and saved ${source}/${game_id} (depth ${depth}).`;
-                log('Re-analyzed and saved to Supabase (' + source + '/' + game_id + ')', 'success');
+                statusEl.textContent = `Re-analyzed ${source}/${game_id} (depth ${depth}) — not saved. AI it / AI Comments, then Save to Supabase.`;
+                log('Re-analyzed ' + source + '/' + game_id + ' (not saved yet)', 'success');
             } catch (e) {
                 statusEl.textContent = 'Re-analyze failed: ' + e.message;
                 log('Re-analyze failed: ' + e.message, 'warning');
@@ -13869,6 +13863,16 @@ ${contentToAnalyze}`;
                         >
                             🤖 Analyze with Chess Coach
                         </button>
+
+                        {/* AI Comments — graft one-line AI notes into the PGN on the board */}
+                        <button
+                            id="aiCommentsBtn"
+                            onClick={() => window.aiCommentKeyMoves && window.aiCommentKeyMoves()}
+                            style={{ ...styles.button, background: '#9b59b6', color: 'white' }}
+                        >
+                            💬 AI Comments → PGN
+                        </button>
+                        <span style={{ fontSize: '12px', color: '#888' }}>analyze, then click AI Comments to integrate into the PGN</span>
 
                         {/* Analyze current move (cheap model) */}
                         <button
