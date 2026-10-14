@@ -10921,6 +10921,10 @@
             const copyPgnBtn = document.getElementById('copyPgnBtn');
             if (copyPgnBtn) {
                 copyPgnBtn.addEventListener('click', async function() {
+                    // When a game is on the board, copy the tree (variations + grafted
+                    // AI comments) like the mini Copy PGN does — the textarea is the
+                    // raw pre-analysis PGN and doesn't have them. No tree = textarea.
+                    if (window.moveTree) { copyPgnToClipboard(); return; }
                     const pgn = document.getElementById('pgnInput').value.trim();
                     if (!pgn) {
                         copyPgnBtn.textContent = 'No PGN!';
