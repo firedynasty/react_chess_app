@@ -1000,6 +1000,28 @@
         </div>
         <div id="pzNoteDisplay" style="display: none; margin-top: 8px; padding: 10px; background: #0f3460; border-radius: 5px; color: #eee; font-size: 14px;"></div>
       </div>
+      <!-- Next-comment bar: shows ONE comment (current or next up) above the board, so it stays visible however narrow the window or long the move list is -->
+      <div id="boardCommentBar" style="display: none; margin: 12px auto; max-width: 1200px; font-family: monospace; font-size: 13px; line-height: 1.6;"></div>
+      <div id="lnSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
+        <div style="color: #888; margin-bottom: 8px;">Supabase Lines (chess_* tables) — save the PGN on the board (comments + variations); load by row # or name, or ?line=<# or name></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <select id="lnTableSelect" onchange="lnLoadRows()" title="Which chess_* table to save to / load from" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="chess_lines">chess_lines</option>
+          </select>
+          <input type="text" id="lnNameInput" placeholder="name, unique (e.g. chessable_cheesecake_1)" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <button onclick="lnSaveLine()" title="Save the game on the board as PGN (comments and variations included). Needs the same access code as the AI modal." style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save board PGN</button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
+          <select id="lnRowSelect" onchange="lnLoadSelectedRow()" style="flex: 1; min-width: 240px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">— rows load here —</option>
+          </select>
+          <input type="text" id="lnRowNumInput" placeholder="row # or name" onkeydown="if(event.key==='Enter')lnLoadRowByRef()" style="width: 170px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <button onclick="lnLoadRowByRef()" title="Load a row from the selected table onto the board — by row # (digits) or by exact name" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Load</button>
+          <button onclick="lnLoadRows()" title="Refresh the row list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
+        </div>
+        <div id="lnStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
+        <div id="lnLink" title="Link that loads this row (?line=<row # or name>) — click to select, then copy" style="margin-top: 4px; font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></div>
+      </div>
     </div>
     <!-- Hidden (not removed): JS still binds to these button IDs. Replace with supabase_fens_pgns content later. -->
     <div id="reportControls" style="display: none; margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -4284,6 +4306,194 @@
             }
             applyPgnStringToBoard(pgnString);
         }
+
+        // ============================================================
+        // SUPABASE LINES (chess_* tables) — save the board's PGN (comments +
+        // variations) to a Supabase table to learn from later, instead of going
+        // through Dropbox. Via /api/lines; writes need the same access code the
+        // AI modal uses ("Use Stanley's Key"); a row's # is its id.
+        // ============================================================
+        function lnStatus(msg) { const el = document.getElementById('lnStatus'); if (el) el.textContent = msg || ''; }
+        function lnTable() { return document.getElementById('lnTableSelect').value; }
+
+        // Same stored code as the report / AI-comments features. An sk- OpenAI
+        // key isn't an access code, so it's ignored here.
+        function lnAccessCode(forcePrompt) {
+            let code = '';
+            if (!forcePrompt) { try { code = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { } }
+            if (code.indexOf('sk-') === 0) code = '';
+            if (!code) {
+                code = (prompt('Access code (same as the AI modal) to save to Supabase:') || '').trim();
+                if (code) { try { localStorage.setItem('sbReportAccessCode', code); } catch (e) { } }
+            }
+            return code;
+        }
+
+        async function lnLoadTables() {
+            const sel = document.getElementById('lnTableSelect');
+            if (!sel) return;
+            try {
+                const r = await fetch('/api/lines?action=tables');
+                const names = await r.json();
+                if (!r.ok || !Array.isArray(names) || !names.length) throw new Error(names.error || 'no tables');
+                const prev = sel.value;
+                sel.innerHTML = names.map(n => '<option value="' + n + '">' + n + '</option>').join('');
+                if (names.indexOf(prev) !== -1) sel.value = prev;
+            } catch (e) { /* keep the default chess_lines option */ }
+            lnLoadRows();
+        }
+
+        async function lnLoadRows() {
+            const sel = document.getElementById('lnRowSelect');
+            if (!sel) return;
+            try {
+                const r = await fetch('/api/lines?' + new URLSearchParams({ action: 'list', table: lnTable() }));
+                const rows = await r.json();
+                if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
+                sel.innerHTML = '<option value="">— ' + rows.length + ' row' + (rows.length === 1 ? '' : 's') + ' in ' + lnTable() + ' —</option>' +
+                    rows.map(row => '<option value="' + row.id + '">#' + row.id + ' · ' + pzEsc(row.name) + '</option>').join('');
+                lnStatus('');
+            } catch (e) {
+                sel.innerHTML = '<option value="">— could not list ' + pzEsc(lnTable()) + ' —</option>';
+                lnStatus('List failed: ' + e.message + ' (has the table been created? see chess-rag/sql/chess_lines.sql)');
+            }
+        }
+
+        // PGN of the game on the board, comments + variations included. A game
+        // loaded from Supabase keeps its original headers; a From Position start
+        // gets its [FEN] so it reloads correctly.
+        function lnBoardPgn(name) {
+            if (!window.moveTree) return '';
+            const movetext = moveTreeToPgn(window.moveTree);
+            if (!movetext) return '';
+            let headers = window.supabaseLoadedGame && window.supabaseLoadedGame.headerBlock
+                ? window.supabaseLoadedGame.headerBlock.trim() : '';
+            if (!headers) {
+                headers = '[Event "' + name.replace(/"/g, "'") + '"]';
+                const startFen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+                if (window.moveTree.fen && window.moveTree.fen !== startFen) {
+                    headers += '\n[Variant "From Position"]\n[FEN "' + window.moveTree.fen + '"]';
+                }
+            }
+            return headers + '\n\n' + movetext;
+        }
+
+        async function lnSaveLine() {
+            const name = document.getElementById('lnNameInput').value.trim();
+            if (!window.moveTree) { showToast('Load a game to the board first'); return; }
+            if (!name) { showToast('Enter a name for this line'); return; }
+            const pgn = lnBoardPgn(name);
+            if (!pgn) { showToast('Nothing on the board to save'); return; }
+
+            let code = lnAccessCode(false);
+            if (!code) { lnStatus('Save cancelled — no access code'); return; }
+            lnStatus('Saving to ' + lnTable() + '…');
+            try {
+                let res, data;
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    res = await fetch('/api/lines', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'save', table: lnTable(), name, pgn, accessCode: code })
+                    });
+                    data = await res.json().catch(() => ({}));
+                    if (res.status !== 401 || attempt === 1) break;
+                    // wrong / stale stored code: ask again once
+                    try { localStorage.removeItem('sbReportAccessCode'); } catch (e) { }
+                    code = lnAccessCode(true);
+                    if (!code) break;
+                }
+                if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+                const id = data.row && data.row.id;
+                lnStatus('Saved as row #' + id + ' in ' + lnTable() + '.');
+                showToast('Saved as row #' + id);
+                document.getElementById('lnNameInput').value = '';
+                lnShowLink(lnTable(), data.row);
+                await lnLoadRows();
+                if (id) document.getElementById('lnRowSelect').value = String(id);
+            } catch (e) {
+                lnStatus('');
+                showToast('Save failed: ' + e.message);
+            }
+        }
+
+        // Link that loads a row: ?line=<name> when the name is URL-safe, else ?line=<row #>
+        // (&table=... only when not chess_lines)
+        function lnShowLink(table, row) {
+            const el = document.getElementById('lnLink');
+            if (!el) return;
+            if (!row || !row.id) { el.textContent = ''; return; }
+            const ref = row.name && /^[A-Za-z0-9_.-]+$/.test(row.name) ? row.name : row.id;
+            el.textContent = 'https://react-chess-app-1.vercel.app/?line=' + ref + (table !== 'chess_lines' ? '&table=' + table : '');
+        }
+
+        // ref = row # (all digits) or a row's exact name
+        async function lnLoadRow(ref, table) {
+            ref = String(ref).trim();
+            table = table || lnTable();
+            const tsel = document.getElementById('lnTableSelect');
+            if (table !== tsel.value) { // URL / caller named a different table: reflect it in the dropdown
+                if (!Array.from(tsel.options).some(o => o.value === table)) tsel.add(new Option(table, table));
+                tsel.value = table;
+                lnLoadRows();
+            }
+            const byId = /^\d+$/.test(ref);
+            lnStatus('Loading ' + (byId ? 'row #' + ref : '"' + ref + '"') + '…');
+            try {
+                const q = { action: 'get', table };
+                q[byId ? 'id' : 'name'] = ref;
+                const r = await fetch('/api/lines?' + new URLSearchParams(q));
+                const row = await r.json();
+                if (!r.ok) throw new Error(row.error || ('HTTP ' + r.status));
+                applyPgnStringToBoard(row.pgn);
+                window.currentLoadedPgn = row.pgn;
+                const ta = document.getElementById('pgnInput');
+                if (ta) ta.value = row.pgn;
+                lnStatus('Loaded row #' + row.id + ' — ' + row.name);
+                lnShowLink(table, row);
+                const rsel = document.getElementById('lnRowSelect');
+                if (rsel) rsel.value = String(row.id);
+            } catch (e) {
+                lnStatus('Load failed: ' + e.message);
+            }
+        }
+
+        function lnLoadSelectedRow() {
+            const id = document.getElementById('lnRowSelect').value;
+            if (id) lnLoadRow(id);
+        }
+
+        function lnLoadRowByRef() {
+            const ref = document.getElementById('lnRowNumInput').value.trim();
+            if (!ref) { showToast('Enter a row # or a name'); return; }
+            lnLoadRow(ref);
+        }
+
+        // Deep link: /?line=12 or /?line=chessable_cheesecake_1 (optionally
+        // &table=chess_other) loads that row onto the board on page open. Waits
+        // for the board like the ?game_id= loader.
+        function lnLoadLineFromUrlParam() {
+            const params = new URLSearchParams(window.location.search);
+            const ref = (params.get('line') || '').trim();
+            if (!ref || ref.length > 200) return;
+            const table = params.get('table') || 'chess_lines';
+            if (!/^chess_[a-z0-9_]+$/.test(table)) { lnStatus('Bad table in URL: ' + table); return; }
+            let attempt = 0;
+            const timer = setInterval(function () {
+                attempt++;
+                if (window.board2 && window.updateFileSectionHeader) {
+                    clearInterval(timer);
+                    lnLoadRow(ref, table);
+                } else if (attempt >= 100) { // ~10s
+                    clearInterval(timer);
+                    lnStatus('Board never finished loading — could not auto-load line "' + ref + '"');
+                }
+            }, 100);
+        }
+        window.lnLoadLineFromUrlParam = lnLoadLineFromUrlParam; // callable from devtools for debugging
+
+        document.addEventListener('DOMContentLoaded', lnLoadTables);
+        document.addEventListener('DOMContentLoaded', lnLoadLineFromUrlParam);
 
         // ============================================================
         // SUPABASE PUZZLES (FENs / PGNs) — ported from vercel_fen_saver, via /api/puzzles
@@ -8570,29 +8780,23 @@
 
             if (comments.length === 0) {
                 container.style.display = 'none';
-                // Also remove inline comments from moveTableContainer
-                const existingInline = document.getElementById('moveTableCommentsContainer');
-                if (existingInline) existingInline.remove();
+                const emptyBar = document.getElementById('boardCommentBar');
+                if (emptyBar) { emptyBar.innerHTML = ''; emptyBar.style.display = 'none'; }
                 return;
             }
 
-            // Keep original allCommentsContainer hidden; comments shown inline in moveTableContainer
+            // Keep original allCommentsContainer hidden; the next comment shows in #boardCommentBar
             container.style.display = 'none';
 
             // Get current node ID for highlighting
             const currentNodeId = window.currentMoveNode ? window.currentMoveNode.nodeId : null;
             const currentFlatIndex = window.studyReportPositionIndex;
 
-            // Also build an inline comments section inside moveTableContainer
-            const moveTableEl = document.getElementById('moveTableContainer');
-            let inlineContainer = document.getElementById('moveTableCommentsContainer');
-            if (moveTableEl) {
-                if (inlineContainer) inlineContainer.remove();
-                inlineContainer = document.createElement('div');
-                inlineContainer.id = 'moveTableCommentsContainer';
-                inlineContainer.style.cssText = 'margin-top: 10px; padding-top: 8px; border-top: 1px solid #1a1a2e; font-size: 12px; line-height: 1.6;';
-                moveTableEl.appendChild(inlineContainer);
-            }
+            // Drop the old inline list under the move table (replaced by the bar)
+            const staleInline = document.getElementById('moveTableCommentsContainer');
+            if (staleInline) staleInline.remove();
+            const inlineContainer = document.getElementById('boardCommentBar');
+            if (inlineContainer) { inlineContainer.innerHTML = ''; inlineContainer.style.display = 'block'; }
 
             // Map each comment to a ply (half-move) number, like a dictionary keyed by move label,
             // then highlight the first comment at or after the current position.
@@ -8610,18 +8814,10 @@
                 if (ply >= curPly && ply < bestPly) { bestPly = ply; highlightIdx = i; }
             });
 
-            // Under the move table only two cards show at a time: the highlighted
-            // comment (current, or next up) and the main-line comment after it.
-            // Past the last comment (nothing highlighted) the final two stay up.
+            // Only ONE card shows: the highlighted comment (the current move's, else the
+            // next one ahead). Past the last comment the final one stays up.
             const shownIdx = new Set();
-            if (highlightIdx >= 0) {
-                shownIdx.add(highlightIdx);
-                for (let j = highlightIdx + 1; j < comments.length; j++) {
-                    if (comments[j].isMainLine !== false) { shownIdx.add(j); break; }
-                }
-            } else {
-                comments.slice(-2).forEach((c, k, arr) => shownIdx.add(comments.length - arr.length + k));
-            }
+            shownIdx.add(highlightIdx >= 0 ? highlightIdx : comments.length - 1);
 
             comments.forEach((c, idx) => {
                 const commentDiv = document.createElement('div');
@@ -8670,19 +8866,16 @@
 
                 container.appendChild(commentDiv);
 
-                // Also append an inline entry to the moveTable comments container
+                // Show this comment as the single card in #boardCommentBar
                 if (inlineContainer && shownIdx.has(idx)) {
                     const inlineEntry = document.createElement('div');
                     inlineEntry.style.cursor = 'pointer';
-                    inlineEntry.style.padding = '5px 10px';
-                    inlineEntry.style.marginBottom = '4px';
-                    inlineEntry.style.borderRadius = '4px';
-                    inlineEntry.style.background = 'rgba(0, 0, 0, 0.3)';
-                    inlineEntry.style.borderLeft = '3px solid transparent';
-                    if (isCurrent) {
-                        inlineEntry.style.background = 'rgba(0, 0, 0, 0.55)';
-                        inlineEntry.style.borderLeft = '3px solid #ffd700';
-                    }
+                    // Single card in the bar: same panel look as the sections around it,
+                    // gold edge always (it is the one comment being shown)
+                    inlineEntry.style.padding = '10px';
+                    inlineEntry.style.borderRadius = '8px';
+                    inlineEntry.style.background = '#16213e';
+                    inlineEntry.style.borderLeft = '3px solid #ffd700';
                     const inlineLabel = document.createElement('span');
                     const inlineAnnotationColor = getAnnotationColor(c.annotation);
                     inlineLabel.style.color = inlineAnnotationColor || (c.isMainLine ? '#00d4ff' : '#888');
@@ -13828,6 +14021,8 @@ ${contentToAnalyze}`;
                                         setAccessCode(code);
                                         setUseSharedKey(true);
                                         setApiKey('');
+                                        // One code unlocks everything: Save board PGN / AI Comments read this
+                                        try { localStorage.setItem('sbReportAccessCode', code.trim()); } catch (e) { }
                                     }
                                 }}
                                 style={{
