@@ -742,6 +742,7 @@
                 <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
                 <button id="dbPgnBtn" title="Sign in to Dropbox, then pick a .pgn file to load to the board" style="background: #0061fe; color: white;">Dropbox PGN</button>
                 <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
+                <button id="aiCommentsBtn" onclick="aiCommentKeyMoves()" title="Ask the AI for fresh one-line comments on the key moves of the game on the board and wrap them into the PGN as { comments } (cheesecake style — Copy PGN / Download then carry them)" style="background: #9b59b6; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">AI Comments</button>
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
             </div>
 
@@ -1869,6 +1870,11 @@
 
         // Star button: gold when the current move has a coach note, dim otherwise
         function updateCoachNoteButton() {
+            // New coach text (AI run, Doc loaded) → rebuild the comment cards, which merge it in
+            if (window._coachSrcForComments !== window.textViewRawContent) {
+                window._coachSrcForComments = window.textViewRawContent;
+                if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
+            }
             var hasNote = !!findCoachNoteForCurrentMove();
             ['coachNoteBtn', 'coachNoteBtnMini'].forEach(function(id) {
                 var btn = document.getElementById(id);
@@ -5279,6 +5285,102 @@
         }
 
         // =====================================================================
+        // AI COMMENTS — ask the model for fresh one-line comments on the key
+        // moves of the game on the board, then graft them into the move tree
+        // as { comments } (the cheesecake_31827.pgn style: terse, thematic,
+        // only on the moves that matter). The LLM returns text only; all
+        // grafting is done here by move number + SAN, so moves/evals/
+        // variations can never be altered. Copy PGN / Download / Dropbox
+        // save then carry the comments out.
+        async function aiCommentKeyMoves() {
+            const btn = document.getElementById('aiCommentsBtn');
+            if (!window.moveTree) { showToast('Load a game to the board first'); return; }
+
+            let key = '';
+            try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
+            if (!key) {
+                key = (prompt('AI comments need an access code (or your own OpenAI API key, sk-…):') || '').trim();
+                if (key) { try { localStorage.setItem('sbReportAccessCode', key); } catch (e) { } }
+            }
+            if (!key) { showToast('AI comments cancelled — no access code'); return; }
+
+            // Eval tags included so the model can see the real turning points
+            const pgn = moveTreeToPgnWithEvals(window.moveTree);
+            btn.disabled = true;
+            const origText = btn.textContent;
+            btn.textContent = 'Commenting…';
+            try {
+                const r = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'gpt-4.1-mini',
+                        accessCode: key.indexOf('sk-') === 0 ? undefined : key,
+                        userApiKey: key.indexOf('sk-') === 0 ? key : undefined,
+                        messages: [{
+                            role: 'user',
+                            content:
+                                'Annotate this chess game with short coaching comments. Output ONLY lines in this exact format, nothing else:\n' +
+                                '8. c4 { Classical cheesecake style. }\n' +
+                                '10... Ne4 { Reasonable idea but easily rebuffed. }\n' +
+                                'Rules:\n' +
+                                '- Comment only the 6-12 most instructive moves (turning points, strategic ideas, critical mistakes). Skip routine moves.\n' +
+                                '- ONE short sentence per comment, about 15 words max, evocative and thematic.\n' +
+                                '- Use the [%eval] tags to find the real turning points.\n' +
+                                '- No markdown, no fences, no extra text — just the lines.\n\n' +
+                                pgn
+                        }]
+                    })
+                });
+                const data = await r.json().catch(function () { return {}; });
+                if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+                const applied = graftAiComments(data.content || '');
+                showToast(applied > 0 ? ('AI comments added to ' + applied + ' move' + (applied > 1 ? 's' : '')) : 'No comment lines parsed from the AI reply');
+                log('AI comments grafted onto ' + applied + ' moves', applied > 0 ? 'success' : 'warning');
+            } catch (e) {
+                showToast('AI comments failed: ' + e.message);
+                log('AI comments failed: ' + e.message, 'warning');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = origText;
+            }
+        }
+
+        // Parse "12. f5 { ... }" / "12... exf5 { ... }" lines and graft each
+        // comment onto the matching main-line node. Returns how many landed.
+        // A line whose SAN doesn't match the game is skipped, never forced.
+        function graftAiComments(text) {
+            const wanted = {};
+            String(text || '').split('\n').forEach(function (line) {
+                const m = line.replace(/\*+/g, '').match(/^\s*(?:[-•]\s*)?(\d+)(\.\.\.|\.)\s*(\S+)?\s*\{([^{}]*)\}/);
+                if (!m || !m[4].trim()) return;
+                const key = m[1] + m[2];
+                (wanted[key] = wanted[key] || []).push({ san: m[3] || null, comment: m[4].trim() });
+            });
+            let applied = 0, skipped = 0;
+            let node = window.moveTree.children && window.moveTree.children[0];
+            while (node && node.san) {
+                const list = wanted[node.moveNumber + (node.isBlackMove ? '...' : '.')] || [];
+                // Duplicated lines for one move: prefer the entry whose SAN matches
+                const w = list.find(function (x) { return x.san && x.san.replace(/[!?]+$/, '') === node.san.replace(/[!?]+$/, ''); }) ||
+                          list.find(function (x) { return !x.san; });
+                if (list.length && !w) {
+                    skipped++;
+                } else if (w) {
+                    node.comment = node.comment ? node.comment + ' ' + w.comment : w.comment;
+                    applied++;
+                }
+                node = node.children && node.children[0];
+            }
+            if (skipped) log('AI comments: skipped ' + skipped + ' line(s) whose SAN did not match the game', 'warning');
+            if (applied) {
+                renderMoveTable(window.moveTree);
+                updateAllCommentsDisplay();
+            }
+            return applied;
+        }
+
+        // =====================================================================
         // RE-ANALYZE & SAVE — strip any stale eval/variation annotations from
         // the loaded Supabase game (clocks are kept), run a fresh full-game
         // Stockfish pass (per-move [%eval] + best-line variations on
@@ -7398,26 +7500,11 @@
             pgnTextarea.value = pgnWithOpening;
             log('Loaded game: ' + selectedLabel, 'info');
 
-            // Load PGN into board2 for navigation
-            if (game.pgn && typeof window.parsePgnToPositions === 'function') {
-                let cleanedPgn = game.pgn;
-                if (typeof AnalysisChess !== 'undefined') {
-                    cleanedPgn = AnalysisChess.cleanPgn(game.pgn);
-                } else if (typeof cleanPgn === 'function') {
-                    cleanedPgn = cleanPgn(game.pgn);
-                }
-
-                window.studyReportPositions = window.parsePgnToPositions(cleanedPgn);
-                window.studyReportPositionIndex = 0;
-
-                if (window.studyReportPositions && window.studyReportPositions.length > 0) {
-                    if (window.board2) {
-                        window.board2.position(window.studyReportPositions[0]);
-                        updateBoard2MoveIndicator(0);
-                    }
-                    log(`Loaded ${window.studyReportPositions.length} positions to board`, 'success');
-                }
-            }
+            // Load onto board2 the same way Dropbox/paste does: full move tree, move
+            // table, variations, comment cards and the coach ⭐ all work (the old flat
+            // position list had none of those).
+            applyPgnStringToBoard(pgnWithOpening);
+            log('Loaded game to board', 'success');
         }
 
         // =====================================================================
@@ -8280,6 +8367,20 @@
         /**
          * Collect all comments from the move tree
          */
+        // One-line form of a coach note for the comment cards: "Best: X. Lesson: Y"
+        // when the AI used its usual layout, else the first body sentence(s).
+        function summarizeCoachNote(text) {
+            const clean = String(text || '').replace(/\*\*/g, '').replace(/\*([^*\n]+)\*/g, '$1');
+            const best = clean.match(/Best move instead:\s*([^\n(]+?)\s*(?:\(|\n|$)/i);
+            const lesson = clean.match(/Lesson:\s*([^\n]+)/i);
+            const parts = [];
+            if (best) parts.push('Best: ' + best[1].trim().replace(/[.\s]+$/, ''));
+            if (lesson) parts.push('Lesson: ' + lesson[1].trim());
+            if (parts.length) return parts.join('. ');
+            const body = clean.split('\n').slice(1).map(l => l.replace(/^\s*[-•]\s*/, '').trim()).filter(Boolean).join(' ');
+            return body.length > 200 ? body.slice(0, 197).replace(/\s+\S*$/, '') + '…' : body;
+        }
+
         function collectAllComments(rootNode) {
             const comments = [];
 
@@ -8440,6 +8541,39 @@
                 });
             }
 
+            // Tree mode: show the AI coach notes (⭐ source) as comments on their moves,
+            // merged with the game's own PGN comments. Display only — nothing is saved
+            // into the PGN. [%eval]/[%clk] tags are dropped from the cards so an
+            // engine-annotated game doesn't bury the real comments.
+            if (window.moveTree) {
+                comments = comments.map(c => Object.assign({}, c, {
+                    comment: c.comment.replace(/\[%(?:eval|clk)[^\]]*\]/g, '').replace(/\s+/g, ' ').trim()
+                })).filter(c => c.comment);
+                const coachMap = getCoachMoveNotes().map;
+                const plyOfNode = (n, b) => n * 2 - (b ? 0 : 1);
+                let walk = window.moveTree.children && window.moveTree.children[0];
+                while (walk && walk.san) {
+                    const entry = coachMap[walk.moveNumber + (walk.isBlackMove ? '...' : '.')];
+                    if (entry && (!entry.san || entry.san === walk.san)) {
+                        const note = summarizeCoachNote(entry.text);
+                        const existing = comments.find(c => c.nodeId === walk.nodeId);
+                        if (note && existing) {
+                            existing.comment = existing.comment + ' — ⭐ ' + note;
+                        } else if (note) {
+                            const ply = plyOfNode(walk.moveNumber, walk.isBlackMove);
+                            const newC = {
+                                moveNumber: walk.moveNumber, san: walk.san, annotation: walk.annotation || '',
+                                comment: '⭐ ' + note, nodeId: walk.nodeId, isBlackMove: walk.isBlackMove, isMainLine: true
+                            };
+                            let at = comments.findIndex(c => c.isMainLine !== false && plyOfNode(c.moveNumber, c.isBlackMove) > ply);
+                            if (at < 0) at = comments.length;
+                            comments.splice(at, 0, newC);
+                        }
+                    }
+                    walk = walk.children && walk.children[0];
+                }
+            }
+
             if (comments.length === 0) {
                 container.style.display = 'none';
                 // Also remove inline comments from moveTableContainer
@@ -8481,6 +8615,19 @@
                 const ply = c.flatIndex !== undefined ? c.flatIndex + 1 : plyOf(c.moveNumber, c.isBlackMove);
                 if (ply >= curPly && ply < bestPly) { bestPly = ply; highlightIdx = i; }
             });
+
+            // Under the move table only two cards show at a time: the highlighted
+            // comment (current, or next up) and the main-line comment after it.
+            // Past the last comment (nothing highlighted) the final two stay up.
+            const shownIdx = new Set();
+            if (highlightIdx >= 0) {
+                shownIdx.add(highlightIdx);
+                for (let j = highlightIdx + 1; j < comments.length; j++) {
+                    if (comments[j].isMainLine !== false) { shownIdx.add(j); break; }
+                }
+            } else {
+                comments.slice(-2).forEach((c, k, arr) => shownIdx.add(comments.length - arr.length + k));
+            }
 
             comments.forEach((c, idx) => {
                 const commentDiv = document.createElement('div');
@@ -8530,7 +8677,7 @@
                 container.appendChild(commentDiv);
 
                 // Also append an inline entry to the moveTable comments container
-                if (inlineContainer) {
+                if (inlineContainer && shownIdx.has(idx)) {
                     const inlineEntry = document.createElement('div');
                     inlineEntry.style.cursor = 'pointer';
                     inlineEntry.style.padding = '5px 10px';
@@ -12740,6 +12887,7 @@ End with a Socratic question about a specific position to help me learn.`
         // Available models
         const openaiModels = {
             'GPT-4o Mini ($0.15/M)': 'gpt-4o-mini',
+            'GPT-4.1 Mini ($0.40/M)': 'gpt-4.1-mini',
             'GPT-4o': 'gpt-4o',
             'GPT-4 Turbo': 'gpt-4-turbo',
             'o1': 'o1',
