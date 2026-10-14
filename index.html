@@ -1165,7 +1165,7 @@
             </defs>
           </svg>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves (⌘[ = back) | ↓ or Enter = ⭐ coach note | ↑ = close note / exit variation | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves (⌘[ = back) | Enter = ⭐ coach note | ↑ or ↓ = close note / exit variation | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -11714,9 +11714,18 @@
                     if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
                     e.preventDefault();
                 } else if (e.key === 'ArrowDown') {
-                    // ArrowDown = open the coach note modal (same as the ⭐ button)
-                    const coachBtn = document.getElementById('coachNoteBtn');
-                    if (coachBtn) coachBtn.click();
+                    // ArrowDown = same as the ↑ Up Out button: exit the variation
+                    // back to the main line (cycle out when there's nothing to
+                    // exit). If the coach note modal is open it closes instead,
+                    // mirroring ArrowUp. The ⭐ note still opens via Enter or the
+                    // ⭐ button.
+                    const tvModalDown = document.getElementById('textViewModal');
+                    if (tvModalDown && tvModalDown.style.display !== 'none') {
+                        tvModalDown.style.display = 'none';
+                        e.preventDefault();
+                        return;
+                    }
+                    if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
                     e.preventDefault();
                 } else if (e.key === 'Tab') {
                     // Tab = same as Cycle Var.: enter the variation, step through its
