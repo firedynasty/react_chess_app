@@ -14124,15 +14124,16 @@ ${contentToAnalyze}`;
                             Copy Chat
                         </button>
 
-                        {/* Save as new Google Doc (named with date/time) */}
+                        {/* Save as Google Doc (new Doc, named with date/time) */}
                         <button
                             onClick={saveChatAsNewDoc}
                             disabled={savingDoc}
                             title="Save this chat as a new Google Doc in Drive: Documents/notes/hobbies/chess/games"
                             style={{ ...styles.button, background: '#6c5ce7', color: 'white', opacity: savingDoc ? 0.6 : 1 }}
                         >
-                            {savingDoc ? 'Saving…' : 'Save as New Doc'}
+                            {savingDoc ? 'Saving…' : 'Save as Google Doc'}
                         </button>
+                        <span style={{ fontSize: '12px', color: '#888' }}>will be saved in Documents/notes/hobbies/chess/games</span>
 
                         {/* Append only the last Ask-Coach Q&A (the selected move) to the loaded Doc */}
                         <button
