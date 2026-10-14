@@ -1001,7 +1001,6 @@
         <div id="pzNoteDisplay" style="display: none; margin-top: 8px; padding: 10px; background: #0f3460; border-radius: 5px; color: #eee; font-size: 14px;"></div>
       </div>
       <!-- Next-comment bar: shows ONE comment (current or next up) above the board, so it stays visible however narrow the window or long the move list is -->
-      <div id="boardCommentBar" style="display: none; margin: 12px auto; max-width: 1200px; font-family: monospace; font-size: 13px; line-height: 1.6;"></div>
       <div id="lnSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
         <div style="color: #888; margin-bottom: 8px;">Supabase Lines (chess_* tables) — save the PGN on the board (comments + variations); load by row # or name, or ?line=<# or name></div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -1022,6 +1021,7 @@
         <div id="lnStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
         <div id="lnLink" title="Link that loads this row (?line=<row # or name>) — click to select, then copy" style="margin-top: 4px; font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></div>
       </div>
+      <div id="boardCommentBar" style="display: none; margin: 12px auto; max-width: 1200px; font-family: monospace; font-size: 13px; line-height: 1.6;"></div>
     </div>
     <!-- Hidden (not removed): JS still binds to these button IDs. Replace with supabase_fens_pgns content later. -->
     <div id="reportControls" style="display: none; margin: 20px auto; padding: 12px 15px; background: #16213e; border-radius: 8px; max-width: 1200px; align-items: center; gap: 12px; flex-wrap: wrap;">
