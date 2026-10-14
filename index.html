@@ -8713,6 +8713,15 @@
         /**
          * Update the all comments display panel
          */
+        // The single comment card alternates look by the comment's index (0, 1, 2 …):
+        // even = navy + gold edge, odd = dark teal + cyan edge, so stepping to the
+        // next comment visibly flips the card — easy to catch in peripheral vision.
+        function commentCardTheme(idx) {
+            return idx % 2 === 0
+                ? { bg: '#16213e', edge: '#ffd700' }
+                : { bg: '#0d3b44', edge: '#00d4ff' };
+        }
+
         function updateAllCommentsDisplay() {
             const container = document.getElementById('allCommentsContainer');
             if (!container) return;
@@ -8870,12 +8879,13 @@
                 if (inlineContainer && shownIdx.has(idx)) {
                     const inlineEntry = document.createElement('div');
                     inlineEntry.style.cursor = 'pointer';
-                    // Single card in the bar: same panel look as the sections around it,
-                    // gold edge always (it is the one comment being shown)
+                    // Single card in the bar: panel look, alternating by comment index
+                    // (commentCardTheme) so each new comment is visibly different
+                    const theme = commentCardTheme(idx);
                     inlineEntry.style.padding = '10px';
                     inlineEntry.style.borderRadius = '8px';
-                    inlineEntry.style.background = '#16213e';
-                    inlineEntry.style.borderLeft = '3px solid #ffd700';
+                    inlineEntry.style.background = theme.bg;
+                    inlineEntry.style.borderLeft = '4px solid ' + theme.edge;
                     const inlineLabel = document.createElement('span');
                     const inlineAnnotationColor = getAnnotationColor(c.annotation);
                     inlineLabel.style.color = inlineAnnotationColor || (c.isMainLine ? '#00d4ff' : '#888');
