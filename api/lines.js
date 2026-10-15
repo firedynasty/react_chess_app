@@ -12,7 +12,8 @@
 //   GET  /api/lines?action=list&table=chess_lines&limit=500
 //   GET  /api/lines?action=get&table=chess_lines&id=12          (row # = id)
 //   GET  /api/lines?action=get&table=chess_lines&name=chessable_cheesecake_1
-//   POST /api/lines  { action: "save", table, name, pgn, accessCode }
+//   POST /api/lines  { action: "save", table, name, pgn, accessCode[, replace: true] }
+//                    replace:true overwrites the pgn of an existing row with that name
 //                    -> writes require accessCode === process.env.ACCESS_CODE
 
 const TABLE_RE = /^chess_[a-z0-9_]+$/;
@@ -40,13 +41,13 @@ export default async function handler(req, res) {
 
       if (action === 'tables') {
         // PostgREST publishes its schema at the API root (service_role only).
-        // Offer chess_* tables that have a pgn column; fall back to chess_lines.
+        // Offer chess_* tables that have name + pgn columns; fall back to chess_lines.
         let names = [];
         try {
           const r = await fetch(`${url}/rest/v1/`, { headers });
           const spec = await r.json();
           const defs = (spec && spec.definitions) || {};
-          names = Object.keys(defs).filter(n => TABLE_RE.test(n) && defs[n].properties && defs[n].properties.pgn);
+          names = Object.keys(defs).filter(n => TABLE_RE.test(n) && defs[n].properties && defs[n].properties.name && defs[n].properties.pgn);
         } catch (e) { /* fall through to the default */ }
         if (!names.length) names = ['chess_lines'];
         return res.status(200).json(names.sort());
@@ -84,7 +85,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { action, table, name, pgn, accessCode } = req.body || {};
+      const { action, table, name, pgn, accessCode, replace } = req.body || {};
       if (action !== 'save') return res.status(400).json({ error: 'Unknown action. Use action=save' });
 
       const validAccessCode = process.env.ACCESS_CODE;
@@ -104,9 +105,9 @@ export default async function handler(req, res) {
         return res.status(413).json({ error: 'PGN too large' });
       }
 
-      const r = await fetch(`${url}/rest/v1/${table}`, {
+      const r = await fetch(`${url}/rest/v1/${table}${replace ? '?on_conflict=name' : ''}`, {
         method: 'POST',
-        headers: { ...headers, Prefer: 'return=representation' },
+        headers: { ...headers, Prefer: (replace ? 'resolution=merge-duplicates,' : '') + 'return=representation' },
         body: JSON.stringify([{ name: String(name).trim(), pgn: String(pgn) }]),
       });
       const created = await r.json();

@@ -1009,6 +1009,7 @@
           </select>
           <input type="text" id="lnNameInput" placeholder="name, unique (e.g. chessable_cheesecake_1)" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
           <button onclick="lnSaveLine()" title="Save the game on the board as PGN (comments and variations included). Needs the same access code as the AI modal." style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save board PGN</button>
+          <button onclick="lnSaveGamePositions()" title="Save the game (if it has no Supabase home yet) plus one training position per flagged (?/??) or commented move — a few moves each, as From Position PGNs. Run Analyze / AI Comments first." style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save game + key positions</button>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
           <select id="lnRowSelect" onchange="lnLoadSelectedRow()" style="flex: 1; min-width: 240px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
@@ -1018,6 +1019,24 @@
           <button onclick="lnLoadRowByRef()" title="Load a row from the selected table onto the board — by row # (digits) or by exact name" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Load</button>
           <button onclick="lnLoadRows()" title="Refresh the row list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
         </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <span style="color: #888; font-size: 12px;">Positions:</span>
+          <select id="lnPosKind" onchange="lnPosFilterChanged()" title="Filter by kind" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">all kinds</option>
+            <option value="blunder">blunder</option>
+            <option value="idea">idea</option>
+            <option value="tactic">tactic</option>
+          </select>
+          <select id="lnPosGame" onchange="lnPosFilterChanged()" title="Filter by game" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">all games</option>
+          </select>
+          <button onclick="lnPosStep(-1)" title="Previous position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">◀</button>
+          <span id="lnPosCounter" style="color: #eee; min-width: 54px; text-align: center;">0/0</span>
+          <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
+          <button onclick="lnPosOpenGame()" title="Load the full game this position came from and jump to the move" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Open game</button>
+          <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
+        </div>
+        <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
         <div id="lnStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
         <div id="lnLink" title="Link that loads this row (?line=<row # or name>) — click to select, then copy" style="margin-top: 4px; font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></div>
       </div>
@@ -4385,24 +4404,11 @@
             const pgn = lnBoardPgn(name);
             if (!pgn) { showToast('Nothing on the board to save'); return; }
 
-            let code = lnAccessCode(false);
-            if (!code) { lnStatus('Save cancelled — no access code'); return; }
             lnStatus('Saving to ' + lnTable() + '…');
             try {
-                let res, data;
-                for (let attempt = 0; attempt < 2; attempt++) {
-                    res = await fetch('/api/lines', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'save', table: lnTable(), name, pgn, accessCode: code })
-                    });
-                    data = await res.json().catch(() => ({}));
-                    if (res.status !== 401 || attempt === 1) break;
-                    // wrong / stale stored code: ask again once
-                    try { localStorage.removeItem('sbReportAccessCode'); } catch (e) { }
-                    code = lnAccessCode(true);
-                    if (!code) break;
-                }
+                const out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn });
+                if (out.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                const res = out.res, data = out.data;
                 if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
                 const id = data.row && data.row.id;
                 lnStatus('Saved as row #' + id + ' in ' + lnTable() + '.');
@@ -4419,12 +4425,15 @@
 
         // Link that loads a row: ?line=<name> when the name is URL-safe, else ?line=<row #>
         // (&table=... only when not chess_lines)
+        function lnLineLink(table, row) {
+            const ref = row.name && /^[A-Za-z0-9_.-]+$/.test(row.name) ? row.name : row.id;
+            return 'https://react-chess-app-1.vercel.app/?line=' + ref + (table !== 'chess_lines' ? '&table=' + table : '');
+        }
+
         function lnShowLink(table, row) {
             const el = document.getElementById('lnLink');
             if (!el) return;
-            if (!row || !row.id) { el.textContent = ''; return; }
-            const ref = row.name && /^[A-Za-z0-9_.-]+$/.test(row.name) ? row.name : row.id;
-            el.textContent = 'https://react-chess-app-1.vercel.app/?line=' + ref + (table !== 'chess_lines' ? '&table=' + table : '');
+            el.textContent = row && row.id ? lnLineLink(table, row) : '';
         }
 
         // ref = row # (all digits) or a row's exact name
@@ -4453,8 +4462,10 @@
                 lnShowLink(table, row);
                 const rsel = document.getElementById('lnRowSelect');
                 if (rsel) rsel.value = String(row.id);
+                return true;
             } catch (e) {
                 lnStatus('Load failed: ' + e.message);
+                return false;
             }
         }
 
@@ -4467,6 +4478,220 @@
             const ref = document.getElementById('lnRowNumInput').value.trim();
             if (!ref) { showToast('Enter a row # or a name'); return; }
             lnLoadRow(ref);
+        }
+
+        // ---- Key positions: one From Position PGN per flagged / commented move ----
+        const LN_POS_PLIES = 10; // the move itself + the next moves, up to 5 full moves
+
+        // POST with the stored access code; asks once, and once more if the server says 401
+        async function lnPost(url, payload) {
+            let code = lnAccessCode(false);
+            if (!code) return { cancelled: true };
+            let res, data;
+            for (let attempt = 0; attempt < 2; attempt++) {
+                res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(Object.assign({}, payload, { accessCode: code }))
+                });
+                data = await res.json().catch(() => ({}));
+                if (res.status !== 401 || attempt === 1) break;
+                try { localStorage.removeItem('sbReportAccessCode'); } catch (e) { } // wrong / stale code
+                code = lnAccessCode(true);
+                if (!code) return { cancelled: true };
+            }
+            return { res, data };
+        }
+
+        // Engine tags are noise in a training position; keep only the human / AI text
+        function lnCleanComment(c) {
+            return String(c || '').replace(/\[%(?:eval|clk)[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        // Copy of a node plus up to `plies` plies of continuation (variations included), comments cleaned
+        function lnCloneLimited(node, plies) {
+            const copy = {
+                san: node.san, annotation: node.annotation || '', moveNumber: node.moveNumber,
+                isBlackMove: node.isBlackMove, comment: lnCleanComment(node.comment), children: []
+            };
+            if (plies > 1 && node.children) node.children.forEach(ch => copy.children.push(lnCloneLimited(ch, plies - 1)));
+            return copy;
+        }
+
+        // PGN movetext for [main, ...alternatives] starting at one position. Unlike
+        // moveTreeToPgn it keeps the alternatives to the FIRST move, and numbers a
+        // Black reply that follows a variation.
+        function lnSerializeLine(kids) {
+            const parts = [];
+            function head(n, numberBlack) {
+                if (!n.isBlackMove) parts.push(n.moveNumber + '.');
+                else if (numberBlack) parts.push(n.moveNumber + '...');
+                parts.push(n.san + n.annotation);
+                if (n.comment) parts.push('{' + n.comment + '}');
+            }
+            function walk(list, numberBlack) {
+                if (!list.length) return;
+                head(list[0], numberBlack);
+                for (let v = 1; v < list.length; v++) {
+                    parts.push('(');
+                    head(list[v], true);
+                    walk(list[v].children, false);
+                    parts.push(')');
+                }
+                walk(list[0].children, list.length > 1);
+            }
+            walk(kids, true);
+            return parts.join(' ');
+        }
+
+        // One row per main-line move that is flagged ? / ?? (blunder) or carries a
+        // human / AI comment (idea). The PGN starts from the position BEFORE the move.
+        function lnBuildPositions() {
+            const rows = [];
+            if (!window.moveTree) return rows;
+            let node = window.moveTree.children && window.moveTree.children[0];
+            while (node && node.san) {
+                const comment = lnCleanComment(node.comment);
+                const isOpeningLabel = /^[A-E]\d\d\b/.test(comment); // the ECO label added after move 1
+                const blunder = /^\?{1,2}$/.test(node.annotation || '');
+                const kind = blunder ? 'blunder' : (comment && !isOpeningLabel ? 'idea' : null);
+                const before = node.parent;
+                if (kind && before && before.fen) {
+                    const kids = (before.children || []).map(ch => lnCloneLimited(ch, LN_POS_PLIES));
+                    const headers = '[Event "Training position"]\n[Variant "From Position"]\n[FEN "' + before.fen + '"]';
+                    rows.push({ kind, pgn: headers + '\n\n' + lnSerializeLine(kids) });
+                }
+                node = node.children && node.children[0];
+            }
+            return rows;
+        }
+
+        async function lnSaveGamePositions() {
+            if (!window.moveTree) { showToast('Load a game to the board first'); return; }
+            const rows = lnBuildPositions();
+            if (!rows.length) { showToast('No flagged (?, ??) or commented moves — run Analyze / AI Comments first'); return; }
+            const blunders = rows.filter(r => r.kind === 'blunder').length;
+
+            try {
+                let game;
+                if (window.supabaseLoadedGame) {
+                    game = sbGetGameLink(); // already lives in Supabase: just point back at it
+                } else {
+                    const name = document.getElementById('lnNameInput').value.trim();
+                    if (!name) { showToast('This game has no Supabase home yet — enter a name to store it in ' + lnTable()); return; }
+                    const pgn = lnBoardPgn(name);
+                    lnStatus('Saving the game to ' + lnTable() + '…');
+                    let out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn });
+                    if (out.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                    if (out.res.status === 409) {
+                        if (!confirm('"' + name + '" already exists in ' + lnTable() + ' — overwrite its PGN and refresh its positions?')) {
+                            lnStatus('Cancelled — nothing saved');
+                            return;
+                        }
+                        out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn, replace: true });
+                        if (out.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                    }
+                    if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
+                    game = lnLineLink(lnTable(), out.data.row);
+                    lnShowLink(lnTable(), out.data.row);
+                    document.getElementById('lnNameInput').value = '';
+                    lnLoadRows();
+                }
+
+                lnStatus('Saving ' + rows.length + ' positions…');
+                const out2 = await lnPost('/api/positions', { action: 'save', game, rows });
+                if (out2.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                if (!out2.res.ok) throw new Error(out2.data.error || ('HTTP ' + out2.res.status) + ' (has chess_positions been created? see chess-rag/sql/chess_positions.sql)');
+                lnStatus('Saved ' + out2.data.saved + ' positions (' + blunders + ' blunder, ' + (rows.length - blunders) + ' idea) for ' + game);
+                showToast('Saved ' + out2.data.saved + ' positions');
+                await lnPosLoad();
+            } catch (e) {
+                lnStatus('');
+                showToast('Save failed: ' + e.message);
+            }
+        }
+
+        // ---- Cycle through the saved positions ----
+        let lnPosAll = [], lnPosView = [], lnPosIdx = -1;
+
+        function lnFenKey(fen) { return String(fen || '').split(' ').slice(0, 4).join(' '); }
+        function lnPosStartFen(pgn) { const m = String(pgn || '').match(/\[FEN\s+"([^"]+)"\]/); return m ? m[1] : ''; }
+        function lnPosFirstMove(pgn) {
+            const m = String(pgn || '').split(/\n\s*\n/).slice(1).join(' ').match(/^\s*(\d+\.(?:\.\.)?)\s*(\S+)/);
+            return m ? m[1] + ' ' + m[2] : '';
+        }
+        function lnPosGameLabel(game) {
+            if (!game) return '(no game)';
+            try {
+                const u = new URL(game);
+                return u.searchParams.get('line') || ('game ' + u.searchParams.get('game_id'));
+            } catch (e) { return game; }
+        }
+
+        async function lnPosLoad() {
+            try {
+                const r = await fetch('/api/positions?action=list');
+                const rows = await r.json();
+                if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
+                lnPosAll = rows;
+                const sel = document.getElementById('lnPosGame');
+                const prev = sel.value;
+                const games = Array.from(new Set(rows.map(x => x.game || '')));
+                sel.innerHTML = '<option value="">all games</option>' +
+                    games.map(g => '<option value="' + pzEsc(g) + '">' + pzEsc(lnPosGameLabel(g)) + '</option>').join('');
+                if (games.indexOf(prev) !== -1) sel.value = prev;
+            } catch (e) {
+                lnPosAll = [];
+            }
+            lnPosFilterChanged();
+        }
+
+        // Filters change the list; nothing is loaded onto the board until you step
+        function lnPosFilterChanged() {
+            const kind = document.getElementById('lnPosKind').value;
+            const game = document.getElementById('lnPosGame').value;
+            lnPosView = lnPosAll.filter(x => (!kind || x.kind === kind) && (!game || (x.game || '') === game));
+            lnPosIdx = -1;
+            document.getElementById('lnPosCounter').textContent = '0/' + lnPosView.length;
+            document.getElementById('lnPosInfo').textContent = '';
+        }
+
+        function lnPosStep(d) {
+            if (!lnPosView.length) { showToast('No saved positions'); return; }
+            lnPosIdx = lnPosIdx < 0 ? (d > 0 ? 0 : lnPosView.length - 1) : (lnPosIdx + d + lnPosView.length) % lnPosView.length;
+            const row = lnPosView[lnPosIdx];
+            applyPgnStringToBoard(row.pgn);
+            window.currentLoadedPgn = row.pgn;
+            const ta = document.getElementById('pgnInput');
+            if (ta) ta.value = row.pgn;
+            document.getElementById('lnPosCounter').textContent = (lnPosIdx + 1) + '/' + lnPosView.length;
+            document.getElementById('lnPosInfo').textContent = '#' + row.id + ' · ' + row.kind + ' · ' + lnPosGameLabel(row.game) +
+                (lnPosFirstMove(row.pgn) ? ' · ' + lnPosFirstMove(row.pgn) : '');
+        }
+
+        // Load the full game this position came from, then jump to the move by matching its FEN
+        async function lnPosOpenGame() {
+            const row = lnPosView[lnPosIdx];
+            if (!row) { showToast('Step to a position first'); return; }
+            if (!row.game) { showToast('This position has no game to open'); return; }
+            let u;
+            try { u = new URL(row.game); } catch (e) { showToast('Bad game link: ' + row.game); return; }
+            let ok = false;
+            const line = u.searchParams.get('line');
+            const gameId = u.searchParams.get('game_id') || u.searchParams.get('gameId');
+            if (line) {
+                ok = await lnLoadRow(line, u.searchParams.get('table') || 'chess_lines');
+            } else if (gameId) {
+                ok = await sbLoadGameByIdAndSource(u.searchParams.get('source') || sbInferSourceFromGameId(gameId), gameId);
+            } else { showToast('Unrecognised game link'); return; }
+            if (!ok) return;
+            const key = lnFenKey(lnPosStartFen(row.pgn));
+            let node = window.moveTree && window.moveTree.children && window.moveTree.children[0];
+            while (node && node.san) {
+                if (node.parent && lnFenKey(node.parent.fen) === key) { jumpToNode(node.nodeId); return; }
+                node = node.children && node.children[0];
+            }
+            showToast('Game opened, but this position was not found in it');
         }
 
         // Deep link: /?line=12 or /?line=chessable_cheesecake_1 (optionally
@@ -4493,6 +4718,7 @@
         window.lnLoadLineFromUrlParam = lnLoadLineFromUrlParam; // callable from devtools for debugging
 
         document.addEventListener('DOMContentLoaded', lnLoadTables);
+        document.addEventListener('DOMContentLoaded', lnPosLoad);
         document.addEventListener('DOMContentLoaded', lnLoadLineFromUrlParam);
 
         // ============================================================
