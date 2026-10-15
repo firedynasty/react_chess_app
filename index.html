@@ -999,28 +999,13 @@
           </label>
         </div>
         <div id="pzNoteDisplay" style="display: none; margin-top: 8px; padding: 10px; background: #0f3460; border-radius: 5px; color: #eee; font-size: 14px;"></div>
-      </div>
-      <!-- Next-comment bar: shows ONE comment (current or next up) above the board, so it stays visible however narrow the window or long the move list is -->
-      <div id="lnSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
-        <div style="color: #888; margin-bottom: 8px;">Supabase Lines (chess_* tables) — save the PGN on the board (comments + variations); load by row # or name, or ?line=<# or name></div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-          <select id="lnTableSelect" onchange="lnLoadRows()" title="Which chess_* table to save to / load from" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="chess_lines">chess_lines</option>
-          </select>
-          <input type="text" id="lnNameInput" placeholder="name, unique (e.g. chessable_cheesecake_1)" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-          <button onclick="lnSaveLine()" title="Save the game on the board as PGN (comments and variations included). Needs the same access code as the AI modal." style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save board PGN</button>
-          <button onclick="lnSaveGamePositions()" title="Save the game (if it has no Supabase home yet) plus one training position per flagged (?/??) or commented move — a few moves each, as From Position PGNs. Run Analyze / AI Comments first." style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save game + key positions</button>
-        </div>
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <div style="color: #888; margin-bottom: 8px;">Positions from your games (chess_positions) — blunders (?/??) and commented ideas, each linking back to its game</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <input type="text" id="lnPosNameInput" placeholder="game name (only if the game isn't in Supabase yet)" style="flex: 1; min-width: 220px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <button onclick="lnSaveGamePositions()" title="Save the game (if it has no Supabase home yet) plus one training position per flagged (?/??) or commented move — a few moves each, as From Position PGNs. Run Analyze / AI Comments first." style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save game + key positions</button>
+          </div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
-          <select id="lnRowSelect" onchange="lnLoadSelectedRow()" style="flex: 1; min-width: 240px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="">— rows load here —</option>
-          </select>
-          <input type="text" id="lnRowNumInput" placeholder="row # or name" onkeydown="if(event.key==='Enter')lnLoadRowByRef()" style="width: 170px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-          <button onclick="lnLoadRowByRef()" title="Load a row from the selected table onto the board — by row # (digits) or by exact name" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Load</button>
-          <button onclick="lnLoadRows()" title="Refresh the row list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
-        </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-          <span style="color: #888; font-size: 12px;">Positions:</span>
           <select id="lnPosKind" onchange="lnPosFilterChanged()" title="Filter by kind" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
             <option value="">all kinds</option>
             <option value="blunder">blunder</option>
@@ -1037,6 +1022,27 @@
           <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
         </div>
         <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
+          <div id="lnPosStatus" style="margin-top: 4px; font-size: 12px; color: #888;"></div>
+        </div>
+      </div>
+      <!-- Next-comment bar: shows ONE comment (current or next up) above the board, so it stays visible however narrow the window or long the move list is -->
+      <div id="lnSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
+        <div style="color: #888; margin-bottom: 8px;">Supabase Lines (chess_* tables) — save the PGN on the board (comments + variations); load by row # or name, or ?line=<# or name></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+          <select id="lnTableSelect" onchange="lnLoadRows()" title="Which chess_* table to save to / load from" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="chess_lines">chess_lines</option>
+          </select>
+          <input type="text" id="lnNameInput" placeholder="name, unique (e.g. chessable_cheesecake_1)" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <button onclick="lnSaveLine()" title="Save the game on the board as PGN (comments and variations included). Needs the same access code as the AI modal." style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save board PGN</button>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
+          <select id="lnRowSelect" onchange="lnLoadSelectedRow()" style="flex: 1; min-width: 240px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">— rows load here —</option>
+          </select>
+          <input type="text" id="lnRowNumInput" placeholder="row # or name" onkeydown="if(event.key==='Enter')lnLoadRowByRef()" style="width: 170px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+          <button onclick="lnLoadRowByRef()" title="Load a row from the selected table onto the board — by row # (digits) or by exact name" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Load</button>
+          <button onclick="lnLoadRows()" title="Refresh the row list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
+        </div>
         <div id="lnStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
         <div id="lnLink" title="Link that loads this row (?line=<row # or name>) — click to select, then copy" style="margin-top: 4px; font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></div>
       </div>
@@ -4481,6 +4487,9 @@
         }
 
         // ---- Key positions: one From Position PGN per flagged / commented move ----
+        // (lives in the Supabase Puzzles panel, so it reports to its own status line)
+        function lnPosMsg(msg) { const el = document.getElementById('lnPosStatus'); if (el) el.textContent = msg || ''; }
+
         const LN_POS_PLIES = 10; // the move itself + the next moves, up to 5 full moves
 
         // POST with the stored access code; asks once, and once more if the server says 401
@@ -4577,36 +4586,36 @@
                 if (window.supabaseLoadedGame) {
                     game = sbGetGameLink(); // already lives in Supabase: just point back at it
                 } else {
-                    const name = document.getElementById('lnNameInput').value.trim();
+                    const name = document.getElementById('lnPosNameInput').value.trim();
                     if (!name) { showToast('This game has no Supabase home yet — enter a name to store it in ' + lnTable()); return; }
                     const pgn = lnBoardPgn(name);
-                    lnStatus('Saving the game to ' + lnTable() + '…');
+                    lnPosMsg('Saving the game to ' + lnTable() + '…');
                     let out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn });
-                    if (out.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                    if (out.cancelled) { lnPosMsg('Save cancelled — no access code'); return; }
                     if (out.res.status === 409) {
                         if (!confirm('"' + name + '" already exists in ' + lnTable() + ' — overwrite its PGN and refresh its positions?')) {
-                            lnStatus('Cancelled — nothing saved');
+                            lnPosMsg('Cancelled — nothing saved');
                             return;
                         }
                         out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn, replace: true });
-                        if (out.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                        if (out.cancelled) { lnPosMsg('Save cancelled — no access code'); return; }
                     }
                     if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
                     game = lnLineLink(lnTable(), out.data.row);
                     lnShowLink(lnTable(), out.data.row);
-                    document.getElementById('lnNameInput').value = '';
+                    document.getElementById('lnPosNameInput').value = '';
                     lnLoadRows();
                 }
 
-                lnStatus('Saving ' + rows.length + ' positions…');
+                lnPosMsg('Saving ' + rows.length + ' positions…');
                 const out2 = await lnPost('/api/positions', { action: 'save', game, rows });
-                if (out2.cancelled) { lnStatus('Save cancelled — no access code'); return; }
+                if (out2.cancelled) { lnPosMsg('Save cancelled — no access code'); return; }
                 if (!out2.res.ok) throw new Error(out2.data.error || ('HTTP ' + out2.res.status) + ' (has chess_positions been created? see chess-rag/sql/chess_positions.sql)');
-                lnStatus('Saved ' + out2.data.saved + ' positions (' + blunders + ' blunder, ' + (rows.length - blunders) + ' idea) for ' + game);
+                lnPosMsg('Saved ' + out2.data.saved + ' positions (' + blunders + ' blunder, ' + (rows.length - blunders) + ' idea) for ' + game);
                 showToast('Saved ' + out2.data.saved + ' positions');
                 await lnPosLoad();
             } catch (e) {
-                lnStatus('');
+                lnPosMsg('');
                 showToast('Save failed: ' + e.message);
             }
         }
@@ -4684,7 +4693,7 @@
             } else if (gameId) {
                 ok = await sbLoadGameByIdAndSource(u.searchParams.get('source') || sbInferSourceFromGameId(gameId), gameId);
             } else { showToast('Unrecognised game link'); return; }
-            if (!ok) return;
+            if (!ok) { showToast('Could not open the game'); return; }
             const key = lnFenKey(lnPosStartFen(row.pgn));
             let node = window.moveTree && window.moveTree.children && window.moveTree.children[0];
             while (node && node.san) {
