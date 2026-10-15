@@ -1044,6 +1044,7 @@
           <select id="lnPosGame" onchange="lnPosFilterChanged()" title="Filter by game" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
             <option value="">all games</option>
           </select>
+          <button onclick="lnPosFirst()" title="Jump to the first position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">&laquo;</button>
           <button onclick="lnPosStep(-1)" title="Previous position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">◀</button>
           <span id="lnPosCounter" style="color: #eee; min-width: 54px; text-align: center;">0/0</span>
           <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
@@ -1221,7 +1222,7 @@
             </defs>
           </svg>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves (⌘[ = back) | Enter = ⭐ coach note | ↑ or ↓ = close note / exit variation | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↑ or ↓ = close note / exit variation | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation | [ ] = previous / next saved position</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -4731,6 +4732,13 @@
             document.getElementById('lnPosCounter').textContent = (lnPosIdx + 1) + '/' + lnPosView.length;
             document.getElementById('lnPosInfo').textContent = '#' + row.id + ' · ' + row.kind + (row.category ? ' · ' + row.category : '') + ' · ' + lnPosGameLabel(row.game) +
                 (lnPosFirstMove(row.pgn) ? ' · ' + lnPosFirstMove(row.pgn) : '');
+        }
+
+        // « : back to the first position of the current filter
+        function lnPosFirst() {
+            if (!lnPosView.length) { showToast('No saved positions'); return; }
+            lnPosIdx = 0;
+            lnPosStep(0); // shows the position at lnPosIdx
         }
 
         // In-page confirm card (instead of the browser's confirm box): resolves true on the red
@@ -12247,14 +12255,6 @@
                 const nextBtn = document.getElementById('board2NextMove');
                 const boardContainer = document.getElementById('myBoard2');
 
-                // Command+[ = Previous move (prevents browser back)
-                if ((e.metaKey || e.ctrlKey) && e.key === '[') {
-                    board2PrevMove();
-                    if (prevBtn) prevBtn.focus();
-                    e.preventDefault();
-                    return;
-                }
-
                 if (e.key === 'ArrowLeft') {
                     board2PrevMove();
                     if (prevBtn) prevBtn.focus();
@@ -12291,6 +12291,11 @@
                         return;
                     }
                     if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
+                    e.preventDefault();
+                } else if ((e.key === '[' || e.key === ']') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // [ / ] = previous / next saved position (the ◀ ▶ buttons in the Positions
+                    // panel). With ⌘ / Ctrl held they fall through to the browser (⌘[ = Back).
+                    lnPosStep(e.key === '[' ? -1 : 1);
                     e.preventDefault();
                 } else if (e.key === 'Tab') {
                     // Tab = same as Cycle Var.: enter the variation, step through its
