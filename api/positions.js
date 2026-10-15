@@ -3,9 +3,10 @@
 // Create the table with chess-rag/sql/chess_positions.sql.
 //
 // Endpoints:
-//   GET  /api/positions?action=list[&game=<link>][&kind=blunder|idea|tactic]
-//   POST /api/positions { action: "save", game, rows: [{ kind, pgn }], accessCode }
-//        -> inserts the rows, then removes that game's OLDER blunder/idea rows
+//   GET  /api/positions?action=list[&category=<label>][&game=<link>][&kind=blunder|idea|tactic]
+//   POST /api/positions { action: "delete", id, accessCode }   -> removes one position
+//   POST /api/positions { action: "save", game, category?, rows: [{ kind, pgn }], accessCode }
+//        -> inserts the rows, then removes that game's OLDER rows
 //           (re-saving a game refreshes its positions). Needs accessCode.
 
 const TABLE = 'chess_positions';
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const { action, game, kind } = req.query;
+      const { action, game, kind, category } = req.query;
       if (action !== 'list') return res.status(400).json({ error: 'Unknown action. Use action=list' });
       const params = new URLSearchParams({
         select: '*',
@@ -40,6 +41,7 @@ export default async function handler(req, res) {
         limit: '1000',
       });
       if (game) params.set('game', `eq.${game}`);
+      if (category) params.set('category', `eq.${category}`);
       if (kind) {
         if (!KINDS.includes(kind)) return res.status(400).json({ error: 'kind must be blunder, idea or tactic' });
         params.set('kind', `eq.${kind}`);
@@ -51,16 +53,31 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { action, game, rows, accessCode } = req.body || {};
-      if (action !== 'save') return res.status(400).json({ error: 'Unknown action. Use action=save' });
+      const { action, id, game, category, rows, accessCode } = req.body || {};
+      if (action !== 'save' && action !== 'delete') return res.status(400).json({ error: 'Unknown action. Use action=save or action=delete' });
 
       const validAccessCode = process.env.ACCESS_CODE;
       if (!validAccessCode || !accessCode || accessCode !== validAccessCode) {
         return res.status(401).json({ error: 'Invalid access code' });
       }
+      if (action === 'delete') {
+        if (!/^\d+$/.test(String(id == null ? '' : id))) return res.status(400).json({ error: 'A numeric position id is required' });
+        const d = await fetch(`${url}/rest/v1/${TABLE}?id=eq.${id}`, {
+          method: 'DELETE',
+          headers: { ...headers, Prefer: 'return=representation' },
+        });
+        const gone = await d.json();
+        if (!d.ok) return fail(d, gone);
+        if (!gone.length) return res.status(404).json({ error: 'Position not found' });
+        return res.status(200).json({ success: true, deleted: gone[0].id });
+      }
       if (typeof game !== 'string' || !game.trim() || game.length > 500) {
         return res.status(400).json({ error: 'game (a link back to the full game) is required' });
       }
+      if (category != null && (typeof category !== 'string' || category.length > 100)) {
+        return res.status(400).json({ error: 'category must be a short text label' });
+      }
+      const cat = category && category.trim() ? category.trim() : null;
       if (!Array.isArray(rows) || rows.length === 0 || rows.length > MAX_ROWS) {
         return res.status(400).json({ error: `rows must be a list of 1-${MAX_ROWS} positions` });
       }
@@ -71,7 +88,8 @@ export default async function handler(req, res) {
             typeof row.pgn !== 'string' || !row.pgn.trim() || row.pgn.length > MAX_PGN_CHARS) {
           return res.status(400).json({ error: 'each row needs kind (blunder|idea|tactic) and a pgn' });
         }
-        clean.push({ game: game.trim(), kind: row.kind, pgn: row.pgn });
+        // category only goes in when given, so a blank-category save never needs the column
+        clean.push(Object.assign({ game: game.trim(), kind: row.kind, pgn: row.pgn }, cat ? { category: cat } : {}));
       }
 
       // Insert the new rows first, so a failure never leaves the game without positions
@@ -83,10 +101,9 @@ export default async function handler(req, res) {
       const saved = await ins.json();
       if (!ins.ok) return fail(ins, saved);
 
-      // Then drop this game's older generated rows (everything except the ones just inserted)
+      // Then drop this game's older rows (everything except the ones just inserted)
       const prune = new URLSearchParams({
         game: `eq.${game.trim()}`,
-        kind: 'in.(blunder,idea)',
         id: `not.in.(${saved.map(r => r.id).join(',')})`,
       });
       const del = await fetch(`${url}/rest/v1/${TABLE}?${prune}`, {

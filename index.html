@@ -999,31 +999,6 @@
           </label>
         </div>
         <div id="pzNoteDisplay" style="display: none; margin-top: 8px; padding: 10px; background: #0f3460; border-radius: 5px; color: #eee; font-size: 14px;"></div>
-        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
-          <div style="color: #888; margin-bottom: 8px;">Positions from your games (chess_positions) — blunders (?/??) and commented ideas, each linking back to its game</div>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-            <input type="text" id="lnPosNameInput" placeholder="game name (only if the game isn't in Supabase yet)" style="flex: 1; min-width: 220px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <button onclick="lnSaveGamePositions()" title="Save the game (if it has no Supabase home yet) plus one training position per flagged (?/??) or commented move — a few moves each, as From Position PGNs. Run Analyze / AI Comments first." style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save game + key positions</button>
-          </div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
-          <select id="lnPosKind" onchange="lnPosFilterChanged()" title="Filter by kind" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="">all kinds</option>
-            <option value="blunder">blunder</option>
-            <option value="idea">idea</option>
-            <option value="tactic">tactic</option>
-          </select>
-          <select id="lnPosGame" onchange="lnPosFilterChanged()" title="Filter by game" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="">all games</option>
-          </select>
-          <button onclick="lnPosStep(-1)" title="Previous position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">◀</button>
-          <span id="lnPosCounter" style="color: #eee; min-width: 54px; text-align: center;">0/0</span>
-          <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
-          <button onclick="lnPosOpenGame()" title="Load the full game this position came from and jump to the move" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Open game</button>
-          <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
-        </div>
-        <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
-          <div id="lnPosStatus" style="margin-top: 4px; font-size: 12px; color: #888;"></div>
-        </div>
       </div>
       <!-- Next-comment bar: shows ONE comment (current or next up) above the board, so it stays visible however narrow the window or long the move list is -->
       <div id="lnSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
@@ -1045,6 +1020,40 @@
         </div>
         <div id="lnStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
         <div id="lnLink" title="Link that loads this row (?line=<row # or name>) — click to select, then copy" style="margin-top: 4px; font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></div>
+      </div>
+      <div id="posSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="color: #888; flex: 1;">Positions from your games — saved to the chess_positions table, separate from the puzzles above: blunders (?/??), missed tactics (??) and commented ideas, each linking back to its game</div>
+          <button id="lnPosToggleBtn" onclick="lnPosToggle()" title="Hide / show this panel" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px; white-space: nowrap;">Hide ▴</button>
+        </div>
+        <div id="lnPosBody" style="margin-top: 8px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <input type="text" id="lnPosCategoryInput" placeholder="category to group games, e.g. french_defense (kept for the next game)" style="flex: 1; min-width: 220px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <button onclick="lnSaveGamePositions()" title="Save the game (if it has no Supabase home yet) plus one training position per flagged (?/??) or commented move — a few moves each, as From Position PGNs. Run Analyze / AI Comments first." style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save game + key positions</button>
+          </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
+          <select id="lnPosKind" onchange="lnPosFilterChanged()" title="Filter by kind" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">all kinds</option>
+            <option value="blunder">blunder</option>
+            <option value="idea">idea</option>
+            <option value="tactic">tactic</option>
+          </select>
+          <select id="lnPosCategory" onchange="lnPosFilterChanged()" title="Filter by category (the label you gave when saving)" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">all categories</option>
+          </select>
+          <select id="lnPosGame" onchange="lnPosFilterChanged()" title="Filter by game" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <option value="">all games</option>
+          </select>
+          <button onclick="lnPosStep(-1)" title="Previous position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">◀</button>
+          <span id="lnPosCounter" style="color: #eee; min-width: 54px; text-align: center;">0/0</span>
+          <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
+          <button onclick="lnPosOpenGame()" title="Load the full game this position came from and jump to the move" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Open game</button>
+          <button onclick="lnPosDelete()" title="Delete the saved position shown now (asks to confirm; needs the access code). The full game stays saved." style="padding: 8px 14px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">🗑 Delete</button>
+          <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
+        </div>
+        <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
+          <div id="lnPosStatus" style="margin-top: 4px; font-size: 12px; color: #888;"></div>
+        </div>
       </div>
       <div id="boardCommentBar" style="display: none; margin: 12px auto; max-width: 1200px; font-family: monospace; font-size: 13px; line-height: 1.6;"></div>
     </div>
@@ -4553,8 +4562,10 @@
             return parts.join(' ');
         }
 
-        // One row per main-line move that is flagged ? / ?? (blunder) or carries a
-        // human / AI comment (idea). The PGN starts from the position BEFORE the move.
+        // One row per main-line move that is flagged ? / ?? or carries a human / AI
+        // comment (idea). A ?? move whose better move (the stored best-line variation)
+        // is forcing — a capture, check or mate — is a missed tactic; any other flagged
+        // move is a blunder. The PGN starts from the position BEFORE the move.
         function lnBuildPositions() {
             const rows = [];
             if (!window.moveTree) return rows;
@@ -4562,9 +4573,11 @@
             while (node && node.san) {
                 const comment = lnCleanComment(node.comment);
                 const isOpeningLabel = /^[A-E]\d\d\b/.test(comment); // the ECO label added after move 1
-                const blunder = /^\?{1,2}$/.test(node.annotation || '');
-                const kind = blunder ? 'blunder' : (comment && !isOpeningLabel ? 'idea' : null);
+                const flagged = /^\?{1,2}$/.test(node.annotation || '');
                 const before = node.parent;
+                const better = flagged && before && (before.children || []).find(ch => ch !== node);
+                const missedTactic = node.annotation === '??' && !!better && /[x+#]/.test(better.san || '');
+                const kind = flagged ? (missedTactic ? 'tactic' : 'blunder') : (comment && !isOpeningLabel ? 'idea' : null);
                 if (kind && before && before.fen) {
                     const kids = (before.children || []).map(ch => lnCloneLimited(ch, LN_POS_PLIES));
                     const headers = '[Event "Training position"]\n[Variant "From Position"]\n[FEN "' + before.fen + '"]';
@@ -4575,19 +4588,43 @@
             return rows;
         }
 
+        // Default name for a game that has no Supabase home yet, from its PGN headers:
+        // the chess.com / Lichess game id when there is one (so re-saving the same game
+        // refreshes it), else White_vs_Black_date, else a timestamp.
+        function lnAutoGameName(prefix) {
+            const ta = document.getElementById('pgnInput');
+            const src = (ta && ta.value) || window.currentLoadedPgn || '';
+            const tag = n => { const m = src.match(new RegExp('\\[' + n + '\\s+"([^"]*)"\\]')); return m ? m[1].trim() : ''; };
+            const slug = t => t.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            let m = (tag('Link') + ' ' + tag('Site')).match(/chess\.com\/(?:game\/)?(?:live|daily)\/(\d+)/i);
+            if (m) return 'chesscom_' + m[1];
+            m = (tag('Link') + ' ' + tag('Site')).match(/lichess\.org\/([A-Za-z0-9]{8})/i);
+            if (m) return 'lichess_' + m[1];
+            const white = slug(tag('White')), black = slug(tag('Black'));
+            const date = (tag('Date') || tag('UTCDate')).replace(/[^0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            if (white && black && white !== '-' && black !== '-') return white + '_vs_' + black + (date ? '_' + date : '');
+            const d = new Date(), p2 = n => (n < 10 ? '0' : '') + n;
+            return (prefix || 'game') + '_' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes());
+        }
+
         async function lnSaveGamePositions() {
             if (!window.moveTree) { showToast('Load a game to the board first'); return; }
             const rows = lnBuildPositions();
             if (!rows.length) { showToast('No flagged (?, ??) or commented moves — run Analyze / AI Comments first'); return; }
-            const blunders = rows.filter(r => r.kind === 'blunder').length;
+            const count = k => rows.filter(r => r.kind === k).length;
+            // Same label for each game you want grouped; normalised so "French Defense" and
+            // french_defense land in one group. Kept in the box (and remembered) for the next game.
+            const catEl = document.getElementById('lnPosCategoryInput');
+            const category = catEl.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            catEl.value = category;
+            try { localStorage.setItem('lnPosCategory', category); } catch (e) { }
 
             try {
                 let game;
                 if (window.supabaseLoadedGame) {
                     game = sbGetGameLink(); // already lives in Supabase: just point back at it
                 } else {
-                    const name = document.getElementById('lnPosNameInput').value.trim();
-                    if (!name) { showToast('This game has no Supabase home yet — enter a name to store it in ' + lnTable()); return; }
+                    const name = lnAutoGameName(category);
                     const pgn = lnBoardPgn(name);
                     lnPosMsg('Saving the game to ' + lnTable() + '…');
                     let out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn });
@@ -4603,21 +4640,31 @@
                     if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
                     game = lnLineLink(lnTable(), out.data.row);
                     lnShowLink(lnTable(), out.data.row);
-                    document.getElementById('lnPosNameInput').value = '';
                     lnLoadRows();
                 }
 
                 lnPosMsg('Saving ' + rows.length + ' positions…');
-                const out2 = await lnPost('/api/positions', { action: 'save', game, rows });
+                const out2 = await lnPost('/api/positions', { action: 'save', game, category: category || undefined, rows });
                 if (out2.cancelled) { lnPosMsg('Save cancelled — no access code'); return; }
                 if (!out2.res.ok) throw new Error(out2.data.error || ('HTTP ' + out2.res.status) + ' (has chess_positions been created? see chess-rag/sql/chess_positions.sql)');
-                lnPosMsg('Saved ' + out2.data.saved + ' positions (' + blunders + ' blunder, ' + (rows.length - blunders) + ' idea) for ' + game);
+                lnPosMsg('Saved ' + out2.data.saved + ' positions (' + count('blunder') + ' blunder, ' + count('tactic') + ' tactic, ' + count('idea') + ' idea)' +
+                    (category ? ' in "' + category + '"' : '') + ' for ' + game);
                 showToast('Saved ' + out2.data.saved + ' positions');
                 await lnPosLoad();
             } catch (e) {
                 lnPosMsg('');
                 showToast('Save failed: ' + e.message);
             }
+        }
+
+        // Hide / show the Positions panel (remembered across reloads)
+        function lnPosToggle(force) {
+            const body = document.getElementById('lnPosBody'), btn = document.getElementById('lnPosToggleBtn');
+            if (!body || !btn) return;
+            const hide = typeof force === 'boolean' ? force : body.style.display !== 'none';
+            body.style.display = hide ? 'none' : 'block';
+            btn.textContent = hide ? 'Show ▾' : 'Hide ▴';
+            try { localStorage.setItem('lnPosHidden', hide ? '1' : '0'); } catch (e) { }
         }
 
         // ---- Cycle through the saved positions ----
@@ -4645,6 +4692,12 @@
                 lnPosAll = rows;
                 const sel = document.getElementById('lnPosGame');
                 const prev = sel.value;
+                const csel = document.getElementById('lnPosCategory');
+                const prevCat = csel.value;
+                const cats = Array.from(new Set(rows.map(x => x.category || '__none__'))).sort();
+                csel.innerHTML = '<option value="">all categories</option>' +
+                    cats.map(c => '<option value="' + pzEsc(c) + '">' + pzEsc(c === '__none__' ? 'uncategorized' : c) + '</option>').join('');
+                if (cats.indexOf(prevCat) !== -1) csel.value = prevCat;
                 const games = Array.from(new Set(rows.map(x => x.game || '')));
                 sel.innerHTML = '<option value="">all games</option>' +
                     games.map(g => '<option value="' + pzEsc(g) + '">' + pzEsc(lnPosGameLabel(g)) + '</option>').join('');
@@ -4659,7 +4712,9 @@
         function lnPosFilterChanged() {
             const kind = document.getElementById('lnPosKind').value;
             const game = document.getElementById('lnPosGame').value;
-            lnPosView = lnPosAll.filter(x => (!kind || x.kind === kind) && (!game || (x.game || '') === game));
+            const cat = document.getElementById('lnPosCategory').value;
+            lnPosView = lnPosAll.filter(x => (!kind || x.kind === kind) && (!game || (x.game || '') === game) &&
+                (!cat || (x.category || '__none__') === cat));
             lnPosIdx = -1;
             document.getElementById('lnPosCounter').textContent = '0/' + lnPosView.length;
             document.getElementById('lnPosInfo').textContent = '';
@@ -4674,8 +4729,76 @@
             const ta = document.getElementById('pgnInput');
             if (ta) ta.value = row.pgn;
             document.getElementById('lnPosCounter').textContent = (lnPosIdx + 1) + '/' + lnPosView.length;
-            document.getElementById('lnPosInfo').textContent = '#' + row.id + ' · ' + row.kind + ' · ' + lnPosGameLabel(row.game) +
+            document.getElementById('lnPosInfo').textContent = '#' + row.id + ' · ' + row.kind + (row.category ? ' · ' + row.category : '') + ' · ' + lnPosGameLabel(row.game) +
                 (lnPosFirstMove(row.pgn) ? ' · ' + lnPosFirstMove(row.pgn) : '');
+        }
+
+        // In-page confirm card (instead of the browser's confirm box): resolves true on the red
+        // button; false on Cancel, Esc or a click outside. Cancel starts focused, so Enter
+        // can't delete by accident, and the board's arrow-key shortcuts are paused meanwhile.
+        function lnConfirmModal(title, detail, confirmText) {
+            return new Promise(resolve => {
+                const overlay = document.createElement('div');
+                overlay.id = 'lnConfirmOverlay';
+                overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:10002; display:flex; align-items:center; justify-content:center; padding:16px;';
+                const card = document.createElement('div');
+                card.style.cssText = 'background:#16213e; border:1px solid #2a2a4e; border-radius:10px; padding:18px; width:min(460px,100%); font-family:monospace; color:#eee; box-shadow:0 8px 30px rgba(0,0,0,0.5);';
+                const h = document.createElement('div');
+                h.textContent = title;
+                h.style.cssText = 'font-size:16px; font-weight:bold; margin-bottom:10px; color:#ff6b6b;';
+                const d = document.createElement('div');
+                d.textContent = detail;
+                d.style.cssText = 'font-size:13px; color:#ccc; white-space:pre-wrap; word-break:break-word; margin-bottom:16px; line-height:1.5;';
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; gap:8px; justify-content:flex-end;';
+                const cancel = document.createElement('button');
+                cancel.textContent = 'Cancel';
+                cancel.style.cssText = 'padding:8px 16px; background:#0f3460; color:#eee; border:1px solid #1a1a2e; border-radius:5px; cursor:pointer; font-family:monospace; font-size:14px;';
+                const ok = document.createElement('button');
+                ok.textContent = confirmText || 'OK';
+                ok.style.cssText = 'padding:8px 16px; background:#c0392b; color:#fff; border:none; border-radius:5px; cursor:pointer; font-family:monospace; font-weight:bold; font-size:14px;';
+                function done(v) { document.removeEventListener('keydown', onKey, true); overlay.remove(); resolve(v); }
+                function onKey(e) {
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(false); }
+                    else if (e.key !== 'Tab' && e.key !== 'Enter' && e.key !== ' ') e.stopPropagation(); // keep arrows etc. off the board
+                }
+                document.addEventListener('keydown', onKey, true);
+                cancel.onclick = () => done(false);
+                ok.onclick = () => done(true);
+                overlay.onclick = e => { if (e.target === overlay) done(false); };
+                row.appendChild(cancel); row.appendChild(ok);
+                card.appendChild(h); card.appendChild(d); card.appendChild(row);
+                overlay.appendChild(card);
+                document.body.appendChild(overlay);
+                cancel.focus();
+            });
+        }
+
+        // Trash the saved position shown now, then move on to the next one
+        async function lnPosDelete() {
+            const row = lnPosView[lnPosIdx];
+            if (!row) { showToast('Step to a position first'); return; }
+            const label = '#' + row.id + ' · ' + row.kind + (row.category ? ' · ' + row.category : '') + ' · ' + lnPosGameLabel(row.game) +
+                (lnPosFirstMove(row.pgn) ? ' · ' + lnPosFirstMove(row.pgn) : '');
+            if (!await lnConfirmModal('Delete this saved position?', label + '\n\nThe full game stays saved.', '🗑 Delete')) return;
+            try {
+                const out = await lnPost('/api/positions', { action: 'delete', id: row.id });
+                if (out.cancelled) { lnPosMsg('Delete cancelled — no access code'); return; }
+                if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
+                lnPosAll = lnPosAll.filter(x => x.id !== row.id);
+                lnPosView = lnPosView.filter(x => x.id !== row.id);
+                lnPosMsg('Deleted ' + label);
+                if (!lnPosView.length) {
+                    lnPosIdx = -1;
+                    document.getElementById('lnPosCounter').textContent = '0/0';
+                    document.getElementById('lnPosInfo').textContent = '';
+                } else {
+                    if (lnPosIdx >= lnPosView.length) lnPosIdx = 0;
+                    lnPosStep(0); // show the one that slid into this slot
+                }
+            } catch (e) {
+                showToast('Delete failed: ' + e.message);
+            }
         }
 
         // Load the full game this position came from, then jump to the move by matching its FEN
@@ -4727,7 +4850,11 @@
         window.lnLoadLineFromUrlParam = lnLoadLineFromUrlParam; // callable from devtools for debugging
 
         document.addEventListener('DOMContentLoaded', lnLoadTables);
-        document.addEventListener('DOMContentLoaded', lnPosLoad);
+        document.addEventListener('DOMContentLoaded', function () {
+            try { const c = localStorage.getItem('lnPosCategory'); if (c) document.getElementById('lnPosCategoryInput').value = c; } catch (e) { }
+            try { if (localStorage.getItem('lnPosHidden') === '1') lnPosToggle(true); } catch (e) { }
+            lnPosLoad();
+        });
         document.addEventListener('DOMContentLoaded', lnLoadLineFromUrlParam);
 
         // ============================================================
