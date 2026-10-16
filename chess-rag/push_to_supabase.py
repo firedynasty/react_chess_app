@@ -8,6 +8,13 @@ Usage:
     python push_to_supabase.py data/tttstanley --username TTTstanley
     python push_to_supabase.py data/firebirdbot --username FirebirdBot
     python push_to_supabase.py data/tttstanley --username TTTstanley --dry-run
+    python push_to_supabase.py data/tttstanley --username TTTstanley --overwrite
+
+By default a game that is ALREADY in the table is left untouched, and only new
+games are inserted. Games you analyzed and saved in the app (their PGN then
+carries evals, variations and comments) would otherwise be overwritten by the
+raw PGN on the next daily sync. --overwrite restores the old behavior
+(refresh every row from the raw PGN, discarding anything saved in the app).
 
 Requires environment variables (export them, or put them in chess-rag/.env):
     SUPABASE_URL              e.g. https://xxxx.supabase.co
@@ -177,23 +184,35 @@ def collect_rows(bucket_dir: str, username: str) -> list[dict]:
     return rows
 
 
-def push_rows(rows: list[dict], url: str, key: str) -> None:
+def push_rows(rows: list[dict], url: str, key: str, overwrite: bool = False) -> None:
     endpoint = f"{url.rstrip('/')}/rest/v1/games"
+    # ignore-duplicates: existing (source, game_id) rows are left exactly as they are, so a PGN
+    # analyzed and saved in the app is never replaced by the raw one. return=representation
+    # then lists only the rows that were actually inserted, which lets us report new vs skipped.
+    prefer = "resolution=merge-duplicates,return=minimal" if overwrite else "resolution=ignore-duplicates,return=representation"
     headers = {
         "apikey": key,
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,return=minimal",
+        "Prefer": prefer,
     }
     params = {"on_conflict": "source,game_id"}
 
+    inserted = 0
     for i in range(0, len(rows), BATCH_SIZE):
         batch = rows[i : i + BATCH_SIZE]
         r = requests.post(endpoint, headers=headers, params=params, json=batch, timeout=30)
         if not r.ok:
             print(f"Batch {i // BATCH_SIZE + 1} failed ({r.status_code}): {r.text}", file=sys.stderr)
             r.raise_for_status()
-        print(f"Pushed rows {i + 1}-{i + len(batch)} of {len(rows)}")
+        if overwrite:
+            print(f"Pushed rows {i + 1}-{i + len(batch)} of {len(rows)} (existing rows overwritten)")
+        else:
+            new = len(r.json())
+            inserted += new
+            print(f"Rows {i + 1}-{i + len(batch)} of {len(rows)}: {new} new, {len(batch) - new} already in Supabase (left untouched)")
+    if not overwrite:
+        print(f"Inserted {inserted} new game(s); {len(rows) - inserted} existing game(s) left as they were.")
 
 
 def main() -> None:
@@ -201,6 +220,9 @@ def main() -> None:
     parser.add_argument("bucket_dir", help="Bucket folder, e.g. data/tttstanley or data/firebirdbot")
     parser.add_argument("--username", required=True, help="The tracked player's username on that source")
     parser.add_argument("--dry-run", action="store_true", help="Parse and print a summary, but don't push")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="Refresh games that are already in Supabase from the raw PGN (discards analysis saved in the app). "
+                             "Default: leave existing games untouched, insert only new ones.")
     args = parser.parse_args()
 
     load_dotenv(os.path.join(HERE, ".env"))
@@ -224,7 +246,7 @@ def main() -> None:
     if not url or not key:
         sys.exit("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (env vars or chess-rag/.env)")
 
-    push_rows(rows, url, key)
+    push_rows(rows, url, key, overwrite=args.overwrite)
     print("Done.")
 
 

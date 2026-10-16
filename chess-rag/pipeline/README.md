@@ -39,12 +39,15 @@ python tree_viz.py tttstanley
 ```
 
 Push to Supabase (run from `chess-rag/` root — `push_to_supabase.py` isn't
-copied into buckets). It re-scans the whole `raw/` folder and upserts on
-`(source, game_id)`, so running it after every ingest is safe and cheap —
-already-pushed games are just merged, only genuinely new ones insert:
+copied into buckets). It re-scans the whole `raw/` folder and inserts only the
+games that aren't in the table yet (matched on `(source, game_id)`), so running
+it after every ingest is safe and cheap. Games already in Supabase are left
+**untouched**, so a game you analyzed and saved in the app keeps its evals,
+variations and comments instead of being replaced by the raw PGN:
 
 ```bash
 python push_to_supabase.py data/tttstanley --username TTTstanley
+python push_to_supabase.py data/tttstanley --username TTTstanley --overwrite   # refresh existing rows from raw (discards saved analysis)
 ```
 
 Requires `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (env vars or
