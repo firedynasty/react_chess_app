@@ -8,6 +8,10 @@
 //   POST /api/positions { action: "save", game, category?, rows: [{ kind, pgn }], accessCode }
 //        -> inserts the rows, then removes that game's OLDER rows
 //           (re-saving a game refreshes its positions). Needs accessCode.
+//   POST /api/positions { action: "save", mode: "merge", game, category, rows, accessCode }
+//        -> adds or updates only: a row whose start position ([FEN]) already exists for this
+//           game is updated in place, any other row is inserted, nothing is deleted. Used by
+//           the picker, which saves just the moves you tick.
 
 const TABLE = 'chess_positions';
 const KINDS = ['blunder', 'idea', 'tactic'];
@@ -53,7 +57,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { action, id, game, category, rows, accessCode } = req.body || {};
+      const { action, id, game, category, rows, accessCode, mode } = req.body || {};
       if (action !== 'save' && action !== 'delete') return res.status(400).json({ error: 'Unknown action. Use action=save or action=delete' });
 
       const validAccessCode = process.env.ACCESS_CODE;
@@ -90,6 +94,43 @@ export default async function handler(req, res) {
         }
         // category only goes in when given, so a blank-category save never needs the column
         clean.push(Object.assign({ game: game.trim(), kind: row.kind, pgn: row.pgn }, cat ? { category: cat } : {}));
+      }
+
+      if (mode === 'merge') {
+        // Match by start position so saving the same move twice updates it instead of duplicating it
+        const fenKey = (pgn) => {
+          const m = String(pgn).match(/\[FEN\s+"([^"]+)"\]/);
+          return m ? m[1].split(' ').slice(0, 4).join(' ') : '';
+        };
+        const ex = await fetch(`${url}/rest/v1/${TABLE}?${new URLSearchParams({ select: 'id,pgn', game: `eq.${game.trim()}`, limit: '1000' })}`, { headers });
+        const existing = await ex.json();
+        if (!ex.ok) return fail(ex, existing);
+        const idByKey = new Map();
+        existing.forEach((r) => { const k = fenKey(r.pgn); if (k && !idByKey.has(k)) idByKey.set(k, r.id); });
+
+        const toInsert = [], toUpdate = [];
+        const seenKeys = new Set();
+        for (const row of clean) {
+          const k = fenKey(row.pgn);
+          if (k && seenKeys.has(k)) continue;           // two rows for one position in one request
+          if (k) seenKeys.add(k);
+          const existingId = k && idByKey.get(k);
+          if (existingId) toUpdate.push({ id: existingId, row }); else toInsert.push(row);
+        }
+        for (const u of toUpdate) {
+          const patch = { kind: u.row.kind, pgn: u.row.pgn, category: cat };   // null clears the category
+          const up = await fetch(`${url}/rest/v1/${TABLE}?id=eq.${u.id}`, {
+            method: 'PATCH', headers: { ...headers, Prefer: 'return=minimal' }, body: JSON.stringify(patch),
+          });
+          if (!up.ok) return fail(up, await up.json().catch(() => ({})));
+        }
+        if (toInsert.length) {
+          const ins = await fetch(`${url}/rest/v1/${TABLE}`, {
+            method: 'POST', headers: { ...headers, Prefer: 'return=minimal' }, body: JSON.stringify(toInsert),
+          });
+          if (!ins.ok) return fail(ins, await ins.json().catch(() => ({})));
+        }
+        return res.status(200).json({ success: true, saved: toInsert.length + toUpdate.length, added: toInsert.length, updated: toUpdate.length });
       }
 
       // Insert the new rows first, so a failure never leaves the game without positions
