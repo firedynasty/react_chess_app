@@ -1020,10 +1020,36 @@
           <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
           <button onclick="lnPosOpenGame()" title="Load the full game this position came from and jump to the move" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Open game</button>
           <button onclick="lnPosDelete()" title="Delete the saved position shown now (asks to confirm; needs the access code). The full game stays saved." style="padding: 8px 14px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">🗑 Delete</button>
+          <button onclick="lnPosExportRow()" title="Copy the position shown now as one fen,note row: fen = From Position PGN (with its comments), note = the move's comment + kind, move and game link" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">Export position</button>
           <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
         </div>
         <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
           <div id="lnPosStatus" style="margin-top: 4px; font-size: 12px; color: #888;"></div>
+        </div>
+      </div>
+      <div id="xferSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="color: #888; flex: 1;">Transfer to puzzles — collect fen,note rows here, pick a category, and Send: they go straight into the shared Supabase puzzles table (the one vercel_fen_saver reads), skipping any FEN already in that category. Needs the access code.</div>
+          <button id="lnXferToggleBtn" onclick="lnXferToggle()" title="Hide / show this panel" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px; white-space: nowrap;">Hide ▴</button>
+        </div>
+        <div id="lnXferBody" style="margin-top: 8px;">
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+            <button onclick="lnXferAddCurrent()" title="Add the position shown in the Positions panel above" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">➕ Add this position</button>
+            <button onclick="lnXferAddAll()" title="Add every position currently listed (respecting the filters above)" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">➕ Add all listed</button>
+            <button onclick="lnXferAddMove()" title="Add the move highlighted in the move list (any move, saved or not)" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">➕ Add highlighted move</button>
+            <span id="lnXferCount" style="color: #eee; min-width: 64px; text-align: center;">0 rows</span>
+            <button onclick="lnXferCopy()" title="Copy every row in the box (e.g. to paste somewhere else)" style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">📋 Copy all rows</button>
+            <button onclick="lnXferClear()" title="Empty the box" style="padding: 8px 14px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">Clear</button>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
+            <select id="lnXferCategory" onchange="lnXferCategoryChanged()" title="Category in the puzzles table" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
+              <option value="__new__">+ New category…</option>
+            </select>
+            <input type="text" id="lnXferNewCategory" placeholder="new category name, e.g. white_blunder" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
+            <button onclick="lnXferSend()" title="Send every row in the box to the puzzles table under the chosen category (asks to confirm; needs the access code)" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">⬆ Send to puzzles</button>
+          </div>
+          <div id="lnXferStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
+          <textarea id="lnXferText" rows="6" oninput="lnXferSync()" spellcheck="false" placeholder="fen,note rows collect here (each row's first cell is the whole PGN in quotes). Edit freely, pick a category, then Send to puzzles (or Copy all rows)." style="width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
         </div>
       </div>
       <div id="boardCommentBar" style="display: none; margin: 12px auto; max-width: 1200px; font-family: monospace; font-size: 13px; line-height: 1.6;"></div>
@@ -1331,6 +1357,7 @@
             <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
+            <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -4533,27 +4560,38 @@
             return parts.join(' ');
         }
 
-        // One row per main-line move that is flagged ? / ?? or carries a human / AI
-        // comment (idea). A ?? move whose better move (the stored best-line variation)
-        // is forcing — a capture, check or mate — is a missed tactic; any other flagged
-        // move is a blunder. The PGN starts from the position BEFORE the move.
+        // What a move is worth saving as: a flagged ? / ?? move is a blunder, or a tactic when it is
+        // ?? and the better move (the stored best-line variation) is forcing — a capture, check or
+        // mate; a commented move is an idea. null = nothing special about this move.
+        function lnPosKindFor(node) {
+            const comment = lnCleanComment(node.comment);
+            const isOpeningLabel = /^[A-E]\d\d\b/.test(comment); // the ECO label added after move 1
+            const isEngineMarker = /^best\s+[-+#]?\d/.test(comment); // Analyze's "best 1.57" on a variation's first move
+            const flagged = /^\?{1,2}$/.test(node.annotation || '');
+            const before = node.parent;
+            const better = flagged && before && (before.children || []).find(ch => ch !== node);
+            const missedTactic = node.annotation === '??' && !!better && /[x+#]/.test(better.san || '');
+            return flagged ? (missedTactic ? 'tactic' : 'blunder') : (comment && !isOpeningLabel && !isEngineMarker ? 'idea' : null);
+        }
+
+        // From Position PGN starting at the position BEFORE `node`: the move, its comment, any
+        // alternatives to it (the Analyze best line), and the next moves (LN_POS_PLIES plies).
+        function lnPositionPgn(node) {
+            const before = node.parent;
+            const kids = [node].concat((before.children || []).filter(ch => ch !== node))
+                .map(ch => lnCloneLimited(ch, LN_POS_PLIES));
+            const headers = '[Event "Training position"]\n[Variant "From Position"]\n[FEN "' + before.fen + '"]';
+            return headers + '\n\n' + lnSerializeLine(kids);
+        }
+
+        // One row per main-line move worth saving (see lnPosKindFor).
         function lnBuildPositions() {
             const rows = [];
             if (!window.moveTree) return rows;
             let node = window.moveTree.children && window.moveTree.children[0];
             while (node && node.san) {
-                const comment = lnCleanComment(node.comment);
-                const isOpeningLabel = /^[A-E]\d\d\b/.test(comment); // the ECO label added after move 1
-                const flagged = /^\?{1,2}$/.test(node.annotation || '');
-                const before = node.parent;
-                const better = flagged && before && (before.children || []).find(ch => ch !== node);
-                const missedTactic = node.annotation === '??' && !!better && /[x+#]/.test(better.san || '');
-                const kind = flagged ? (missedTactic ? 'tactic' : 'blunder') : (comment && !isOpeningLabel ? 'idea' : null);
-                if (kind && before && before.fen) {
-                    const kids = (before.children || []).map(ch => lnCloneLimited(ch, LN_POS_PLIES));
-                    const headers = '[Event "Training position"]\n[Variant "From Position"]\n[FEN "' + before.fen + '"]';
-                    rows.push({ kind, pgn: headers + '\n\n' + lnSerializeLine(kids) });
-                }
+                const kind = lnPosKindFor(node);
+                if (kind && node.parent && node.parent.fen) rows.push({ kind, pgn: lnPositionPgn(node) });
                 node = node.children && node.children[0];
             }
             return rows;
@@ -4710,6 +4748,271 @@
             lnPosIdx = 0;
             lnPosStep(0); // shows the position at lnPosIdx
         }
+
+        // One position as a comma-delimited row for the `puzzles` bulk-paste tool: fen,note
+        //   fen  = [Variant "From Position"] + [FEN "…"] headers, a blank line, then the moves
+        //          (comments and variations stay in the text), as that tool expects
+        //   note = the flagged move's own comment (if any), its kind and move, and the game link
+        // A cell is double-quoted (inner quotes doubled) when it holds a comma, quote or line
+        // break; the fen cell always does, since its headers sit on their own lines.
+        function lnCsvCell(v) {
+            const t = v == null ? '' : String(v);
+            return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+        }
+
+        function lnPosMoves(pgn) {
+            return String(pgn || '').split(/\n\s*\n/).slice(1).join(' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function lnPosFenText(r) {
+            return '[Variant "From Position"]\n[FEN "' + lnPosStartFen(r.pgn) + '"]\n\n' + lnPosMoves(r.pgn);
+        }
+
+        function lnPosNote(r) {
+            const m = lnPosMoves(r.pgn).match(/^\s*\d+\.(?:\.\.)?\s*\S+\s*\{([^}]*)\}/); // comment right after the first move
+            const first = lnPosFirstMove(r.pgn);
+            const c = m ? m[1].trim() : '';
+            return [/^best\s+[-+#]?\d/.test(c) ? '' : c, r.kind + (first ? ' · ' + first : ''), r.game].filter(Boolean).join(' — ');
+        }
+
+        function lnPosRow(r) {
+            return lnCsvCell(lnPosFenText(r)) + ',' + lnCsvCell(lnPosNote(r));
+        }
+
+        async function lnPosExportRow() {
+            const row = lnPosView[lnPosIdx];
+            if (!row) { showToast('Step to a position first'); return; }
+            const text = lnPosRow(row);
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Copied position #' + row.id + ' as fen,note');
+                lnPosMsg('Copied #' + row.id + ' as fen,note' + (row.category ? ' — category: ' + row.category : ''));
+            } catch (e) { // clipboard blocked: show the row so it can be copied by hand
+                window.prompt('Clipboard blocked — copy this row:', text);
+            }
+        }
+
+        // Link back to the game on the board: its ?game_id= link when it lives in Supabase, else the
+        // [Link "…"] header of the PGN (chess.com / Lichess), else nothing.
+        function lnCurrentGameLink() {
+            if (window.supabaseLoadedGame) return sbGetGameLink() || '';
+            const ta = document.getElementById('pgnInput');
+            const m = ((ta && ta.value) || window.currentLoadedPgn || '').match(/\[Link\s+"([^"]+)"\]/);
+            return m ? m[1] : '';
+        }
+
+        // The highlighted move in the move list as a fen,note row (what a saved position would
+        // give), or null when no move is selected. Works on any move, main line or variation.
+        function lnMoveInfoRow() {
+            const node = window.currentMoveNode;
+            if (!node || !node.san || !node.parent || !node.parent.fen) return null;
+            return {
+                text: lnPosRow({ kind: lnPosKindFor(node) || 'position', game: lnCurrentGameLink(), pgn: lnPositionPgn(node) }),
+                label: node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san + (node.annotation || '')
+            };
+        }
+
+        // Copy Move Info: copy that row — nothing is saved.
+        async function lnCopyMoveInfo() {
+            const info = lnMoveInfoRow();
+            if (!info) { showToast('Click a move in the move list first'); return; }
+            try {
+                await navigator.clipboard.writeText(info.text);
+                showToast('Copied move info: ' + info.label);
+            } catch (e) { // clipboard blocked: show the row so it can be copied by hand
+                window.prompt('Clipboard blocked — copy this row:', info.text);
+            }
+        }
+
+        // ---- Transfer to puzzles: collect fen,note rows, then paste them into vercel_fen_saver's
+        // "Bulk add rows" box. Nothing is written to the puzzles table from here: that app keeps
+        // Dropbox as the source of truth, and its Sync would delete rows saved only to Supabase.
+
+        // Split CSV text into records, breaking only on line breaks OUTSIDE double quotes
+        // (a row's fen cell spans several lines)
+        function lnCsvRecords(text) {
+            const recs = []; let cur = '', q = false;
+            const t = String(text || '').replace(/\r\n?/g, '\n');
+            for (let i = 0; i < t.length; i++) {
+                const ch = t[i];
+                if (ch === '"') { cur += ch; if (q && t[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+                else if (ch === '\n' && !q) { if (cur.trim()) recs.push(cur.trim()); cur = ''; }
+                else cur += ch;
+            }
+            if (cur.trim()) recs.push(cur.trim());
+            return recs;
+        }
+
+        function lnXferSync() { // count + remember what has been collected (survives a reload)
+            const ta = document.getElementById('lnXferText');
+            const n = lnCsvRecords(ta.value).length;
+            document.getElementById('lnXferCount').textContent = n + (n === 1 ? ' row' : ' rows');
+            try { localStorage.setItem('lnXferText', ta.value); } catch (e) { }
+        }
+
+        function lnXferAdd(texts) {
+            const ta = document.getElementById('lnXferText');
+            const have = new Set(lnCsvRecords(ta.value));
+            const fresh = texts.filter((t, i) => !have.has(t) && texts.indexOf(t) === i);
+            if (fresh.length) ta.value = (ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' : '') + fresh.join('\n') + '\n';
+            lnXferSync();
+            if (fresh.length) ta.scrollTop = ta.scrollHeight;
+            const skipped = texts.length - fresh.length;
+            showToast(fresh.length ? 'Added ' + fresh.length + ' row' + (fresh.length === 1 ? '' : 's') + (skipped ? ' (' + skipped + ' already there)' : '')
+                                   : (texts.length === 1 ? 'That row is already in the list' : 'All ' + texts.length + ' rows are already in the list'));
+        }
+
+        function lnXferAddCurrent() {
+            const row = lnPosView[lnPosIdx];
+            if (!row) { showToast('Step to a position first'); return; }
+            lnXferAdd([lnPosRow(row)]);
+        }
+
+        function lnXferAddAll() {
+            if (!lnPosView.length) { showToast('No saved positions listed'); return; }
+            lnXferAdd(lnPosView.map(lnPosRow));
+        }
+
+        function lnXferAddMove() {
+            const info = lnMoveInfoRow();
+            if (!info) { showToast('Click a move in the move list first'); return; }
+            lnXferAdd([info.text]);
+        }
+
+        async function lnXferCopy() {
+            const text = document.getElementById('lnXferText').value.trim();
+            const n = lnCsvRecords(text).length;
+            if (!n) { showToast('Nothing to copy yet'); return; }
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('Copied ' + n + ' row' + (n === 1 ? '' : 's'));
+            } catch (e) { window.prompt('Clipboard blocked — copy these rows:', text); }
+        }
+
+        async function lnXferClear() {
+            const n = lnCsvRecords(document.getElementById('lnXferText').value).length;
+            if (!n) return;
+            if (!await lnConfirmModal('Clear the transfer list?', n + ' row' + (n === 1 ? '' : 's') + ' will be removed from this box. Nothing was saved anywhere, so they can\'t be brought back.', 'Clear')) return;
+            document.getElementById('lnXferText').value = '';
+            lnXferSync();
+        }
+
+        function lnXferMsg(msg) { const el = document.getElementById('lnXferStatus'); if (el) el.textContent = msg || ''; }
+
+        // The cells of ONE CSV record (quotes handled, "" = a quote inside a cell)
+        function lnCsvCells(record) {
+            const cells = []; let cur = '', q = false;
+            for (let i = 0; i < record.length; i++) {
+                const ch = record[i];
+                if (q) { if (ch === '"' && record[i + 1] === '"') { cur += '"'; i++; } else if (ch === '"') q = false; else cur += ch; }
+                else if (ch === '"') q = true;
+                else if (ch === ',') { cells.push(cur); cur = ''; }
+                else cur += ch;
+            }
+            cells.push(cur);
+            return cells;
+        }
+
+        // A puzzle's fen cell is a plain FEN or a PGN carrying a [FEN "…"] header (the puzzles table's two kinds)
+        function lnFenLike(t) {
+            return /\[FEN\s+"[^"]+"\]/.test(t) || /^([prnbqkPRNBQK1-8]+\/){7}[prnbqkPRNBQK1-8]+(\s|$)/.test(String(t).trim());
+        }
+
+        async function lnXferLoadCategories() {
+            const sel = document.getElementById('lnXferCategory');
+            if (!sel) return;
+            let prev = sel.value && sel.value !== '__new__' ? sel.value : '';
+            if (!prev) { try { prev = localStorage.getItem('lnXferCategory') || ''; } catch (e) { } }
+            let cats = [];
+            try {
+                const r = await fetch('/api/puzzles?action=categories');
+                const j = await r.json();
+                if (r.ok && Array.isArray(j)) cats = j;
+            } catch (e) { /* offline / no API: only "new category" is offered */ }
+            sel.innerHTML = cats.map(c => '<option value="' + pzEsc(c) + '">' + pzEsc(c) + '</option>').join('') +
+                '<option value="__new__">+ New category…</option>';
+            if (prev && cats.indexOf(prev) !== -1) sel.value = prev;
+            lnXferCategoryChanged();
+        }
+
+        function lnXferCategoryChanged() {
+            const sel = document.getElementById('lnXferCategory');
+            document.getElementById('lnXferNewCategory').style.display = sel.value === '__new__' ? '' : 'none';
+            try { if (sel.value !== '__new__') localStorage.setItem('lnXferCategory', sel.value); } catch (e) { }
+        }
+
+        function lnXferCategoryName() {
+            const sel = document.getElementById('lnXferCategory');
+            if (sel.value !== '__new__') return sel.value;
+            return document.getElementById('lnXferNewCategory').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        }
+
+        // Send every collected row to the puzzles table under the chosen category
+        async function lnXferSend() {
+            const category = lnXferCategoryName();
+            if (!category) { showToast('Pick a category, or type a new one'); return; }
+            const recs = lnCsvRecords(document.getElementById('lnXferText').value);
+            if (!recs.length) { showToast('Nothing to send yet'); return; }
+
+            const rows = [], bad = [];
+            recs.forEach((rec, i) => {
+                const c = lnCsvCells(rec), fen = (c[0] || '').trim();
+                if (c.length !== 2 || !fen || !lnFenLike(fen)) bad.push(i + 1);
+                else rows.push({ fen, note: (c[1] || '').trim() });
+            });
+            if (bad.length) {
+                lnXferMsg('Row' + (bad.length === 1 ? ' ' : 's ') + bad.join(', ') + ' ' + (bad.length === 1 ? 'is' : 'are') + ' not a fen,note row (two cells, the first a FEN or a PGN with [FEN "…"]). Fix or remove ' + (bad.length === 1 ? 'it' : 'them') + ', then send again.');
+                return;
+            }
+
+            // skip anything already in that category (same FEN), and repeats inside the box
+            const have = new Set();
+            try {
+                const r = await fetch('/api/puzzles?action=list&category=' + encodeURIComponent(category));
+                const list = await r.json();
+                if (r.ok && Array.isArray(list)) list.forEach(p => have.add(String(p.fen || '').trim()));
+            } catch (e) { /* if the list can't be read, the server still accepts the rows */ }
+            const seen = new Set();
+            const fresh = rows.filter(r => { if (have.has(r.fen) || seen.has(r.fen)) return false; seen.add(r.fen); return true; });
+            const skipped = rows.length - fresh.length;
+            if (!fresh.length) { lnXferMsg('All ' + rows.length + ' row' + (rows.length === 1 ? ' is' : 's are') + ' already in "' + category + '" — nothing to send.'); return; }
+
+            if (!await lnConfirmModal('Send to puzzles?', 'Add ' + fresh.length + ' row' + (fresh.length === 1 ? '' : 's') + ' to "' + category + '"' +
+                (skipped ? ' (' + skipped + ' already there, skipped)' : '') + '.\n\nThey go straight into the shared Supabase puzzles table, the one vercel_fen_saver reads.', '⬆ Send')) return;
+
+            try {
+                lnXferMsg('Sending ' + fresh.length + ' row' + (fresh.length === 1 ? '' : 's') + '…');
+                const out = await lnPost('/api/puzzles', { action: 'bulk', category, rows: fresh });
+                if (out.cancelled) { lnXferMsg('Send cancelled — no access code'); return; }
+                if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
+                document.getElementById('lnXferText').value = '';   // every row was either added or already there
+                lnXferSync();
+                lnXferMsg('Sent ' + out.data.added + ' row' + (out.data.added === 1 ? '' : 's') + ' to "' + category + '"' + (skipped ? ' (' + skipped + ' already there)' : '') + '.');
+                showToast('Sent ' + out.data.added + ' to ' + category);
+                await lnXferLoadCategories();
+                const sel = document.getElementById('lnXferCategory');
+                if (Array.from(sel.options).some(o => o.value === category)) { sel.value = category; lnXferCategoryChanged(); }
+            } catch (e) {
+                lnXferMsg('Send failed: ' + e.message);
+                showToast('Send failed: ' + e.message);
+            }
+        }
+
+        function lnXferToggle(force) {
+            const body = document.getElementById('lnXferBody'), btn = document.getElementById('lnXferToggleBtn');
+            if (!body || !btn) return;
+            const hide = typeof force === 'boolean' ? force : body.style.display !== 'none';
+            body.style.display = hide ? 'none' : 'block';
+            btn.textContent = hide ? 'Show ▾' : 'Hide ▴';
+            try { localStorage.setItem('lnXferHidden', hide ? '1' : '0'); } catch (e) { }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            try { const t = localStorage.getItem('lnXferText'); if (t) document.getElementById('lnXferText').value = t; } catch (e) { }
+            try { if (localStorage.getItem('lnXferHidden') === '1') lnXferToggle(true); } catch (e) { }
+            lnXferSync();
+            lnXferLoadCategories();
+        });
 
         // In-page confirm card (instead of the browser's confirm box): resolves true on the red
         // button; false on Cancel, Esc or a click outside. Cancel starts focused, so Enter

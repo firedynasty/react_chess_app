@@ -1,29 +1,55 @@
 // Vercel Serverless Function — Supabase `puzzles` table proxy
 // Keeps SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY server-side. service_role
 // is required (not the anon key) because RLS on `puzzles` has no
-// anon/authenticated policies — same pattern as react-chess-analysis_vercel's
-// api/games.js.
+// anon/authenticated policies — same pattern as api/games.js.
+//
+// The `puzzles` table lives in the same Supabase project as this app's games / chess_*
+// tables and is shared with the vercel_fen_saver app. Supabase is its source of truth.
+// This file is a port of vercel_fen_saver's api/puzzles.js (each app deploys its own copy).
 //
 // Set in Vercel dashboard -> Settings -> Environment Variables:
 //   SUPABASE_URL = https://xxxx.supabase.co
 //   SUPABASE_SERVICE_ROLE_KEY = your-service-role-key
+//   ACCESS_CODE = code required for every write: X-Access-Code header, or accessCode in the JSON body
 //
 // Endpoints:
 //   GET  /api/puzzles?action=categories
 //   GET  /api/puzzles?action=list&category=X
 //   GET  /api/puzzles?action=get&id=123
-//   POST /api/puzzles   { action: "save", category, note, fen }
-//   DELETE /api/puzzles?id=123
+//   POST /api/puzzles   { action: "save", category, note, fen }              (needs access code)
+//   POST /api/puzzles   { action: "bulk", category, rows: [{ fen, note }] }  (needs access code)
+//   DELETE /api/puzzles?id=123                                               (needs access code)
+//
+// Supabase `puzzles` is the only source of truth. Backup / bulk edit through CSVs is
+// done offline with puzzles_csv.py; no web request can delete puzzles because of a CSV.
+
+import { timingSafeEqual } from 'node:crypto';
 
 const LIST_COLUMNS = 'id,category,note,fen,position,created_at';
-// position is set by vercel_flashcards/supabase_fen_chess.html (▲ ▼ reorder).
+// position = order inside a category (save / bulk append at the end; puzzles_csv.py --upload sets it).
 // Needs: alter table puzzles add column position integer; update puzzles set position = id;
 const LIST_ORDER = 'position.asc.nullslast,id.asc';
+
+// Writes need the shared ACCESS_CODE. Fails closed if it isn't configured.
+function checkAccessCode(req, res) {
+  const expected = process.env.ACCESS_CODE;
+  if (!expected) {
+    res.status(500).json({ error: 'ACCESS_CODE not set on server.' });
+    return false;
+  }
+  const given = String(req.headers['x-access-code'] || (req.body && req.body.accessCode) || '');
+  const a = Buffer.from(given), b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    res.status(401).json({ error: 'Wrong access code' });
+    return false;
+  }
+  return true;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Access-Code');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -72,8 +98,32 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
+      if (!checkAccessCode(req, res)) return;
       const { action, category, note, fen } = req.body || {};
-      if (action !== 'save') return res.status(400).json({ error: 'Unknown action. Use action=save' });
+      if (action === 'bulk') {
+        const rows = (req.body.rows || [])
+          .map(r => ({ fen: String(r.fen || '').trim(), note: String(r.note || '').trim() || null }))
+          .filter(r => r.fen);
+        if (!category || !rows.length) return res.status(400).json({ error: 'category and rows are required' });
+
+        // Same placement as save: after the highest position in the category.
+        const last = await fetch(`${url}/rest/v1/puzzles?${new URLSearchParams({
+          select: 'position', category: `eq.${category}`, order: 'position.desc.nullslast', limit: '1',
+        })}`, { headers });
+        const lastRows = await last.json();
+        if (!last.ok) return res.status(last.status).json(lastRows);
+        const start = ((lastRows[0] && lastRows[0].position) || 0) + 1;
+
+        const r = await fetch(`${url}/rest/v1/puzzles`, {
+          method: 'POST',
+          headers: { ...headers, Prefer: 'return=representation' },
+          body: JSON.stringify(rows.map((row, i) => ({ category, note: row.note, fen: row.fen, position: start + i }))),
+        });
+        const created = await r.json();
+        if (!r.ok) return res.status(r.status).json(created);
+        return res.status(200).json({ success: true, added: created.length });
+      }
+      if (action !== 'save') return res.status(400).json({ error: 'Unknown action. Use action=save or action=bulk' });
       if (!category || !fen) {
         return res.status(400).json({ error: 'category and fen are required' });
       }
@@ -97,6 +147,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'DELETE') {
+      if (!checkAccessCode(req, res)) return;
       const id = String(req.query.id || '');
       if (!/^\d+$/.test(id)) return res.status(400).json({ error: 'A numeric id is required' });
 
