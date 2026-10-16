@@ -1020,7 +1020,8 @@
           <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
           <button onclick="lnPosOpenGame()" title="Load the full game this position came from and jump to the move" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Open game</button>
           <button onclick="lnPosDelete()" title="Delete the saved position shown now (asks to confirm; needs the access code). The full game stays saved." style="padding: 8px 14px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">🗑 Delete</button>
-          <button onclick="lnPosExportRow()" title="Copy the position shown now as one fen,note row: fen = From Position PGN (with its comments), note = the move's comment + kind, move and game link" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">Export position</button>
+          <button onclick="lnPosExportRow(this)" title="Copy the position shown now as one fen,note row (fen = From Position PGN with its comments; note = the move's comment + kind, move and game link), then paste it into the Transfer box below" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">📋 Copy position</button>
+          <button onclick="lnPosExportAll(this)" title="Copy every position currently listed (respecting the filters) as fen,note rows, one after another, then paste them into the Transfer box below" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">📋 Copy all listed</button>
           <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
         </div>
         <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
@@ -1029,16 +1030,13 @@
       </div>
       <div id="xferSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <div style="color: #888; flex: 1;">Transfer to puzzles — collect fen,note rows here, pick a category, and Send: they go straight into the shared Supabase puzzles table (the one vercel_fen_saver reads), skipping any FEN already in that category. Needs the access code.</div>
+          <div style="color: #888; flex: 1;">Transfer to puzzles — copy rows with Copy position, Copy all listed or Copy Move Info, paste them here (⌘V), pick a category, and Send: they go straight into the shared Supabase puzzles table (the one vercel_fen_saver reads), skipping any FEN already in that category. Needs the access code.</div>
           <button id="lnXferToggleBtn" onclick="lnXferToggle()" title="Hide / show this panel" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px; white-space: nowrap;">Hide ▴</button>
         </div>
         <div id="lnXferBody" style="margin-top: 8px;">
           <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-            <button onclick="lnXferAddCurrent()" title="Add the position shown in the Positions panel above" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">➕ Add this position</button>
-            <button onclick="lnXferAddAll()" title="Add every position currently listed (respecting the filters above)" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">➕ Add all listed</button>
-            <button onclick="lnXferAddMove()" title="Add the move highlighted in the move list (any move, saved or not)" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">➕ Add highlighted move</button>
             <span id="lnXferCount" style="color: #eee; min-width: 64px; text-align: center;">0 rows</span>
-            <button onclick="lnXferCopy()" title="Copy every row in the box (e.g. to paste somewhere else)" style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">📋 Copy all rows</button>
+            <button onclick="lnXferCopy(this)" title="Copy every row in the box (e.g. to paste somewhere else)" style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">📋 Copy all rows</button>
             <button onclick="lnXferClear()" title="Empty the box" style="padding: 8px 14px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">Clear</button>
           </div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
@@ -1049,7 +1047,7 @@
             <button onclick="lnXferSend()" title="Send every row in the box to the puzzles table under the chosen category (asks to confirm; needs the access code)" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">⬆ Send to puzzles</button>
           </div>
           <div id="lnXferStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
-          <textarea id="lnXferText" rows="6" oninput="lnXferSync()" spellcheck="false" placeholder="fen,note rows collect here (each row's first cell is the whole PGN in quotes). Edit freely, pick a category, then Send to puzzles (or Copy all rows)." style="width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+          <textarea id="lnXferText" rows="6" oninput="lnXferSync()" spellcheck="false" placeholder="Paste fen,note rows here (⌘V) — copy them with Copy position, Copy all listed or Copy Move Info. Each row's first cell is the whole PGN in quotes. Edit freely, pick a category, then Send to puzzles." style="width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
         </div>
       </div>
       <div id="boardCommentBar" style="display: none; margin: 12px auto; max-width: 1200px; font-family: monospace; font-size: 13px; line-height: 1.6;"></div>
@@ -1357,7 +1355,7 @@
             <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
-            <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
+            <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -4519,9 +4517,17 @@
             return { res, data };
         }
 
+        // A comment that is the same text written two or more times in a row ("X. X.") becomes
+        // one copy. That is what re-running AI Comments used to leave behind.
+        function lnDedupeComment(c) {
+            const t = String(c == null ? '' : c).trim();
+            const m = t.match(/^(.{12,}?)(?:\s+\1)+$/s);
+            return m ? m[1] : t;
+        }
+
         // Engine tags are noise in a training position; keep only the human / AI text
         function lnCleanComment(c) {
-            return String(c || '').replace(/\[%(?:eval|clk)[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+            return lnDedupeComment(String(c || '').replace(/\[%(?:eval|clk)[^\]]*\]/g, '').replace(/\s+/g, ' ').trim());
         }
 
         // Copy of a node plus up to `plies` plies of continuation (variations included), comments cleaned
@@ -4779,17 +4785,42 @@
             return lnCsvCell(lnPosFenText(r)) + ',' + lnCsvCell(lnPosNote(r));
         }
 
-        async function lnPosExportRow() {
-            const row = lnPosView[lnPosIdx];
-            if (!row) { showToast('Step to a position first'); return; }
-            const text = lnPosRow(row);
+        // Visual cue: the button turns green and says "✓ Copied …" for a moment
+        function lnFlashBtn(btn, label) {
+            if (!btn) return;
+            if (!btn.dataset.orig) { btn.dataset.orig = btn.textContent; btn.dataset.origBg = btn.style.background; btn.dataset.origColor = btn.style.color; }
+            btn.textContent = label; btn.style.background = '#27ae60'; btn.style.color = '#fff';
+            clearTimeout(btn._flash);
+            btn._flash = setTimeout(() => {
+                btn.textContent = btn.dataset.orig; btn.style.background = btn.dataset.origBg; btn.style.color = btn.dataset.origColor;
+                delete btn.dataset.orig;
+            }, 1600);
+        }
+
+        // Copy text to the clipboard with the toast + button cue; if the clipboard is blocked, show it to copy by hand
+        async function lnCopyText(text, btn, flashLabel, toastMsg) {
             try {
                 await navigator.clipboard.writeText(text);
-                showToast('Copied position #' + row.id + ' as fen,note');
-                lnPosMsg('Copied #' + row.id + ' as fen,note' + (row.category ? ' — category: ' + row.category : ''));
-            } catch (e) { // clipboard blocked: show the row so it can be copied by hand
-                window.prompt('Clipboard blocked — copy this row:', text);
+                showToast(toastMsg);
+                lnFlashBtn(btn, flashLabel);
+            } catch (e) {
+                window.prompt('Clipboard blocked — copy this:', text);
             }
+        }
+
+        async function lnPosExportRow(btn) {
+            const row = lnPosView[lnPosIdx];
+            if (!row) { showToast('Step to a position first'); return; }
+            await lnCopyText(lnPosRow(row), btn, '✓ Copied', 'Copied position #' + row.id + ' — paste it into the Transfer box');
+            lnPosMsg('Copied #' + row.id + ' as fen,note' + (row.category ? ' — category: ' + row.category : ''));
+        }
+
+        // Every listed position (filters respected), one fen,note row after another
+        async function lnPosExportAll(btn) {
+            if (!lnPosView.length) { showToast('No saved positions listed'); return; }
+            const n = lnPosView.length;
+            await lnCopyText(lnPosView.map(lnPosRow).join('\n'), btn, '✓ Copied ' + n, 'Copied ' + n + ' row' + (n === 1 ? '' : 's') + ' — paste into the Transfer box');
+            lnPosMsg('Copied ' + n + ' row' + (n === 1 ? '' : 's') + ' as fen,note');
         }
 
         // Link back to the game on the board: its ?game_id= link when it lives in Supabase, else the
@@ -4813,15 +4844,10 @@
         }
 
         // Copy Move Info: copy that row — nothing is saved.
-        async function lnCopyMoveInfo() {
+        async function lnCopyMoveInfo(btn) {
             const info = lnMoveInfoRow();
             if (!info) { showToast('Click a move in the move list first'); return; }
-            try {
-                await navigator.clipboard.writeText(info.text);
-                showToast('Copied move info: ' + info.label);
-            } catch (e) { // clipboard blocked: show the row so it can be copied by hand
-                window.prompt('Clipboard blocked — copy this row:', info.text);
-            }
+            await lnCopyText(info.text, btn, '✓ Copied', 'Copied move info: ' + info.label + ' — paste it into the Transfer box');
         }
 
         // ---- Transfer to puzzles: collect fen,note rows, then paste them into vercel_fen_saver's
@@ -4843,50 +4869,25 @@
             return recs;
         }
 
+        let lnXferLastCount = 0;
         function lnXferSync() { // count + remember what has been collected (survives a reload)
             const ta = document.getElementById('lnXferText');
             const n = lnCsvRecords(ta.value).length;
-            document.getElementById('lnXferCount').textContent = n + (n === 1 ? ' row' : ' rows');
+            const cnt = document.getElementById('lnXferCount');
+            cnt.textContent = n + (n === 1 ? ' row' : ' rows');
+            if (n > lnXferLastCount) { // rows were pasted in: flash the counter so you can see it landed
+                cnt.style.background = '#27ae60'; cnt.style.color = '#fff'; cnt.style.borderRadius = '4px';
+                setTimeout(() => { cnt.style.background = ''; cnt.style.color = '#eee'; }, 1200);
+            }
+            lnXferLastCount = n;
             try { localStorage.setItem('lnXferText', ta.value); } catch (e) { }
         }
 
-        function lnXferAdd(texts) {
-            const ta = document.getElementById('lnXferText');
-            const have = new Set(lnCsvRecords(ta.value));
-            const fresh = texts.filter((t, i) => !have.has(t) && texts.indexOf(t) === i);
-            if (fresh.length) ta.value = (ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' : '') + fresh.join('\n') + '\n';
-            lnXferSync();
-            if (fresh.length) ta.scrollTop = ta.scrollHeight;
-            const skipped = texts.length - fresh.length;
-            showToast(fresh.length ? 'Added ' + fresh.length + ' row' + (fresh.length === 1 ? '' : 's') + (skipped ? ' (' + skipped + ' already there)' : '')
-                                   : (texts.length === 1 ? 'That row is already in the list' : 'All ' + texts.length + ' rows are already in the list'));
-        }
-
-        function lnXferAddCurrent() {
-            const row = lnPosView[lnPosIdx];
-            if (!row) { showToast('Step to a position first'); return; }
-            lnXferAdd([lnPosRow(row)]);
-        }
-
-        function lnXferAddAll() {
-            if (!lnPosView.length) { showToast('No saved positions listed'); return; }
-            lnXferAdd(lnPosView.map(lnPosRow));
-        }
-
-        function lnXferAddMove() {
-            const info = lnMoveInfoRow();
-            if (!info) { showToast('Click a move in the move list first'); return; }
-            lnXferAdd([info.text]);
-        }
-
-        async function lnXferCopy() {
+        async function lnXferCopy(btn) {
             const text = document.getElementById('lnXferText').value.trim();
             const n = lnCsvRecords(text).length;
             if (!n) { showToast('Nothing to copy yet'); return; }
-            try {
-                await navigator.clipboard.writeText(text);
-                showToast('Copied ' + n + ' row' + (n === 1 ? '' : 's'));
-            } catch (e) { window.prompt('Clipboard blocked — copy these rows:', text); }
+            await lnCopyText(text, btn, '✓ Copied ' + n, 'Copied ' + n + ' row' + (n === 1 ? '' : 's'));
         }
 
         async function lnXferClear() {
@@ -5924,9 +5925,12 @@
                 });
                 const data = await r.json().catch(function () { return {}; });
                 if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
-                const applied = graftAiComments(data.content || '');
-                showToast(applied > 0 ? ('AI comments added to ' + applied + ' move' + (applied > 1 ? 's' : '')) : 'No comment lines parsed from the AI reply');
-                log('AI comments grafted onto ' + applied + ' moves', applied > 0 ? 'success' : 'warning');
+                const { applied, already } = graftAiComments(data.content || '');
+                const keptNote = already ? ' (' + already + ' already had a comment, left as is)' : '';
+                showToast(applied > 0 ? ('AI comments added to ' + applied + ' move' + (applied > 1 ? 's' : '') + keptNote)
+                                      : already > 0 ? ('Nothing added: ' + already + ' of those moves already have a comment')
+                                                    : 'No comment lines parsed from the AI reply');
+                log('AI comments grafted onto ' + applied + ' moves' + keptNote, applied > 0 ? 'success' : 'warning');
             } catch (e) {
                 showToast('AI comments failed: ' + e.message);
                 log('AI comments failed: ' + e.message, 'warning');
@@ -5947,7 +5951,7 @@
                 const key = m[1] + m[2];
                 (wanted[key] = wanted[key] || []).push({ san: m[3] || null, comment: m[4].trim() });
             });
-            let applied = 0, skipped = 0;
+            let applied = 0, skipped = 0, already = 0;
             let node = window.moveTree.children && window.moveTree.children[0];
             while (node && node.san) {
                 const list = wanted[node.moveNumber + (node.isBlackMove ? '...' : '.')] || [];
@@ -5957,8 +5961,11 @@
                 if (list.length && !w) {
                     skipped++;
                 } else if (w) {
-                    node.comment = node.comment ? node.comment + ' ' + w.comment : w.comment;
-                    applied++;
+                    // A move that already has a real comment (yours or an earlier AI run) is left alone:
+                    // adding to it is what used to double / stack comments on a re-run. Engine-only
+                    // comments ([%eval], [%clk]) don't count, so those moves still get the AI comment.
+                    if (lnCleanComment(node.comment)) { already++; }
+                    else { node.comment = node.comment ? node.comment + ' ' + w.comment : w.comment; applied++; }
                 }
                 node = node.children && node.children[0];
             }
@@ -5967,7 +5974,7 @@
                 renderMoveTable(window.moveTree);
                 updateAllCommentsDisplay();
             }
-            return applied;
+            return { applied, already };
         }
 
         // =====================================================================
@@ -8526,7 +8533,7 @@
                 if (token.startsWith('{')) {
                     const comment = token.slice(1, -1).trim();
                     if (lastMoveNode && lastMoveNode !== parentNode) {
-                        lastMoveNode.comment = comment;
+                        lastMoveNode.comment = typeof lnDedupeComment === 'function' ? lnDedupeComment(comment) : comment;
                     }
                     i++;
                     continue;
