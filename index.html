@@ -1264,7 +1264,7 @@
             </defs>
           </svg>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↑ or ↓ = close note / exit variation | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation | [ ] = previous / next saved position</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↓ = step into a variation | ↑ = exit variation (closes note if open) | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation | [ ] = previous / next saved position</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -1392,7 +1392,7 @@
             <button onclick="document.getElementById('board2PrevMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">← Prev</button>
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
-            <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) cycleVariationStepOut();" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
+            <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
             <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
@@ -10394,6 +10394,23 @@
 
         // Exit the current variation (Shift+Tab): jump back to the main-line move
         // the variation branched from (not its continuation).
+        // ArrowDown: step into a variation. A move whose parent has other continuations
+        // "has variations"; from the main-line move go to the first one, from inside a
+        // variation go on to the next sibling. With no sibling, fall back to the
+        // alternatives for the next move.
+        function enterVariationDown() {
+            const node = window.currentMoveNode;
+            if (!window.moveTree || !node) { showToast('No variation here'); return; }
+            const sibs = node.parent ? node.parent.children : [];
+            const at = sibs.indexOf(node);
+            if (at >= 0 && at < sibs.length - 1) { jumpToNode(sibs[at + 1].nodeId); return; }
+            if (sibs.length <= 1 && node.children && node.children.length > 1) {
+                jumpToNode(node.children[1].nodeId);
+                return;
+            }
+            showToast(sibs.length > 1 ? 'Last variation here' : 'No variation here');
+        }
+
         function exitVariationToBranchMainLineMove() {
             if (!window.moveTree || !window.currentMoveNode) return false;
             let outerBranch = null;
@@ -12511,23 +12528,22 @@
                         return;
                     }
                     // ArrowUp = exit the variation from ANY move in it, back to the
-                    // main-line move it branched from. On the main line (nothing to
-                    // exit) it falls back to Cycle Var., which enters the variation.
-                    if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
+                    // main-line move it branched from. On the main line there is
+                    // nothing to exit.
+                    if (!exitVariationToBranchMainLineMove()) showToast('Already on the main line');
                     e.preventDefault();
                 } else if (e.key === 'ArrowDown') {
-                    // ArrowDown = same as the ↑ Up Out button: exit the variation
-                    // back to the main line (cycle out when there's nothing to
-                    // exit). If the coach note modal is open it closes instead,
-                    // mirroring ArrowUp. The ⭐ note still opens via Enter or the
-                    // ⭐ button.
+                    // ArrowDown = step into a variation (first one from the main-line
+                    // move, then the next sibling). If the coach note modal is open
+                    // it closes instead, mirroring ArrowUp. The ⭐ note still opens
+                    // via Enter or the ⭐ button.
                     const tvModalDown = document.getElementById('textViewModal');
                     if (tvModalDown && tvModalDown.style.display !== 'none') {
                         tvModalDown.style.display = 'none';
                         e.preventDefault();
                         return;
                     }
-                    if (!exitVariationToBranchMainLineMove()) cycleVariationStepOut();
+                    enterVariationDown();
                     e.preventDefault();
                 } else if ((e.key === '[' || e.key === ']') && !e.metaKey && !e.ctrlKey && !e.altKey) {
                     // [ / ] = previous / next saved position (the ◀ ▶ buttons in the Positions
