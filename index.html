@@ -797,6 +797,8 @@
                 </select>
                 <button id="sbLoadGameBtn" onclick="sbLoadSelectedGame()" disabled style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Selected</button>
                 <button id="sbSaveGameBtn" onclick="sbSaveLoadedGame()" disabled style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to Supabase</button>
+                <button id="sbStageGameBtn" onclick="sbStageLoadedGame()" title="Save the board's PGN (evals, variations, comments) to the games_staging table; Transfer then moves it into games" style="background: #d35400; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to games_staging</button>
+                <button id="sbTransferStagedBtn" onclick="sbTransferStaged()" title="Copy every staged game into games (one chesssync already put there is kept as is), then clear it from games_staging" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Transfer staging → games</button>
                 <button id="sbReanalyzeBtn" onclick="sbReanalyze()" disabled title="Strip any stale eval/variations and run a fresh Stockfish pass on the loaded game — does NOT save; AI it / AI Comments first, then Save to Supabase" style="background: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Re-analyze</button>
             </div>
             <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -6050,6 +6052,52 @@
 
         sbRenderSavedReportsSelect();
         sbRenderReportList();
+
+        // Save the board's PGN to games_staging (via /api/staging) instead of straight into
+        // games, for games chesssync hasn't pulled in yet. Transfer moves them across.
+        async function sbStageLoadedGame() {
+            const statusEl = document.getElementById('sbStatus');
+            const movetext = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
+            if (!movetext) { log('No PGN available to save', 'warning'); return; }
+            const loaded = window.supabaseLoadedGame;
+            const headerBlock = (loaded && loaded.headerBlock) || extractPgnHeaderBlock(window.currentLoadedPgn);
+            if (!headerBlock) { statusEl.textContent = 'No PGN headers to stage (need [White]/[Link] etc.).'; return; }
+            const resultMatch = headerBlock.match(/\[Result\s+"([^"]*)"\]/);
+            const pgn = headerBlock + '\n\n' + (resultMatch ? movetext + ' ' + resultMatch[1] : movetext);
+            const account = JSON.parse(document.getElementById('sbAccount').value);
+            statusEl.textContent = 'Staging…';
+            try {
+                const out = await lnPost('/api/staging', {
+                    action: 'stage', pgn, username: account.username,
+                    source: loaded ? loaded.source : undefined, game_id: loaded ? loaded.game_id : undefined,
+                });
+                if (out.cancelled) { statusEl.textContent = 'Cancelled.'; return; }
+                if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
+                statusEl.textContent = 'Staged ' + out.data.source + '/' + out.data.game_id + ' — Transfer staging → games when ready.';
+                log('Saved to games_staging', 'success');
+            } catch (e) {
+                statusEl.textContent = 'Stage failed: ' + e.message;
+                log('Save to games_staging failed: ' + e.message, 'warning');
+            }
+        }
+
+        async function sbTransferStaged() {
+            const statusEl = document.getElementById('sbStatus');
+            statusEl.textContent = 'Transferring…';
+            try {
+                const out = await lnPost('/api/staging', { action: 'promote' });
+                if (out.cancelled) { statusEl.textContent = 'Cancelled.'; return; }
+                if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
+                const d = out.data;
+                statusEl.textContent = d.moved || d.alreadyThere
+                    ? 'Moved ' + d.moved + ' game(s) into games; ' + d.alreadyThere + ' already there (staged copy deleted).'
+                    : 'Nothing staged.';
+                log('Transfer staging → games: ' + statusEl.textContent, 'success');
+            } catch (e) {
+                statusEl.textContent = 'Transfer failed: ' + e.message;
+                log('Transfer failed: ' + e.message, 'warning');
+            }
+        }
 
         async function sbSaveLoadedGame() {
             const statusEl = document.getElementById('sbStatus');
