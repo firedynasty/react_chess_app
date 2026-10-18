@@ -8,6 +8,7 @@
 //
 // Endpoints:
 //   GET  /api/staging?action=list
+//   GET  /api/staging?action=get&source=chesscom&game_id=123
 //   POST /api/staging { action: "stage",   pgn, username[, source, game_id], accessCode }
 //   POST /api/staging { action: "promote", accessCode }
 //        copies every staged row that is not yet in `games` across, then empties staging.
@@ -86,7 +87,17 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      if (req.query.action !== 'list') return res.status(400).json({ error: 'Unknown action. Use action=list' });
+      if (req.query.action === 'get') {
+        const { source, game_id } = req.query;
+        if (!source || !game_id) return res.status(400).json({ error: 'source and game_id required' });
+        const params = new URLSearchParams({ select: '*', source: `eq.${source}`, game_id: `eq.${game_id}`, limit: '1' });
+        const r = await fetch(`${url}/rest/v1/games_staging?${params}`, { headers });
+        const rows = await r.json();
+        if (!r.ok) return res.status(r.status).json(rows);
+        if (!rows.length) return res.status(404).json({ error: 'Not in staging' });
+        return res.status(200).json(rows[0]);
+      }
+      if (req.query.action !== 'list') return res.status(400).json({ error: 'Unknown action. Use action=list or action=get' });
       const params = new URLSearchParams({
         select: 'source,game_id,username,white,black,result,played_at,staged_at',
         order: 'staged_at.desc',

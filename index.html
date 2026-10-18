@@ -799,6 +799,9 @@
                 <button id="sbSaveGameBtn" onclick="sbSaveLoadedGame()" disabled style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to Supabase</button>
                 <button id="sbStageGameBtn" onclick="sbStageLoadedGame()" title="Save the board's PGN (evals, variations, comments) to the games_staging table; Transfer then moves it into games" style="background: #d35400; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Save to games_staging</button>
                 <button id="sbTransferStagedBtn" onclick="sbTransferStaged()" title="Copy every staged game into games (one chesssync already put there is kept as is), then clear it from games_staging" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Transfer staging → games</button>
+                <select id="sbStagedSelect" onchange="sbLoadStaged(this)" title="Games saved to games_staging, not yet transferred — pick one to load it on the board" style="min-width: 200px; max-width: 100%; padding: 6px 10px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+                    <option value="">Staged games (0)</option>
+                </select>
                 <button id="sbReanalyzeBtn" onclick="sbReanalyze()" disabled title="Strip any stale eval/variations and run a fresh Stockfish pass on the loaded game — does NOT save; AI it / AI Comments first, then Save to Supabase" style="background: #8e44ad; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Re-analyze</button>
             </div>
             <div style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -814,6 +817,7 @@
 
             <div style="margin-top: 10px;">
                 <span id="sbGameLink" title="Deep link (?game_id=...) to the game currently loaded from Supabase" style="font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></span>
+                <button id="sbCopyGameLinkBtn" onclick="sbCopyGameLink(this)" title="Copy the deep link to the clipboard" style="margin-left: 8px; padding: 2px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 12px;">📋 Copy URL</button>
             </div>
             <!-- Google Doc loader — sign in + Recent; picking a Doc loads its text into the coach-note source (window.textViewRawContent) so the ⭐ button works -->
             <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
@@ -5619,6 +5623,13 @@
         window.sbLoadGameByIdAndSource = sbLoadGameByIdAndSource;
         window.sbInferSourceFromGameId = sbInferSourceFromGameId;
 
+        // 📋 Copy URL next to the deep link under sbStatus.
+        async function sbCopyGameLink(btn) {
+            const link = sbGetGameLink();
+            if (!link) { showToast('No Supabase game loaded'); return; }
+            await lnCopyText(link, btn, '✓ Copied', 'Copied game link: ' + link);
+        }
+
         // Shows the deep link for the game on the board (blank when none).
         function sbRefreshGameLink() {
             const el = document.getElementById('sbGameLink');
@@ -6052,16 +6063,89 @@
 
         sbRenderSavedReportsSelect();
         sbRenderReportList();
+        sbRefreshStaged(); // refill the Staged games dropdown on page load
 
         // Save the board's PGN to games_staging (via /api/staging) instead of straight into
         // games, for games chesssync hasn't pulled in yet. Transfer moves them across.
+        // Dropdown of games_staging rows (refilled on load, after Stage and after Transfer).
+        async function sbRefreshStaged() {
+            const sel = document.getElementById('sbStagedSelect');
+            if (!sel) return;
+            try {
+                const r = await fetch('/api/staging?action=list');
+                const rows = await r.json();
+                if (!r.ok || !Array.isArray(rows)) throw new Error('list failed');
+                sel.innerHTML = '';
+                const first = document.createElement('option');
+                first.value = '';
+                first.textContent = 'Staged games (' + rows.length + ')';
+                sel.appendChild(first);
+                rows.forEach(function (g) {
+                    const o = document.createElement('option');
+                    o.value = JSON.stringify({ source: g.source, game_id: g.game_id });
+                    const day = g.played_at ? g.played_at.slice(0, 10) : '';
+                    o.textContent = (day ? day + ' ' : '') + (g.white || '?') + ' vs ' + (g.black || '?') + ' (' + g.source + '/' + g.game_id + ')';
+                    sel.appendChild(o);
+                });
+            } catch (e) { /* table not created yet / offline: leave the placeholder */ }
+        }
+
+        async function sbLoadStaged(sel) {
+            if (!sel.value) return;
+            const { source, game_id } = JSON.parse(sel.value);
+            const statusEl = document.getElementById('sbStatus');
+            statusEl.textContent = 'Loading staged game…';
+            try {
+                const r = await fetch('/api/staging?' + new URLSearchParams({ action: 'get', source, game_id }));
+                const row = await r.json();
+                if (!r.ok) throw new Error(row.error || ('HTTP ' + r.status));
+                applyPgnStringToBoard(row.pgn); // resets window.supabaseLoadedGame — set it after
+                window.currentLoadedPgn = row.pgn;
+                window.supabaseLoadedGame = { source, game_id, headerBlock: extractPgnHeaderBlock(row.pgn), label: source + '/' + game_id + ' (staged)' };
+                document.getElementById('sbSaveGameBtn').disabled = false;
+                document.getElementById('sbReanalyzeBtn').disabled = false;
+                sbRefreshGameLink();
+                statusEl.textContent = 'Loaded staged ' + source + '/' + game_id + '.';
+            } catch (e) {
+                statusEl.textContent = 'Load failed: ' + e.message;
+            }
+        }
+
         async function sbStageLoadedGame() {
             const statusEl = document.getElementById('sbStatus');
             const movetext = window.moveTree ? moveTreeToPgn(window.moveTree) : (window.currentLoadedPgn || window.annotatedPgnWithVariations);
             if (!movetext) { log('No PGN available to save', 'warning'); return; }
             const loaded = window.supabaseLoadedGame;
-            const headerBlock = (loaded && loaded.headerBlock) || extractPgnHeaderBlock(window.currentLoadedPgn);
-            if (!headerBlock) { statusEl.textContent = 'No PGN headers to stage (need [White]/[Link] etc.).'; return; }
+            // Other edit flows can resync currentLoadedPgn to headerless movetext, so also look in
+            // the report box (applyPgnStringToBoard writes the original PGN there) and the PGN input.
+            const headerSources = [
+                loaded && loaded.headerBlock, window.currentLoadedPgn, window.annotatedPgnWithVariations,
+                (document.getElementById('analysisReportText') || {}).textContent, (document.getElementById('pgnInput') || {}).value,
+            ];
+            let headerBlock = '';
+            for (let i = 0; i < headerSources.length && !headerBlock; i++) {
+                const src = headerSources[i];
+                if (!src) continue;
+                headerBlock = src.trim().startsWith('[') ? extractPgnHeaderBlock(src) : '';
+            }
+            // Analyze Game strips every [Tag] from the PGN box, so a game picked from the fetched-games
+            // dropdown has none left on the board -- take them from the original in fetchedGames.
+            let fetched = null;
+            if (!headerBlock) {
+                const label = (document.getElementById('game-dropdown') || {}).value;
+                fetched = label && typeof fetchedGames !== 'undefined' ? fetchedGames[label] : null;
+                // .pgn is movetext only (extractPgnMoves strips headers at fetch time); .fullPgn has them
+                if (fetched && (fetched.fullPgn || fetched.pgn)) {
+                    headerBlock = (fetched.fullPgn || fetched.pgn).split(/\r?\n/).filter(function (l) { return /^\s*\[[A-Za-z0-9_]+\s+"[^"]*"\]\s*$/.test(l); }).map(function (l) { return l.trim(); }).join('\n');
+                }
+            }
+            let fetchedSource, fetchedId;
+            if (fetched && fetched.metadata && fetched.metadata.url) {
+                const u = fetched.metadata.url;
+                fetchedSource = /lichess\.org/.test(u) ? 'lichess' : 'chesscom';
+                fetchedId = u.split('/').pop().split('?')[0];
+            }
+            if (!headerBlock) { statusEl.textContent = 'No PGN headers found anywhere (board, report box, PGN input) — load the game with its [White]/[Link] headers first.'; return; }
             const resultMatch = headerBlock.match(/\[Result\s+"([^"]*)"\]/);
             const pgn = headerBlock + '\n\n' + (resultMatch ? movetext + ' ' + resultMatch[1] : movetext);
             const account = JSON.parse(document.getElementById('sbAccount').value);
@@ -6069,12 +6153,13 @@
             try {
                 const out = await lnPost('/api/staging', {
                     action: 'stage', pgn, username: account.username,
-                    source: loaded ? loaded.source : undefined, game_id: loaded ? loaded.game_id : undefined,
+                    source: loaded ? loaded.source : fetchedSource, game_id: loaded ? loaded.game_id : fetchedId,
                 });
                 if (out.cancelled) { statusEl.textContent = 'Cancelled.'; return; }
                 if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
                 statusEl.textContent = 'Staged ' + out.data.source + '/' + out.data.game_id + ' — Transfer staging → games when ready.';
                 log('Saved to games_staging', 'success');
+                sbRefreshStaged();
             } catch (e) {
                 statusEl.textContent = 'Stage failed: ' + e.message;
                 log('Save to games_staging failed: ' + e.message, 'warning');
@@ -6093,6 +6178,7 @@
                     ? 'Moved ' + d.moved + ' game(s) into games; ' + d.alreadyThere + ' already there (staged copy deleted).'
                     : 'Nothing staged.';
                 log('Transfer staging → games: ' + statusEl.textContent, 'success');
+                sbRefreshStaged();
             } catch (e) {
                 statusEl.textContent = 'Transfer failed: ' + e.message;
                 log('Transfer failed: ' + e.message, 'warning');
