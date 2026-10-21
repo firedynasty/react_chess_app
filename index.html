@@ -1400,6 +1400,8 @@
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
             <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
+            <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
+            <button id="toggleSoundBtnMini" title="Turn move sounds on or off" onclick="toggleChessSound()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sound On</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
@@ -1463,7 +1465,7 @@
           <button id="exportFenBtn" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Export FEN</button>
           <button id="lichessLinksBtn" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Lichess Links</button>
           <button id="toggleChatBtn" onclick="var p = document.getElementById('chatNotesPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Toggle Chat</button>
-          <button id="toggleSoundBtn" onclick="window.chessSoundEnabled = !window.chessSoundEnabled; this.textContent = window.chessSoundEnabled ? 'Sound On' : 'Sound Off'; this.style.background = window.chessSoundEnabled ? '#555' : '#333'" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
+          <button id="toggleSoundBtn" onclick="toggleChessSound()" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
           <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
           <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); if(p.style.display!=='none'){p.style.display='none'; this.style.background='linear-gradient(90deg, #e91e63, #9c27b0)'; if(typeof stopStockfishGame==='function') stopStockfishGame();}else{p.style.display='block'; this.style.background='#555';}" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
           <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Hide Moves</button>
@@ -1724,6 +1726,22 @@
         // =====================================================================
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         window.chessSoundEnabled = true;
+        try { if (localStorage.getItem('chessSoundEnabled') === '0') window.chessSoundEnabled = false; } catch (e) {}
+
+        function syncSoundButtons() {
+            const on = window.chessSoundEnabled;
+            const full = document.getElementById('toggleSoundBtn');
+            const mini = document.getElementById('toggleSoundBtnMini');
+            if (full) { full.textContent = on ? 'Sound On' : 'Sound Off'; full.style.background = on ? '#555' : '#333'; }
+            if (mini) { mini.textContent = on ? 'Sound On' : 'Sound Off'; mini.style.opacity = on ? '1' : '0.55'; }
+        }
+        window.toggleChessSound = function() {
+            window.chessSoundEnabled = !window.chessSoundEnabled;
+            try { localStorage.setItem('chessSoundEnabled', window.chessSoundEnabled ? '1' : '0'); } catch (e) {}
+            if (window.chessSoundEnabled && ctx.state === 'suspended') ctx.resume();
+            syncSoundButtons();
+        };
+        document.addEventListener('DOMContentLoaded', syncSoundButtons);
 
         window.playMoveSound = playMoveSound;
         function playMoveSound(san) {
@@ -7462,6 +7480,126 @@
                 stockfish.postMessage('position fen ' + fen);
                 stockfish.postMessage('go depth ' + depth);
             });
+        }
+
+        // Engine plays both sides from the current position until the game ends
+        // (mate, stalemate, draw) and the line is stored as a variation at the current
+        // node. A previous play-out at the same node (tagged in its first comment) or a
+        // variation starting with the same move is replaced.
+        const PLAYOUT_TAG = 'Engine play-out';
+        window._playoutRunning = false;
+        window._playoutCancel = false;
+
+        async function playOutToEnd() {
+            const btn = document.getElementById('playout-btn');
+            const statusEl = document.getElementById('variation-status');
+            if (window._playoutRunning) { window._playoutCancel = true; return; }
+
+            const currentMove = document.querySelector('.move-san.current[data-node-id]');
+            if (currentMove && currentMove.dataset.nodeId) jumpToNode(currentMove.dataset.nodeId);
+
+            const anchor = window.currentMoveNode || window.moveTree;
+            if (!anchor || !anchor.fen) {
+                statusEl.textContent = 'No position selected. Navigate to a move first.';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            const depth = parseInt(document.getElementById('variation-depth').value) || 12;
+            const MAX_PLIES = 200;
+            const chess = new Chess(anchor.fen);
+            const pv = [];
+            const uciPat = /^[a-h][1-8][a-h][1-8][qrbn]?$/;
+
+            window._playoutRunning = true;
+            window._playoutCancel = false;
+            const idleLabel = btn.textContent;
+            btn.textContent = 'Stop';
+            statusEl.style.color = '#00d4ff';
+
+            try {
+                while (!chess.game_over() && pv.length < MAX_PLIES && !window._playoutCancel) {
+                    statusEl.textContent = `Playing out at depth ${depth}... ${pv.length} plies`;
+                    let result = null;
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            result = await analyzePositionForVariation(chess.fen(), depth);
+                            break;
+                        } catch (retryErr) {
+                            if (attempt === 2) throw retryErr;
+                            await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
+                    if (!result || !result.bestMove) break;
+                    const best = result.bestMove;
+                    const move = uciPat.test(best)
+                        ? chess.move({ from: best.slice(0, 2), to: best.slice(2, 4), promotion: best[4] || undefined })
+                        : chess.move(best, { sloppy: true });
+                    if (!move) break;
+                    pv.push(move.san);
+                }
+            } catch (err) {
+                statusEl.textContent = 'Play-out failed: ' + err.message;
+                statusEl.style.color = '#ff6b6b';
+                return;
+            } finally {
+                window._playoutRunning = false;
+                btn.textContent = idleLabel;
+            }
+
+            if (pv.length === 0) {
+                statusEl.textContent = chess.game_over() ? 'Game is already over here' : 'No engine move found';
+                statusEl.style.color = '#ff6b6b';
+                return;
+            }
+
+            let outcome = 'stopped';
+            if (chess.in_checkmate()) outcome = 'checkmate';
+            else if (chess.in_stalemate()) outcome = 'stalemate';
+            else if (chess.in_draw()) outcome = 'draw';
+            else if (pv.length >= MAX_PLIES) outcome = 'ply limit';
+
+            // The variation is an alternative to the game move, so it can't start with it
+            const mainChild = anchor.children && anchor.children[0];
+            if (mainChild && mainChild.san === pv[0]) {
+                statusEl.textContent = `Engine's best move (${pv[0]}) is the game move — nothing to add. Step forward and run it again.`;
+                statusEl.style.color = '#f39c12';
+                return;
+            }
+
+            // Drop the earlier play-out / same-first-move variations (and their registry entries)
+            const dropNode = (n) => { delete window.moveNodeRegistry[n.nodeId]; (n.children || []).forEach(dropNode); };
+            anchor.children = (anchor.children || []).filter((c, i) => {
+                if (i === 0) return true;
+                const replace = c.san === pv[0] || (c.comment || '').startsWith(PLAYOUT_TAG);
+                if (replace) dropNode(c);
+                return !replace;
+            });
+
+            window.currentVariationResult = {
+                moveNumber: anchor.nodeId === 'root' ? 1 : (anchor.isBlackMove ? anchor.moveNumber + 1 : anchor.moveNumber),
+                isBlack: anchor.nodeId === 'root' ? anchor.fen.split(' ')[1] === 'b' : !anchor.isBlackMove,
+                plyIndex: null,
+                fen: anchor.fen,
+                bestMove: pv[0],
+                score: undefined,
+                pv: pv,
+                parentNode: anchor
+            };
+            addVariationToPgn();
+
+            const firstNode = anchor.children.find((c, i) => i > 0 && c.san === pv[0]) || anchor.children[anchor.children.length - 1];
+            if (firstNode) {
+                firstNode.comment = `${PLAYOUT_TAG} (depth ${depth}): ${outcome} after ${pv.length} plies`;
+                const pgn = moveTreeToPgn(window.moveTree);
+                if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+                window.annotatedPgnWithVariations = pgn;
+                renderMoveTable(window.moveTree);
+            }
+            updateReportWithPgn();
+
+            statusEl.textContent = `Play-out added: ${pv.length} plies, ${outcome}`;
+            statusEl.style.color = '#2ecc71';
         }
 
         function addVariationToPgn() {
