@@ -1499,6 +1499,25 @@
               <div style="font-weight:bold; margin-bottom:14px; color:#a8d8ea; font-size:15px;">Lichess Links</div>
               <div style="font-family:monospace; font-size:12px; color:#ff9800; margin-bottom:14px; word-break:break-all;" id="fenLichessModalFen"></div>
 
+              <!-- From Position PGN (header + FEN, no moves) so a played-out line pasted back anchors on this position -->
+              <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; margin-bottom:10px; border:2px solid #ff9800;">
+                <div style="font-weight:600; margin-bottom:6px; color:#ff9800;">From Position PGN — pick side to move:</div>
+                <pre id="fenLichessFromPosPgn" style="font-family:monospace; font-size:12px; color:#eee; margin:0 0 8px; white-space:pre-wrap; word-break:break-all;"></pre>
+                <div style="display:flex; gap:8px;">
+                  <button onclick="copyLichessFromPos('w', this)" style="flex:1; padding:8px; background:#4CAF50; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy White to Move</button>
+                  <button onclick="copyLichessFromPos('b', this)" style="flex:1; padding:8px; background:#666; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy Black to Move</button>
+                </div>
+              </div>
+
+              <!-- Paste the played-out line from Lichess; merged under the move this modal was opened on -->
+              <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; margin-bottom:10px; border:2px solid #629924;">
+                <div style="font-weight:600; margin-bottom:6px; color:#8bc34a;">Paste Lichess play-out:</div>
+                <div id="fenLichessAnchorInfo" style="font-size:11px; color:#aaa; margin-bottom:6px;"></div>
+                <textarea id="fenLichessPasteArea" rows="4" placeholder='[Variant "From Position"] [FEN "..."] 1... Ng3 2. Qd3 ...' style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:6px; font-family:monospace; font-size:12px;"></textarea>
+                <button onclick="buildLichessPlayout(this)" style="width:100%; margin-top:6px; padding:8px; background:#629924; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Build new PGN (adds line + copies full PGN)</button>
+                <div id="fenLichessBuildStatus" style="font-size:12px; margin-top:6px;"></div>
+              </div>
+
               <!-- White analysis -->
               <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:5px; margin-bottom:10px; border:2px solid #4CAF50;">
                 <div style="font-weight:600; margin-bottom:6px; color:#4CAF50;">♔ White to Move (Analysis):</div>
@@ -7561,7 +7580,7 @@
 
             // The variation is an alternative to the game move, so it can't start with it
             const mainChild = anchor.children && anchor.children[0];
-            if (mainChild && mainChild.san === pv[0]) {
+            if (mainChild && mainChild.san === pv[0] && !PLAYOUT_TAG_RE.test(mainChild.comment || '')) {
                 statusEl.textContent = `Engine's best move (${pv[0]}) is the game move — nothing to add. Step forward and run it again.`;
                 statusEl.style.color = '#f39c12';
                 return;
@@ -7570,8 +7589,7 @@
             // Drop the earlier play-out / same-first-move variations (and their registry entries)
             const dropNode = (n) => { delete window.moveNodeRegistry[n.nodeId]; (n.children || []).forEach(dropNode); };
             anchor.children = (anchor.children || []).filter((c, i) => {
-                if (i === 0) return true;
-                const replace = c.san === pv[0] || (c.comment || '').startsWith(PLAYOUT_TAG);
+                const replace = PLAYOUT_TAG_RE.test(c.comment || '') || (i > 0 && c.san === pv[0]);
                 if (replace) dropNode(c);
                 return !replace;
             });
@@ -7600,6 +7618,157 @@
 
             statusEl.textContent = `Play-out added: ${pv.length} plies, ${outcome}`;
             statusEl.style.color = '#2ecc71';
+        }
+
+        // ---- Lichess play-out: merge a pasted "From Position" line into the tree ----
+        // The anchor is the node that was on the board when Lichess Links opened. It is
+        // stored as the SAN path from the start (survives reloads, works inside variations)
+        // and the pasted FEN header is ignored, so transpositions can't misplace the line.
+        const PLAYOUT_TAG_RE = /^(Engine|Lichess) play-out/;
+
+        function lichessAnchorPath(node) {
+            const path = [];
+            for (let n = node; n && n.parent && n.san; n = n.parent) path.unshift(n.san);
+            return path;
+        }
+
+        function resolveLichessAnchor(path) {
+            let node = window.moveTree;
+            for (const san of path) {
+                node = node && (node.children || []).find(c => c.san === san);
+                if (!node) return null;
+            }
+            return node;
+        }
+
+        // `path` is the SAN path of the move the modal was opened on. When that move has a
+        // parent the line is an ALTERNATIVE to it: it starts from the position before the move,
+        // and replaces that move's other variations (the game's main line is never removed).
+        // At the very start of the game there is no move to replace, so the line is added
+        // as a continuation instead.
+        function applyLichessPlayout(text, path) {
+            if (!window.moveTree) return { error: 'No game loaded' };
+            const clicked = resolveLichessAnchor(path);
+            if (!clicked) return { error: 'The move you started from is no longer in this game' };
+
+            const moveText = text.replace(/\[[^\]]*\]/g, '').replace(/\{[^}]*\}/g, '').replace(/\$\d+/g, '')
+                .replace(/\d+\.{1,3}\s*/g, ' ');
+            const tokens = moveText.split(/\s+/).filter(t => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
+            if (tokens.length === 0) return { error: 'No moves found in the pasted text' };
+
+            // The anchor is the remembered move — no FEN comparison. The line is validated
+            // against the position AFTER that move; if its first move isn't legal there, it
+            // is an ALTERNATIVE to the move and is validated against the position before it.
+            const tryValidate = (fen) => {
+                const c = new Chess(fen);
+                const out = [];
+                for (let ti = 0; ti < tokens.length; ti++) {
+                    const m = c.move(tokens[ti], { sloppy: true });
+                    if (!m) return { sans: null, fail: tokens[ti], at: ti };
+                    out.push(m.san);
+                }
+                return { sans: out };
+            };
+
+            // Try, in order: after the move; before the move (alternative); before the move
+            // with the side to move flipped — the board the modal's other-side copy button
+            // gives, for "what the other side should have done" lines.
+            let anchor = clicked, startFen = clicked.fen, sans = null, best = null;
+            const attempts = [{ fen: clicked.fen, node: clicked }];
+            if (clicked.parent && clicked.san) {
+                attempts.push({ fen: clicked.parent.fen, node: clicked.parent });
+                const parts = clicked.parent.fen.split(' ');
+                const flipped = parts.slice();
+                flipped[1] = parts[1] === 'w' ? 'b' : 'w';
+                if (parts[1] === 'b') flipped[5] = String((parseInt(parts[5]) || 1) + 1);
+                attempts.push({ fen: flipped.join(' '), node: clicked.parent });
+            }
+            for (const att of attempts) {
+                const r = tryValidate(att.fen);
+                if (r.sans) { sans = r.sans; anchor = att.node; startFen = att.fen; break; }
+                if (!best || r.at > best.at) best = r;
+            }
+            if (!sans) {
+                const label = clicked.san
+                    ? `${clicked.moveNumber}${clicked.isBlackMove ? '...' : '.'}${clicked.san}`
+                    : 'the start of the game';
+                return { error: `"${best.fail}" (move ${best.at + 1} of the paste) doesn't fit the position at ${label}. Open Lichess Links on the right move.` };
+            }
+
+            // One rule for every paste: the WHOLE line becomes a self-contained variation
+            // at the clicked move (or, for an alternative, at its parent) — even if its
+            // first move duplicates the game move. Any variation that move already has is
+            // replaced: alternatives to it (at its parent), alternatives to the reply (at
+            // the move itself), plus tagged play-out lines below it. The game line itself
+            // is never removed.
+            const dropNode = (n) => { delete window.moveNodeRegistry[n.nodeId]; (n.children || []).forEach(dropNode); };
+
+            // Guard: the line is exactly the game's own continuation — nothing to add
+            let g = anchor, gi = 0;
+            while (gi < sans.length && g.children && g.children.length > 0 && g.children[0].san === sans[gi]) {
+                g = g.children[0]; gi++;
+            }
+            if (gi === sans.length) return { error: 'That line is already in the game', added: 0 };
+
+            let replaced = 0;
+            const slotNodes = (clicked.parent && clicked.san) ? [clicked.parent, clicked] : [clicked];
+            for (const sn of slotNodes) {
+                sn.children = (sn.children || []).filter((c, idx) => {
+                    if (idx === 0 || c === clicked) return true;
+                    dropNode(c); replaced++;
+                    return false;
+                });
+            }
+            (function prune(n) {
+                n.children = (n.children || []).filter((c) => {
+                    if (PLAYOUT_TAG_RE.test(c.comment || '')) { dropNode(c); replaced++; return false; }
+                    return true;
+                });
+                n.children.forEach(prune);
+            })(clicked);
+
+            let node = anchor, i = 0;
+
+            const walk = new Chess(startFen);
+            // Move numbers come from the starting position itself, so flipped-side lines
+            // number correctly too (e.g. 24. Rxg7+ for a white line at 23...a3)
+            const startSide = startFen.split(' ')[1];
+            const startFull = parseInt(startFen.split(' ')[5]) || 1;
+            const counterBase = Object.keys(window.moveNodeRegistry).length;
+            let first = null, ci = 0;
+            for (; i < sans.length; i++) {
+                const move = walk.move(sans[i]);
+                if (!move) break;
+                const isBlack = (startSide === 'w') ? (i % 2 === 1) : (i % 2 === 0);
+                const moveNumber = startFull + Math.floor((i + (startSide === 'b' ? 1 : 0)) / 2);
+                const newNode = {
+                    san: move.san, annotation: '', fen: walk.fen(), moveNumber: moveNumber,
+                    isBlackMove: isBlack, comment: '', parent: node, children: [],
+                    depth: first ? node.depth : (node.children.length > 0 ? (node.depth || 0) + 1 : node.depth),
+                    nodeId: `node-var-${counterBase + ci}`
+                };
+                ci++;
+                node.children.push(newNode);
+                window.moveNodeRegistry[newNode.nodeId] = newNode;
+                if (!first) first = newNode;
+                node = newNode;
+            }
+            const outcome = walk.in_checkmate() ? 'checkmate' : walk.in_stalemate() ? 'stalemate' : walk.in_draw() ? 'draw' : 'unfinished';
+            first.comment = `Lichess play-out: ${outcome} after ${sans.length} plies`;
+
+            const pgn = moveTreeToPgn(window.moveTree);
+            if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+            window.annotatedPgnWithVariations = pgn;
+            if (typeof window.parsePgnToPositions === 'function') {
+                window.studyReportPositions = window.parsePgnToPositions(
+                    typeof AnalysisChess !== 'undefined' ? AnalysisChess.cleanPgn(pgn) : pgn);
+            }
+            window.currentMoveNode = null;
+            window.cycleVarSequence = [];
+            window.cycleVarIndex = -1;
+            renderMoveTable(window.moveTree);
+            updateReportWithPgn();
+            return { added: ci, outcome: outcome, replaced: replaced };
         }
 
         function addVariationToPgn() {
@@ -11939,15 +12108,49 @@
                 });
             }
 
+            // [Variant "From Position"] header + FEN with no moves; moves from a Lichess
+            // play-out are appended to this and pasted back, anchoring on the FEN
+            function lichessFromPosPgn(side) {
+                return '[Variant "From Position"]\n[FEN "' + window.lichessFromPosFen[side] + '"]\n\n';
+            }
+            window.copyLichessFromPos = function(side, btn) {
+                const label = btn.textContent;
+                document.getElementById('fenLichessFromPosPgn').textContent = lichessFromPosPgn(side);
+                navigator.clipboard.writeText(lichessFromPosPgn(side)).then(function() {
+                    btn.textContent = 'Copied!';
+                    setTimeout(function() { btn.textContent = label; }, 1500);
+                });
+            };
+
+            window.buildLichessPlayout = function(btn) {
+                const area = document.getElementById('fenLichessPasteArea');
+                const status = document.getElementById('fenLichessBuildStatus');
+                try { localStorage.setItem('lichessPlayoutText', area.value); } catch (e) {}
+                let path = window.lichessAnchorSteps;
+                if (!path) {
+                    try { path = JSON.parse(localStorage.getItem('lichessAnchorPath') || 'null'); } catch (e) {}
+                }
+                if (!path) { status.textContent = 'Click a move and open Lichess Links first.'; status.style.color = '#ff6b6b'; return; }
+                const res = applyLichessPlayout(area.value, path);
+                if (res.error) { status.textContent = res.error; status.style.color = '#ff6b6b'; return; }
+                copyPgnToClipboard();
+                status.textContent = `Added ${res.added} plies (${res.outcome})` + (res.replaced ? `, replaced ${res.replaced} old variation${res.replaced > 1 ? 's' : ''}` : '') + '. Full PGN copied.';
+                status.style.color = '#2ecc71';
+            };
+
             // Lichess Links button - shows modal with analysis + editor URLs
             const lichessLinksBtn = document.getElementById('lichessLinksBtn');
             if (lichessLinksBtn) {
                 lichessLinksBtn.addEventListener('click', function() {
                     if (!window.board2) { alert('No board available.'); return; }
-                    const boardFen = window.board2.fen();
-                    const fullFen = boardFen + ' ' + window.fenExportColor + ' KQkq - 0 1';
+                    // On a move (not the start), play out the ALTERNATIVE to it: all links and the
+                    // From Position block use the position before that move
+                    const clickedNode = window.currentMoveNode;
+                    const altNode = clickedNode && clickedNode.parent && clickedNode.san && clickedNode.parent.fen ? clickedNode : null;
+                    const boardFen = altNode ? altNode.parent.fen.split(' ')[0] : window.board2.fen();
+                    const turn = altNode ? altNode.parent.fen.split(' ')[1] : (window.fenExportColor || 'w');
+                    const fullFen = boardFen + ' ' + turn + ' KQkq - 0 1';
                     const baseFen = boardFen.replace(/ /g, '_');
-                    const turn = window.fenExportColor || 'w';
                     const colorName = turn === 'w' ? 'white' : 'black';
                     const whiteUrl = `https://lichess.org/analysis/${baseFen}_w_KQkq_-_0_1`;
                     const blackUrl = `https://lichess.org/analysis/${baseFen}_b_KQkq_-_0_1`;
@@ -11959,6 +12162,22 @@
                     document.getElementById('fenLichessBlackLink').textContent = blackUrl;
                     document.getElementById('fenLichessEditorLink').href = editorUrl;
                     document.getElementById('fenLichessEditorLink').textContent = editorUrl;
+                    window.lichessFromPosFen = { w: boardFen + ' w KQkq - 0 1', b: boardFen + ' b KQkq - 0 1' };
+                    const anchorNode = altNode || window.currentMoveNode || window.moveTree;
+                    const anchorSide = turn;
+                    document.getElementById('fenLichessFromPosPgn').textContent = lichessFromPosPgn(anchorSide);
+                    if (anchorNode && window.moveTree) {
+                        window.lichessAnchorSteps = lichessAnchorPath(anchorNode);
+                        try { localStorage.setItem('lichessAnchorPath', JSON.stringify(window.lichessAnchorSteps)); } catch (e) {}
+                    }
+                    const info = document.getElementById('fenLichessAnchorInfo');
+                    if (window.lichessAnchorSteps && altNode) {
+                        info.textContent = 'Alternative to ' + altNode.moveNumber + (altNode.isBlackMove ? '...' : '.') + altNode.san +
+                            ' — the pasted line is added whole as a variation at this move, replacing any variation it already has.';
+                    } else if (window.lichessAnchorSteps) {
+                        info.textContent = 'Line will be added from the start of the game (' + (anchorSide === 'w' ? 'White' : 'Black') + ' to move)';
+                    } else info.textContent = 'Open a game first.';
+                    try { document.getElementById('fenLichessPasteArea').value = localStorage.getItem('lichessPlayoutText') || ''; } catch (e) {}
                     document.getElementById('fenLichessModal').style.display = 'flex';
                 });
             }
