@@ -1271,6 +1271,15 @@
             </defs>
           </svg>
         </div>
+        <!-- Practice banner: sits below the board so showing it never shifts the board -->
+        <div id="practiceBanner" style="display: none; width: 100%; max-width: 400px; box-sizing: border-box; margin-top: 6px; padding: 8px 10px; background: #16213e; border: 1px solid #ff9800; border-radius: 6px;">
+          <div id="practiceBannerTitle" style="color: #ff9800; font-weight: bold; font-size: 12px;">PRACTICE</div>
+          <div id="practiceStatus" style="color: #ffd700; font-size: 12px; font-family: monospace; min-height: 16px; margin: 4px 0 6px;"></div>
+          <div style="display: flex; gap: 6px;">
+            <button onclick="practiceShowResult()" title="Show the moves so far as a From Position snippet" style="flex: 1; padding: 7px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">Snippet</button>
+            <button onclick="practiceBack()" title="Leave practice and return to the move you started from" style="flex: 1; padding: 7px; background: #0f3460; color: #eee; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">Back to game</button>
+          </div>
+        </div>
         <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↓ = step into a variation | ↑ = exit variation (closes note if open) | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation | [ ] = previous / next saved position</p>
       </div>
 
@@ -1402,6 +1411,7 @@
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
             <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
+            <button id="practice-btn" title="Play Stockfish from this move (or the move before) and copy the moves as a From Position snippet. Your game stays loaded." onclick="openPracticeModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Practice</button>
             <button id="toggleSoundBtnMini" title="Turn move sounds on or off" onclick="toggleChessSound()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sound On</button>
             <button id="toggleBorderBtnMini" title="Show the eval bar, move comment bar, the board border (?? / ? / ?! moves) and the variation glow (on/off)" onclick="toggleBoardBorder()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Signals On</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
@@ -1541,6 +1551,39 @@
                 <div style="font-size:11px; color:#aaa; margin-bottom:6px;">Note: use the White to Move FEN as the starting point when pasting into the editor.</div>
                 <a id="fenLichessEditorLink" href="#" target="_blank" style="word-break:break-all; color:#4285f4; text-decoration:none; font-size:12px; display:block; margin-bottom:6px;"></a>
                 <button onclick="navigator.clipboard.writeText(document.getElementById('fenLichessEditorLink').href); this.textContent='Copied!'; setTimeout(()=>this.textContent='Copy Editor URL',1500)" style="width:100%; padding:6px; font-size:13px; background:#00d4ff; color:#1a1a2e; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Copy Editor URL</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Practice: choose the start, side and level -->
+          <div id="practiceModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:480px; width:90%; border:1px solid #ff9800; position:relative;">
+              <button onclick="document.getElementById('practiceModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:12px; color:#ff9800; font-size:15px;">Practice from a move</div>
+              <div style="color:#aaa; font-size:12px; margin-bottom:6px;">Start from:</div>
+              <label style="display:block; color:#eee; font-size:13px; margin-bottom:6px; cursor:pointer;"><input type="radio" name="practiceStart" value="after" checked onchange="practiceSyncSide()"> <span id="practiceAfterText"></span></label>
+              <label id="practiceBeforeRow" style="display:block; color:#eee; font-size:13px; margin-bottom:12px; cursor:pointer;"><input type="radio" name="practiceStart" value="before" onchange="practiceSyncSide()"> <span id="practiceBeforeText"></span></label>
+              <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+                <label style="color:#ccc; font-size:13px;">You play: <select id="practiceSide" style="padding:6px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px;"><option value="white">White</option><option value="black">Black</option></select></label>
+                <label style="color:#ccc; font-size:13px;">Level: <select id="practiceLevel" style="padding:6px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px;"></select></label>
+              </div>
+              <div style="color:#888; font-size:12px; line-height:1.5; margin-bottom:14px;">Stockfish replies after each of your moves. Your game stays loaded; <b>Back to game</b> returns to the move you're on. The eval bar and move borders are hidden while you practice.</div>
+              <button onclick="practiceStart()" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Start practice</button>
+              <button onclick="document.getElementById('practiceModal').style.display='none'" style="width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Practice: the moves played, as a From Position snippet -->
+          <div id="practiceResultModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; border:1px solid #ff9800; position:relative;">
+              <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:6px; color:#ff9800; font-size:15px;">Practice snippet</div>
+              <div id="practiceResultInfo" style="color:#aaa; font-size:12px; margin-bottom:10px;"></div>
+              <textarea id="practiceResultText" readonly rows="7" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;"></textarea>
+              <button id="practiceCopyBtn" onclick="practiceCopy(this)" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy snippet</button>
+              <div style="display:flex; gap:8px;">
+                <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="flex:1; padding:10px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Keep playing</button>
+                <button onclick="practiceBack()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Back to game</button>
               </div>
             </div>
           </div>
@@ -9526,6 +9569,7 @@
          * Jump to a specific node in the move tree
          */
         function jumpToNode(nodeId) {
+            if (window.practiceBlocksNav && window.practiceBlocksNav()) return;
             const node = window.moveNodeRegistry[nodeId];
             if (!node) return;
 
@@ -10038,6 +10082,7 @@
          * Navigate to the start position (root node)
          */
         function jumpToRoot() {
+            if (window.practiceBlocksNav && window.practiceBlocksNav()) return;
             if (!window.moveTree) return;
 
             window._dragBuild = null;
@@ -10614,6 +10659,7 @@
         }
 
         function board2NextMove() {
+            if (window.practiceBlocksNav && window.practiceBlocksNav()) return;
             // Tree-based navigation (if move tree is active)
             if (window.moveTree) {
                 if (window.currentMoveNode === null) {
@@ -10662,6 +10708,7 @@
         }
 
         function board2PrevMove() {
+            if (window.practiceBlocksNav && window.practiceBlocksNav()) return;
             // Tree-based navigation (if move tree is active)
             if (window.moveTree) {
                 if (window.currentMoveNode === null) {
@@ -16641,9 +16688,12 @@ ${contentToAnalyze}`;
         function setSfStatus(msg) {
             const el = document.getElementById('sfPlayStatus');
             if (el) el.textContent = msg;
+            const pel = document.getElementById('practiceStatus');
+            if (pel) pel.textContent = window._practice ? msg : '';
         }
 
         window.startStockfishGame = function() {
+            if (window._practice) practiceBack();
             const level = parseInt(document.getElementById('sfLevel').value);
             const playAs = document.getElementById('sfPlayColor').value;
             const engineColor = playAs === 'white' ? 'black' : 'white';
@@ -16670,9 +16720,9 @@ ${contentToAnalyze}`;
         };
 
         window.startStockfishFromPosition = function() {
+            if (window._practice) practiceBack();
             const level = parseInt(document.getElementById('sfLevel').value);
             const playAs = document.getElementById('sfPlayColor').value;
-            const engineColor = playAs === 'white' ? 'black' : 'white';
 
             // Get current board position
             let fen;
@@ -16683,6 +16733,12 @@ ${contentToAnalyze}`;
             } else {
                 fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
             }
+            startStockfishFromFen(fen, playAs, level);
+        };
+
+        // Start a game against Stockfish from an exact FEN (also used by Practice)
+        window.startStockfishFromFen = function(fen, playAs, level) {
+            const engineColor = playAs === 'white' ? 'black' : 'white';
 
             typedChess = new Chess(fen);
             typedMoveList = [];
@@ -16705,9 +16761,165 @@ ${contentToAnalyze}`;
         };
 
         window.stopStockfishGame = function() {
+            if (window._practice) { practiceBack(); return; }
             window._sfGame = null;
             setSfStatus('Game stopped.');
         };
+
+        // =====================================================================
+        // PRACTICE FROM A MOVE — play Stockfish from the move you're on, then copy the
+        // moves as a From Position snippet. The loaded game is never touched: only the
+        // pieces on the board change, and Back to game restores the move you started on.
+        // =====================================================================
+        window._practice = null; // { startFen, startLabel, side, origNode, origOrientation, signalsWereOn }
+
+        function practiceMoveLabel(n) {
+            return n && n.san ? `${n.moveNumber}${n.isBlackMove ? '...' : '.'}${n.san}` : 'the start of the game';
+        }
+
+        // Stepping through the game would pull the board off the practice position
+        function practiceBlocksNav() {
+            if (!window._practice) return false;
+            showToast('Finish practice first — use Back to game');
+            return true;
+        }
+
+        // Moves played from startFen as a Lichess-style From Position snippet (numbered from 1)
+        function practiceSnippet(startFen, sans) {
+            const blackFirst = startFen.split(' ')[1] === 'b';
+            const parts = [];
+            sans.forEach((san, i) => {
+                const ply = i + (blackFirst ? 1 : 0);
+                if (ply % 2 === 0) parts.push((ply / 2 + 1) + '. ' + san);
+                else if (i === 0) parts.push(((ply - 1) / 2 + 1) + '... ' + san);
+                else parts.push(san);
+            });
+            return '[Variant "From Position"]\n[FEN "' + startFen + '"]\n\n' + parts.join(' ');
+        }
+
+        function practiceChosenStartNode() {
+            const anchor = window._practiceAnchor;
+            const before = document.querySelector('input[name="practiceStart"]:checked').value === 'before';
+            return before && anchor.parent ? anchor.parent : anchor;
+        }
+
+        // Default "You play" to the side to move at the chosen start
+        function practiceSyncSide() {
+            if (!window._practiceAnchor) return;
+            document.getElementById('practiceSide').value = practiceChosenStartNode().fen.split(' ')[1] === 'b' ? 'black' : 'white';
+        }
+
+        function openPracticeModal() {
+            const anchor = window._practice ? window._practice.origNode : (window.currentMoveNode || window.moveTree);
+            if (!anchor || !anchor.fen) { showToast('Load a game and pick a move first'); return; }
+            const hasPrev = !!(anchor.parent && anchor.san);
+            window._practiceAnchor = anchor;
+            const sideName = (fen) => fen.split(' ')[1] === 'b' ? 'Black' : 'White';
+            const label = practiceMoveLabel(anchor);
+            document.getElementById('practiceAfterText').textContent = `After ${label} (${sideName(anchor.fen)} to move)`;
+            document.getElementById('practiceBeforeText').textContent = hasPrev ? `Before ${label} (${sideName(anchor.parent.fen)} to move)` : '';
+            document.getElementById('practiceBeforeRow').style.display = hasPrev ? 'block' : 'none';
+            // a flagged move (?, ??) is usually one you want to replay from the move before
+            const flagged = hasPrev && /\?/.test(anchor.annotation || '');
+            document.querySelector(`input[name="practiceStart"][value="${flagged ? 'before' : 'after'}"]`).checked = true;
+            const lvl = document.getElementById('practiceLevel');
+            lvl.innerHTML = document.getElementById('sfLevel').innerHTML;
+            lvl.value = document.getElementById('sfLevel').value;
+            practiceSyncSide();
+            document.getElementById('practiceModal').style.display = 'flex';
+        }
+
+        function practiceStart() {
+            const anchor = window._practiceAnchor;
+            if (!anchor) return;
+            if (!window._sfReady || !window._sfReady()) { showToast('Stockfish is still loading — try again in a moment'); return; }
+            const before = document.querySelector('input[name="practiceStart"]:checked').value === 'before' && !!anchor.parent;
+            const startFen = (before ? anchor.parent : anchor).fen;
+            const side = document.getElementById('practiceSide').value;
+            const level = parseInt(document.getElementById('practiceLevel').value);
+            const prev = window._practice;
+            window._practice = {
+                startFen: startFen,
+                startLabel: (before ? 'before ' : 'after ') + practiceMoveLabel(anchor),
+                side: side,
+                origNode: anchor,
+                // keep the very first orientation / signals state when restarting inside a practice
+                origOrientation: prev ? prev.origOrientation : (window.board2 ? window.board2.orientation() : 'white'),
+                signalsWereOn: prev ? prev.signalsWereOn : !!window.boardBorderEnabled
+            };
+            if (window.boardBorderEnabled && window.toggleBoardBorder) window.toggleBoardBorder();
+            document.getElementById('sfLevel').value = String(level);
+            document.getElementById('practiceModal').style.display = 'none';
+            document.getElementById('practiceResultModal').style.display = 'none';
+            document.getElementById('practiceBannerTitle').textContent =
+                'PRACTICE · ' + window._practice.startLabel + ' · you play ' + (side === 'white' ? 'White' : 'Black');
+            document.getElementById('practiceBanner').style.display = 'block';
+            startStockfishFromFen(startFen, side, level);
+        }
+
+        function practiceShowResult() {
+            const p = window._practice;
+            if (!p) return;
+            const chess = getTypedChess();
+            const sans = chess.history();
+            let state = sans.length + ' move' + (sans.length === 1 ? '' : 's');
+            if (chess.in_checkmate()) state += ' · checkmate';
+            else if (chess.in_stalemate()) state += ' · stalemate';
+            else if (chess.in_draw()) state += ' · draw';
+            document.getElementById('practiceResultInfo').textContent =
+                'From ' + p.startLabel + ' · you played ' + (p.side === 'white' ? 'White' : 'Black') + ' · ' + state +
+                (sans.length === 0 ? ' — just the position so far' : '');
+            document.getElementById('practiceResultText').value = practiceSnippet(p.startFen, sans);
+            document.getElementById('practiceCopyBtn').textContent = 'Copy snippet';
+            document.getElementById('practiceResultModal').style.display = 'flex';
+        }
+
+        // The engine's reply lands while the snippet is open: keep the text current
+        function practiceRefreshResult() {
+            const m = document.getElementById('practiceResultModal');
+            if (window._practice && m && m.style.display !== 'none') practiceShowResult();
+        }
+
+        function practiceOnGameOver() {
+            if (window._practice) setTimeout(practiceShowResult, 600);
+        }
+
+        function practiceCopy(btn) {
+            const ta = document.getElementById('practiceResultText');
+            const done = () => { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy snippet'; }, 1500); };
+            const fallback = () => { ta.select(); try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Press ⌘C'; } };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done).catch(fallback);
+            else fallback();
+        }
+
+        function practiceBack() {
+            const p = window._practice;
+            if (!p) return;
+            window._practice = null; // first, so the navigation guards let the restore through
+            if (window._sfGame) window._sfGame.active = false;
+            window._sfGame = null;
+            const sf = window._sfEngine && window._sfEngine();
+            if (sf) sf.postMessage('stop');
+            document.getElementById('practiceModal').style.display = 'none';
+            document.getElementById('practiceResultModal').style.display = 'none';
+            document.getElementById('practiceBanner').style.display = 'none';
+            if (window.board2) window.board2.orientation(p.origOrientation);
+            const node = p.origNode;
+            if (node === window.moveTree) jumpToRoot();
+            else if (node && node.nodeId && window.moveNodeRegistry[node.nodeId]) jumpToNode(node.nodeId);
+            else if (window.board2 && node) window.board2.position(node.fen);
+            if (p.signalsWereOn && !window.boardBorderEnabled && window.toggleBoardBorder) window.toggleBoardBorder();
+            setSfStatus('');
+        }
+
+        // inline onclick handlers and the navigation guards live outside this script's scope
+        window.openPracticeModal = openPracticeModal;
+        window.practiceStart = practiceStart;
+        window.practiceBack = practiceBack;
+        window.practiceShowResult = practiceShowResult;
+        window.practiceCopy = practiceCopy;
+        window.practiceSyncSide = practiceSyncSide;
+        window.practiceBlocksNav = practiceBlocksNav;
 
         function makeStockfishMove() {
             if (!window._sfGame || !window._sfGame.active) return;
@@ -16719,6 +16931,7 @@ ${contentToAnalyze}`;
                 else if (chess.in_draw()) result += 'Draw';
                 setSfStatus(result);
                 window._sfGame.active = false;
+                practiceOnGameOver();
                 return;
             }
 
@@ -16734,10 +16947,13 @@ ${contentToAnalyze}`;
                 return;
             }
 
+            const gameToken = window._sfGame;
             const handler = function(e) {
                 const line = e.data;
                 if (line.startsWith('bestmove')) {
                     sf.removeEventListener('message', handler);
+                    // the game was left (Back to game / new game) while the engine was thinking
+                    if (window._sfGame !== gameToken || !gameToken.active) return;
                     const uciMove = line.split(' ')[1];
                     if (!uciMove || uciMove === '(none)') {
                         setSfStatus('Stockfish has no move — game over?');
@@ -16759,6 +16975,7 @@ ${contentToAnalyze}`;
                         playMoveSound(move.san);
                         setSfStatus('Stockfish played: ' + move.san);
                         setTypedStatus(getPgnSummary());
+                        practiceRefreshResult();
 
                         // Check game over after engine move
                         if (chess.game_over()) {
@@ -16768,6 +16985,7 @@ ${contentToAnalyze}`;
                             else if (chess.in_draw()) result += 'Draw';
                             setSfStatus(result);
                             window._sfGame.active = false;
+                            practiceOnGameOver();
                         }
                     } else {
                         setSfStatus('Engine returned invalid move: ' + uciMove);
@@ -16793,6 +17011,8 @@ ${contentToAnalyze}`;
 
         // Patch: intercept drag-drop when in vs-stockfish or typed-move mode
         function patchedBoardDrop(source, target, piece) {
+            // practice ended (game over) but the board still shows it: don't edit the game tree
+            if (window._practice && !(window._sfGame && window._sfGame.active)) return 'snapback';
             if (window._sfGame && window._sfGame.active) {
                 const chess = getTypedChess();
                 const turn = chess.turn();
@@ -16824,6 +17044,7 @@ ${contentToAnalyze}`;
                     else if (chess.in_draw()) result += 'Draw';
                     setSfStatus(result);
                     window._sfGame.active = false;
+                    practiceOnGameOver();
                     return;
                 }
 
