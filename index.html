@@ -651,6 +651,8 @@
         }
         .gdrive-cell-input:focus { outline: none; border-color: #00d4ff; }
             body.signals-off #boardCommentBar { display: none !important; }
+            /* the green variation arrows show where a variation branches off */
+            body.signals-off #board2ArrowSvg .arrow-line { display: none !important; }
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -1575,7 +1577,7 @@
 
           <!-- Practice: the moves played, as a From Position snippet -->
           <div id="practiceResultModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
-            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; border:1px solid #ff9800; position:relative;">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #ff9800; position:relative;">
               <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
               <div style="font-weight:bold; margin-bottom:6px; color:#ff9800; font-size:15px;">Practice snippet</div>
               <div id="practiceResultInfo" style="color:#aaa; font-size:12px; margin-bottom:10px;"></div>
@@ -1584,6 +1586,18 @@
               <div style="display:flex; gap:8px;">
                 <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="flex:1; padding:10px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Keep playing</button>
                 <button onclick="practiceBack()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Back to game</button>
+              </div>
+
+              <!-- Save this snippet as one row in the puzzles table -->
+              <div style="margin-top:14px; padding-top:12px; border-top:1px solid #0f3460;">
+                <div style="font-weight:bold; color:#8bc34a; font-size:13px; margin-bottom:8px;">Save to puzzles</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+                  <select id="practiceSaveCategory" onchange="practiceSaveCategoryChanged()" title="Category in the puzzles table" style="padding:8px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; font-size:13px; min-width:160px;"></select>
+                  <input type="text" id="practiceSaveNewCategory" placeholder="new category, e.g. endgame_practice" style="display:none; flex:1; min-width:180px; padding:8px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; font-size:13px;">
+                </div>
+                <input type="text" id="practiceSaveNote" placeholder="Note (optional)" style="width:100%; box-sizing:border-box; padding:8px; margin-bottom:8px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; font-size:13px;">
+                <button id="practiceSaveBtn" onclick="practiceSave()" style="width:100%; padding:10px; background:#629924; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Save to puzzles</button>
+                <div id="practiceSaveStatus" style="font-size:12px; margin-top:6px; min-height:16px; color:#aaa;"></div>
               </div>
             </div>
           </div>
@@ -16871,7 +16885,86 @@ ${contentToAnalyze}`;
                 (sans.length === 0 ? ' — just the position so far' : '');
             document.getElementById('practiceResultText').value = practiceSnippet(p.startFen, sans);
             document.getElementById('practiceCopyBtn').textContent = 'Copy snippet';
-            document.getElementById('practiceResultModal').style.display = 'flex';
+            const modal = document.getElementById('practiceResultModal');
+            const wasOpen = modal.style.display === 'flex'; // a live refresh keeps the note and category as typed
+            modal.style.display = 'flex';
+            if (!wasOpen) practiceSaveInit();
+        }
+
+        // ---- Save the snippet as one row in the puzzles table (the same /api/puzzles bulk
+        // write the Transfer panel uses, so the access-code prompt works unchanged) ----
+        function practiceSaveMsg(msg, color) {
+            const el = document.getElementById('practiceSaveStatus');
+            el.textContent = msg;
+            el.style.color = color || '#aaa';
+        }
+
+        function practiceSaveCategoryName() {
+            const sel = document.getElementById('practiceSaveCategory');
+            if (sel.value !== '__new__') return sel.value;
+            return document.getElementById('practiceSaveNewCategory').value.trim().toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+        }
+
+        function practiceSaveCategoryChanged() {
+            const sel = document.getElementById('practiceSaveCategory');
+            document.getElementById('practiceSaveNewCategory').style.display = sel.value === '__new__' ? '' : 'none';
+        }
+
+        async function practiceSaveInit() {
+            const p = window._practice;
+            if (!p) return;
+            const link = typeof lnCurrentGameLink === 'function' ? lnCurrentGameLink() : '';
+            document.getElementById('practiceSaveNote').value =
+                (link ? link + ' — ' : '') + 'practice from ' + p.startLabel + ', played as ' + (p.side === 'white' ? 'White' : 'Black');
+            document.getElementById('practiceSaveNewCategory').value = '';
+            practiceSaveMsg('');
+            const sel = document.getElementById('practiceSaveCategory');
+            let prev = '';
+            try { prev = localStorage.getItem('practiceSaveCategory') || localStorage.getItem('lnXferCategory') || ''; } catch (e) { }
+            let cats = [];
+            try {
+                const r = await fetch('/api/puzzles?action=categories');
+                const j = await r.json();
+                if (r.ok && Array.isArray(j)) cats = j;
+            } catch (e) { /* offline / no API: only "new category" is offered */ }
+            sel.innerHTML = '';
+            cats.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o); });
+            const neu = document.createElement('option'); neu.value = '__new__'; neu.textContent = '+ New category…'; sel.appendChild(neu);
+            if (prev && cats.indexOf(prev) !== -1) sel.value = prev;
+            practiceSaveCategoryChanged();
+        }
+
+        async function practiceSave() {
+            if (!window._practice) return;
+            const btn = document.getElementById('practiceSaveBtn');
+            const category = practiceSaveCategoryName();
+            if (!category) { practiceSaveMsg('Pick a category, or type a new one', '#ff6b6b'); return; }
+            const fen = document.getElementById('practiceResultText').value.trim();
+            const note = document.getElementById('practiceSaveNote').value.trim();
+            btn.disabled = true;
+            practiceSaveMsg('Saving…');
+            try {
+                // skip it when this exact snippet is already in that category
+                try {
+                    const r = await fetch('/api/puzzles?action=list&category=' + encodeURIComponent(category));
+                    const list = await r.json();
+                    if (r.ok && Array.isArray(list) && list.some(x => String(x.fen || '').trim() === fen)) {
+                        practiceSaveMsg('Already saved in "' + category + '".', '#f39c12');
+                        return;
+                    }
+                } catch (e) { /* if the list can't be read, the server still accepts the row */ }
+                const out = await lnPost('/api/puzzles', { action: 'bulk', category: category, rows: [{ fen: fen, note: note }] });
+                if (out.cancelled) { practiceSaveMsg('Cancelled — no access code', '#f39c12'); return; }
+                if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
+                try { localStorage.setItem('practiceSaveCategory', category); } catch (e) { }
+                practiceSaveMsg('Saved to "' + category + '".', '#2ecc71');
+                showToast('Saved to ' + category);
+            } catch (e) {
+                practiceSaveMsg('Save failed: ' + e.message, '#ff6b6b');
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         // The engine's reply lands while the snippet is open: keep the text current
@@ -16918,6 +17011,8 @@ ${contentToAnalyze}`;
         window.practiceBack = practiceBack;
         window.practiceShowResult = practiceShowResult;
         window.practiceCopy = practiceCopy;
+        window.practiceSave = practiceSave;
+        window.practiceSaveCategoryChanged = practiceSaveCategoryChanged;
         window.practiceSyncSide = practiceSyncSide;
         window.practiceBlocksNav = practiceBlocksNav;
 
