@@ -1542,6 +1542,23 @@
             </div>
           </div>
 
+          <!-- Play Out: confirm where the engine line will land -->
+          <div id="playoutModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:520px; width:90%; border:1px solid #2ecc71; position:relative;">
+              <button onclick="document.getElementById('playoutModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:12px; color:#2ecc71; font-size:15px;">Play Out — where will the line land?</div>
+              <div style="color:#eee; font-size:13px; line-height:1.5; margin-bottom:10px;">
+                The engine plays both sides from the position <b>after <span id="playoutModalWhere" style="color:#00d4ff;"></span></b> to the end, and the line is added as a variation <span id="playoutModalNext"></span>. Any variation already there is replaced.
+              </div>
+              <div id="playoutModalPrevRow" style="color:#ffcc80; font-size:13px; line-height:1.5; margin-bottom:14px;">
+                Want an <b>alternative to</b> this move instead (what should have been played)? Play out from the move before: <b><span id="playoutModalPrev"></span></b>.
+              </div>
+              <button id="playoutModalHereBtn" onclick="playoutModalChoose(false)" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;"></button>
+              <button id="playoutModalPrevBtn" onclick="playoutModalChoose(true)" style="width:100%; padding:10px; margin-bottom:8px; background:#0f3460; color:#ffcc80; border:1px solid #ffcc80; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Go to the move before and play out there</button>
+              <button onclick="document.getElementById('playoutModal').style.display='none'" style="width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Cancel</button>
+            </div>
+          </div>
+
           <!-- Export FEN Modal -->
           <div id="fenExportModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
             <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; border:1px solid #0f3460; position:relative;">
@@ -7505,12 +7522,16 @@
         // (mate, stalemate, draw) and the line is stored as a variation at the current
         // node. A previous play-out at the same node (tagged in its first comment) or a
         // variation starting with the same move is replaced.
-        const PLAYOUT_TAG = 'Engine play-out';
         window._playoutRunning = false;
         window._playoutCancel = false;
 
-        async function playOutToEnd() {
-            const btn = document.getElementById('playout-btn');
+        function playoutMoveLabel(n) {
+            return n && n.san ? `${n.moveNumber}${n.isBlackMove ? '...' : '.'}${n.san}` : 'the start of the game';
+        }
+
+        // Button handler: while running it stops the run; otherwise it asks where the line
+        // will land before any engine time is spent
+        function playOutToEnd() {
             const statusEl = document.getElementById('variation-status');
             if (window._playoutRunning) { window._playoutCancel = true; return; }
 
@@ -7523,6 +7544,34 @@
                 statusEl.style.color = '#ff6b6b';
                 return;
             }
+            window._playoutAnchor = anchor;
+
+            const next = anchor.children && anchor.children[0];
+            const hasPrev = !!(anchor.parent && anchor.san);
+            document.getElementById('playoutModalWhere').textContent = playoutMoveLabel(anchor);
+            document.getElementById('playoutModalNext').textContent = next
+                ? `beside the game's next move (${playoutMoveLabel(next)})`
+                : 'at the end of the line';
+            document.getElementById('playoutModalPrev').textContent = hasPrev ? playoutMoveLabel(anchor.parent) : '';
+            document.getElementById('playoutModalPrevRow').style.display = hasPrev ? 'block' : 'none';
+            document.getElementById('playoutModalPrevBtn').style.display = hasPrev ? 'block' : 'none';
+            document.getElementById('playoutModalHereBtn').textContent = 'Play out after ' + playoutMoveLabel(anchor);
+            document.getElementById('playoutModal').style.display = 'flex';
+        }
+
+        function playoutModalChoose(usePrevious) {
+            document.getElementById('playoutModal').style.display = 'none';
+            let anchor = window._playoutAnchor;
+            if (usePrevious && anchor && anchor.parent && anchor.san) {
+                anchor = anchor.parent;
+                if (anchor.nodeId && window.moveNodeRegistry[anchor.nodeId]) jumpToNode(anchor.nodeId);
+            }
+            if (anchor) runPlayOut(anchor);
+        }
+
+        async function runPlayOut(anchor) {
+            const btn = document.getElementById('playout-btn');
+            const statusEl = document.getElementById('variation-status');
 
             const depth = parseInt(document.getElementById('variation-depth').value) || 12;
             const MAX_PLIES = 200;
@@ -7572,51 +7621,28 @@
                 return;
             }
 
-            let outcome = 'stopped';
-            if (chess.in_checkmate()) outcome = 'checkmate';
-            else if (chess.in_stalemate()) outcome = 'stalemate';
-            else if (chess.in_draw()) outcome = 'draw';
-            else if (pv.length >= MAX_PLIES) outcome = 'ply limit';
-
-            // The variation is an alternative to the game move, so it can't start with it
-            const mainChild = anchor.children && anchor.children[0];
-            if (mainChild && mainChild.san === pv[0] && !PLAYOUT_TAG_RE.test(mainChild.comment || '')) {
-                statusEl.textContent = `Engine's best move (${pv[0]}) is the game move — nothing to add. Step forward and run it again.`;
-                statusEl.style.color = '#f39c12';
-                return;
-            }
-
-            // Drop the earlier play-out / same-first-move variations (and their registry entries)
+            // The whole engine line becomes one self-contained variation at this move, even
+            // when its first move is the game move. Variations already present at this move
+            // are replaced (and tagged play-outs below it); the game line is never removed.
             const dropNode = (n) => { delete window.moveNodeRegistry[n.nodeId]; (n.children || []).forEach(dropNode); };
+            let replaced = 0;
             anchor.children = (anchor.children || []).filter((c, i) => {
-                const replace = PLAYOUT_TAG_RE.test(c.comment || '') || (i > 0 && c.san === pv[0]);
-                if (replace) dropNode(c);
-                return !replace;
+                if (i === 0) return true;
+                dropNode(c); replaced++;
+                return false;
             });
+            (function prune(n) {
+                n.children = (n.children || []).filter((c) => {
+                    if (PLAYOUT_TAG_RE.test(c.comment || '')) { dropNode(c); replaced++; return false; }
+                    return true;
+                });
+                n.children.forEach(prune);
+            })(anchor);
 
-            window.currentVariationResult = {
-                moveNumber: anchor.nodeId === 'root' ? 1 : (anchor.isBlackMove ? anchor.moveNumber + 1 : anchor.moveNumber),
-                isBlack: anchor.nodeId === 'root' ? anchor.fen.split(' ')[1] === 'b' : !anchor.isBlackMove,
-                plyIndex: null,
-                fen: anchor.fen,
-                bestMove: pv[0],
-                score: undefined,
-                pv: pv,
-                parentNode: anchor
-            };
-            addVariationToPgn();
+            const res = commitLineVariation(anchor, anchor.fen, pv, 'Engine', ` (depth ${depth})`);
+            const outcome = res.outcome;
 
-            const firstNode = anchor.children.find((c, i) => i > 0 && c.san === pv[0]) || anchor.children[anchor.children.length - 1];
-            if (firstNode) {
-                firstNode.comment = `${PLAYOUT_TAG} (depth ${depth}): ${outcome} after ${pv.length} plies`;
-                const pgn = moveTreeToPgn(window.moveTree);
-                if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
-                window.annotatedPgnWithVariations = pgn;
-                renderMoveTable(window.moveTree);
-            }
-            updateReportWithPgn();
-
-            statusEl.textContent = `Play-out added: ${pv.length} plies, ${outcome}`;
+            statusEl.textContent = `Play-out added: ${pv.length} plies, ${outcome}` + (replaced ? `, replaced ${replaced} old variation${replaced > 1 ? 's' : ''}` : '');
             statusEl.style.color = '#2ecc71';
         }
 
@@ -7727,16 +7753,22 @@
                 n.children.forEach(prune);
             })(clicked);
 
-            let node = anchor, i = 0;
+            const res = commitLineVariation(anchor, startFen, sans, 'Lichess');
+            return { added: res.added, outcome: res.outcome, replaced: replaced };
+        }
 
+        // Hang `sans` (legal from startFen) under `anchor` as one self-contained variation,
+        // tag its first move, and sync/re-render. The first move may duplicate the game
+        // move — that is intended, so addVariationToPgn's dedupe is deliberately bypassed.
+        function commitLineVariation(anchor, startFen, sans, source, detail) {
             const walk = new Chess(startFen);
             // Move numbers come from the starting position itself, so flipped-side lines
             // number correctly too (e.g. 24. Rxg7+ for a white line at 23...a3)
             const startSide = startFen.split(' ')[1];
             const startFull = parseInt(startFen.split(' ')[5]) || 1;
             const counterBase = Object.keys(window.moveNodeRegistry).length;
-            let first = null, ci = 0;
-            for (; i < sans.length; i++) {
+            let node = anchor, first = null, ci = 0;
+            for (let i = 0; i < sans.length; i++) {
                 const move = walk.move(sans[i]);
                 if (!move) break;
                 const isBlack = (startSide === 'w') ? (i % 2 === 1) : (i % 2 === 0);
@@ -7754,7 +7786,7 @@
                 node = newNode;
             }
             const outcome = walk.in_checkmate() ? 'checkmate' : walk.in_stalemate() ? 'stalemate' : walk.in_draw() ? 'draw' : 'unfinished';
-            first.comment = `Lichess play-out: ${outcome} after ${sans.length} plies`;
+            first.comment = `${source} play-out${detail || ''}: ${outcome} after ${sans.length} plies`;
 
             const pgn = moveTreeToPgn(window.moveTree);
             if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
@@ -7768,7 +7800,7 @@
             window.cycleVarIndex = -1;
             renderMoveTable(window.moveTree);
             updateReportWithPgn();
-            return { added: ci, outcome: outcome, replaced: replaced };
+            return { added: ci, outcome: outcome };
         }
 
         function addVariationToPgn() {
