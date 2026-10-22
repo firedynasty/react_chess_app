@@ -650,6 +650,7 @@
             margin-top: 6px;
         }
         .gdrive-cell-input:focus { outline: none; border-color: #00d4ff; }
+            body.signals-off #boardCommentBar { display: none !important; }
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -1402,6 +1403,7 @@
             <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
             <button id="toggleSoundBtnMini" title="Turn move sounds on or off" onclick="toggleChessSound()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sound On</button>
+            <button id="toggleBorderBtnMini" title="Show the eval bar, move comment bar, the board border (?? / ? / ?! moves) and the variation glow (on/off)" onclick="toggleBoardBorder()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Signals On</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
             <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
@@ -1466,6 +1468,7 @@
           <button id="lichessLinksBtn" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Lichess Links</button>
           <button id="toggleChatBtn" onclick="var p = document.getElementById('chatNotesPanel'); p.style.display = p.style.display === 'none' ? 'block' : 'none'" style="background: #6f42c1; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Toggle Chat</button>
           <button id="toggleSoundBtn" onclick="toggleChessSound()" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Sound On</button>
+          <button id="toggleBorderBtn" title="Show the eval bar, move comment bar, the board border (?? / ? / ?! moves) and the variation glow (on/off)" onclick="toggleBoardBorder()" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Signals On</button>
           <button id="viewTextBtn" onclick="openTextViewModal()" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">View Text</button>
           <button id="toggleTypedMoveBtn" onclick="var p=document.getElementById('typedMovePanel'); if(p.style.display!=='none'){p.style.display='none'; this.style.background='linear-gradient(90deg, #e91e63, #9c27b0)'; if(typeof stopStockfishGame==='function') stopStockfishGame();}else{p.style.display='block'; this.style.background='#555';}" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Type/Play</button>
           <button id="toggleMoveTableBtn" style="background: #555; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Hide Moves</button>
@@ -1778,6 +1781,45 @@
             syncSoundButtons();
         };
         document.addEventListener('DOMContentLoaded', syncSoundButtons);
+
+        // Board border that lights up for ?? / ? / ?! moves; toggleable so it can be
+        // switched off while stepping through the game with the arrow keys.
+        window.boardBorderEnabled = true;
+        try { if (localStorage.getItem('boardBorderEnabled') === '0') window.boardBorderEnabled = false; } catch (e) {}
+        window.lastBoardBorderColor = null;
+        window.lastBoardGlow = 'none';
+        window.applyBoardGlow = function(shadow) {
+            window.lastBoardGlow = shadow || 'none';
+            const b = document.getElementById('myBoard2');
+            if (b) b.style.boxShadow = window.boardBorderEnabled ? window.lastBoardGlow : 'none';
+        };
+        window.applyBoardBorder = function(color) {
+            window.lastBoardBorderColor = color || null;
+            const b = document.getElementById('myBoard2');
+            if (b) b.style.border = (color && window.boardBorderEnabled) ? '4px solid ' + color : 'none';
+        };
+        function syncBorderButtons() {
+            const on = window.boardBorderEnabled;
+            // visibility (not display) so the board doesn't shift when toggling
+            document.body.classList.toggle('signals-off', !on);
+            const evalWrap = document.getElementById('evalBarWrap');
+            if (evalWrap) evalWrap.style.visibility = on ? 'visible' : 'hidden';
+            ['toggleBorderBtn', 'toggleBorderBtnMini'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                btn.textContent = on ? 'Signals On' : 'Signals Off';
+                if (id === 'toggleBorderBtn') btn.style.background = on ? '#555' : '#333';
+                else btn.style.opacity = on ? '1' : '0.55';
+            });
+        }
+        window.toggleBoardBorder = function() {
+            window.boardBorderEnabled = !window.boardBorderEnabled;
+            try { localStorage.setItem('boardBorderEnabled', window.boardBorderEnabled ? '1' : '0'); } catch (e) {}
+            window.applyBoardBorder(window.lastBoardBorderColor);
+            window.applyBoardGlow(window.lastBoardGlow);
+            syncBorderButtons();
+        };
+        document.addEventListener('DOMContentLoaded', syncBorderButtons);
 
         window.playMoveSound = playMoveSound;
         function playMoveSound(san) {
@@ -9580,7 +9622,7 @@
                     indicator.style.background = boardBorderColor;
                     indicator.style.color = '#1a1a2e';
                 }
-                if (boardContainer) boardContainer.style.border = boardBorderColor ? '4px solid ' + boardBorderColor : 'none';
+                window.applyBoardBorder(boardBorderColor);
                 // Sync mini indicator
                 const miniInd = document.getElementById('board2MoveIndicatorMini');
                 if (miniInd) {
@@ -9628,14 +9670,14 @@
                     // Gray glow while viewing a variation line (including its first
                     // move — the branch node is the main-line move before it);
                     // yellow only on a main-line move that branches.
-                    if (boardContainer) boardContainer.style.boxShadow = isInVariation
+                    window.applyBoardGlow(isInVariation
                         ? '0 0 10px 3px rgba(170, 170, 170, 0.7)'
-                        : '0 0 10px 3px rgba(255, 215, 0, 0.7)';
+                        : '0 0 10px 3px rgba(255, 215, 0, 0.7)');
                     if (hasSiblingVariations) drawVariationArrows(node); else clearBoard2Arrows();
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
-                    if (boardContainer) boardContainer.style.boxShadow = 'none';
+                    window.applyBoardGlow('none');
                     clearBoard2Arrows();
                 }
             }
@@ -10015,9 +10057,9 @@
             const boardContainer = document.getElementById('myBoard2');
             if (boardContainer) {
                 boardContainer.style.opacity = '1';
-                boardContainer.style.border = 'none';
-                boardContainer.style.boxShadow = 'none';
             }
+            window.applyBoardBorder(null);
+            window.applyBoardGlow('none');
 
             // Clear variation arrows and move highlights
             clearBoard2Arrows();
@@ -10072,11 +10114,11 @@
                 if (window.moveTree.children && window.moveTree.children.length > 1) {
                     varIndicator.textContent = '(';
                     if (nextBtn) nextBtn.style.border = '4px solid #ffd700';
-                    if (boardContainer) boardContainer.style.boxShadow = '0 0 10px 3px rgba(255, 215, 0, 0.7)';
+                    window.applyBoardGlow('0 0 10px 3px rgba(255, 215, 0, 0.7)');
                 } else {
                     varIndicator.textContent = '';
                     if (nextBtn) nextBtn.style.border = 'none';
-                    if (boardContainer) boardContainer.style.boxShadow = 'none';
+                    window.applyBoardGlow('none');
                 }
             }
         }
@@ -10225,8 +10267,7 @@
                 indicator.style.background = srBorderColor;
                 indicator.style.color = '#1a1a2e';
             }
-            const srBoard = document.getElementById('myBoard2');
-            if (srBoard) srBoard.style.border = srBorderColor ? '4px solid ' + srBorderColor : 'none';
+            window.applyBoardBorder(srBorderColor);
 
             // Sync mini indicator
             const miniIndicator = document.getElementById('board2MoveIndicatorMini');
