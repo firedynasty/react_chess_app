@@ -1551,10 +1551,10 @@
                 The engine plays both sides from the position <b>after <span id="playoutModalWhere" style="color:#00d4ff;"></span></b> to the end, and the line is added as a variation <span id="playoutModalNext"></span>. Any variation already there is replaced.
               </div>
               <div id="playoutModalPrevRow" style="color:#ffcc80; font-size:13px; line-height:1.5; margin-bottom:14px;">
-                Want an <b>alternative to</b> this move instead (what should have been played)? Play out from the move before: <b><span id="playoutModalPrev"></span></b>.
+                To play out <b>this move itself</b> (an alternative to it, what should have been played), the engine starts from the move before: <b><span id="playoutModalPrev"></span></b>.
               </div>
               <button id="playoutModalHereBtn" onclick="playoutModalChoose(false)" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;"></button>
-              <button id="playoutModalPrevBtn" onclick="playoutModalChoose(true)" style="width:100%; padding:10px; margin-bottom:8px; background:#0f3460; color:#ffcc80; border:1px solid #ffcc80; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Go to the move before and play out there</button>
+              <button id="playoutModalPrevBtn" onclick="playoutModalChoose(true)" style="width:100%; padding:10px; margin-bottom:8px; background:#0f3460; color:#ffcc80; border:1px solid #ffcc80; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;"></button>
               <button onclick="document.getElementById('playoutModal').style.display='none'" style="width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Cancel</button>
             </div>
           </div>
@@ -7555,7 +7555,8 @@
             document.getElementById('playoutModalPrev').textContent = hasPrev ? playoutMoveLabel(anchor.parent) : '';
             document.getElementById('playoutModalPrevRow').style.display = hasPrev ? 'block' : 'none';
             document.getElementById('playoutModalPrevBtn').style.display = hasPrev ? 'block' : 'none';
-            document.getElementById('playoutModalHereBtn').textContent = 'Play out after ' + playoutMoveLabel(anchor);
+            document.getElementById('playoutModalHereBtn').textContent = 'This will play out the move after ' + playoutMoveLabel(anchor);
+            document.getElementById('playoutModalPrevBtn').textContent = 'This will play out this move (' + playoutMoveLabel(anchor) + ')';
             document.getElementById('playoutModal').style.display = 'flex';
         }
 
