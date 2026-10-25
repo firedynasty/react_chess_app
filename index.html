@@ -11634,7 +11634,8 @@
             // Force refresh board images after short delay (fixes Vercel deployment image loading)
             setTimeout(function() {
                 if (window.board2) {
-                    window.board2.position('start');
+                    // A deep link (?game_id=&ply=) can jump to a move before this fires; don't undo it
+                    window.board2.position(window.currentMoveNode && window.currentMoveNode.fen ? window.currentMoveNode.fen : 'start');
                 }
             }, 500);
 
