@@ -15539,6 +15539,16 @@ ${contentToAnalyze}`;
                     .join('\n\n');
                 const gameLink = window.sbGetGameLink && window.sbGetGameLink();
                 if (gameLink) chatText += '\n\nGame link: ' + gameLink;
+                // chess.com/Lichess game details, when the game was loaded from the dropdown
+                const dd = document.getElementById('game-dropdown');
+                const details = document.getElementById('game-details');
+                if (dd && dd.value && details) {
+                    const lines = Array.from(details.querySelectorAll('p'))
+                        .map(p => p.textContent.trim())
+                        .filter(Boolean)
+                        .map(t => (/^\d+$/.test(t) ? 'Game ID: ' + t : t));
+                    if (lines.length) chatText += '\n\nGame details:\n' + lines.join('\n');
+                }
                 return chatText;
             };
 
