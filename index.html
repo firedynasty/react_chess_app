@@ -15544,6 +15544,7 @@ ${contentToAnalyze}`;
 
             // Save chat as a new Google Doc in Drive/Documents/notes/hobbies/chess/games
             const [savingDoc, setSavingDoc] = useState(false);
+            const [docTitle, setDocTitle] = useState('');
             const saveChatAsNewDoc = async () => {
                 if (messages.length === 0) {
                     alert('No messages to save');
@@ -15556,7 +15557,9 @@ ${contentToAnalyze}`;
                 setSavingDoc(true);
                 try {
                     const opp = window.sbGetOpponentName && window.sbGetOpponentName();
-                    const doc = await window.gnSaveNewDoc(buildChatText(), opp ? 'vs ' + opp : '');
+                    // A typed title wins; otherwise fall back to the opponent auto-label
+                    const label = docTitle.trim() || (opp ? 'vs ' + opp : '');
+                    const doc = await window.gnSaveNewDoc(buildChatText(), label);
                     alert('Saved new Google Doc: ' + doc.name);
                 } catch (err) {
                     alert('Save to Google Docs failed: ' + err.message);
@@ -15882,6 +15885,14 @@ ${contentToAnalyze}`;
                         >
                             {savingDoc ? 'Saving…' : 'Save as Google Doc'}
                         </button>
+                        <input
+                            type="text"
+                            value={docTitle}
+                            onChange={(e) => setDocTitle(e.target.value)}
+                            placeholder="Doc title (optional)"
+                            title="Title for the Google Doc. The date/time is added in front. Empty = auto-label (vs opponent when a Supabase game is loaded)."
+                            style={{ ...styles.input, minWidth: '180px' }}
+                        />
                         <span style={{ fontSize: '12px', color: '#888' }}>will be saved in Documents/notes/hobbies/chess/games</span>
 
                         {/* Append only the last Ask-Coach Q&A (the selected move) to the loaded Doc */}
