@@ -1426,6 +1426,7 @@
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
+            <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -5778,9 +5779,28 @@
 
         // 📋 Copy URL next to the deep link under sbStatus.
         async function sbCopyGameLink(btn) {
-            const link = sbGetGameLink();
+            let link = sbGetGameLink();
             if (!link) { showToast('No Supabase game loaded'); return; }
+            const ply = sbCurrentMainlinePly();
+            if (ply) link += '&ply=' + ply; // the link opens on the highlighted move
             await lnCopyText(link, btn, '✓ Copied', 'Copied game link: ' + link);
+        }
+
+        // 1-based ply of the highlighted move (1 = White's first move), or 0 when nothing is
+        // highlighted or it is inside a variation (a ply number only identifies a mainline move).
+        function sbCurrentMainlinePly() {
+            const target = window.currentMoveNode;
+            if (!target || !target.san) return 0;
+            let node = window.moveTree && window.moveTree.children && window.moveTree.children[0], ply = 1;
+            while (node && node !== target) { node = node.children && node.children[0]; ply++; }
+            return node ? ply : 0;
+        }
+
+        // Jump the board to the mainline move at that 1-based ply (clamped to the game's length)
+        function sbJumpToMainlinePly(ply) {
+            let node = window.moveTree && window.moveTree.children && window.moveTree.children[0];
+            for (let i = 1; node && i < ply && node.children && node.children[0]; i++) node = node.children[0];
+            if (node && node.san) jumpToNode(node.nodeId);
         }
 
         // Shows the deep link for the game on the board (blank when none).
@@ -5813,11 +5833,12 @@
             console.log('[sbLoadGameFromUrlParam] location.search =', JSON.stringify(search));
             if (search.length <= 1) return; // no "?" or empty
             const raw = search.slice(1);
-            let gameId, source;
+            let gameId, source, ply = 0;
             if (raw.includes('=')) {
                 const params = new URLSearchParams(search);
                 gameId = params.get('game_id') || params.get('gameId');
                 source = params.get('source');
+                ply = parseInt(params.get('ply'), 10) || 0;
             } else {
                 gameId = decodeURIComponent(raw.split('&')[0]);
             }
@@ -5840,7 +5861,9 @@
                 if (ready) {
                     clearInterval(timer);
                     console.log('[sbLoadGameFromUrlParam] board ready, loading', gameId);
-                    sbLoadGameByIdAndSource(source, gameId);
+                    Promise.resolve(sbLoadGameByIdAndSource(source, gameId)).then(function (ok) {
+                        if (ok && ply > 0) sbJumpToMainlinePly(ply);
+                    });
                 } else if (attempt >= maxAttempts) {
                     clearInterval(timer);
                     console.warn('[sbLoadGameFromUrlParam] gave up after', attempt, 'attempts');
