@@ -121,7 +121,8 @@ export default async function handler(req, res) {
         });
         const created = await r.json();
         if (!r.ok) return res.status(r.status).json(created);
-        return res.status(200).json({ success: true, added: created.length });
+        // ids so the caller can link straight to the new puzzle (?id=…)
+        return res.status(200).json({ success: true, added: created.length, ids: created.map(row => row.id) });
       }
       if (action !== 'save') return res.status(400).json({ error: 'Unknown action. Use action=save or action=bulk' });
       if (!category || !fen) {
