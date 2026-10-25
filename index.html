@@ -827,6 +827,7 @@
                 <button id="gnSignInBtn" onclick="gnSignIn()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">G Sign In</button>
                 <button id="gnRecentBtn" onclick="gnToggleRecentDropdown()" disabled title="Pick a recent Google Doc to load as coach analysis" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Recent ▾</button>
                 <button id="gnGamesBtn" onclick="gnToggleGamesDropdown()" disabled title="List Docs in the chess/games folder — filtered by the name input when it has text (10 most recent matches), otherwise sorted by name" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Games ▾</button>
+                <button id="gnChessBtn" onclick="gnToggleChessDropdown()" disabled title="List Docs in the chess/vercel_chess Drive folder (and its subfolders) — filtered by the name input when it has text, otherwise sorted by name" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Chess ▾</button>
                 <input id="gnGamesFilter" onkeydown="if(event.key==='Enter')gnQueryGamesDropdown()" placeholder="games filter (name)…" title="Filter the Games ▾ list by Doc name (e.g. an opponent's name); press Enter to search" style="width: 130px; background: #0f3460; border: 1px solid #00d4ff; color: #eee; padding: 6px 8px; border-radius: 6px; font-size: 12px;">
                 <span id="gnDocName" style="font-size: 12px; color: #888; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
                 <span id="gnStatus" style="font-size: 12px; color: #888;"></span>
@@ -843,6 +844,7 @@
                 </div>
             </div>
             <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
+            <div id="gnChessDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
             <div id="gnGamesDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
 
             <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
@@ -16055,6 +16057,7 @@ ${contentToAnalyze}`;
                             document.getElementById('gnSignInBtn').textContent = 'G Sign Out';
                             document.getElementById('gnRecentBtn').disabled = false;
                             document.getElementById('gnGamesBtn').disabled = false;
+                            document.getElementById('gnChessBtn').disabled = false;
                             gnSetStatus('Signed in to Google');
                             gnAuthWaiters.splice(0).forEach(function (w) { w.resolve(); });
                         } else {
@@ -16076,6 +16079,7 @@ ${contentToAnalyze}`;
                 document.getElementById('gnSignInBtn').textContent = 'G Sign In';
                 document.getElementById('gnRecentBtn').disabled = true;
                 document.getElementById('gnGamesBtn').disabled = true;
+                document.getElementById('gnChessBtn').disabled = true;
                 gnCloseDropdowns();
                 gnSetStatus('Signed out of Google');
             } else if (gnTokenClient) {
@@ -16090,6 +16094,13 @@ ${contentToAnalyze}`;
             gnCloseDropdowns();
             if (wasOpen) return;
             gnFetchRecentFiles();
+        };
+
+        window.gnToggleChessDropdown = function () {
+            var wasOpen = !document.getElementById('gnChessDropdown').hidden;
+            gnCloseDropdowns();
+            if (wasOpen) return;
+            gnFetchChessFiles();
         };
 
         window.gnToggleGamesDropdown = function () {
@@ -16143,6 +16154,37 @@ ${contentToAnalyze}`;
                 .finally(function () { btn.textContent = 'Games ▾'; });
         }
 
+        // Docs in My Drive/Documents/notes/hobbies/chess/vercel_chess and its subfolders (one level down).
+        // Same filter rule as Games: name text -> 10 most recent matches, otherwise sorted by name.
+        var GN_CHESS_FOLDER_ID = '1KBroG2U0H_RluAh2fYmzOR4lBocDF2HK';
+        function gnFetchChessFiles() {
+            var btn = document.getElementById('gnChessBtn');
+            var filterEl = document.getElementById('gnGamesFilter');
+            var filter = filterEl ? filterEl.value.trim() : '';
+            var auth = { headers: { Authorization: 'Bearer ' + gnAccessToken } };
+            btn.textContent = 'Loading…';
+            var subQ = "'" + GN_CHESS_FOLDER_ID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+            fetch('https://www.googleapis.com/drive/v3/files?fields=files(id)&q=' + encodeURIComponent(subQ), auth)
+                .then(function (r) { return r.json(); })
+                .then(function (sub) {
+                    var parents = [GN_CHESS_FOLDER_ID].concat((sub.files || []).map(function (f) { return f.id; }));
+                    var q = '(' + parents.map(function (id) { return "'" + id + "' in parents"; }).join(' or ') + ")" +
+                        " and mimeType='application/vnd.google-apps.document' and trashed=false";
+                    if (filter) q += " and name contains '" + filter.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
+                    var url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
+                        '&orderBy=' + (filter ? 'modifiedTime+desc' : 'name') +
+                        '&pageSize=10&fields=files(id,name,modifiedTime)';
+                    return fetch(url, auth).then(function (r) { return r.json(); });
+                })
+                .then(function (data) {
+                    if (data.error) throw new Error(data.error.message);
+                    gnOpenFilesDropdown('gnChessDropdown', 'gnChessBtn', data.files || [],
+                        filter ? 'No Docs matching "' + filter + '" in vercel_chess' : 'No Docs in the vercel_chess folder yet');
+                })
+                .catch(function (err) { gnSetStatus('Error fetching vercel_chess folder: ' + err.message); })
+                .finally(function () { btn.textContent = 'Chess ▾'; });
+        }
+
         function gnOpenFilesDropdown(dropdownId, btnId, files, emptyMsg) {
             var dropdown = document.getElementById(dropdownId);
             dropdown.innerHTML = '';
@@ -16172,7 +16214,7 @@ ${contentToAnalyze}`;
             if (!gnDismissListener) {
                 setTimeout(function () {
                     gnDismissListener = function (e) {
-                        ['gnRecentDropdown', 'gnGamesDropdown'].forEach(function (id) {
+                        ['gnRecentDropdown', 'gnGamesDropdown', 'gnChessDropdown'].forEach(function (id) {
                             var dd = document.getElementById(id);
                             if (dd && !dd.hidden && !dd.contains(e.target)) gnCloseDropdowns();
                         });
@@ -16182,7 +16224,7 @@ ${contentToAnalyze}`;
             }
         }
         function gnCloseDropdowns() {
-            ['gnRecentDropdown', 'gnGamesDropdown'].forEach(function (id) {
+            ['gnRecentDropdown', 'gnGamesDropdown', 'gnChessDropdown'].forEach(function (id) {
                 var dd = document.getElementById(id);
                 if (dd) dd.hidden = true;
             });
