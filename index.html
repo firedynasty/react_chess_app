@@ -671,7 +671,6 @@
 
     <div class="status-bar">
         <a href="/puzzles.html" style="background: #0f3460; color: #00d4ff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px;">Puzzles</a>
-        <a href="/looker" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Chess Looker</a>
         <a href="https://vercel-youtube.vercel.app/parser.html" target="_blank" style="background: linear-gradient(90deg, #9c27b0, #e91e63); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Parser</a>
         <a href="/reformatter" target="_blank" style="background: linear-gradient(90deg, #17a2b8, #28a745); color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: bold;">Text Reformatter</a>
     </div>
@@ -1232,6 +1231,9 @@
                 padding: 10px; background: #1a1a2e; border: 1px solid #0f3460; border-radius: 5px;
                 font-family: monospace; font-size: 12px; line-height: 1.6; display: none;">
     </div>
+
+    <!-- PGN tabs: chrome-style tabs, one loaded game per tab -->
+    <div id="pgnTabStrip" style="display: flex; gap: 4px; align-items: flex-end; flex-wrap: wrap; max-width: 1200px; margin: 14px auto 0; padding: 0 2px;"></div>
 
     <!-- Board and Move Table (side by side) -->
     <div id="boardMainFlex" style="display: flex; gap: 15px; flex-wrap: nowrap; margin: 20px auto; max-width: 1200px; align-items: flex-start;">
@@ -1884,6 +1886,7 @@
         window.playMoveSound = playMoveSound;
         function playMoveSound(san) {
             if (!window.chessSoundEnabled) return;
+            if (window._suppressMoveSound) return; // tab switches jump silently
             if (!san) { playMove(); return; }
             if (san === 'O-O' || san === 'O-O-O') { playCastle(); }
             else if (san.includes('+') || san.includes('#')) { playCheck(); }
@@ -3203,6 +3206,13 @@
             const originalPgnForChessis = pgn;
             const hasChessisBestMoves = pgn.includes('{Best:');
 
+            // From Position PGNs (practice snippets, Lichess analysis exports):
+            // grab the [FEN "..."] start position before sanitize + the header
+            // strip below remove it, so the analysis starts there and not from
+            // the initial position.
+            const analyzeFenHdr = pgn.match(/\[FEN\s+"([^"]+)"\]/);
+            const analyzeStartFen = analyzeFenHdr ? analyzeFenHdr[1] : null;
+
             // Strip clock/eval comments, glyphs, and variations that
             // chess.js load_pgn cannot handle (annotated PGNs from ingest.py
             // or chess.com analysis exports)
@@ -3272,7 +3282,20 @@
                 const chess = new Chess();
 
                 // Try to load PGN
-                if (!chess.load_pgn(pgn)) {
+                if (analyzeStartFen) {
+                    // load_pgn resets to the initial position and the [FEN]
+                    // header was stripped above, so start from the FEN and
+                    // replay the movetext tokens ("15..." numbering and the
+                    // result token are skipped).
+                    chess.load(analyzeStartFen);
+                    const moves = pgn.replace(/\d+\.(\.\.)?/g, '').trim().split(/\s+/);
+                    for (const move of moves) {
+                        if (!move || /^(1-0|0-1|1\/2-1\/2|\*)$/.test(move)) continue;
+                        if (!chess.move(move)) {
+                            throw new Error(`Invalid move: ${move}`);
+                        }
+                    }
+                } else if (!chess.load_pgn(pgn)) {
                     chess.reset();
                     const moves = pgn.replace(/\d+\./g, '').trim().split(/\s+/);
                     for (const move of moves) {
@@ -3306,6 +3329,7 @@
                 }
 
                 chess.reset();
+                if (analyzeStartFen) chess.load(analyzeStartFen);
 
                 const mistakes = [];
                 const evalLog = [];  // full per-move debug log
@@ -3377,13 +3401,43 @@
                     }));
                 }
 
+                // From Position games: the start isn't ≈ equal, so evaluate it
+                // too — otherwise the first move's swing is measured against 0
+                // and a lopsided practice position flags a phantom blunder on
+                // the side that's already worse.
+                let startEval = 0;
+                if (analyzeStartFen) {
+                    try {
+                        let raw0 = null, depth0 = 0;
+                        if (useCloud) {
+                            const c0 = await lichessCloudEval(startFen);
+                            if (c0) raw0 = c0.score;
+                        } else {
+                            const pool0 = await getAnalysisPool();
+                            const sf0 = await analyzePositionOn(pool0[0], startFen, depth);
+                            if (sf0.depth > 0) { raw0 = sf0.evaluation; depth0 = sf0.depth; }
+                        }
+                        if (raw0 !== null) {
+                            startEval = startFen.split(' ')[1] === 'w' ? raw0 : -raw0;
+                            window.positionEvalMap[startFen] = startEval;
+                            if (depth0 > 0) window.positionDepthMap[startFen] = depth0;
+                        }
+                    } catch (e0) {
+                        log('Start-position eval failed, assuming equal: ' + e0.message, 'warning');
+                    }
+                }
+
                 // Phase 2 — swings and severity flags, in game order.
                 // prevEval carries forward just like the old sequential loop.
-                let prevEval = 0;  // starting position ≈ equal
+                let prevEval = startEval;  // real eval of the start position (0 for a normal game)
+                const startTurn = analyzeStartFen ? analyzeStartFen.split(' ')[1] : 'w';
+                const startMoveNum = analyzeStartFen ? (parseInt(analyzeStartFen.split(' ')[5], 10) || 1) : 1;
                 for (let i = 0; i < history.length; i++) {
                     const move = history[i];
-                    const moveNum = Math.floor(i / 2) + 1;
-                    const isWhite = i % 2 === 0;
+                    // From Position: move numbers and sides follow the FEN
+                    // (e.g. "15." White, or "23..." Black), not "1." White.
+                    const isWhite = (i % 2 === 0) === (startTurn === 'w');
+                    const moveNum = startMoveNum + Math.floor((i + (startTurn === 'b' ? 1 : 0)) / 2);
                     const notation = isWhite ? `${moveNum}.` : `${moveNum}...`;
                     const fenBefore = i === 0 ? startFen : fens[i - 1];
                     const fenAfter = fens[i];
@@ -3519,25 +3573,31 @@
 
                 // Store annotated PGN in hidden variable for later retrieval
                 const annotatedPgn = generateAnnotatedPgn(pgn, mistakes, openingInfo);
-                window.annotatedPgnWithVariations = annotatedPgn;
+                // From Position games: re-attach the start position so the tree
+                // rebuild below (and Copy PGN later) starts from it, not the
+                // initial position.
+                const finalAnnotatedPgn = analyzeStartFen
+                    ? '[Variant "From Position"]\n[FEN "' + analyzeStartFen + '"]\n\n' + annotatedPgn
+                    : annotatedPgn;
+                window.annotatedPgnWithVariations = finalAnnotatedPgn;
 
                 // Clear the input textarea (PGN is now in moveContainer and hidden variable)
                 document.getElementById('pgnInput').value = '';
 
                 // Always load the annotated PGN into the board after analysis
                 if (typeof window.parsePgnWithVariations === 'function') {
-                    window.moveTree = window.parsePgnWithVariations(annotatedPgn);
+                    window.moveTree = window.parsePgnWithVariations(finalAnnotatedPgn);
                     window.currentMoveNode = null;
                     window.cycleVarSequence = [];
                     window.cycleVarIndex = -1;
-                    window.currentLoadedPgn = annotatedPgn;
+                    window.currentLoadedPgn = finalAnnotatedPgn;
                     renderMoveTable(window.moveTree);
                     if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
                 }
 
                 // Reset board to start position
                 const startPositions = window.parsePgnToPositionsWithComments
-                    ? window.parsePgnToPositionsWithComments(annotatedPgn)
+                    ? window.parsePgnToPositionsWithComments(finalAnnotatedPgn)
                     : null;
                 if (startPositions && startPositions.positions && startPositions.positions.length > 0) {
                     window.studyReportPositions = startPositions.positions;
@@ -3561,8 +3621,9 @@
                     const chessisMoves = extractAllChessisBestMoves(originalPgnForChessis);
 
                     for (const cm of chessisMoves) {
-                        const plyIndex = (cm.moveNumber - 1) * 2 + (cm.isBlack ? 1 : 0);
-                        if (!positions || plyIndex >= positions.length) continue;
+                        // ply 0 = first move of the (possibly From Position) game
+                        const plyIndex = (cm.moveNumber - startMoveNum) * 2 + (cm.isBlack ? 1 : 0) - (startTurn === 'b' ? 1 : 0);
+                        if (!positions || plyIndex < 0 || plyIndex >= positions.length) continue;
                         variationTargets.push({
                             fen: positions[plyIndex],
                             moveNumber: cm.moveNumber,
@@ -3578,7 +3639,8 @@
                     for (const mistake of mistakes) {
                         const isBlack = mistake.notation.includes('...');
                         const moveNumber = parseInt(mistake.notation);
-                        const plyIndex = (moveNumber - 1) * 2 + (isBlack ? 1 : 0);
+                        // ply 0 = first move of the (possibly From Position) game
+                        const plyIndex = (moveNumber - startMoveNum) * 2 + (isBlack ? 1 : 0) - (startTurn === 'b' ? 1 : 0);
                         variationTargets.push({
                             fen: mistake.fen,
                             moveNumber, isBlack, plyIndex,
@@ -9478,6 +9540,10 @@
             if (rootNode.children && rootNode.children.length > 0) {
                 renderMoveSequence(rootNode.children[0], container, true);
             }
+
+            // Every load path funnels through here, so keep the tab strip's
+            // titles (White vs Black from the PGN headers) up to date.
+            if (typeof pgnTabRenderStrip === 'function') pgnTabRenderStrip();
         }
 
         /**
@@ -14320,6 +14386,224 @@ END OF GUIDE
 
             log('Study tool initialized', 'success');
         };
+
+        // ============================================================
+        // PGN TABS — chrome-style tabs, one loaded game per tab. A tab's
+        // snapshot holds the live window.* game state BY REFERENCE: switching
+        // away just keeps the references, and loading a game into another tab
+        // replaces the window.* objects with fresh ones, so nothing is copied
+        // or serialized and old tabs stay intact. In-memory only — a reload
+        // starts over with a single tab. Switching is blocked while engine
+        // work runs (Get Eval / Analyze / Play Out / practice / vs Stockfish)
+        // so results can't land in the wrong tab's state.
+        // ============================================================
+        const PGN_TAB_KEYS = [
+            'moveTree', 'moveNodeRegistry', 'currentMoveNode',
+            'positionEvalMap', 'positionEvalMap2', 'positionDepthMap',
+            'studyReportPositions', 'studyReportComments', 'studyReportPositionIndex',
+            'currentLoadedPgn', 'cycleVarSequence', 'cycleVarIndex',
+            'fenVariants', 'pgnVariants', 'allVariants', 'allFileSections',
+            'loadedFenVariants', 'loadedFenVariantIndex',
+            'supabaseLoadedGame', 'textViewRawContent', 'analysisReportRawText',
+            'studyReportRawText'
+        ];
+        window.pgnTabs = [{ id: 't1', num: 1, title: '', snapshot: null }];
+        window.pgnTabActiveId = 't1';
+        let pgnTabSeq = 1;
+
+        // A reason switching is unsafe right now, or null.
+        function pgnTabBusy() {
+            if (window._practice) return 'practice (Back to game first)';
+            if (window._sfGame && window._sfGame.active) return 'the game vs Stockfish';
+            if (window._playoutRunning) return 'Play Out';
+            const checks = [['analyzeBtn', 'Analyze Game'], ['getEvalBtn', 'Get Eval'],
+                            ['analyze-variation-btn', 'variation analysis']];
+            for (const [id, label] of checks) {
+                const b = document.getElementById(id);
+                if (b && b.disabled) return label;
+            }
+            return null;
+        }
+
+        // "White vs Black" from PGN headers, else the Event, else ''.
+        function pgnTabTitleFromPgn(pgn) {
+            const grab = tag => ((String(pgn || '').match(new RegExp('\\[' + tag + ' "([^"]+)"\\]')) || [])[1] || '').trim();
+            const w = grab('White'), b = grab('Black');
+            const ok = s => s && s !== '?';
+            if (ok(w) && ok(b)) return (w + ' vs ' + b).slice(0, 32);
+            const ev = grab('Event');
+            if (ok(ev) && !/^(Training position|From Position)$/i.test(ev)) return ev.slice(0, 32);
+            return '';
+        }
+
+        // Refresh the active tab's title from the game currently on the board.
+        function pgnTabSyncActiveTitle() {
+            const t = window.pgnTabs.find(x => x.id === window.pgnTabActiveId);
+            if (!t) return;
+            if (window.moveTree) {
+                const live = window.currentLoadedPgn || (document.getElementById('pgnInput') || {}).value || '';
+                const derived = pgnTabTitleFromPgn(live);
+                if (derived) t.title = derived;
+                else if (!t.title || t.title === 'New tab') t.title = 'Game ' + t.num;
+            } else if (!t.title) {
+                t.title = 'New tab';
+            }
+        }
+
+        // Keep the window.* state the tab is leaving (null = untouched tab).
+        function pgnTabCapture() {
+            if (!window.moveTree) return null;
+            const rc = document.getElementById('analysisReportContainer');
+            const snap = {
+                _pgnInput: (document.getElementById('pgnInput') || {}).value || '',
+                _orientation: window.board2 ? window.board2.orientation() : 'white',
+                _reportText: (document.getElementById('analysisReportText') || {}).textContent || '',
+                _reportShown: !!rc && rc.style.display !== 'none'
+            };
+            PGN_TAB_KEYS.forEach(k => { snap[k] = window[k]; });
+            return snap;
+        }
+
+        // Put a tab's state back onto the board (null snapshot = empty tab).
+        function pgnTabApply(snap) {
+            window._dragBuild = null;
+            const pgnInput = document.getElementById('pgnInput');
+            const reportText = document.getElementById('analysisReportText');
+            const reportContainer = document.getElementById('analysisReportContainer');
+            const container = document.getElementById('moveTableContainer');
+
+            if (!snap) {
+                PGN_TAB_KEYS.forEach(k => { window[k] = undefined; });
+                window.moveTree = null;
+                window.moveNodeRegistry = {};
+                window.currentMoveNode = null;
+                window.positionEvalMap = {}; window.positionEvalMap2 = {}; window.positionDepthMap = {};
+                window.studyReportPositions = []; window.studyReportComments = {}; window.studyReportPositionIndex = 0;
+                window.currentLoadedPgn = '';
+                window.cycleVarSequence = []; window.cycleVarIndex = -1;
+                window.fenVariants = []; window.pgnVariants = []; window.allVariants = []; window.allFileSections = [];
+                window.loadedFenVariants = []; window.loadedFenVariantIndex = 0;
+                window.supabaseLoadedGame = null;
+                window.textViewRawContent = ''; window.analysisReportRawText = ''; window.studyReportRawText = '';
+                if (pgnInput) pgnInput.value = '';
+                if (reportText) reportText.textContent = '';
+                if (reportContainer) reportContainer.style.display = 'none';
+                if (container) container.innerHTML = '';
+                ['board2MoveIndicator', 'board2MoveIndicatorMini', 'board2MovePlayedSan', 'variantNotesDisplay', 'board2PositionCount'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) { el.textContent = ''; el.style.background = 'transparent'; el.style.color = '#eee'; }
+                });
+                if (window.board2) { window.board2.orientation('white'); window.board2.start(); }
+                clearMoveHighlights();
+                clearBoard2Arrows();
+                window.applyBoardBorder(null);
+                if (window.updateFileSectionHeader) window.updateFileSectionHeader(-1);
+                if (window.sbRefreshGameLink) window.sbRefreshGameLink();
+                if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+                updateEvalBar(null);
+                updateAllCommentsDisplay();
+                updateMaterialDisplay('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+                return;
+            }
+
+            PGN_TAB_KEYS.forEach(k => { window[k] = snap[k]; });
+            if (pgnInput) pgnInput.value = snap._pgnInput;
+            if (reportText) reportText.textContent = snap._reportText;
+            if (reportContainer) reportContainer.style.display = snap._reportShown ? 'block' : 'none';
+            if (window.sbRefreshGameLink) window.sbRefreshGameLink();
+            renderMoveTable(window.moveTree);
+            if (window.board2) window.board2.orientation(snap._orientation);
+            // jumpToNode/jumpToRoot repaint board, eval bar, indicator, border,
+            // arrows and comments; the move sound is suppressed for tab switches.
+            window._suppressMoveSound = true;
+            try {
+                if (window.currentMoveNode) jumpToNode(window.currentMoveNode.nodeId);
+                else jumpToRoot();
+            } finally {
+                window._suppressMoveSound = false;
+            }
+        }
+
+        function pgnTabSwitch(id) {
+            if (id === window.pgnTabActiveId) return;
+            const busy = pgnTabBusy();
+            if (busy) { showToast('Finish ' + busy + ' before switching tabs'); return; }
+            const from = window.pgnTabs.find(t => t.id === window.pgnTabActiveId);
+            if (from) from.snapshot = pgnTabCapture();
+            const to = window.pgnTabs.find(t => t.id === id);
+            if (!to) return;
+            window.pgnTabActiveId = id;
+            pgnTabApply(to.snapshot);
+            pgnTabRenderStrip();
+        }
+
+        function pgnTabNew() {
+            const busy = pgnTabBusy();
+            if (busy) { showToast('Finish ' + busy + ' before opening a new tab'); return; }
+            const from = window.pgnTabs.find(t => t.id === window.pgnTabActiveId);
+            if (from) from.snapshot = pgnTabCapture();
+            const t = { id: 't' + (++pgnTabSeq), num: pgnTabSeq, title: '', snapshot: null };
+            window.pgnTabs.push(t);
+            window.pgnTabActiveId = t.id;
+            pgnTabApply(null);
+            pgnTabRenderStrip();
+        }
+
+        function pgnTabClose(id, ev) {
+            if (ev) ev.stopPropagation();
+            const busy = pgnTabBusy();
+            if (busy) { showToast('Finish ' + busy + ' before closing tabs'); return; }
+            const idx = window.pgnTabs.findIndex(t => t.id === id);
+            if (idx === -1) return;
+            window.pgnTabs.splice(idx, 1);
+            if (!window.pgnTabs.length) { pgnTabNew(); return; }
+            if (window.pgnTabActiveId === id) {
+                const next = window.pgnTabs[Math.min(idx, window.pgnTabs.length - 1)];
+                window.pgnTabActiveId = next.id; // the closed tab's state goes with it — no capture
+                pgnTabApply(next.snapshot);
+            }
+            pgnTabRenderStrip();
+        }
+
+        function pgnTabRenderStrip() {
+            const strip = document.getElementById('pgnTabStrip');
+            if (!strip) return;
+            pgnTabSyncActiveTitle();
+            strip.innerHTML = '';
+            window.pgnTabs.forEach(function (t) {
+                const active = t.id === window.pgnTabActiveId;
+                const btn = document.createElement('span');
+                btn.style.cssText = 'display:inline-flex; align-items:center; gap:6px; max-width:220px; padding:5px 8px 5px 12px; ' +
+                    'border:1px solid ' + (active ? '#00d4ff' : '#333') + '; border-radius:6px 6px 0 0; ' +
+                    'background:' + (active ? '#16213e' : '#0d1526') + '; color:' + (active ? '#00d4ff' : '#888') + '; ' +
+                    'cursor:pointer; font-size:12px; font-family:monospace; user-select:none;';
+                const label = document.createElement('span');
+                label.textContent = t.title || 'New tab';
+                label.title = label.textContent;
+                label.style.cssText = 'overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                btn.appendChild(label);
+                if (window.pgnTabs.length > 1) {
+                    const x = document.createElement('span');
+                    x.textContent = '✕';
+                    x.title = 'Close tab';
+                    x.style.cssText = 'color:#666; padding:0 2px; font-size:11px;';
+                    x.onmouseover = function () { x.style.color = '#ff6666'; };
+                    x.onmouseout = function () { x.style.color = '#666'; };
+                    x.onclick = function (ev) { pgnTabClose(t.id, ev); };
+                    btn.appendChild(x);
+                }
+                btn.onclick = function () { pgnTabSwitch(t.id); };
+                strip.appendChild(btn);
+            });
+            const plus = document.createElement('button');
+            plus.textContent = '+ New tab';
+            plus.title = 'Open a new empty tab, then load a PGN into it';
+            plus.style.cssText = 'padding:5px 10px; background:#0f3460; color:#00d4ff; border:1px dashed #00d4ff; border-radius:6px; cursor:pointer; font-size:12px; font-family:monospace;';
+            plus.onclick = pgnTabNew;
+            strip.appendChild(plus);
+        }
+        window.pgnTabRenderStrip = pgnTabRenderStrip;
+        pgnTabRenderStrip();
     </script>
 
     <!-- React CDN for Chess Coach Chat -->
