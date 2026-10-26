@@ -1418,6 +1418,8 @@
             <button title="Add the engine's best line (Stockfish d15) as a variation at the current move" onclick="analyzeForVariation()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var.</button>
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
             <button id="practice-btn" title="Play Stockfish from this move (or the move before) and copy the moves as a From Position snippet. Your game stays loaded." onclick="openPracticeModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Practice</button>
+            <button id="oneline-btn" title="Flatten a multi-line PGN / From Position snippet to a single line for a Google Sheets cell" onclick="openOneLineModal()" style="background: #0f3460; color: #e91e63; border: 1px solid #e91e63; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">1-Line</button>
+            <button id="coachpgn-btn" title="Paste a PGN and the chess coach's written analysis; the per-move comments are merged into the PGN" onclick="openCoachPgnModal()" style="background: #0f3460; color: #ffd700; border: 1px solid #ffd700; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">AI → PGN</button>
             <button id="toggleSoundBtnMini" title="Turn move sounds on or off" onclick="toggleChessSound()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sound On</button>
             <button id="toggleBorderBtnMini" title="Show the eval bar, move comment bar, the board border (?? / ? / ?! moves) and the variation glow (on/off)" onclick="toggleBoardBorder()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Signals On</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
@@ -1432,6 +1434,7 @@
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
+            <button id="loadToBoardMini" title="Load the PGN in the text box (or the clipboard if it is empty) to the board — same as Load to Board" onclick="loadPgnToBoard()" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load to Board</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1578,6 +1581,43 @@
               <div style="color:#888; font-size:12px; line-height:1.5; margin-bottom:14px;">Stockfish replies after each of your moves. Your game stays loaded; <b>Back to game</b> returns to the move you're on. The eval bar and move borders are hidden while you practice.</div>
               <button onclick="practiceStart()" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Start practice</button>
               <button onclick="document.getElementById('practiceModal').style.display='none'" style="width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Cancel</button>
+            </div>
+          </div>
+
+          <!-- Coach → PGN: paste a PGN + the coach's written analysis, get the PGN with per-move comments -->
+          <div id="coachPgnModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:680px; width:92%; max-height:92vh; overflow-y:auto; border:1px solid #ffd700; position:relative;">
+              <button onclick="document.getElementById('coachPgnModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:6px; color:#ffd700; font-size:15px;">Coach analysis → PGN</div>
+              <div style="color:#aaa; font-size:12px; margin-bottom:10px;">Paste the game's PGN, then the coach's text (the “### Move 5... Nd4?” sections). Each section becomes a comment on that move.</div>
+              <label style="color:#aaa; font-size:12px;">PGN</label>
+              <textarea id="coachPgnInput" rows="5" spellcheck="false" placeholder="1. e4 e5 2. Nf3 Nc6 ..." style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:8px;"></textarea>
+              <label style="color:#aaa; font-size:12px;">Coach comments</label>
+              <textarea id="coachPgnComments" rows="7" spellcheck="false" placeholder="Paste the coach's analysis here..." style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:8px;"></textarea>
+              <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <button onclick="coachPgnMerge()" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Merge into PGN</button>
+                <button id="coachPgnLineBtn" onclick="coachPgnToggleLine()" style="flex:1; padding:10px; background:#b91c1c; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Single line: ON</button>
+                <button onclick="coachPgnClear()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Clear</button>
+              </div>
+              <div id="coachPgnStatus" style="color:#aaa; font-size:12px; margin-bottom:6px; min-height:16px;"></div>
+              <textarea id="coachPgnOutput" readonly rows="8" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:8px;"></textarea>
+              <button id="coachPgnCopyBtn" onclick="coachPgnCopy(this)" style="width:100%; padding:10px; background:#0f3460; color:#ffd700; border:1px solid #ffd700; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy PGN</button>
+            </div>
+          </div>
+
+          <!-- 1-Line: flatten a multi-line PGN to one line for a Sheets cell -->
+          <div id="oneLineModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #e91e63; position:relative;">
+              <button onclick="document.getElementById('oneLineModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; margin-bottom:6px; color:#e91e63; font-size:15px;">PGN to single line</div>
+              <div style="color:#aaa; font-size:12px; margin-bottom:10px;">Paste multi-line PGN text, get one line for a Google Sheets cell.</div>
+              <textarea id="oneLineInput" rows="6" spellcheck="false" oninput="oneLineConvert()" placeholder="Paste PGN here..." style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:8px;"></textarea>
+              <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <button id="oneLinePasteBtn" onclick="oneLinePaste(this)" title="Read the clipboard, flatten it, and copy the single line back to the clipboard" style="flex:1; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Paste &amp; Copy</button>
+                <button id="oneLineTagBtn" onclick="oneLineToggleTags()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Remove Tags: OFF</button>
+              </div>
+              <textarea id="oneLineOutput" readonly rows="4" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:8px;"></textarea>
+              <button id="oneLineCopyBtn" onclick="oneLineCopy(this)" style="width:100%; padding:10px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy single line</button>
             </div>
           </div>
 
@@ -2116,7 +2156,14 @@
             var cur = getCurrentMoveKey();
             if (!cur) return null;
             var entry = getCoachMoveNotes().map[cur.key];
-            if (!entry) return null;
+            if (!entry) {
+                // No separate coach text loaded: a real comment written into the PGN
+                // itself ({ ... } after the move, e.g. from Coach → PGN) counts as the note
+                var node = window.moveTree && window.currentMoveNode;
+                var own = node && typeof lnCleanComment === 'function' ? lnCleanComment(node.comment) : '';
+                if (!own) return null;
+                return { label: cur.key + ' ' + (cur.san || ''), san: cur.san, text: own };
+            }
             // Tree mode: require SAN match so a variation move with the same
             // move number doesn't show the main-line note
             if (cur.san && entry.san && cur.san !== entry.san) return null;
@@ -2232,11 +2279,11 @@
         window.updateCoachNoteButton = updateCoachNoteButton;
 
         function openCoachNoteForCurrentMove() {
-            if (!Object.keys(getCoachMoveNotes().map).length) {
+            var entry = findCoachNoteForCurrentMove();
+            if (!entry && !Object.keys(getCoachMoveNotes().map).length) {
                 openTextViewModal('No coach analysis yet. Run "Analyze with Chess Coach" first.', '⭐ Coach Note');
                 return;
             }
-            var entry = findCoachNoteForCurrentMove();
             if (entry) {
                 openTextViewModal(entry.text, '⭐ Coach: ' + entry.label);
             } else {
@@ -3618,8 +3665,34 @@
                     window.cycleVarSequence = [];
                     window.cycleVarIndex = -1;
                     window.currentLoadedPgn = finalAnnotatedPgn;
+                    // The engine pass runs on a comment-free copy, so the { ... } comments
+                    // that came in with the pasted PGN (coach notes etc.) would be lost.
+                    // Carry them over onto the same main-line moves.
+                    // parsePgnWithVariations() resets window.moveNodeRegistry, so keep the real
+                    // tree's registry and put it back, or jumpToNode lands on throwaway nodes
+                    // and Cycle Var / glyphs act on a stale tree.
+                    const keepRegistry = window.moveNodeRegistry;
+                    try {
+                        const origTree = window.parsePgnWithVariations(originalPgnForChessis);
+                        window.moveNodeRegistry = keepRegistry;
+                        const origComments = {};
+                        let on = origTree && origTree.children && origTree.children[0];
+                        while (on && on.san) {
+                            const c = typeof lnCleanComment === 'function' ? lnCleanComment(on.comment) : (on.comment || '');
+                            if (c) origComments[on.moveNumber + (on.isBlackMove ? '...' : '.')] = c;
+                            on = on.children && on.children[0];
+                        }
+                        let nn = window.moveTree.children && window.moveTree.children[0], carried = 0;
+                        while (nn && nn.san) {
+                            const c = origComments[nn.moveNumber + (nn.isBlackMove ? '...' : '.')];
+                            if (c) { nn.comment = nn.comment ? nn.comment + ' ' + c : c; carried++; }
+                            nn = nn.children && nn.children[0];
+                        }
+                        if (carried) log('Kept ' + carried + ' comment(s) from the pasted PGN', 'info');
+                    } catch (carryErr) { window.moveNodeRegistry = keepRegistry; log('Could not carry PGN comments over: ' + carryErr.message, 'warning'); }
                     renderMoveTable(window.moveTree);
                     if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
+                    if (window.updateCoachNoteButton) window.updateCoachNoteButton();
                 }
 
                 // Reset board to start position
@@ -13310,9 +13383,26 @@
                         }
                         e.preventDefault();
                     }
+                } else if (e.key === '9' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // 9 = paste the clipboard into the PGN textarea, then Load to Board
+                    e.preventDefault();
+                    navigator.clipboard.readText().then(function (text) {
+                        text = (text || '').trim();
+                        if (!text) { showToast('Clipboard is empty'); return; }
+                        const pgnBox = document.getElementById('pgnInput');
+                        if (pgnBox) pgnBox.value = text;
+                        loadPgnToBoard();
+                    }).catch(function () { showToast('Clipboard access blocked'); });
                 } else if (e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey) {
-                    // / = Cycle Var. only — never triggers Stockfish Add Var.
-                    if (cycleVariationStepOut()) e.preventDefault();
+                    // / = toggle the coach note (⭐) on/off: closes the modal if it is
+                    // open, otherwise opens it like the ⭐ button. Tab still cycles variations.
+                    e.preventDefault();
+                    const tvModalSlash = document.getElementById('textViewModal');
+                    if (tvModalSlash && tvModalSlash.style.display !== 'none') {
+                        tvModalSlash.style.display = 'none';
+                    } else {
+                        openCoachNoteForCurrentMove();
+                    }
                 } else if (e.key === 'Enter') {
                     // Enter = open the coach note for the current move (gold star only).
                     // Always preventDefault so Enter never activates the focused
@@ -17553,6 +17643,133 @@ ${contentToAnalyze}`;
             else fallback();
         }
 
+        // Coach → PGN: graft the coach's "### Move 5... Nd4?" sections onto a pasted PGN
+        window._coachPgnSingleLine = true;
+        // -> { "5...": { glyph: '?', text: 'Best: ... Why: ... Lesson: ...' } }
+        function coachPgnParseComments(text) {
+            const out = {};
+            const parts = String(text || '').split(/^#{2,4}\s*(?=Move\s+\d)/m).slice(1);
+            parts.forEach(function (part) {
+                const lines = part.split('\n');
+                const m = lines[0].match(/^Move\s+(\d+)(\.\.\.|\.)\s*(\S+)/);
+                if (!m) return;
+                // Body stops at the next "## " section (Missed Tactics etc.)
+                const body = [];
+                for (let i = 1; i < lines.length; i++) { if (/^##\s/.test(lines[i])) break; body.push(lines[i]); }
+                const field = function (label) {
+                    const mm = body.join('\n').match(new RegExp('^\\s*[-•*]\\s*\\*{0,2}' + label + '[^:\\n]*:\\*{0,2}\\s*([\\s\\S]*?)(?=\\n\\s*[-•*]\\s*\\*{0,2}[A-Z][\\w ]*:|$)', 'mi'));
+                    return mm ? mm[1] : '';
+                };
+                const clean = function (t) { return t.replace(/[{}]/g, '').replace(/\*+/g, '').replace(/\s+/g, ' ').trim(); };
+                const best = clean(field('Best move')), why = clean(field('Why weaker')), lesson = clean(field('Lesson'));
+                let comment = [best && 'Best: ' + best.replace(/\.$/, '') + '.', why, lesson && 'Lesson: ' + lesson].filter(Boolean).join(' ');
+                if (!comment) comment = clean(body.join(' '));
+                if (!comment) return;
+                out[m[1] + m[2]] = { glyph: (m[3].match(/[!?]+$/) || [''])[0], san: m[3].replace(/[!?]+$/, ''), text: comment };
+            });
+            return out;
+        }
+        function coachPgnMerge() {
+            const status = document.getElementById('coachPgnStatus');
+            const outEl = document.getElementById('coachPgnOutput');
+            const pgnText = document.getElementById('coachPgnInput').value.trim();
+            if (!pgnText) { status.textContent = 'Paste a PGN first.'; return; }
+            const game = new Chess();
+            if (!game.load_pgn(pgnText, { sloppy: true })) { status.textContent = 'Could not parse that PGN.'; outEl.value = ''; return; }
+            const headers = game.header();
+            const wanted = coachPgnParseComments(document.getElementById('coachPgnComments').value);
+            // Replay from the start position (FEN header for From Position games) to number the moves
+            const startFen = headers.FEN || 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+            const f = startFen.split(' ');
+            let num = parseInt(f[5], 10) || 1;
+            let toMove = f[1] === 'b' ? 'b' : 'w';
+            let used = 0, mismatch = [], afterComment = true;
+            const toks = [];
+            game.history({ verbose: true }).forEach(function (mv) {
+                const key = num + (mv.color === 'b' ? '...' : '.');
+                const w = wanted[key];
+                let san = mv.san;
+                if (mv.color === 'w') toks.push(num + '. ' + san);
+                else toks.push((afterComment ? num + '... ' : '') + san);
+                if (w) {
+                    used++;
+                    if (w.san && w.san.replace(/[+#]$/, '') !== mv.san.replace(/[+#]$/, '')) mismatch.push(key + ' ' + w.san + ' vs ' + mv.san);
+                    toks[toks.length - 1] += w.glyph + ' { ' + w.text + ' }';
+                    afterComment = true;
+                } else afterComment = false;
+                if (mv.color === 'b') num++;
+            });
+            const head = Object.keys(headers).map(function (k) { return '[' + k + ' "' + headers[k] + '"]'; }).join('\n');
+            let movetext = toks.join(' ') + (headers.Result ? ' ' + headers.Result : '');
+            let result = (head ? head + '\n\n' : '') + movetext;
+            if (window._coachPgnSingleLine) result = result.replace(/\s+/g, ' ').trim();
+            outEl.value = result;
+            // Straight onto the clipboard so it can be pasted into a Sheets cell right away
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(result).catch(function () { });
+            const total = Object.keys(wanted).length;
+            status.textContent = used + ' of ' + total + ' coach comment' + (total === 1 ? '' : 's') + ' placed, copied to clipboard' +
+                (mismatch.length ? ' — move differs from the coach text at: ' + mismatch.join('; ') + ' (placed by move number)' : '') +
+                (used < total ? ' — ' + (total - used) + ' had a move number not in this PGN' : '') + '.';
+        }
+        function openCoachPgnModal() { document.getElementById('coachPgnModal').style.display = 'flex'; document.getElementById('coachPgnInput').focus(); }
+        function coachPgnToggleLine() {
+            window._coachPgnSingleLine = !window._coachPgnSingleLine;
+            const b = document.getElementById('coachPgnLineBtn');
+            b.textContent = 'Single line: ' + (window._coachPgnSingleLine ? 'ON' : 'OFF');
+            b.style.background = window._coachPgnSingleLine ? '#b91c1c' : '#444';
+            if (document.getElementById('coachPgnOutput').value) coachPgnMerge();
+        }
+        function coachPgnClear() {
+            ['coachPgnInput', 'coachPgnComments', 'coachPgnOutput'].forEach(function (id) { document.getElementById(id).value = ''; });
+            document.getElementById('coachPgnStatus').textContent = '';
+        }
+        function coachPgnCopy(btn) {
+            const ta = document.getElementById('coachPgnOutput');
+            const done = () => { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy PGN'; }, 1500); };
+            const fallback = () => { ta.select(); try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Press ⌘C'; } };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done).catch(fallback);
+            else fallback();
+        }
+
+        // 1-Line: flatten a multi-line PGN to one line for a Google Sheets cell
+        window._oneLineStripTags = false;
+        function oneLineFlatten(text) {
+            if (window._oneLineStripTags) text = text.replace(/\[[A-Za-z0-9_]+\s+"[^"]*"\]/g, '');
+            return text.replace(/\s+/g, ' ').trim();
+        }
+        function oneLineCopyText(text, btn, label) {
+            const done = () => { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = label; }, 1500); };
+            const fallback = () => { const o = document.getElementById('oneLineOutput'); o.select(); try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Press ⌘C'; } };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
+            else fallback();
+        }
+        function openOneLineModal() {
+            document.getElementById('oneLineModal').style.display = 'flex';
+            document.getElementById('oneLineInput').focus();
+        }
+        function oneLineConvert() {
+            document.getElementById('oneLineOutput').value = oneLineFlatten(document.getElementById('oneLineInput').value);
+        }
+        function oneLineToggleTags() {
+            window._oneLineStripTags = !window._oneLineStripTags;
+            const b = document.getElementById('oneLineTagBtn');
+            b.textContent = 'Remove Tags: ' + (window._oneLineStripTags ? 'ON' : 'OFF');
+            b.style.background = window._oneLineStripTags ? '#b91c1c' : '#444';
+            oneLineConvert();
+        }
+        function oneLinePaste(btn) {
+            const label = 'Paste & Copy';
+            if (!(navigator.clipboard && navigator.clipboard.readText)) { btn.textContent = 'Paste with ⌘V'; return; }
+            navigator.clipboard.readText().then(t => {
+                document.getElementById('oneLineInput').value = t;
+                oneLineConvert();
+                oneLineCopyText(document.getElementById('oneLineOutput').value, btn, label);
+            }).catch(() => { btn.textContent = 'Clipboard blocked'; setTimeout(() => { btn.textContent = label; }, 1500); });
+        }
+        function oneLineCopy(btn) {
+            oneLineCopyText(document.getElementById('oneLineOutput').value, btn, 'Copy single line');
+        }
+
         function practiceBack() {
             const p = window._practice;
             if (!p) return;
@@ -17579,6 +17796,16 @@ ${contentToAnalyze}`;
         window.practiceBack = practiceBack;
         window.practiceShowResult = practiceShowResult;
         window.practiceCopy = practiceCopy;
+        window.openOneLineModal = openOneLineModal;
+        window.openCoachPgnModal = openCoachPgnModal;
+        window.coachPgnMerge = coachPgnMerge;
+        window.coachPgnToggleLine = coachPgnToggleLine;
+        window.coachPgnClear = coachPgnClear;
+        window.coachPgnCopy = coachPgnCopy;
+        window.oneLineConvert = oneLineConvert;
+        window.oneLineToggleTags = oneLineToggleTags;
+        window.oneLinePaste = oneLinePaste;
+        window.oneLineCopy = oneLineCopy;
         window.practiceSave = practiceSave;
         window.practiceSaveCategoryChanged = practiceSaveCategoryChanged;
         window.practiceSyncSide = practiceSyncSide;

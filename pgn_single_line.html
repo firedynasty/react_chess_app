@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PGN to Single Line</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #1e1e1e; color: #ccc; display: flex; flex-direction: column; height: 100vh; padding: 16px; gap: 12px; }
+  h1 { font-size: 1rem; color: #fff; }
+  .row { display: flex; gap: 12px; flex: 1; min-height: 0; }
+  .col { display: flex; flex-direction: column; flex: 1; gap: 6px; }
+  label { font-size: 0.8rem; color: #888; }
+  textarea { flex: 1; background: #2d2d2d; color: #eee; border: 1px solid #444; border-radius: 4px; padding: 10px; font-family: monospace; font-size: 0.9rem; resize: none; }
+  .buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  button { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; background: #333; color: #ccc; }
+  button:hover { background: #444; }
+  #parseBtn { background: #0070f3; color: #fff; }
+  #parseBtn:hover { background: #0060d0; }
+  #tagToggle.on { background: #b91c1c; color: #fff; }
+  #status { font-size: 0.8rem; color: #0a0; }
+</style>
+</head>
+<body>
+
+<h1>PGN to Single Line (for a Google Sheets cell)</h1>
+
+<div class="row">
+  <div class="col">
+    <label>INPUT</label>
+    <textarea id="input" placeholder='[Variant "From Position"]
+[FEN "rnbqkbnr/pp3ppp/4p3/2pp4/3PP3/2N5/PPP2PPP/R1BQKBNR b KQkq - 0 1"]
+
+1... cxd4 2. Qxd4 Nc6 3. Bb5 a6'></textarea>
+  </div>
+  <div class="col">
+    <label>OUTPUT</label>
+    <textarea id="output" readonly></textarea>
+  </div>
+</div>
+
+<div class="buttons">
+  <button id="parseBtn">Parse</button>
+  <button id="tagToggle">Remove Tags: OFF</button>
+  <button id="copyBtn">Copy Output</button>
+  <button id="clearBtn">Clear</button>
+  <span id="status"></span>
+</div>
+
+<script>
+let removeTags = false;
+
+// Collapse every run of newlines / spaces into one space; optionally drop [Tag "..."] pairs first
+function flatten(text) {
+  if (removeTags) text = text.replace(/\[[A-Za-z0-9_]+\s+"[^"]*"\]/g, '');
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+document.getElementById('tagToggle').addEventListener('click', () => {
+  removeTags = !removeTags;
+  const btn = document.getElementById('tagToggle');
+  btn.textContent = `Remove Tags: ${removeTags ? 'ON' : 'OFF'}`;
+  btn.classList.toggle('on', removeTags);
+});
+
+document.getElementById('parseBtn').addEventListener('click', () => {
+  document.getElementById('output').value = flatten(document.getElementById('input').value);
+  setStatus('');
+});
+
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const out = document.getElementById('output').value;
+  if (!out) return;
+  navigator.clipboard.writeText(out).then(() => {
+    setStatus('Copied!');
+    setTimeout(() => setStatus(''), 1500);
+  });
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  document.getElementById('input').value = '';
+  document.getElementById('output').value = '';
+  setStatus('');
+});
+</script>
+
+</body>
+</html>
