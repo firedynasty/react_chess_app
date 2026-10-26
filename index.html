@@ -759,6 +759,7 @@
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
                 <button id="loadCurrentBtn" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Current</button>
                 <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
+                <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800;">Hints</button>
                 <button id="dbPgnBtn" title="Sign in to Dropbox, then pick a .pgn file to load to the board" style="background: #0061fe; color: white;">Dropbox PGN</button>
                 <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
@@ -1435,6 +1436,7 @@
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
             <button id="loadToBoardMini" title="Load the PGN in the text box (or the clipboard if it is empty) to the board — same as Load to Board" onclick="loadPgnToBoard()" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load to Board</button>
+            <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Hints</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1567,6 +1569,24 @@
           </div>
 
           <!-- Practice: choose the start, side and level -->
+          <!-- Hints: keyboard shortcuts -->
+          <div id="hintsModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+            <div style="background:#16213e; border-radius:10px; padding:20px; max-width:480px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #ff9800; position:relative;">
+              <button onclick="document.getElementById('hintsModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; color:#ff9800; font-size:15px; margin-bottom:10px;">Keyboard hints</div>
+              <table style="font-size:13px; border-collapse:collapse;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">← / →</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next move (→ or PageDown or Space = next)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Space</kbd></td><td style="padding:4px 0; color:#ddd;">Next move</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">9</kbd></td><td style="padding:4px 0; color:#ddd;">Paste clipboard into the PGN box and Load to Board</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">0</kbd></td><td style="padding:4px 0; color:#ddd;">Go to move — type 48 + Enter (48b = Black's move)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↑</kbd></td><td style="padding:4px 0; color:#ddd;">Exit the variation back to the main line</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↓</kbd></td><td style="padding:4px 0; color:#ddd;">Step into a variation</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Tab</kbd></td><td style="padding:4px 0; color:#ddd;">Cycle variations (adds one if none)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Esc</kbd></td><td style="padding:4px 0; color:#ddd;">Remove the variation at this move / close a modal</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">/</kbd></td><td style="padding:4px 0; color:#ddd;">Toggle the coach note</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Enter</kbd></td><td style="padding:4px 0; color:#ddd;">Open the coach note (gold star)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">[ / ]</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next saved position</td></tr></table>
+            </div>
+          </div>
+
+          <!-- Go to move: press 0, type a move number, Enter -->
+          <div id="gotoMoveModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)closeGotoMove()">
+            <div style="background:#16213e; border-radius:10px; padding:20px; width:260px; max-width:90%; border:1px solid #ff9800; text-align:center;">
+              <div style="font-weight:bold; color:#ff9800; font-size:15px; margin-bottom:10px;">Go to move</div>
+              <input type="text" id="gotoMoveInput" inputmode="numeric" autocomplete="off" placeholder="48" onkeydown="gotoMoveKey(event)" style="width:100%; box-sizing:border-box; text-align:center; font-size:28px; padding:8px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:6px;">
+              <div id="gotoMoveHint" style="color:#aaa; font-size:12px; margin-top:8px; min-height:16px;">Enter = jump · add b for Black's move (48b) · Esc = cancel</div>
+            </div>
+          </div>
+
           <div id="practiceModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
             <div style="background:#16213e; border-radius:10px; padding:24px; max-width:480px; width:90%; border:1px solid #ff9800; position:relative;">
               <button onclick="document.getElementById('practiceModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
@@ -1629,6 +1649,7 @@
               <div id="practiceResultInfo" style="color:#aaa; font-size:12px; margin-bottom:10px;"></div>
               <textarea id="practiceResultText" readonly rows="7" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;"></textarea>
               <button id="practiceCopyBtn" onclick="practiceCopy(this)" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy snippet</button>
+              <a id="practiceLichessLink" href="https://lichess.org/analysis" target="_blank" rel="noopener" title="Open the Lichess analysis board" style="display:block; box-sizing:border-box; text-align:center; text-decoration:none; width:100%; padding:10px; margin-bottom:8px; background:#0f3460; color:#8bc34a; border:1px solid #8bc34a; border-radius:6px; font-weight:bold; font-size:14px;">Open in Lichess analysis ↗</a>
               <div style="display:flex; gap:8px;">
                 <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="flex:1; padding:10px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Keep playing</button>
                 <button onclick="practiceBack()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Back to game</button>
@@ -13383,6 +13404,10 @@
                         }
                         e.preventDefault();
                     }
+                } else if (e.key === '0' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // 0 = Go to move: type a move number, Enter jumps to it on the main line
+                    e.preventDefault();
+                    openGotoMove();
                 } else if (e.key === '9' && !e.metaKey && !e.ctrlKey && !e.altKey) {
                     // 9 = paste the clipboard into the PGN textarea, then Load to Board
                     e.preventDefault();
@@ -13411,9 +13436,13 @@
                     if (findCoachNoteForCurrentMove()) {
                         openCoachNoteForCurrentMove();
                     }
-                } else if (e.key === ' ' && (document.activeElement === prevBtn || document.activeElement === nextBtn)) {
-                    // Spacebar when focused on nav buttons triggers variation
-                    nextVariation();
+                } else if (e.key === ' ' && !e.metaKey && !e.ctrlKey && !e.altKey &&
+                           (document.activeElement === prevBtn || document.activeElement === nextBtn ||
+                            !/^(BUTTON|SELECT|A)$/.test(e.target.tagName))) {
+                    // Spacebar = next move, same as ArrowRight. (It used to cycle variations
+                    // when a Prev/Next button was focused; Tab does that now.) Other focused
+                    // buttons / dropdowns / links keep their normal Space behaviour.
+                    board2NextMove();
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
                 } else if (e.key === 'Escape') {
@@ -17791,6 +17820,42 @@ ${contentToAnalyze}`;
         }
 
         // inline onclick handlers and the navigation guards live outside this script's scope
+        // 0 = Go to move: jump along the main line to move N (White's move; "48b" = Black's)
+        function openGotoMove() {
+            if (!window.moveTree) { showToast('Load a game first'); return; }
+            const inp = document.getElementById('gotoMoveInput');
+            inp.value = '';
+            document.getElementById('gotoMoveModal').style.display = 'flex';
+            inp.focus();
+        }
+        function closeGotoMove() { document.getElementById('gotoMoveModal').style.display = 'none'; }
+        function gotoMoveKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeGotoMove(); }
+            else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); gotoMoveCommit(); }
+            else e.stopPropagation();
+        }
+        function gotoMoveCommit() {
+            const m = document.getElementById('gotoMoveInput').value.trim().match(/^(\d+)\s*(b?)\.{0,3}$/i);
+            const hint = document.getElementById('gotoMoveHint');
+            if (!m) { hint.textContent = 'Type a move number, e.g. 48'; return; }
+            const num = parseInt(m[1], 10), black = !!m[2];
+            let node = window.moveTree && window.moveTree.children && window.moveTree.children[0], found = null, last = null;
+            while (node) {
+                last = node;
+                if (node.moveNumber === num && !!node.isBlackMove === black) { found = node; break; }
+                node = node.children && node.children[0];
+            }
+            if (!found) {
+                hint.textContent = 'No move ' + num + (black ? ' (Black)' : '') + ' on the main line' + (last ? ' — game ends at ' + last.moveNumber : '');
+                return;
+            }
+            closeGotoMove();
+            jumpToNode(found.nodeId);
+        }
+        window.gotoMoveKey = gotoMoveKey;
+        window.closeGotoMove = closeGotoMove;
+        window.openGotoMove = openGotoMove;
+        window.openHintsModal = function () { document.getElementById('hintsModal').style.display = 'flex'; };
         window.openPracticeModal = openPracticeModal;
         window.practiceStart = practiceStart;
         window.practiceBack = practiceBack;
