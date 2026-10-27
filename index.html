@@ -1457,6 +1457,9 @@
           <button id="analyze-variation-btn2" onclick="analyzeForVariation()" style="padding: 8px 15px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 6px; cursor: pointer;">
                 Add Var.
             </button>
+          <button id="addVar2Btn" title="Prototype: paste a practice snippet (FEN + moves), see which move it matches, add it as a variation" onclick="openAddVar2()" style="padding: 8px 15px; background: #0f3460; color: #ff9800; border: 1px solid #ff9800; border-radius: 6px; cursor: pointer;">
+                Add Var. 2
+            </button>
           <button id="clearVariationsBtn" title="Remove the variation at the current move (opposite of Add Var.)" style="background: #dc3545; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Clear Var.</button>
           <!-- Next Var, Back Var, Cycle Clipboard moved to hidden-features/nav-buttons.html -->
           <button id="loadClipboardPgnBtn" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold;">Load Annotated PGN</button>
@@ -1575,6 +1578,19 @@
               <button onclick="document.getElementById('hintsModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
               <div style="font-weight:bold; color:#ff9800; font-size:15px; margin-bottom:10px;">Keyboard hints</div>
               <table style="font-size:13px; border-collapse:collapse;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">← / →</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next move (→ or PageDown or Space = next)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Space</kbd></td><td style="padding:4px 0; color:#ddd;">Next move</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">9</kbd></td><td style="padding:4px 0; color:#ddd;">Paste clipboard into the PGN box and Load to Board</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">0</kbd></td><td style="padding:4px 0; color:#ddd;">Go to move — type 48 + Enter (48b = Black's move)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↑</kbd></td><td style="padding:4px 0; color:#ddd;">Exit the variation back to the main line</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↓</kbd></td><td style="padding:4px 0; color:#ddd;">Step into a variation</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Tab</kbd></td><td style="padding:4px 0; color:#ddd;">Cycle variations (adds one if none)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Esc</kbd></td><td style="padding:4px 0; color:#ddd;">Remove the variation at this move / close a modal</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">/</kbd></td><td style="padding:4px 0; color:#ddd;">Toggle the coach note</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Enter</kbd></td><td style="padding:4px 0; color:#ddd;">Open the coach note (gold star)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">[ / ]</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next saved position</td></tr></table>
+            </div>
+          </div>
+
+          <!-- Add Var. 2 (prototype): paste a practice snippet, match its FEN to a move node, add as a variation -->
+          <div id="addVar2Modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)closeAddVar2()">
+            <div style="background:#16213e; border-radius:10px; padding:20px; max-width:560px; width:92%; max-height:90vh; overflow-y:auto; border:1px solid #ff9800; position:relative;">
+              <button onclick="closeAddVar2()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+              <div style="font-weight:bold; color:#ff9800; font-size:15px; margin-bottom:4px;">Add Var. 2 <span style="color:#aaa; font-weight:normal; font-size:12px;">(prototype)</span></div>
+              <div style="color:#aaa; font-size:12px; margin-bottom:8px;">Paste a practice snippet ([FEN] header + moves). The FEN picks the move it hangs under.</div>
+              <textarea id="addVar2Text" rows="6" spellcheck="false" oninput="updateAddVar2()" onkeydown="event.stopPropagation(); if(event.key==='Escape')closeAddVar2()" placeholder='[Variant "From Position"]&#10;[FEN "..."]&#10;&#10;1. Bg5 Kg8 2. Rf3 ...' style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px;"></textarea>
+              <select id="addVar2Pick" onchange="updateAddVar2(true)" style="display:none; width:100%; margin-top:8px; padding:6px; background:#0f3460; color:#eee; border:1px solid #555; border-radius:4px;"></select>
+              <div id="addVar2Status" style="font-size:13px; margin:10px 0; min-height:36px; color:#aaa;">Waiting for a snippet.</div>
+              <button id="addVar2Go" onclick="commitAddVar2()" disabled style="width:100%; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px; opacity:0.5;">Add as variation</button>
             </div>
           </div>
 
@@ -8110,6 +8126,127 @@
             updateReportWithPgn();
             return { added: ci, outcome: outcome };
         }
+
+        // ---- Add Var. 2 (prototype): practice snippet -> FEN match -> variation ----
+        // Match on piece placement + side to move only; the snippet's clocks and castling
+        // field often differ from the node's.
+        const addVar2Key = (f) => f.split(' ').slice(0, 2).join(' ');
+        const addVar2Label = (n) => n.san ? `${n.moveNumber}${n.isBlackMove ? '...' : '.'} ${n.san}` : 'the start of the game';
+
+        function addVar2Parse(text) {
+            const fenM = text.match(/\[FEN\s+"([^"]+)"\]/);
+            const body = text.replace(/\[[^\]]*\]/g, '').replace(/\{[^}]*\}/g, '').replace(/\$\d+/g, '')
+                .replace(/\d+\.{1,3}\s*/g, ' ');
+            const tokens = body.split(/\s+/).filter(t => t && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t));
+            return { fen: fenM ? fenM[1].trim() : null, tokens };
+        }
+
+        // Main-line nodes first, then variation nodes, so a transposition prefers the main line
+        function addVar2Find(fen) {
+            const target = addVar2Key(fen), hits = [], main = new Set();
+            for (let n = window.moveTree; n; n = n.children && n.children[0]) {
+                main.add(n);
+                if (n.fen && addVar2Key(n.fen) === target) hits.push({ node: n, main: true });
+            }
+            Object.values(window.moveNodeRegistry || {}).forEach(n => {
+                if (!main.has(n) && n.fen && addVar2Key(n.fen) === target) hits.push({ node: n, main: false });
+            });
+            return hits;
+        }
+
+        function openAddVar2() {
+            if (!window.moveTree) { showToast('Load a game first'); return; }
+            document.getElementById('addVar2Text').value = '';
+            updateAddVar2();
+            document.getElementById('addVar2Modal').style.display = 'flex';
+            document.getElementById('addVar2Text').focus();
+        }
+        function closeAddVar2() { document.getElementById('addVar2Modal').style.display = 'none'; }
+
+        function updateAddVar2(keepPick) {
+            const status = document.getElementById('addVar2Status');
+            const go = document.getElementById('addVar2Go');
+            const pick = document.getElementById('addVar2Pick');
+            const setState = (msg, color, ok) => {
+                status.textContent = msg; status.style.color = color;
+                go.disabled = !ok; go.style.opacity = ok ? '1' : '0.5';
+                if (!ok) { window._addVar2 = null; pick.style.display = 'none'; }
+            };
+            const text = document.getElementById('addVar2Text').value.trim();
+            if (!text) return setState('Waiting for a snippet.', '#aaa', false);
+            const { fen, tokens } = addVar2Parse(text);
+            if (!fen) return setState('No [FEN "..."] header found in the paste.', '#ff6b6b', false);
+            if (tokens.length === 0) return setState('No moves found after the FEN header.', '#ff6b6b', false);
+            const hits = addVar2Find(fen);
+            if (hits.length === 0) {
+                return setState('No move in this game has that position (placement + side to move), so there is nothing to hang the line under.', '#ff6b6b', false);
+            }
+            if (!keepPick || pick.options.length !== hits.length) {
+                pick.innerHTML = hits.map((h, i) =>
+                    `<option value="${i}">${addVar2Label(h.node)} — ${h.main ? 'main line' : 'variation'}</option>`).join('');
+            }
+            pick.style.display = hits.length > 1 ? 'block' : 'none';
+            const hit = hits[parseInt(pick.value, 10) || 0] || hits[0];
+            const anchor = hit.node;
+
+            let sans;
+            try {
+                const c = new Chess(anchor.fen);
+                sans = [];
+                for (let i = 0; i < tokens.length; i++) {
+                    const m = c.move(tokens[i], { sloppy: true });
+                    if (!m) return setState(`"${tokens[i]}" (move ${i + 1} of the paste) isn't legal from that position.`, '#ff6b6b', false);
+                    sans.push(m.san);
+                }
+            } catch (e) { return setState('Could not read that FEN: ' + e.message, '#ff6b6b', false); }
+
+            // Already present as the game line or an existing variation?
+            let cur = anchor, matched = 0;
+            const path = [anchor];
+            for (const san of sans) {
+                const next = (cur.children || []).find(ch => ch.san === san);
+                if (!next) break;
+                cur = next; matched++; path.push(next);
+            }
+            if (matched === sans.length) return setState('That line is already in the game.', '#f1c40f', false);
+
+            // Moves the game already has are skipped: only the new tail hangs under the last
+            // node it shares (e.g. a snippet starting with the game's own 27.Bg5 attaches at 27.Bg5)
+            const rest = sans.slice(matched);
+            // One variation per node: every node on the shared path (matched node .. last shared
+            // node) keeps only its game continuation (children[0]) and the child the line runs
+            // through; any other variation there is replaced. This also clears variations whose
+            // first move is the shared one (e.g. a stale 27.Bg5 line beside the game's 27.Bg5).
+            const stale = [];
+            path.forEach((n, i) => (n.children || []).forEach(c => {
+                if (c !== n.children[0] && c !== path[i + 1]) stale.push(c);
+            }));
+            window._addVar2 = { anchor: cur, sans: rest, stale };
+            const matchedLbl = `${addVar2Label(anchor)} (${hit.main ? 'main line' : 'variation'})`;
+            setState(`Matches ${matchedLbl}.` +
+                (matched ? ` The game already has the first ${matched} ${matched > 1 ? 'plies' : 'ply'} (through ${addVar2Label(cur)}).` : '') +
+                ` ${rest.length} ${rest.length > 1 ? 'plies' : 'ply'} will hang under ${addVar2Label(cur)}, starting ${rest[0]}.` +
+                (stale.length ? ` It will replace ${stale.length} existing variation${stale.length > 1 ? 's' : ''} at ${path.map(addVar2Label).join(' / ')}.` : '') +
+                (hits.length > 1 ? ` ${hits.length} nodes share this position; pick one above.` : ''), '#2ecc71', true);
+        }
+
+        function commitAddVar2() {
+            const s = window._addVar2;
+            if (!s) return;
+            // One variation per node: drop the variations already hanging under the anchor
+            // (children[0] is the game's continuation and is never removed)
+            const dropNode = (n) => { delete window.moveNodeRegistry[n.nodeId]; (n.children || []).forEach(dropNode); };
+            const old = s.stale || [];
+            old.forEach(n => { n.parent.children = n.parent.children.filter(c => c !== n); dropNode(n); });
+            s.anchor.children = (s.anchor.children || []).slice(0, 1);
+            const res = commitLineVariation(s.anchor, s.anchor.fen, s.sans, 'Practice');
+            closeAddVar2();
+            showToast(`Added variation (${res.added} plies, ${res.outcome})` + (old.length ? `, replaced ${old.length} old variation${old.length > 1 ? 's' : ''}` : ''));
+        }
+        window.openAddVar2 = openAddVar2;
+        window.closeAddVar2 = closeAddVar2;
+        window.updateAddVar2 = updateAddVar2;
+        window.commitAddVar2 = commitAddVar2;
 
         function addVariationToPgn() {
             if (!window.currentVariationResult) {
