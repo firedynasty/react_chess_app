@@ -18288,6 +18288,8 @@ ${contentToAnalyze}`;
         <div style="font-weight:bold; margin-bottom:10px; color:#4caf50; font-size:15px;">Add to print list <span id="ppAddNum" style="color:#aaa; font-weight:normal;"></span></div>
         <div id="ppAddPreview" style="width:220px; margin:0 auto 6px;"></div>
         <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:10px;"></div>
+        <input id="ppAddFen" type="text" spellcheck="false" autocomplete="off" oninput="ppFenInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('ppAddComment').focus();}" placeholder="FEN (optional): leave empty to use the board's position" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#ff9800; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:4px;">
+        <div id="ppAddFenMsg" style="font-size:11px; min-height:14px; margin-bottom:6px; color:#ff6b6b;"></div>
         <textarea id="ppAddComment" rows="3" spellcheck="false" placeholder="Comment (Enter = add, Shift+Enter = new line)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ppConfirmAdd();}" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:13px; margin-bottom:10px;"></textarea>
         <div style="display:flex; gap:8px;">
           <button onclick="ppConfirmAdd()" style="flex:1; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Add</button>
@@ -18364,12 +18366,35 @@ ${contentToAnalyze}`;
             $('ppAddPreview').innerHTML = boardSvg(p.fen, p.black, 'width:100%;height:auto;');
             $('ppAddInfo').textContent = infoLine(p);
             $('ppAddComment').value = '';
+            $('ppAddFen').value = '';
+            $('ppAddFenMsg').textContent = '';
             $('ppAddModal').style.display = 'flex';
             $('ppAddComment').focus();
+        };
+
+        // A typed FEN replaces the board's: complete it to 6 fields, or null when it is not a FEN
+        function typedFen() {
+            const t = $('ppAddFen').value.trim().split(/\s+/).filter(Boolean);
+            if (!t.length) return '';
+            if (!boardSvg(t.join(' '), false, '')) return null;
+            const d = [t[0], 'w', '-', '-', '0', '1'];
+            for (let i = 1; i < 6 && i < t.length; i++) d[i] = t[i];
+            return d.join(' ');
+        }
+        window.ppFenInput = function () {
+            const f = typedFen();
+            $('ppAddFenMsg').textContent = f === null ? 'Not a valid FEN' : '';
+            const show = f ? Object.assign({}, pending, { fen: f }) : pending;
+            if (!show || f === null) return;
+            $('ppAddPreview').innerHTML = boardSvg(show.fen, show.black, 'width:100%;height:auto;');
+            $('ppAddInfo').textContent = f ? infoLine({ fen: f, l: '' }) : infoLine(pending);
         };
         window.ppCloseAdd = function () { $('ppAddModal').style.display = 'none'; pending = null; };
         window.ppConfirmAdd = function () {
             if (!pending) return;
+            const f = typedFen();
+            if (f === null) { $('ppAddFenMsg').textContent = 'Not a valid FEN'; $('ppAddFen').focus(); return; }
+            if (f) { pending.fen = f; pending.l = ''; } // typed FEN replaces the board's (the move label no longer applies)
             pending.c = $('ppAddComment').value.trim();
             list.push(pending);
             save();
