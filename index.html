@@ -1420,7 +1420,9 @@
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
             <button id="practice-btn" title="Play Stockfish from this move (or the move before) and copy the moves as a From Position snippet. Your game stays loaded." onclick="openPracticeModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Practice</button>
             <button id="oneline-btn" title="Flatten a multi-line PGN / From Position snippet to a single line for a Google Sheets cell" onclick="openOneLineModal()" style="background: #0f3460; color: #e91e63; border: 1px solid #e91e63; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">1-Line</button>
-            <button id="coachpgn-btn" title="Paste a PGN and the chess coach's written analysis; the per-move comments are merged into the PGN" onclick="openCoachPgnModal()" style="background: #0f3460; color: #ffd700; border: 1px solid #ffd700; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">AI → PGN</button>
+            <button id="ppAddBtn" title="Take the FEN of the position on the board (main line or variation), ask for a comment, and add it to the print list" onclick="ppOpenAdd()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">+ For Print (0)</button>
+            <button id="ppListBtn" title="Review the print list, edit comments, and print it (6 positions per page)" onclick="ppOpenList()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Print List</button>
+            <button id="coachpgn-btn"title="Paste a PGN and the chess coach's written analysis; the per-move comments are merged into the PGN" onclick="openCoachPgnModal()" style="background: #0f3460; color: #ffd700; border: 1px solid #ffd700; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">AI → PGN</button>
             <button id="toggleSoundBtnMini" title="Turn move sounds on or off" onclick="toggleChessSound()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sound On</button>
             <button id="toggleBorderBtnMini" title="Show the eval bar, move comment bar, the board border (?? / ? / ?! moves) and the variation glow (on/off)" onclick="toggleBoardBorder()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Signals On</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
@@ -18273,6 +18275,165 @@ ${contentToAnalyze}`;
                     });
                 }
         }, 1000);
+    })();
+    </script>
+    <!-- Print list: append the board's FEN + a comment, then print 6 positions per Letter page -->
+    <div id="ppAddModal" onkeydown="event.stopPropagation(); if (event.key === 'Escape') ppCloseAdd();" onclick="if(event.target===this)ppCloseAdd()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+      <div style="background:#16213e; border-radius:10px; padding:24px; max-width:420px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #4caf50; position:relative;">
+        <button onclick="ppCloseAdd()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+        <div style="font-weight:bold; margin-bottom:10px; color:#4caf50; font-size:15px;">Add to print list <span id="ppAddNum" style="color:#aaa; font-weight:normal;"></span></div>
+        <div id="ppAddPreview" style="width:220px; margin:0 auto 6px;"></div>
+        <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:10px;"></div>
+        <textarea id="ppAddComment" rows="3" spellcheck="false" placeholder="Comment (Enter = add, Shift+Enter = new line)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ppConfirmAdd();}" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:13px; margin-bottom:10px;"></textarea>
+        <div style="display:flex; gap:8px;">
+          <button onclick="ppConfirmAdd()" style="flex:1; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Add</button>
+          <button onclick="ppCloseAdd()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div id="ppListModal" onkeydown="event.stopPropagation(); if (event.key === 'Escape') ppCloseList();" onclick="if(event.target===this)ppCloseList()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
+      <div style="background:#16213e; border-radius:10px; padding:24px; max-width:640px; width:92%; max-height:90vh; overflow-y:auto; border:1px solid #4caf50; position:relative;">
+        <button onclick="ppCloseList()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+        <div style="font-weight:bold; margin-bottom:4px; color:#4caf50; font-size:15px;">Print list</div>
+        <div id="ppListSummary" style="color:#aaa; font-size:12px; margin-bottom:12px;"></div>
+        <div id="ppListRows"></div>
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button onclick="ppPrint()" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print</button>
+          <button id="ppClearBtn" onclick="ppClear()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Clear all</button>
+        </div>
+      </div>
+    </div>
+    <script>
+    (function () {
+        const KEY = 'chessPrintPositions', PER_PAGE = 6;
+        let list = [], pending = null, clearArmed = false;
+        try { list = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { list = []; }
+        const $ = id => document.getElementById(id);
+        const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        function save() { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {} refreshCount(); }
+        function refreshCount() { const b = $('ppAddBtn'); if (b) b.textContent = '+ For Print (' + list.length + ')'; }
+
+        // FEN as an inline SVG board (unicode pieces, no libraries); black = Black at the bottom
+        const GLYPH = { K: ['♔', '♚'], Q: ['♕', '♛'], R: ['♖', '♜'], B: ['♗', '♝'], N: ['♘', '♞'], P: ['♙', '♟'] };
+        function boardSvg(fen, black, css) {
+            const rows = fen.trim().split(/\s+/)[0].split('/'), board = [];
+            if (rows.length !== 8) return '';
+            for (let i = 0; i < 8; i++) {
+                const cells = [];
+                rows[i].split('').forEach(ch => { if (/[1-8]/.test(ch)) { for (let k = 0; k < +ch; k++) cells.push(null); } else cells.push(ch); });
+                if (cells.length !== 8) return '';
+                board.push(cells);
+            }
+            const S = 40;
+            let svg = '<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" style="' + css + '">', pcs = '';
+            for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+                svg += '<rect x="' + f * S + '" y="' + r * S + '" width="' + S + '" height="' + S + '" fill="' + ((r + f) % 2 ? '#c8c8c8' : '#fff') + '"/>';
+                const pc = board[black ? 7 - r : r][black ? 7 - f : f];
+                if (!pc) continue;
+                const up = pc.toUpperCase(), a = 'x="' + (f * S + S / 2) + '" y="' + (r * S + S / 2 + 1) + '" font-size="34" text-anchor="middle" dominant-baseline="central"';
+                if (pc === up) pcs += '<text ' + a + ' fill="#fff" stroke="#fff" stroke-width="5" stroke-linejoin="round">' + GLYPH[up][1] + '︎</text><text ' + a + ' fill="#000">' + GLYPH[up][0] + '︎</text>';
+                else pcs += '<text ' + a + ' fill="#000" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">' + GLYPH[up][1] + '︎</text>';
+            }
+            return svg + pcs + '<rect width="320" height="320" fill="none" stroke="#000" stroke-width="2"/></svg>';
+        }
+        function infoLine(p) { return (p.l ? p.l + ' · ' : '') + (p.fen.split(' ')[1] === 'b' ? 'Black' : 'White') + ' to move'; }
+
+        // The position on the board right now (main line or variation): placement from the board,
+        // side to move from the highlighted move when it matches
+        function currentPosition() {
+            const b = window.board2;
+            const place = b && b.fen();
+            if (!place) return null;
+            const n = window.currentMoveNode;
+            let side = 'w';
+            if (n && n.fen && n.fen.split(' ')[0] === place) side = n.fen.split(' ')[1] || 'w';
+            const label = n && n.san && n.parent ? n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san + (n.annotation || '') : '';
+            return { fen: place + ' ' + side + ' - - 0 1', black: b.orientation() === 'black', l: label, c: '' };
+        }
+
+        window.ppOpenAdd = function () {
+            const p = currentPosition();
+            if (!p) { showToast('Load a game or position first'); return; }
+            pending = p;
+            $('ppAddNum').textContent = '#' + (list.length + 1);
+            $('ppAddPreview').innerHTML = boardSvg(p.fen, p.black, 'width:100%;height:auto;');
+            $('ppAddInfo').textContent = infoLine(p);
+            $('ppAddComment').value = '';
+            $('ppAddModal').style.display = 'flex';
+            $('ppAddComment').focus();
+        };
+        window.ppCloseAdd = function () { $('ppAddModal').style.display = 'none'; pending = null; };
+        window.ppConfirmAdd = function () {
+            if (!pending) return;
+            pending.c = $('ppAddComment').value.trim();
+            list.push(pending);
+            save();
+            showToast('Added #' + list.length + ' to the print list');
+            window.ppCloseAdd();
+        };
+
+        function renderList() {
+            $('ppListSummary').textContent = list.length
+                ? list.length + ' position' + (list.length !== 1 ? 's' : '') + ' · ' + Math.ceil(list.length / PER_PAGE) + ' page' + (list.length > PER_PAGE ? 's' : '') + ' (' + PER_PAGE + ' per page)'
+                : 'Empty. Use "+ For Print" on a position to add it.';
+            $('ppListRows').innerHTML = list.map((p, i) =>
+                '<div style="display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px solid rgba(255,255,255,0.1);">'
+                + '<div style="color:#4caf50; font-weight:bold; width:24px; text-align:right; padding-top:2px;">' + (i + 1) + '</div>'
+                + '<div style="width:96px; flex-shrink:0;">' + boardSvg(p.fen, p.black, 'width:100%;height:auto;') + '</div>'
+                + '<div style="flex:1; min-width:0;"><div style="color:#a8d8ea; font-size:11px; margin-bottom:4px;">' + esc(infoLine(p)) + '</div>'
+                + '<textarea rows="3" spellcheck="false" oninput="ppComment(' + i + ',this.value)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:6px; font-family:monospace; font-size:12px;">' + esc(p.c) + '</textarea></div>'
+                + '<button onclick="ppRemove(' + i + ')" title="Remove" style="background:none; border:none; color:#c0392b; font-size:16px; cursor:pointer;">✕</button></div>'
+            ).join('');
+        }
+        window.ppOpenList = function () { clearArmed = false; $('ppClearBtn').textContent = 'Clear all'; renderList(); $('ppListModal').style.display = 'flex'; };
+        window.ppCloseList = function () { $('ppListModal').style.display = 'none'; };
+        window.ppComment = function (i, v) { if (list[i]) { list[i].c = v; save(); } };
+        window.ppRemove = function (i) { list.splice(i, 1); save(); renderList(); };
+        window.ppClear = function () {
+            if (!list.length) return;
+            if (!clearArmed) { clearArmed = true; $('ppClearBtn').textContent = 'Click again to clear'; return; }
+            list = []; save(); window.ppOpenList();
+        };
+
+        function printHtml() {
+            let sheets = '';
+            const pages = Math.ceil(list.length / PER_PAGE);
+            for (let s = 0; s < pages; s++) {
+                let cards = '';
+                for (let k = 0; k < PER_PAGE; k++) {
+                    const p = list[s * PER_PAGE + k];
+                    if (!p) { cards += '<div class="card empty"></div>'; continue; }
+                    cards += '<div class="card"><span class="num">' + (s * PER_PAGE + k + 1) + '</span>'
+                        + boardSvg(p.fen, p.black, 'width:2.3in;height:2.3in;')
+                        + '<div class="info">' + esc(infoLine(p)) + '</div>'
+                        + '<div class="cmt' + (p.c ? '' : ' blank') + '">' + esc(p.c).replace(/\n/g, '<br>') + '</div></div>';
+                }
+                sheets += '<div class="sheet">' + cards + '<div class="pg">Page ' + (s + 1) + ' of ' + pages + '</div></div>';
+            }
+            return '<!doctype html><html><head><meta charset="utf-8"><title>Positions</title><style>'
+                + '@page{size:letter portrait;margin:0}'
+                + 'html,body{margin:0;background:#fff;color:#000;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}'
+                + '.sheet{width:8.5in;height:10.98in;box-sizing:border-box;padding:0.4in;display:grid;position:relative;'
+                + 'grid-template-columns:repeat(2,3.85in);grid-template-rows:repeat(3,3.3in);break-after:page;page-break-after:always;overflow:hidden}'
+                + '.sheet:last-child{break-after:auto;page-break-after:auto}'
+                + '.card{box-sizing:border-box;border:1px dashed #b5b5b5;padding:0.12in;position:relative;display:flex;flex-direction:column;align-items:center;overflow:hidden}'
+                + '.card.empty{border:none}'
+                + '.num{position:absolute;top:0.06in;left:0.1in;font-size:14pt;font-weight:700}'
+                + '.info{font-size:9pt;color:#555;margin:0.04in 0 0.05in}'
+                + '.cmt{font-size:11pt;line-height:1.3;width:100%;overflow-wrap:anywhere;text-align:left}'
+                + '.cmt.blank{flex:1;background:repeating-linear-gradient(transparent,transparent 0.22in,#bbb 0.22in,#bbb calc(0.22in + 1px))}'
+                + '.pg{position:absolute;bottom:0.12in;left:0;right:0;text-align:center;font-size:8pt;color:#888}'
+                + '</style></head><body>' + sheets + '</body></html>';
+        }
+        window.ppPrint = function () {
+            if (!list.length) { showToast('The print list is empty'); return; }
+            const f = document.createElement('iframe');
+            f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+            f.onload = function () { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(function () { f.remove(); }, 60000); };
+            f.srcdoc = printHtml();
+            document.body.appendChild(f);
+        };
+        refreshCount();
     })();
     </script>
     <script>
