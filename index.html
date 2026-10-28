@@ -18410,10 +18410,13 @@ ${contentToAnalyze}`;
                 return '<div class="card fen"><span class="num">' + n + '</span>' + boardSvg(p.fen, p.black, 'width:2.2in;height:2.2in;')
                     + '<div class="info">' + esc(infoLine(p)) + '</div></div>';
             }
-            if (FEN_RE.test(p.c)) {
-                const side2 = p.c.trim().split(/\s+/)[1] === 'b' ? 'Black' : 'White';
-                return '<div class="card fen"><span class="num">' + n + '</span>' + boardSvg(p.c, p.black, 'width:2.2in;height:2.2in;')
-                    + '<div class="info">' + side2 + ' to move</div></div>';
+            // "FEN" or "FEN, comment": the board prints from the FEN, the comment (if any) goes under it
+            const comma = p.c.indexOf(','), head = comma < 0 ? p.c : p.c.slice(0, comma), note = comma < 0 ? '' : p.c.slice(comma + 1).trim();
+            if (FEN_RE.test(head)) {
+                const side2 = head.trim().split(/\s+/)[1] === 'b' ? 'Black' : 'White', px = note ? '1.65in' : '2.2in';
+                return '<div class="card fen"><span class="num">' + n + '</span>' + boardSvg(head, p.black, 'width:' + px + ';height:' + px + ';')
+                    + '<div class="info">' + side2 + ' to move</div>'
+                    + (note ? '<div class="fnote">' + esc(note).replace(/\n/g, '<br>') + '</div>' : '') + '</div>';
             }
             const len = p.c.length, size = len > 150 ? 'xs' : len > 90 ? 'sm' : 'md';
             return '<div class="card"><span class="num">' + n + '</span><div class="t ' + size + '">' + esc(p.c).replace(/\n/g, '<br>') + '</div></div>';
@@ -18439,6 +18442,7 @@ ${contentToAnalyze}`;
                 + '.card.empty{border:none}'
                 + '.card.fen{flex-direction:column;padding:0.1in;gap:0.03in}'
                 + '.info{font-size:9pt;color:#555}'
+                + '.fnote{font-size:10pt;line-height:1.25;overflow-wrap:anywhere;max-height:0.55in;overflow:hidden}'
                 + '.num{position:absolute;top:0.07in;left:0.1in;font-size:12pt;font-weight:700;color:#555}'
                 + '.t{line-height:1.3;overflow-wrap:anywhere}'
                 + '.t.md{font-size:15pt}.t.sm{font-size:13pt}.t.xs{font-size:11pt}'
