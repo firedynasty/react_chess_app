@@ -25,3 +25,13 @@ yarn-error.log*
 # vercel
 .vercel
 .env*
+
+# unused stockfish engine build variants (only src/stockfish-17.1-lite-single-03e3232.* is served)
+src/stockfish-17.1-8e4d048.js
+src/stockfish-17.1-8e4d048-part-*.wasm
+src/stockfish-17.1-single-a496a04.js
+src/stockfish-17.1-single-a496a04-part-*.wasm
+src/stockfish-17.1-lite-51f59da.js
+src/stockfish-17.1-lite-51f59da.wasm
+src/stockfish-17.1-asm-341ff22.js
+src/stockfish-part-*.wasm
