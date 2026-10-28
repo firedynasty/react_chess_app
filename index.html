@@ -18290,7 +18290,8 @@ ${contentToAnalyze}`;
         <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:10px;"></div>
         <input id="ppAddFen" type="text" spellcheck="false" autocomplete="off" oninput="ppFenInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('ppAddComment').focus();}" placeholder="FEN (optional): leave empty to use the board's position" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#ff9800; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:4px;">
         <div id="ppAddFenMsg" style="font-size:11px; min-height:14px; margin-bottom:6px; color:#ff6b6b;"></div>
-        <textarea id="ppAddComment" rows="3" spellcheck="false" placeholder="Comment (Enter = add, Shift+Enter = new line)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ppConfirmAdd();}" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:13px; margin-bottom:10px;"></textarea>
+        <button onclick="ppAppendFen()" title="Put the FEN of the position on the board at the start of the comment as 'FEN, ' so the back of the card prints that board" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">Append FEN ↓ to comment</button>
+        <textarea id="ppAddComment" rows="3" spellcheck="false" oninput="ppDraftSave()" placeholder="Comment (Enter = add, Shift+Enter = new line)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ppConfirmAdd();}" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:13px; margin-bottom:10px;"></textarea>
         <div style="display:flex; gap:8px;">
           <button onclick="ppConfirmAdd()" style="flex:1; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Add</button>
           <button onclick="ppCloseAdd()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Cancel</button>
@@ -18365,9 +18366,12 @@ ${contentToAnalyze}`;
             $('ppAddNum').textContent = '#' + (list.length + 1);
             $('ppAddPreview').innerHTML = boardSvg(p.fen, p.black, 'width:100%;height:auto;');
             $('ppAddInfo').textContent = infoLine(p);
-            $('ppAddComment').value = '';
-            $('ppAddFen').value = '';
+            let d = {};
+            try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {}; } catch (e) {}
+            $('ppAddComment').value = d.c || '';
+            $('ppAddFen').value = d.f || '';
             $('ppAddFenMsg').textContent = '';
+            window.ppFenInput();
             $('ppAddModal').style.display = 'flex';
             $('ppAddComment').focus();
         };
@@ -18381,7 +18385,23 @@ ${contentToAnalyze}`;
             for (let i = 1; i < 6 && i < t.length; i++) d[i] = t[i];
             return d.join(' ');
         }
+        // Pull the board's FEN down into the comment as "FEN, comment" (the back of the card prints it as a board)
+        window.ppAppendFen = function () {
+            const p = currentPosition();
+            if (!p) { showToast('No board position'); return; }
+            const ta = $('ppAddComment');
+            ta.value = p.fen + ', ' + ta.value.replace(/^\s*([prnbqkPRNBQK1-8]+\/){7}[^,\n]*,?\s*/, '');
+            window.ppDraftSave();
+            ta.focus();
+            ta.setSelectionRange(ta.value.length, ta.value.length);
+        };
+        // The add dialog keeps what you last typed (FEN box + comment) until you add it
+        const DRAFT_KEY = 'chessPrintDraft';
+        window.ppDraftSave = function () {
+            try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ f: $('ppAddFen').value, c: $('ppAddComment').value })); } catch (e) {}
+        };
         window.ppFenInput = function () {
+            window.ppDraftSave();
             const f = typedFen();
             $('ppAddFenMsg').textContent = f === null ? 'Not a valid FEN' : '';
             const show = f ? Object.assign({}, pending, { fen: f }) : pending;
@@ -18398,6 +18418,7 @@ ${contentToAnalyze}`;
             pending.c = $('ppAddComment').value.trim();
             list.push(pending);
             save();
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
             showToast('Added #' + list.length + ' to the print list');
             window.ppCloseAdd();
         };
