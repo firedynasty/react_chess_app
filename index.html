@@ -18284,11 +18284,14 @@ ${contentToAnalyze}`;
     </script>
     <!-- Print list: append the board's FEN + a comment, then print 6 positions per Letter page -->
     <div id="ppAddModal" onkeydown="event.stopPropagation(); if (event.key === 'Escape') ppCloseAdd();" onclick="if(event.target===this)ppCloseAdd()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
-      <div style="background:#16213e; border-radius:10px; padding:24px; max-width:420px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #4caf50; position:relative;">
+      <div style="background:#16213e; border-radius:10px; padding:24px; max-width:520px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #4caf50; position:relative;">
         <button onclick="ppCloseAdd()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
         <div style="font-weight:bold; margin-bottom:10px; color:#4caf50; font-size:15px;">Add to print list <span id="ppAddNum" style="color:#aaa; font-weight:normal;"></span></div>
         <div id="ppAddPreview" style="width:220px; margin:0 auto 6px;"></div>
-        <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:4px;"></div>
+        <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:6px;"></div>
+        <style>#ppMovesBox [data-pp-node]{cursor:pointer} #ppMovesBox .pp-sel{background:#4caf50 !important; color:#fff !important; border-radius:3px}</style>
+        <button id="ppMovesToggle" onclick="ppToggleMoves()" title="Show the game's moves here and click one to use that position (main line or variation)" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">▸ Choose a position from the moves</button>
+        <div id="ppMovesBox" style="display:none; max-height:220px; overflow-y:auto; padding:8px; background:#0f3460; border-radius:5px; font-family:monospace; font-size:13px; line-height:1.8; margin-bottom:8px;"></div>
         <input id="ppAddGame" type="text" spellcheck="false" autocomplete="off" placeholder="Game name (from the dropdown; edit or clear it)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#a8d8ea; border:1px solid #555; border-radius:4px; padding:6px 8px; font-size:12px; margin-bottom:10px;">
         <input id="ppAddFen" type="text" spellcheck="false" autocomplete="off" oninput="ppFenInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('ppAddComment').focus();}" placeholder="FEN (optional): leave empty to use the board's position" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#ff9800; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:4px;">
         <div id="ppAddFenMsg" style="font-size:11px; min-height:14px; margin-bottom:6px; color:#ff6b6b;"></div>
@@ -18386,6 +18389,50 @@ ${contentToAnalyze}`;
             return dd.value.replace(/^Game\s+\d+:\s*/, '') + (ids.length ? ' \u00B7 ' + ids[ids.length - 1] : '');
         }
 
+        // A copy of the move list (main line + variations) inside the add dialog: click a move to use its position
+        let movesOpen = false, selNode = '';
+        function markSel() {
+            const box = $('ppMovesBox');
+            box.querySelectorAll('.pp-sel').forEach(e => e.classList.remove('pp-sel'));
+            const el = selNode && box.querySelector('[data-pp-node="' + selNode + '"]');
+            if (el) { el.classList.add('pp-sel'); el.scrollIntoView({ block: 'nearest' }); }
+        }
+        function buildMoves() {
+            const src = $('moveTableContainer'), box = $('ppMovesBox');
+            if (!src || !src.innerHTML.trim()) { box.textContent = 'No moves yet: load a game first.'; return; }
+            const c = src.cloneNode(true);
+            c.removeAttribute('id'); c.removeAttribute('style');
+            c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+            // the copy must not look like the real list to the page's own lookups (data-node-id, .current)
+            c.querySelectorAll('[data-node-id]').forEach(e => {
+                e.setAttribute('data-pp-node', e.getAttribute('data-node-id'));
+                e.removeAttribute('data-node-id'); e.removeAttribute('onclick'); e.classList.remove('current');
+            });
+            box.innerHTML = '';
+            box.appendChild(c);
+            markSel();
+        }
+        $('ppMovesBox').addEventListener('click', function (e) {
+            const t = e.target.closest('[data-pp-node]');
+            if (!t) return;
+            e.stopPropagation(); e.preventDefault();
+            const n = window.moveNodeRegistry && window.moveNodeRegistry[t.getAttribute('data-pp-node')];
+            if (!n || !n.fen || !pending || !boardSvg(n.fen, false, '')) return;
+            pending.fen = n.fen;
+            pending.l = n.san ? n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san + (n.annotation || '') : '';
+            selNode = n.nodeId;
+            $('ppAddFen').value = ''; $('ppAddFenMsg').textContent = ''; window.ppDraftSave(); // a picked move replaces any typed FEN
+            $('ppAddPreview').innerHTML = boardSvg(pending.fen, pending.black, 'width:100%;height:auto;');
+            $('ppAddInfo').textContent = infoLine(pending);
+            markSel();
+        }, true);
+        window.ppToggleMoves = function () {
+            movesOpen = !movesOpen;
+            $('ppMovesBox').style.display = movesOpen ? 'block' : 'none';
+            $('ppMovesToggle').textContent = (movesOpen ? '\u25BE Hide the moves' : '\u25B8 Choose a position from the moves');
+            if (movesOpen) buildMoves();
+        };
+
         window.ppOpenAdd = function () {
             const p = currentPosition();
             if (!p) { showToast('Load a game or position first'); return; }
@@ -18394,6 +18441,8 @@ ${contentToAnalyze}`;
             $('ppAddPreview').innerHTML = boardSvg(p.fen, p.black, 'width:100%;height:auto;');
             $('ppAddInfo').textContent = infoLine(p);
             $('ppAddGame').value = p.g || '';
+            selNode = (window.currentMoveNode && window.currentMoveNode.nodeId) || '';
+            if (movesOpen) buildMoves();
             let d = {};
             try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {}; } catch (e) {}
             $('ppAddComment').value = d.c || '';
