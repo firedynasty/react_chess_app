@@ -18288,7 +18288,8 @@ ${contentToAnalyze}`;
         <button onclick="ppCloseAdd()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
         <div style="font-weight:bold; margin-bottom:10px; color:#4caf50; font-size:15px;">Add to print list <span id="ppAddNum" style="color:#aaa; font-weight:normal;"></span></div>
         <div id="ppAddPreview" style="width:220px; margin:0 auto 6px;"></div>
-        <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:10px;"></div>
+        <div id="ppAddInfo" style="text-align:center; color:#a8d8ea; font-size:12px; margin-bottom:4px;"></div>
+        <input id="ppAddGame" type="text" spellcheck="false" autocomplete="off" placeholder="Game name (from the dropdown; edit or clear it)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#a8d8ea; border:1px solid #555; border-radius:4px; padding:6px 8px; font-size:12px; margin-bottom:10px;">
         <input id="ppAddFen" type="text" spellcheck="false" autocomplete="off" oninput="ppFenInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('ppAddComment').focus();}" placeholder="FEN (optional): leave empty to use the board's position" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#ff9800; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:4px;">
         <div id="ppAddFenMsg" style="font-size:11px; min-height:14px; margin-bottom:6px; color:#ff6b6b;"></div>
         <button onclick="ppAppendFen()" title="Put the FEN of the position on the board at the start of the comment as 'FEN, ' so the back of the card prints that board" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">Append FEN ↓ to comment</button>
@@ -18304,6 +18305,7 @@ ${contentToAnalyze}`;
         <button onclick="ppCloseLine()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
         <div style="font-weight:bold; margin-bottom:4px; color:#4caf50; font-size:15px;">Print a line</div>
         <div style="color:#aaa; font-size:12px; margin-bottom:8px;">Paste a From Position snippet (or just a FEN). Every position is a board, moving left to right. ✕ removes one.</div>
+        <input id="ppLineGame" type="text" spellcheck="false" autocomplete="off" oninput="ppLineGameChanged()" placeholder="Game name (printed above the moves; from the dropdown, edit or clear it)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#a8d8ea; border:1px solid #555; border-radius:4px; padding:6px 8px; font-size:12px; margin-bottom:6px;">
         <textarea id="ppLineText" rows="5" spellcheck="false" oninput="ppLineChanged()" placeholder='[Variant "From Position"]&#10;[FEN "..."]&#10;&#10;1... Kh8 2. Rfd1 Kg8 ...' style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:6px;"></textarea>
         <div id="ppLineMsg" style="font-size:12px; min-height:16px; margin-bottom:6px; color:#ff6b6b;"></div>
         <div id="ppLineBoards" style="display:flex; flex-wrap:wrap; gap:14px; justify-content:center;"></div>
@@ -18372,7 +18374,16 @@ ${contentToAnalyze}`;
             let side = 'w';
             if (n && n.fen && n.fen.split(' ')[0] === place) side = n.fen.split(' ')[1] || 'w';
             const label = n && n.san && n.parent ? n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san + (n.annotation || '') : '';
-            return { fen: place + ' ' + side + ' - - 0 1', black: b.orientation() === 'black', l: label, c: '' };
+            return { fen: place + ' ' + side + ' - - 0 1', black: b.orientation() === 'black', l: label, c: '', g: currentGameName() };
+        }
+
+        // The game picked in the dropdown ("vs ewan_dart (Loss as Black) - rapid - Oct 29 \u00B7 <game id>"), '' when none.
+        // It lives in the page, so a reload clears it; positions keep the name they were added under.
+        function currentGameName() {
+            const dd = $('game-dropdown');
+            if (!dd || !dd.value) return '';
+            const ids = Array.from(document.querySelectorAll('#game-details p')).map(x => x.textContent.trim()).filter(t => /^\d+$/.test(t));
+            return dd.value.replace(/^Game\s+\d+:\s*/, '') + (ids.length ? ' \u00B7 ' + ids[ids.length - 1] : '');
         }
 
         window.ppOpenAdd = function () {
@@ -18382,6 +18393,7 @@ ${contentToAnalyze}`;
             $('ppAddNum').textContent = '#' + (list.length + 1);
             $('ppAddPreview').innerHTML = boardSvg(p.fen, p.black, 'width:100%;height:auto;');
             $('ppAddInfo').textContent = infoLine(p);
+            $('ppAddGame').value = p.g || '';
             let d = {};
             try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {}; } catch (e) {}
             $('ppAddComment').value = d.c || '';
@@ -18431,6 +18443,7 @@ ${contentToAnalyze}`;
             const f = typedFen();
             if (f === null) { $('ppAddFenMsg').textContent = 'Not a valid FEN'; $('ppAddFen').focus(); return; }
             if (f) { pending.fen = f; pending.l = ''; } // typed FEN replaces the board's (the move label no longer applies)
+            pending.g = $('ppAddGame').value.trim(); // pre-filled from the dropdown, editable
             pending.c = $('ppAddComment').value.trim();
             list.push(pending);
             save();
@@ -18447,7 +18460,7 @@ ${contentToAnalyze}`;
                 '<div style="display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px solid rgba(255,255,255,0.1);">'
                 + '<div style="color:#4caf50; font-weight:bold; width:24px; text-align:right; padding-top:2px;">' + (i + 1) + '</div>'
                 + '<div style="width:96px; flex-shrink:0;">' + boardSvg(p.fen, p.black, 'width:100%;height:auto;') + '</div>'
-                + '<div style="flex:1; min-width:0;"><div style="color:#a8d8ea; font-size:11px; margin-bottom:4px;">' + esc(infoLine(p)) + '</div>'
+                + '<div style="flex:1; min-width:0;"><div style="color:#a8d8ea; font-size:11px; margin-bottom:4px;">' + esc(infoLine(p)) + (p.g ? '<br><span style="color:#888;">' + esc(p.g) + '</span>' : '') + '</div>'
                 + '<textarea rows="3" spellcheck="false" oninput="ppComment(' + i + ',this.value)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:6px; font-family:monospace; font-size:12px;">' + esc(p.c) + '</textarea></div>'
                 + '<button onclick="ppRemove(' + i + ')" title="Remove" style="background:none; border:none; color:#c0392b; font-size:16px; cursor:pointer;">✕</button></div>'
             ).join('');
@@ -18469,8 +18482,8 @@ ${contentToAnalyze}`;
         function cardHtml(p, n, side) {
             if (!p) return '<div class="card empty"></div>';
             if (side === 'front') {
-                return '<div class="card fen"><span class="num">' + n + '</span>' + boardSvg(p.fen, p.black, 'width:2.2in;height:2.2in;')
-                    + '<div class="info">' + esc(infoLine(p)) + '</div></div>';
+                return '<div class="card fen"><span class="num">' + n + '</span>' + boardSvg(p.fen, p.black, p.g ? 'width:2.02in;height:2.02in;' : 'width:2.2in;height:2.2in;')
+                    + '<div class="info">' + esc(infoLine(p)) + '</div>' + (p.g ? '<div class="gm">' + esc(p.g) + '</div>' : '') + '</div>';
             }
             // "FEN" or "FEN, comment": the board prints from the FEN, the comment (if any) goes under it
             const comma = p.c.indexOf(','), head = comma < 0 ? p.c : p.c.slice(0, comma), note = comma < 0 ? '' : p.c.slice(comma + 1).trim();
@@ -18504,6 +18517,7 @@ ${contentToAnalyze}`;
                 + '.card.empty{border:none}'
                 + '.card.fen{flex-direction:column;padding:0.1in;gap:0.03in}'
                 + '.info{font-size:9pt;color:#555}'
+                + '.gm{font-size:7.5pt;color:#555;max-height:0.28in;overflow:hidden;line-height:1.2}'
                 + '.fnote{font-size:10pt;line-height:1.25;overflow-wrap:anywhere;max-height:0.55in;overflow:hidden}'
                 + '.num{position:absolute;top:0.07in;left:0.1in;font-size:12pt;font-weight:700;color:#555}'
                 + '.t{line-height:1.3;overflow-wrap:anywhere}'
@@ -18522,7 +18536,7 @@ ${contentToAnalyze}`;
         // ── Print Line: a From Position snippet as boards moving left to right (single-sided, 4 x 5 per sheet) ──
         const LINE_KEY = 'chessPrintLine', LINE_COLS = 2, LINE_ROWS = 4;
         let linePos = [], lineMoves = '', lineRm = new Set(), lineBlack = false;
-        function lineSave() { try { localStorage.setItem(LINE_KEY, JSON.stringify({ t: $('ppLineText').value, rm: Array.from(lineRm), b: lineBlack })); } catch (e) {} }
+        function lineSave() { try { localStorage.setItem(LINE_KEY, JSON.stringify({ t: $('ppLineText').value, g: $('ppLineGame').value, rm: Array.from(lineRm), b: lineBlack })); } catch (e) {} }
 
         // [{fen, label}]: the start position, then the position after each move
         function parseLine(text) {
@@ -18581,6 +18595,7 @@ ${contentToAnalyze}`;
             let d = {};
             try { d = JSON.parse(localStorage.getItem(LINE_KEY) || '{}') || {}; } catch (e) {}
             $('ppLineText').value = d.t || '';
+            $('ppLineGame').value = d.t && d.g != null ? d.g : currentGameName(); // a saved snippet keeps its own name
             lineBlack = d.b != null ? !!d.b : !!(window.board2 && window.board2.orientation() === 'black');
             lineParseNow();
             lineRm = new Set((d.rm || []).filter(i => i < linePos.length));
@@ -18589,6 +18604,7 @@ ${contentToAnalyze}`;
             $('ppLineText').focus();
         };
         window.ppCloseLine = function () { $('ppLineModal').style.display = 'none'; };
+        window.ppLineGameChanged = function () { lineSave(); };
         window.ppLineChanged = function () { lineParseNow(); lineRm = new Set(); lineSave(); lineRender(); };
         window.ppLineRemove = function (i) { lineRm.add(i); lineSave(); lineRender(); };
         window.ppLineRestore = function () { lineRm = new Set(); lineSave(); lineRender(); };
@@ -18597,13 +18613,13 @@ ${contentToAnalyze}`;
             const kept = linePos.filter((p, i) => !lineRm.has(i)), per = LINE_COLS * LINE_ROWS;
             if (!kept.length) { showToast('Nothing to print: paste a snippet first'); return; }
             // Same sheet as the flashcards (2 x 4, 8 per Letter sheet). The first cell lists the move order.
-            const cells = [{ moves: lineMoves }].concat(kept);
+            const cells = [{ moves: lineMoves, game: $('ppLineGame').value.trim() }].concat(kept);
             let sheets = '';
             for (let i = 0; i < cells.length; i += per) {
                 const chunk = cells.slice(i, i + per);
                 while (chunk.length < per) chunk.push(null);
                 sheets += '<div class="sheet">' + chunk.map(p => !p ? '<div class="card empty"></div>'
-                    : p.moves != null ? '<div class="card"><div class="mv' + (p.moves.length > 420 ? ' sm' : '') + '">' + (esc(p.moves) || 'Start position') + '</div></div>'
+                    : p.moves != null ? '<div class="card"><div>' + (p.game ? '<div class="gn">' + esc(p.game) + '</div>' : '') + '<div class="mv' + (p.moves.length > 420 ? ' sm' : '') + '">' + (esc(p.moves) || 'Start position') + '</div></div></div>'
                     : '<div class="card fen">' + boardSvg(p.fen, lineBlack, 'width:2.2in;height:2.2in;') + '<div class="lb">' + esc(p.label) + '</div></div>').join('') + '</div>';
             }
             const html = '<!doctype html><html><head><meta charset="utf-8"><title>Line</title><style>'
@@ -18616,6 +18632,7 @@ ${contentToAnalyze}`;
                 + '.card.empty{border:none}'
                 + '.card.fen{flex-direction:column;padding:0.1in;gap:0.03in}'
                 + '.lb{font-size:10pt;font-weight:700}'
+                + '.gn{font-size:10pt;font-weight:700;color:#333;margin-bottom:0.08in;text-align:left}'
                 + '.mv{font-size:13pt;line-height:1.4;text-align:left;overflow-wrap:anywhere}.mv.sm{font-size:10.5pt}'
                 + '</style></head><body>' + sheets + '</body></html>';
             const f = document.createElement('iframe');
