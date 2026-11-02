@@ -18330,6 +18330,17 @@ ${contentToAnalyze}`;
           <button onclick="ppPrint()" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print</button>
           <button id="ppClearBtn" onclick="ppClear()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Clear all</button>
         </div>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button onclick="ppExportJson()" title="Download the print list (and the Print Line snippet) as a .json file" style="flex:1; padding:8px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">⬇ Export JSON</button>
+          <button onclick="document.getElementById('ppLoadFile').click()" title="Load a .json file saved with Export JSON; it replaces the list shown here" style="flex:1; padding:8px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">⬆ Load JSON (replaces)</button>
+          <input type="file" id="ppLoadFile" accept=".json,application/json" onchange="ppLoadJson(this)" style="display:none;">
+        </div>
+        <div style="margin-top:12px; color:#0061fe; font-size:12px; font-weight:bold;">Dropbox file</div>
+        <input id="ppDbxPath" type="text" spellcheck="false" autocomplete="off" oninput="ppDbxPathChanged()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:6px 8px; font-family:monospace; font-size:12px; margin:4px 0 6px;">
+        <div style="display:flex; gap:8px;">
+          <button onclick="ppDbxSave()" title="Upload the list as JSON to this Dropbox path. If the file changed since you loaded it, you are asked to click again before it is overwritten." style="flex:1; padding:8px; background:#0061fe; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">☁ Save to Dropbox</button>
+          <button onclick="ppDbxLoad()" title="Download that file and replace the list shown here" style="flex:1; padding:8px; background:#0061fe; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">☁ Load from Dropbox (replaces)</button>
+        </div>
       </div>
     </div>
     <script>
@@ -18514,7 +18525,8 @@ ${contentToAnalyze}`;
                 + '<button onclick="ppRemove(' + i + ')" title="Remove" style="background:none; border:none; color:#c0392b; font-size:16px; cursor:pointer;">✕</button></div>'
             ).join('');
         }
-        window.ppOpenList = function () { clearArmed = false; $('ppClearBtn').textContent = 'Clear all'; renderList(); $('ppListModal').style.display = 'flex'; };
+        window.ppOpenList = function () {
+            try { $('ppDbxPath').value = localStorage.getItem(DBX_PATH_KEY) || DBX_DEFAULT; } catch (e) { $('ppDbxPath').value = DBX_DEFAULT; } clearArmed = false; $('ppClearBtn').textContent = 'Clear all'; renderList(); $('ppListModal').style.display = 'flex'; };
         window.ppCloseList = function () { $('ppListModal').style.display = 'none'; };
         window.ppComment = function (i, v) { if (list[i]) { list[i].c = v; save(); } };
         window.ppRemove = function (i) { list.splice(i, 1); save(); renderList(); };
@@ -18545,6 +18557,136 @@ ${contentToAnalyze}`;
             const len = p.c.length, size = len > 150 ? 'xs' : len > 90 ? 'sm' : 'md';
             return '<div class="card"><span class="num">' + n + '</span><div class="t ' + size + '">' + esc(p.c).replace(/\n/g, '<br>') + '</div></div>';
         }
+        // Export / load the list as a file, so it does not depend on this browser's localStorage.
+        // The Print Line snippet (text, game name, removed boards, orientation) rides along.
+        window.ppExportJson = function () {
+            let line = null;
+            try { line = JSON.parse(localStorage.getItem(LINE_KEY) || 'null'); } catch (e) {}
+            const data = { type: 'chess-print-list', version: 1, exported: new Date().toISOString(), list: list, line: line };
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+            a.download = 'chess-print-list-' + new Date().toISOString().slice(0, 10) + '.json';
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+            showToast('Exported ' + list.length + ' position' + (list.length !== 1 ? 's' : ''));
+        };
+        // Replace the list (and the Print Line snippet when present) with parsed export data
+        function applyLoaded(data) {
+            const arr = Array.isArray(data) ? data : data && data.list;
+            if (!Array.isArray(arr)) return { error: 'No print list found in that file' };
+            const ok = arr.filter(p => p && typeof p.fen === 'string' && boardSvg(p.fen, false, ''))
+                .map(p => ({ fen: p.fen, black: !!p.black, l: String(p.l || ''), c: String(p.c || ''), g: String(p.g || '') }));
+            list = ok; save(); clearArmed = false;
+            if (data.line && typeof data.line === 'object') { try { localStorage.setItem(LINE_KEY, JSON.stringify(data.line)); } catch (e) {} }
+            $('ppClearBtn').textContent = 'Clear all';
+            renderList();
+            return { msg: 'Loaded ' + ok.length + ' position' + (ok.length !== 1 ? 's' : '') + (arr.length > ok.length ? ' (' + (arr.length - ok.length) + ' skipped: bad FEN)' : '') + (data.line ? ' and the Print Line snippet' : '') };
+        }
+        window.ppLoadJson = function (inp) {
+            const file = inp.files && inp.files[0];
+            inp.value = ''; // so the same file can be picked again
+            if (!file) return;
+            const rd = new FileReader();
+            rd.onload = function () {
+                let data;
+                try { data = JSON.parse(rd.result); } catch (e) { showToast('Not a JSON file'); return; }
+                const res = applyLoaded(data);
+                showToast(res.error || res.msg);
+            };
+            rd.readAsText(file);
+        };
+
+        // ── Dropbox: one JSON file (default /vercel/chess/print_list.json), same sign-in as the PGN loader ──
+        const DBX_PATH_KEY = 'chessPrintDropboxPath', DBX_DEFAULT = '/vercel/chess/print_list.json';
+        const dbxRev = {}; // path -> rev of the version this page last loaded or saved
+        let dbxForce = ''; // path whose next Save may overwrite a newer Dropbox version
+        function dbxPath() {
+            let p = ($('ppDbxPath').value || '').trim() || DBX_DEFAULT;
+            if (p[0] !== '/') p = '/' + p;
+            return /\.json$/i.test(p) ? p : p + '.json';
+        }
+        window.ppDbxPathChanged = function () { dbxForce = ''; try { localStorage.setItem(DBX_PATH_KEY, $('ppDbxPath').value); } catch (e) {} };
+        // Dropbox-API-Arg is an HTTP header: escape anything non-ASCII
+        const dbxArg = o => JSON.stringify(o).replace(/[\u007f-\uffff]/g, c => '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4));
+        function dbxReady() {
+            if (window.dropboxAccessToken) return true;
+            showToast('Sign in to Dropbox first (opening the sign-in popup), then click again');
+            if (typeof dropboxSignIn === 'function') dropboxSignIn();
+            return false;
+        }
+        async function dbxMeta(path) {
+            const r = await fetch('https://api.dropboxapi.com/2/files/get_metadata', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + window.dropboxAccessToken, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ path: path })
+            });
+            if (r.status === 409) return null; // not found
+            if (!r.ok) throw new Error(r.status === 401 ? 'Dropbox sign-in expired: sign in again' : 'HTTP ' + r.status);
+            return r.json();
+        }
+        window.ppDbxSave = async function () {
+            if (!dbxReady()) return;
+            const path = dbxPath();
+            try {
+                let mode;
+                if (dbxForce === path) mode = 'overwrite';
+                else if (dbxRev[path]) mode = { '.tag': 'update', update: dbxRev[path] };
+                else {
+                    const meta = await dbxMeta(path);
+                    if (meta) { // exists, and this page never loaded it
+                        dbxForce = path;
+                        showToast('Dropbox already has ' + path + ' (saved ' + (meta.server_modified || '').slice(0, 10) + '). Click Load to get it, or Save again to overwrite it.', 7000);
+                        return;
+                    }
+                    mode = 'add';
+                }
+                let line = null;
+                try { line = JSON.parse(localStorage.getItem(LINE_KEY) || 'null'); } catch (e) {}
+                const data = { type: 'chess-print-list', version: 1, exported: new Date().toISOString(), list: list, line: line };
+                const res = await fetch('https://content.dropboxapi.com/2/files/upload', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + window.dropboxAccessToken,
+                        'Dropbox-API-Arg': dbxArg({ path: path, mode: mode, autorename: false, mute: true }),
+                        'Content-Type': 'application/octet-stream'
+                    },
+                    body: JSON.stringify(data, null, 2)
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    if (res.status === 409 && /conflict/.test(err.error_summary || '')) {
+                        dbxForce = path;
+                        showToast('Dropbox has a newer version than the one you loaded. Click Load to get it, or Save again to overwrite it.', 7000);
+                        return;
+                    }
+                    throw new Error(res.status === 401 ? 'Dropbox sign-in expired: sign in again' : err.error_summary || 'HTTP ' + res.status);
+                }
+                const out = await res.json();
+                dbxRev[path] = out.rev; dbxForce = '';
+                showToast('Saved ' + list.length + ' position' + (list.length !== 1 ? 's' : '') + ' to Dropbox: ' + path);
+            } catch (e) { showToast('Dropbox save failed: ' + e.message, 6000); }
+        };
+        window.ppDbxLoad = async function () {
+            if (!dbxReady()) return;
+            const path = dbxPath();
+            try {
+                const res = await fetch('https://content.dropboxapi.com/2/files/download', {
+                    method: 'POST',
+                    headers: { Authorization: 'Bearer ' + window.dropboxAccessToken, 'Dropbox-API-Arg': dbxArg({ path: path }) }
+                });
+                if (res.status === 409) { showToast('No file at ' + path + ' yet: use Save to Dropbox first'); return; }
+                if (!res.ok) throw new Error(res.status === 401 ? 'Dropbox sign-in expired: sign in again' : 'HTTP ' + res.status);
+                let data;
+                try { data = JSON.parse(await res.text()); } catch (e) { showToast('That Dropbox file is not valid JSON'); return; }
+                const r = applyLoaded(data);
+                if (r.error) { showToast(r.error); return; }
+                const meta = await dbxMeta(path);
+                if (meta) dbxRev[path] = meta.rev;
+                dbxForce = '';
+                showToast(r.msg + ' from Dropbox');
+            } catch (e) { showToast('Dropbox load failed: ' + e.message, 6000); }
+        };
+
         function printHtml(duplex) {
             let sheets = '';
             for (let i = 0; i < list.length; i += PER_PAGE) {
