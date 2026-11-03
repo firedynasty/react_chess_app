@@ -18629,9 +18629,10 @@ ${contentToAnalyze}`;
       <div style="background:#16213e; border-radius:10px; padding:24px; max-width:1060px; width:94%; max-height:92vh; overflow-y:auto; border:1px solid #4caf50; position:relative;">
         <button onclick="ppCloseLine()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
         <div style="font-weight:bold; margin-bottom:4px; color:#4caf50; font-size:15px;">Print a line</div>
-        <div style="color:#aaa; font-size:12px; margin-bottom:8px;">Paste a From Position snippet (or just a FEN). Every position is a board, moving left to right. ✕ removes one.</div>
+        <div style="color:#aaa; font-size:12px; margin-bottom:8px;">Paste a From Position snippet, a PGN, or a list of FENs (one per line). Every position is a board, moving left to right. ✕ removes one.</div>
         <input id="ppLineGame" type="text" spellcheck="false" autocomplete="off" oninput="ppLineGameChanged()" placeholder="Game name (printed above the moves; from the dropdown, edit or clear it)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#a8d8ea; border:1px solid #555; border-radius:4px; padding:6px 8px; font-size:12px; margin-bottom:6px;">
         <textarea id="ppLineText" rows="5" spellcheck="false" oninput="ppLineChanged()" placeholder='[Variant "From Position"]&#10;[FEN "..."]&#10;&#10;1... Kh8 2. Rfd1 Kg8 ...' style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:6px;"></textarea>
+        <button onclick="ppLineChanged()" title="Read the text above again and redraw every board (also brings back removed boards)" style="width:100%; padding:7px; margin-bottom:6px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">↻ Redraw the boards</button>
         <div id="ppLineMsg" style="font-size:12px; min-height:16px; margin-bottom:6px; color:#ff6b6b;"></div>
         <div id="ppLineBoards" style="display:flex; flex-wrap:wrap; gap:14px; justify-content:center;"></div>
         <div style="display:flex; gap:8px; margin-top:12px;">
@@ -19055,13 +19056,31 @@ ${contentToAnalyze}`;
         function parseLine(text) {
             const out = { pos: [], error: '', moves: '' }, mt = [];
             let fen, body;
-            const fm = text.match(/\[FEN\s+"([^"]+)"\]/i);
-            if (fm) { fen = fm[1]; body = text.replace(/\[[A-Za-z0-9_]+\s+"[^"]*"\]/g, ' '); }
-            else {
-                const lines = text.trim().split('\n');
-                fen = lines[0]; body = lines.slice(1).join(' ');
-            }
             if (!text.trim()) return out;
+            // Several lines that are all FENs: one board per FEN ("FEN, note" uses the note as the label)
+            const fenLines = text.trim().split('\n').map(s => s.trim()).filter(Boolean);
+            if (fenLines.length > 1 && fenLines.every(l => /^([prnbqkPRNBQK1-8]+\/){7}[prnbqkPRNBQK1-8]+(\s|,|$)/.test(l))) {
+                fenLines.forEach((l, i) => {
+                    const c = l.indexOf(','), t2 = (c < 0 ? l : l.slice(0, c)).trim().split(/\s+/), note = c < 0 ? '' : l.slice(c + 1).trim();
+                    const f2 = [t2[0], 'w', '-', '-', '0', '1'];
+                    for (let k = 1; k < 6 && k < t2.length; k++) f2[k] = t2[k];
+                    const fen2 = f2.join(' ');
+                    if (!boardSvg(fen2, false, '')) { if (!out.error) out.error = 'Line ' + (i + 1) + ' is not a valid FEN (skipped)'; return; }
+                    out.pos.push({ fen: fen2, label: note || 'Position ' + (i + 1) + ' \u00B7 ' + (f2[1] === 'b' ? 'Black' : 'White') + ' to move' });
+                });
+                out.moves = out.pos.length + ' positions';
+                return out;
+            }
+            // FEN from a [FEN "..."] header, else from a bare FEN on the first line, else the standard start
+            // (a plain PGN with or without headers). Moves come from the main line only.
+            const fm = text.match(/\[FEN\s+"([^"]+)"\]/i);
+            const noTags = text.replace(/\[[A-Za-z0-9_]+\s+"[^"]*"\]/g, ' ').trim();
+            if (fm) { fen = fm[1]; body = noTags; }
+            else {
+                const lines = noTags.split('\n');
+                if (/^\s*([prnbqkPRNBQK1-8]+\/){7}[prnbqkPRNBQK1-8]+(\s|$)/.test(lines[0])) { fen = lines[0]; body = lines.slice(1).join(' '); }
+                else { fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'; body = noTags; }
+            }
             const t = fen.trim().split(/\s+/), d = [t[0], 'w', '-', '-', '0', '1'];
             for (let i = 1; i < 6 && i < t.length; i++) d[i] = t[i];
             fen = d.join(' ');
@@ -19072,10 +19091,11 @@ ${contentToAnalyze}`;
             let prev;
             do { prev = body; body = body.replace(/\{[^}]*\}|\([^()]*\)/g, ' '); } while (body !== prev);
             const toks = body.replace(/;[^\n]*/g, ' ').replace(/\$\d+/g, ' ').replace(/\d+\.+/g, ' ').split(/\s+/)
+                .map(s => s.replace(/[!?]+$/, '').replace(/^0-0-0$/, 'O-O-O').replace(/^0-0$/, 'O-O'))
                 .filter(s => s && !/^(1-0|0-1|1\/2-1\/2|\*)$/.test(s));
             for (const tok of toks) {
                 const mv = g.move(tok, { sloppy: true });
-                if (!mv) { out.error = 'Stopped at "' + tok + '" (not a legal move there)'; break; }
+                if (!mv) { out.error = 'Stopped at ' + no + (turn === 'w' ? '. ' : '... ') + tok + ': not a legal move in that position. The boards up to ' + out.pos[out.pos.length - 1].label + ' are drawn.'; break; }
                 out.pos.push({ fen: g.fen(), label: no + (turn === 'w' ? '. ' : '... ') + mv.san });
                 mt.push(turn === 'w' || !mt.length ? no + (turn === 'w' ? '. ' : '... ') + mv.san : mv.san);
                 if (turn === 'b') no++;
