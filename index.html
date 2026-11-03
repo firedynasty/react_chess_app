@@ -1440,7 +1440,8 @@
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
-            <button id="loadToBoardMini" title="Load the PGN in the text box (or the clipboard if it is empty) to the board — same as Load to Board" onclick="loadPgnToBoard()" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load to Board</button>
+            <button id="pgnLibBtnMini" title="PGN Library: load a JSON of games (or a folder of .pgn files) from your computer and browse them in a sidebar" onclick="plToggle()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📚 Library</button>
+            <button id="loadToBoardMini"title="Load the PGN in the text box (or the clipboard if it is empty) to the board — same as Load to Board" onclick="loadPgnToBoard()" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load to Board</button>
             <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Hints</button>
           </div>
         </div>
@@ -1925,6 +1926,33 @@
         </div>
         <div id="dropboxStatus" style="color: #51cf66; font-size: 12px; margin-bottom: 8px;"></div>
         <div id="dropboxFileList" style="color: #eee;"></div>
+      </div>
+    </div>
+
+    <!-- PGN Library Sidebar (local JSON / folder of .pgn files) -->
+    <div id="plSidebar" onclick="if(event.target===this)plToggle()" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1001; align-items: center; justify-content: center;">
+      <div style="width: min(560px, 94vw); max-height: 86vh; background: #0d1b2a; border: 2px solid #4caf50; border-radius: 10px; box-shadow: 0 8px 40px rgba(0,0,0,0.6); display: flex; flex-direction: column; color: #eee; overflow: hidden;">
+      <div style="padding: 12px; border-bottom: 1px solid #1a1a2e;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <strong style="color: #4caf50; font-size: 15px;">📚 PGN Library</strong>
+          <button onclick="plToggle()" style="margin-left: auto; background: #dc3545; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 14px;">&times;</button>
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button onclick="document.getElementById('plJsonInput').click()" title="Load a .json library (replaces the list)" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">⬆ Load JSON</button>
+          <button onclick="document.getElementById('plFolderInput').click()" title="Pick a folder; every .pgn inside (subfolders too) becomes entries, multi-game files are split" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">📁 Load folder</button>
+          <button onclick="plExportJson()" title="Save the current list as one .json you can reload later" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">⬇ Export JSON</button>
+        </div>
+        <input type="file" id="plJsonInput" accept=".json,application/json" multiple onchange="plLoadJsonFile(this)" style="display: none;">
+        <input type="file" id="plFolderInput" webkitdirectory multiple onchange="plLoadFolder(this)" style="display: none;">
+        <input type="text" id="plFilter" placeholder="Filter (player, opening, folder…)" oninput="plRender()" style="width: 100%; box-sizing: border-box; margin-top: 8px; padding: 6px 8px; border-radius: 6px; border: 1px solid #444; background: #1a1a2e; color: #eee; font-size: 13px;">
+        <div style="display: flex; align-items: center; gap: 6px; margin-top: 8px;">
+          <button onclick="plStep(-1)" style="padding: 4px 12px; background: #0f3460; color: #eee; border: 1px solid #444; border-radius: 6px; cursor: pointer;">◀ Prev</button>
+          <button onclick="plStep(1)" style="padding: 4px 12px; background: #0f3460; color: #eee; border: 1px solid #444; border-radius: 6px; cursor: pointer;">Next ▶</button>
+          <label title="Leave this window open after choosing a game" style="margin-left: auto; font-size: 12px; color: #aaa; cursor: pointer;"><input type="checkbox" id="plKeepOpen"> keep open</label>
+          <span id="plStatus" style="font-size: 12px; color: #888; font-size: 12px; color: #888;">No library loaded</span>
+        </div>
+      </div>
+      <div id="plList" style="flex: 1; overflow-y: auto;"></div>
       </div>
     </div>
 
@@ -4746,6 +4774,168 @@
 
             updateEvalBar(window.moveTree ? window.moveTree.fen : null);
             updateAllCommentsDisplay();
+        }
+
+        // ============================================================
+        // PGN LIBRARY — browse many games from a local JSON (or a folder of
+        // .pgn files) in a left sidebar. Nothing is uploaded; the files are read
+        // in the browser. JSON shape: {"games":[{"title","folder","pgn"}]}
+        // (a bare array, or array items that are plain PGN strings, also load).
+        // ============================================================
+        window.pgnLib = { games: [], idx: -1 };
+
+        function plToggle() {
+            const el = document.getElementById('plSidebar');
+            el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        function plHeader(pgn, tag) {
+            const m = pgn.match(new RegExp('\\[' + tag + '\\s+"([^"]*)"\\]'));
+            return m ? m[1] : '';
+        }
+
+        // Split a file's text on each [Event tag so multi-game .pgn files become one entry per game
+        function plSplitPgn(text) {
+            return text.replace(/\r\n?/g, '\n').split(/\n(?=\[Event\s)/).map(function (s) { return s.trim(); }).filter(Boolean);
+        }
+
+        function plMakeGame(pgn, folder, fileName, n, total) {
+            const w = plHeader(pgn, 'White'), b = plHeader(pgn, 'Black');
+            let title = (w || b) ? ((w || '?') + ' vs ' + (b || '?')) : '';
+            if (!title) title = (fileName || 'game').replace(/\.pgn$/i, '') + (total > 1 ? ' #' + (n + 1) : '');
+            return { title: title, folder: folder || '', pgn: pgn };
+        }
+
+        function plMeta(g) {
+            return [plHeader(g.pgn, 'Date').replace(/\.\?\?/g, ''), plHeader(g.pgn, 'Result'), plHeader(g.pgn, 'ECO'), plHeader(g.pgn, 'Opening')]
+                .filter(function (s) { return s && s !== '?'; }).join(' · ');
+        }
+
+        function plSetGames(games, label) {
+            window.pgnLib.games = games;
+            window.pgnLib.idx = -1;
+            document.getElementById('plFilter').value = '';
+            plRender();
+            document.getElementById('plSidebar').style.display = 'flex';
+            document.getElementById('plStatus').textContent = games.length + ' game' + (games.length === 1 ? '' : 's') + (label ? ' · ' + label : '');
+        }
+
+        async function plLoadJsonFile(input) {
+            const files = Array.from(input.files || []);
+            input.value = '';
+            if (!files.length) return;
+            const games = [];
+            try {
+                for (const file of files) {
+                    const data = JSON.parse(await file.text());
+                    const arr = Array.isArray(data) ? data : (data.games || data.library || []);
+                    arr.forEach(function (item, i) {
+                        const pgn = (typeof item === 'string' ? item : (item && (item.pgn || item.text)) || '').trim();
+                        if (!pgn) return;
+                        if (typeof item === 'string') {
+                            plSplitPgn(pgn).forEach(function (p, n, all) { games.push(plMakeGame(p, '', 'game ' + (i + 1), n, all.length)); });
+                        } else {
+                            const g = plMakeGame(pgn, item.folder || '', item.file || ('game ' + (i + 1)), 0, 1);
+                            if (item.title) g.title = item.title;
+                            games.push(g);
+                        }
+                    });
+                }
+                if (!games.length) throw new Error('no games found in the JSON');
+                plSetGames(games, files.length === 1 ? files[0].name : files.length + ' files');
+            } catch (e) {
+                document.getElementById('plStatus').textContent = 'Load failed: ' + e.message;
+            }
+        }
+
+        async function plLoadFolder(input) {
+            const files = Array.from(input.files || []).filter(function (f) { return /\.pgn$/i.test(f.name); });
+            input.value = '';
+            if (!files.length) { document.getElementById('plStatus').textContent = 'No .pgn files in that folder'; return; }
+            files.sort(function (a, b) { return (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, undefined, { numeric: true }); });
+            const games = [];
+            for (const f of files) {
+                const parts = (f.webkitRelativePath || f.name).split('/');
+                const folder = parts.slice(0, -1).join('/');
+                const chunks = plSplitPgn(await f.text());
+                chunks.forEach(function (p, n) { games.push(plMakeGame(p, folder, f.name, n, chunks.length)); });
+            }
+            plSetGames(games, files.length + ' file' + (files.length === 1 ? '' : 's'));
+        }
+
+        function plExportJson() {
+            if (!window.pgnLib.games.length) { document.getElementById('plStatus').textContent = 'Nothing to export'; return; }
+            const blob = new Blob([JSON.stringify({ version: 1, games: window.pgnLib.games }, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'pgn_library.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function plVisible() {
+            const q = (document.getElementById('plFilter').value || '').trim().toLowerCase();
+            const out = [];
+            window.pgnLib.games.forEach(function (g, i) {
+                if (!q || (g.title + ' ' + g.folder + ' ' + plMeta(g)).toLowerCase().indexOf(q) !== -1) out.push(i);
+            });
+            return out;
+        }
+
+        function plRender() {
+            const list = document.getElementById('plList');
+            list.innerHTML = '';
+            let lastFolder = null;
+            plVisible().forEach(function (i) {
+                const g = window.pgnLib.games[i];
+                if (g.folder !== lastFolder) {
+                    lastFolder = g.folder;
+                    if (g.folder) {
+                        const h = document.createElement('div');
+                        h.textContent = '📁 ' + g.folder;
+                        h.style.cssText = 'padding: 6px 10px; font-size: 11px; color: #4caf50; background: #091420; position: sticky; top: 0;';
+                        list.appendChild(h);
+                    }
+                }
+                const row = document.createElement('div');
+                row.dataset.idx = i;
+                row.style.cssText = 'padding: 7px 10px; cursor: pointer; border-bottom: 1px solid #1a1a2e; font-size: 13px;' + (i === window.pgnLib.idx ? ' background: #16345e;' : '');
+                const t = document.createElement('div');
+                t.textContent = g.title;
+                t.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                const m = document.createElement('div');
+                m.textContent = plMeta(g);
+                m.style.cssText = 'font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+                row.appendChild(t);
+                row.appendChild(m);
+                row.onclick = function () { plOpen(i, true); };
+                row.onmouseenter = function () { if (i !== window.pgnLib.idx) row.style.background = '#16213e'; };
+                row.onmouseleave = function () { if (i !== window.pgnLib.idx) row.style.background = ''; };
+                list.appendChild(row);
+            });
+        }
+
+        function plOpen(i, fromClick) {
+            const g = window.pgnLib.games[i];
+            if (!g) return;
+            window.pgnLib.idx = i;
+            const ta = document.getElementById('pgnInput');
+            if (ta) ta.value = g.pgn;
+            applyPgnStringToBoard(g.pgn);
+            if (fromClick && !document.getElementById('plKeepOpen').checked) { document.getElementById('plSidebar').style.display = 'none'; return; }
+            plRender();
+            const sel = document.querySelector('#plList [data-idx="' + i + '"]');
+            if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+            const vis = plVisible();
+            document.getElementById('plStatus').textContent = (vis.indexOf(i) + 1) + ' / ' + vis.length + (vis.length !== window.pgnLib.games.length ? ' (filtered)' : '');
+        }
+
+        function plStep(d) {
+            const vis = plVisible();
+            if (!vis.length) return;
+            const pos = vis.indexOf(window.pgnLib.idx);
+            const next = pos === -1 ? (d > 0 ? 0 : vis.length - 1) : Math.min(vis.length - 1, Math.max(0, pos + d));
+            plOpen(vis[next]);
         }
 
         async function loadPgnToBoard() {
