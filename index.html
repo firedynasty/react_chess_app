@@ -1660,7 +1660,6 @@
             </div>
           </div>
 
-          <!-- Practice: the moves played, as a From Position snippet -->
           <!-- Mask: click squares, only those keep their piece in the 8x8 text grid; the rest print 0 -->
           <div id="maskModal" onkeydown="event.stopPropagation(); if (event.key === 'Escape') closeMaskModal();" onclick="if(event.target===this)closeMaskModal()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;">
             <div style="background:#16213e; border-radius:10px; padding:24px; max-width:480px; width:92%; max-height:92vh; overflow-y:auto; border:1px solid #00bcd4; position:relative;">
@@ -1684,6 +1683,7 @@
             </div>
           </div>
 
+          <!-- Practice: the moves played, as a From Position snippet -->
           <div id="practiceResultModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
             <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #ff9800; position:relative;">
               <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
@@ -18127,6 +18127,105 @@ ${contentToAnalyze}`;
             if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
             else fallback();
         }
+        // ── Mask: pick squares on the board; only those keep their piece in the 8x8 text grid, the rest print 0 ──
+        window._mask = window._mask || { sel: new Set(), flip: false, grid: [] };
+        function maskPlacement() {
+            const b = window.board2;
+            let fen = b && b.fen && b.fen();
+            if (!fen) return null;
+            fen = String(fen).split(' ')[0];
+            const rows = fen.split('/');
+            if (rows.length !== 8) return null;
+            const grid = rows.map(r => r.replace(/[1-8]/g, d => '0'.repeat(+d)));
+            return grid.every(r => r.length === 8) ? grid : null;
+        }
+        function openMaskModal() {
+            const grid = maskPlacement();
+            if (!grid) { showToast('No position on the board'); return; }
+            window._mask.grid = grid;
+            const n = window.currentMoveNode;
+            const nf = n && n.fen && n.fen.split(' ')[0] === window.board2.fen() ? n.fen.split(' ') : null;
+            window._mask.side = (nf && nf[1]) || 'w';
+            window._mask.rest = nf && nf.length >= 6 ? nf.slice(2, 6).join(' ') : '- - 0 1';
+            document.getElementById('maskMsg').textContent = '';
+            window._mask.flip = !!(window.board2.orientation && window.board2.orientation() === 'black');
+            maskRender();
+            document.getElementById('maskModal').style.display = 'flex';
+        }
+        function closeMaskModal() { document.getElementById('maskModal').style.display = 'none'; }
+        function maskSq(r, c) { return 'abcdefgh'[c] + (8 - r); }
+        function maskRender() {
+            const m = window._mask, G = { K: '\u2654', Q: '\u2655', R: '\u2656', B: '\u2657', N: '\u2658', P: '\u2659' };
+            const S = 40;
+            let svg = '<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">';
+            for (let dr = 0; dr < 8; dr++) for (let dc = 0; dc < 8; dc++) {
+                const r = m.flip ? 7 - dr : dr, c = m.flip ? 7 - dc : dc, sq = maskSq(r, c), on = m.sel.has(sq), ch = m.grid[r][c];
+                svg += '<g data-sq="' + sq + '" style="cursor:pointer"><rect x="' + dc * S + '" y="' + dr * S + '" width="' + S + '" height="' + S + '" fill="' + (on ? '#00bcd4' : (dr + dc) % 2 ? '#8a9aa8' : '#d8e0e6') + '"/>';
+                if (ch !== '0') {
+                    const up = ch.toUpperCase(), white = ch === up;
+                    svg += '<text x="' + (dc * S + S / 2) + '" y="' + (dr * S + S / 2 + 1) + '" font-size="34" text-anchor="middle" dominant-baseline="central" fill="' + (white ? '#fff' : '#000') + '" stroke="' + (white ? '#000' : '#fff') + '" stroke-width="' + (white ? 1.2 : 0.6) + '" paint-order="stroke">' + (white ? G[up] : String.fromCodePoint(G[up].codePointAt(0) + 6)) + '\uFE0E</text>';
+                }
+                svg += '</g>';
+            }
+            document.getElementById('maskBoard').innerHTML = svg + '<rect width="320" height="320" fill="none" stroke="#000" stroke-width="2"/></svg>';
+            document.getElementById('maskOut').textContent = maskText();
+            document.getElementById('maskAllBtn').textContent = m.sel.size === 64 ? 'Unselect all' : 'Select all';
+            document.getElementById('maskFlipBtn').textContent = m.flip ? 'Black at bottom' : 'White at bottom';
+        }
+        function maskText() {
+            const m = window._mask;
+            return m.grid.map((row, r) => row.split('').map((ch, c) => m.sel.has(maskSq(r, c)) ? ch : '0').join('')).join('\n');
+        }
+        // FEN of the original position (nothing masked): placement from the grid + the side/castling/ep/clock fields
+        function maskFen() {
+            const m = window._mask;
+            const place = m.grid.map(row => row.replace(/0+/g, z => z.length)).join('/');
+            return place + ' ' + (m.side || 'w') + ' ' + (m.rest || '- - 0 1');
+        }
+        function maskFlash(btn, text) {
+            if (!btn) return;
+            const o = btn.dataset.o || btn.textContent; btn.dataset.o = o;
+            btn.textContent = text; setTimeout(() => { btn.textContent = o; }, 1200);
+        }
+        function maskCopyFen(btn) {
+            const t = maskFen();
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => { maskFlash(btn, 'Copied!'); showToast('FEN copied'); }, () => showToast('Copy failed'));
+            else showToast('Copy not available here');
+        }
+        function maskParseFen(text) {
+            const mt = String(text).match(/([1-8prnbqkPRNBQK]+(?:\/[1-8prnbqkPRNBQK]+){7})(?:\s+([wb])(?:\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d+))?)?/);
+            if (!mt) return null;
+            const grid = mt[1].split('/').map(r => r.replace(/[1-8]/g, d => '0'.repeat(+d)));
+            return grid.every(r => r.length === 8) ? { grid: grid, side: mt[2] || 'w', rest: mt[6] ? mt.slice(3, 7).join(' ') : '- - 0 1' } : null;
+        }
+        function maskPasteFen(btn) {
+            const msg = document.getElementById('maskMsg');
+            if (!(navigator.clipboard && navigator.clipboard.readText)) { msg.textContent = 'Clipboard read is not available here'; return; }
+            navigator.clipboard.readText().then(t => {
+                const r = maskParseFen(t);
+                if (!r) { msg.textContent = 'No valid FEN on the clipboard'; return; }
+                window._mask.grid = r.grid; window._mask.side = r.side; window._mask.rest = r.rest;
+                msg.textContent = '';
+                maskRender(); maskFlash(btn, 'Pasted!');
+            }, () => { msg.textContent = 'Clipboard blocked: allow clipboard access for this page'; });
+        }
+        function maskSelectAll() { const sel = window._mask.sel; if (sel.size === 64) { sel.clear(); } else { for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) sel.add(maskSq(r, c)); } maskRender(); }
+        function maskSelectPieces() { const m = window._mask; m.sel.clear(); for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (m.grid[r][c] !== '0') m.sel.add(maskSq(r, c)); maskRender(); }
+        function maskClear() { window._mask.sel.clear(); maskRender(); }
+        function maskFlip() { window._mask.flip = !window._mask.flip; maskRender(); }
+        function maskCopy(btn) {
+            const t = maskText();
+            const done = () => { if (btn) { const o = btn.id === 'maskCopyBtn' ? 'Copy grid' : btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { if (btn.id === 'maskCopyBtn') btn.textContent = o; else btn.textContent = o; }, 1200); } showToast('Grid copied'); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => showToast('Copy failed: select the grid and press Cmd+C'));
+            else showToast('Copy not available here');
+        }
+        document.getElementById('maskBoard').addEventListener('click', function (e) {
+            const g = e.target.closest('[data-sq]');
+            if (!g) return;
+            const sq = g.getAttribute('data-sq'), sel = window._mask.sel;
+            if (sel.has(sq)) sel.delete(sq); else sel.add(sq);
+            maskRender();
+        });
         function openOneLineModal() {
             document.getElementById('oneLineModal').style.display = 'flex';
             document.getElementById('oneLineInput').focus();
@@ -18217,6 +18316,15 @@ ${contentToAnalyze}`;
         window.practiceShowResult = practiceShowResult;
         window.practiceCopy = practiceCopy;
         window.openOneLineModal = openOneLineModal;
+        window.openMaskModal = openMaskModal;
+        window.closeMaskModal = closeMaskModal;
+        window.maskSelectAll = maskSelectAll;
+        window.maskSelectPieces = maskSelectPieces;
+        window.maskClear = maskClear;
+        window.maskFlip = maskFlip;
+        window.maskCopy = maskCopy;
+        window.maskCopyFen = maskCopyFen;
+        window.maskPasteFen = maskPasteFen;
         window.openCoachPgnModal = openCoachPgnModal;
         window.coachPgnMerge = coachPgnMerge;
         window.coachPgnToggleLine = coachPgnToggleLine;
@@ -18317,105 +18425,6 @@ ${contentToAnalyze}`;
         }
 
         // Override board drop handler to support typed-move/vs-stockfish mode
-        // ── Mask: pick squares on the board; only those keep their piece in the 8x8 text grid, the rest print 0 ──
-        window._mask = window._mask || { sel: new Set(), flip: false, grid: [] };
-        function maskPlacement() {
-            const b = window.board2;
-            let fen = b && b.fen && b.fen();
-            if (!fen) return null;
-            fen = String(fen).split(' ')[0];
-            const rows = fen.split('/');
-            if (rows.length !== 8) return null;
-            const grid = rows.map(r => r.replace(/[1-8]/g, d => '0'.repeat(+d)));
-            return grid.every(r => r.length === 8) ? grid : null;
-        }
-        function openMaskModal() {
-            const grid = maskPlacement();
-            if (!grid) { showToast('No position on the board'); return; }
-            window._mask.grid = grid;
-            const n = window.currentMoveNode;
-            const nf = n && n.fen && n.fen.split(' ')[0] === window.board2.fen() ? n.fen.split(' ') : null;
-            window._mask.side = (nf && nf[1]) || 'w';
-            window._mask.rest = nf && nf.length >= 6 ? nf.slice(2, 6).join(' ') : '- - 0 1';
-            document.getElementById('maskMsg').textContent = '';
-            window._mask.flip = !!(window.board2.orientation && window.board2.orientation() === 'black');
-            maskRender();
-            document.getElementById('maskModal').style.display = 'flex';
-        }
-        function closeMaskModal() { document.getElementById('maskModal').style.display = 'none'; }
-        function maskSq(r, c) { return 'abcdefgh'[c] + (8 - r); }
-        function maskRender() {
-            const m = window._mask, G = { K: '\u2654', Q: '\u2655', R: '\u2656', B: '\u2657', N: '\u2658', P: '\u2659' };
-            const S = 40;
-            let svg = '<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">';
-            for (let dr = 0; dr < 8; dr++) for (let dc = 0; dc < 8; dc++) {
-                const r = m.flip ? 7 - dr : dr, c = m.flip ? 7 - dc : dc, sq = maskSq(r, c), on = m.sel.has(sq), ch = m.grid[r][c];
-                svg += '<g data-sq="' + sq + '" style="cursor:pointer"><rect x="' + dc * S + '" y="' + dr * S + '" width="' + S + '" height="' + S + '" fill="' + (on ? '#00bcd4' : (dr + dc) % 2 ? '#8a9aa8' : '#d8e0e6') + '"/>';
-                if (ch !== '0') {
-                    const up = ch.toUpperCase(), white = ch === up;
-                    svg += '<text x="' + (dc * S + S / 2) + '" y="' + (dr * S + S / 2 + 1) + '" font-size="34" text-anchor="middle" dominant-baseline="central" fill="' + (white ? '#fff' : '#000') + '" stroke="' + (white ? '#000' : '#fff') + '" stroke-width="' + (white ? 1.2 : 0.6) + '" paint-order="stroke">' + (white ? G[up] : String.fromCodePoint(G[up].codePointAt(0) + 6)) + '\uFE0E</text>';
-                }
-                svg += '</g>';
-            }
-            document.getElementById('maskBoard').innerHTML = svg + '<rect width="320" height="320" fill="none" stroke="#000" stroke-width="2"/></svg>';
-            document.getElementById('maskOut').textContent = maskText();
-            document.getElementById('maskAllBtn').textContent = m.sel.size === 64 ? 'Unselect all' : 'Select all';
-            document.getElementById('maskFlipBtn').textContent = m.flip ? 'Black at bottom' : 'White at bottom';
-        }
-        function maskText() {
-            const m = window._mask;
-            return m.grid.map((row, r) => row.split('').map((ch, c) => m.sel.has(maskSq(r, c)) ? ch : '0').join('')).join('\n');
-        }
-        // FEN of the original position (nothing masked): placement from the grid + the side/castling/ep/clock fields
-        function maskFen() {
-            const m = window._mask;
-            const place = m.grid.map(row => row.replace(/0+/g, z => z.length)).join('/');
-            return place + ' ' + (m.side || 'w') + ' ' + (m.rest || '- - 0 1');
-        }
-        function maskFlash(btn, text) {
-            if (!btn) return;
-            const o = btn.dataset.o || btn.textContent; btn.dataset.o = o;
-            btn.textContent = text; setTimeout(() => { btn.textContent = o; }, 1200);
-        }
-        function maskCopyFen(btn) {
-            const t = maskFen();
-            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => { maskFlash(btn, 'Copied!'); showToast('FEN copied'); }, () => showToast('Copy failed'));
-            else showToast('Copy not available here');
-        }
-        function maskParseFen(text) {
-            const mt = String(text).match(/([1-8prnbqkPRNBQK]+(?:\/[1-8prnbqkPRNBQK]+){7})(?:\s+([wb])(?:\s+(\S+)\s+(\S+)\s+(\d+)\s+(\d+))?)?/);
-            if (!mt) return null;
-            const grid = mt[1].split('/').map(r => r.replace(/[1-8]/g, d => '0'.repeat(+d)));
-            return grid.every(r => r.length === 8) ? { grid: grid, side: mt[2] || 'w', rest: mt[6] ? mt.slice(3, 7).join(' ') : '- - 0 1' } : null;
-        }
-        function maskPasteFen(btn) {
-            const msg = document.getElementById('maskMsg');
-            if (!(navigator.clipboard && navigator.clipboard.readText)) { msg.textContent = 'Clipboard read is not available here'; return; }
-            navigator.clipboard.readText().then(t => {
-                const r = maskParseFen(t);
-                if (!r) { msg.textContent = 'No valid FEN on the clipboard'; return; }
-                window._mask.grid = r.grid; window._mask.side = r.side; window._mask.rest = r.rest;
-                msg.textContent = '';
-                maskRender(); maskFlash(btn, 'Pasted!');
-            }, () => { msg.textContent = 'Clipboard blocked: allow clipboard access for this page'; });
-        }
-        function maskSelectAll() { const sel = window._mask.sel; if (sel.size === 64) { sel.clear(); } else { for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) sel.add(maskSq(r, c)); } maskRender(); }
-        function maskSelectPieces() { const m = window._mask; m.sel.clear(); for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) if (m.grid[r][c] !== '0') m.sel.add(maskSq(r, c)); maskRender(); }
-        function maskClear() { window._mask.sel.clear(); maskRender(); }
-        function maskFlip() { window._mask.flip = !window._mask.flip; maskRender(); }
-        function maskCopy(btn) {
-            const t = maskText();
-            const done = () => { if (btn) { const o = btn.id === 'maskCopyBtn' ? 'Copy grid' : btn.textContent; btn.textContent = 'Copied!'; setTimeout(() => { if (btn.id === 'maskCopyBtn') btn.textContent = o; else btn.textContent = o; }, 1200); } showToast('Grid copied'); };
-            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(done, () => showToast('Copy failed: select the grid and press Cmd+C'));
-            else showToast('Copy not available here');
-        }
-        document.getElementById('maskBoard').addEventListener('click', function (e) {
-            const g = e.target.closest('[data-sq]');
-            if (!g) return;
-            const sq = g.getAttribute('data-sq'), sel = window._mask.sel;
-            if (sel.has(sq)) sel.delete(sq); else sel.add(sq);
-            maskRender();
-        });
         const origHandleBoardDrop = window.board2 ? window.board2.config.onDrop : null;
 
         // Patch: intercept drag-drop when in vs-stockfish or typed-move mode
@@ -18506,15 +18515,6 @@ ${contentToAnalyze}`;
                 if (window.board2) {
                     var pos = window.board2.position();
                     var ori = window.board2.orientation();
-        window.openMaskModal = openMaskModal;
-        window.closeMaskModal = closeMaskModal;
-        window.maskSelectAll = maskSelectAll;
-        window.maskSelectPieces = maskSelectPieces;
-        window.maskClear = maskClear;
-        window.maskFlip = maskFlip;
-        window.maskCopy = maskCopy;
-        window.maskCopyFen = maskCopyFen;
-        window.maskPasteFen = maskPasteFen;
                     window.board2 = Chessboard('myBoard2', {
                         draggable: mode === 'drag',
                         dropOffBoard: 'snapback',
