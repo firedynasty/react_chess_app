@@ -1939,7 +1939,7 @@
         </div>
         <div style="display: flex; gap: 6px; flex-wrap: wrap;">
           <button onclick="document.getElementById('plJsonInput').click()" title="Load a .json library (replaces the list)" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">⬆ Load JSON</button>
-          <button onclick="document.getElementById('plFolderInput').click()" title="Pick a folder; every .pgn inside (subfolders too) becomes entries, multi-game files are split" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">📁 Load folder</button>
+          <button onclick="document.getElementById('plFolderInput').click()" title="Pick a folder; every .pgn or .txt inside (subfolders too) becomes entries, multi-game files are split. A .txt can hold From Position snippets (FEN + moves)" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">📁 Load folder</button>
           <button onclick="plExportJson()" title="Save the current list as one .json you can reload later" style="flex: 1; padding: 6px; background: #0f3460; color: #4caf50; border: 1px solid #4caf50; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">⬇ Export JSON</button>
         </div>
         <input type="file" id="plJsonInput" accept=".json,application/json" multiple onchange="plLoadJsonFile(this)" style="display: none;">
@@ -4794,15 +4794,30 @@
             return m ? m[1] : '';
         }
 
-        // Split a file's text on each [Event tag so multi-game .pgn files become one entry per game
+        // Split a file's text into games: a new game starts at a tag line ([Event ..], [Variant ..], [FEN ..]) that follows
+        // movetext, so multi-game .pgn files and .txt files of From Position snippets both become one entry per game
         function plSplitPgn(text) {
-            return text.replace(/\r\n?/g, '\n').split(/\n(?=\[Event\s)/).map(function (s) { return s.trim(); }).filter(Boolean);
+            const out = [];
+            let cur = [], hasMoves = false;
+            text.replace(/\r\n?/g, '\n').split('\n').forEach(function (line) {
+                const isTag = /^\s*\[[A-Za-z0-9_]+\s+"/.test(line);
+                if (isTag && hasMoves) { out.push(cur.join('\n')); cur = []; hasMoves = false; }
+                if (!isTag && line.trim()) hasMoves = true;
+                cur.push(line);
+            });
+            out.push(cur.join('\n'));
+            return out.map(function (s) { return s.trim(); }).filter(Boolean);
+        }
+
+        // For .txt files: keep only chunks that look like chess (a [FEN]/[Event] tag or numbered moves), so notes are skipped
+        function plLooksLikePgn(chunk) {
+            return /\[(FEN|Event|Variant)\s+"/.test(chunk) || /(^|\s)\d+\.(\.\.)?\s*(O-O|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8]|0-0)/.test(chunk);
         }
 
         function plMakeGame(pgn, folder, fileName, n, total) {
             const w = plHeader(pgn, 'White'), b = plHeader(pgn, 'Black');
             let title = (w || b) ? ((w || '?') + ' vs ' + (b || '?')) : '';
-            if (!title) title = (fileName || 'game').replace(/\.pgn$/i, '') + (total > 1 ? ' #' + (n + 1) : '');
+            if (!title) title = (fileName || 'game').replace(/\.(pgn|txt)$/i, '') + (total > 1 ? ' #' + (n + 1) : '');
             return { title: title, folder: folder || '', pgn: pgn };
         }
 
@@ -4849,15 +4864,16 @@
         }
 
         async function plLoadFolder(input) {
-            const files = Array.from(input.files || []).filter(function (f) { return /\.pgn$/i.test(f.name); });
+            const files = Array.from(input.files || []).filter(function (f) { return /\.(pgn|txt)$/i.test(f.name); });
             input.value = '';
-            if (!files.length) { document.getElementById('plStatus').textContent = 'No .pgn files in that folder'; return; }
+            if (!files.length) { document.getElementById('plStatus').textContent = 'No .pgn or .txt files in that folder'; return; }
             files.sort(function (a, b) { return (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name, undefined, { numeric: true }); });
             const games = [];
             for (const f of files) {
                 const parts = (f.webkitRelativePath || f.name).split('/');
                 const folder = parts.slice(0, -1).join('/');
-                const chunks = plSplitPgn(await f.text());
+                let chunks = plSplitPgn(await f.text());
+                if (/\.txt$/i.test(f.name)) chunks = chunks.filter(plLooksLikePgn);
                 chunks.forEach(function (p, n) { games.push(plMakeGame(p, folder, f.name, n, chunks.length)); });
             }
             plSetGames(games, files.length + ' file' + (files.length === 1 ? '' : 's'));
