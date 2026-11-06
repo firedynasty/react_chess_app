@@ -18634,6 +18634,7 @@ ${contentToAnalyze}`;
         <input id="ppAddFen" type="text" spellcheck="false" autocomplete="off" oninput="ppFenInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('ppAddComment').focus();}" placeholder="FEN (optional): leave empty to use the board's position" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#ff9800; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:4px;">
         <div id="ppAddFenMsg" style="font-size:11px; min-height:14px; margin-bottom:6px; color:#ff6b6b;"></div>
         <button onclick="ppAppendFen()" title="Put the FEN of the position on the board at the start of the comment as 'FEN, ' so the back of the card prints that board" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">Append FEN ↓ to comment</button>
+        <button onclick="ppFillBetter()" title="With a move picked above (the move BEFORE the mistake), fill the comment from the better line that hangs off the next move: the FEN after its first move, then 'Played … → better: …'" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">Fill back from the better line ↓</button>
         <textarea id="ppAddComment" rows="3" spellcheck="false" oninput="ppDraftSave()" placeholder="Comment (Enter = add, Shift+Enter = new line)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ppConfirmAdd();}" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:13px; margin-bottom:10px;"></textarea>
         <div style="display:flex; gap:8px;">
           <button onclick="ppConfirmAdd()" style="flex:1; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Add</button>
@@ -18830,6 +18831,18 @@ ${contentToAnalyze}`;
         const DRAFT_KEY = 'chessPrintDraft';
         window.ppDraftSave = function () {
             try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ f: $('ppAddFen').value, c: $('ppAddComment').value })); } catch (e) {}
+        };
+        // The picked move is the one BEFORE the mistake (e.g. 8. Qc3). The next main-line move is what was played;
+        // a variation next to it is the better line. Front stays the picked position; back = the better line's first position.
+        window.ppFillBetter = function () {
+            const n = (window.moveNodeRegistry && window.moveNodeRegistry[selNode]) || window.currentMoveNode || window.moveTree;
+            const played = n && n.children && n.children[0], alts = n && n.children ? n.children.slice(1).filter(a => a.san && a.fen) : [];
+            if (!played) { showToast('No move after this one'); return; }
+            if (!alts.length) { showToast('No better line after this move: pick the move BEFORE a mistake that has a variation'); return; }
+            const alt = alts[0];
+            $('ppAddComment').value = alt.fen + ', Played ' + plyText(played) + ' \u2192 better: ' + lineText(alt);
+            window.ppDraftSave();
+            showToast(alts.length > 1 ? 'Filled from line 1 of ' + alts.length + ' better lines' : 'Filled from the better line');
         };
         window.ppFenInput = function () {
             window.ppDraftSave();
