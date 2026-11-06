@@ -18664,6 +18664,10 @@ ${contentToAnalyze}`;
         <div style="font-weight:bold; margin-bottom:4px; color:#4caf50; font-size:15px;">Print list</div>
         <div id="ppListSummary" style="color:#aaa; font-size:12px; margin-bottom:12px;"></div>
         <div id="ppListRows"></div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+          <button onclick="ppAutoFill()" title="One card per ? / ?? move that has a better line: front = the position before the mistake, back = the position after the first move of the better line, with that line as the note" style="padding:8px 14px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">⚡ Add this game's mistakes</button>
+          <label style="color:#aaa; font-size:12px;"><input type="checkbox" id="ppAutoInacc"> also ?! (inaccuracies)</label>
+        </div>
         <label style="display:block; color:#aaa; font-size:12px; margin-top:12px;"><input type="checkbox" id="ppOneSided"> One-sided printer (don't mirror the back sheets). Default is duplex: choose Two-sided → Flip on long edge, scale 100%, margins none.</label>
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button onclick="ppPrint()" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print</button>
@@ -18896,6 +18900,40 @@ ${contentToAnalyze}`;
             const len = p.c.length, size = len > 150 ? 'xs' : len > 90 ? 'sm' : 'md';
             return '<div class="card"><span class="num">' + n + '</span><div class="t ' + size + '">' + esc(p.c).replace(/\n/g, '<br>') + '</div></div>';
         }
+        // ── Auto-fill: one card per main-line mistake (? / ??) that has a better line ──
+        // Front = the position before the mistake (after the previous move). Back = the position after the first
+        // move of the better line, with that line as the note ("FEN, note").
+        function plyText(n) { return n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san + (n.annotation || ''); }
+        function lineText(first) {
+            const parts = [];
+            for (let n = first; n && n.san; n = n.children && n.children[0]) {
+                parts.push(!parts.length ? plyText(n) : (n.isBlackMove ? '' : n.moveNumber + '. ') + n.san + (n.annotation || ''));
+            }
+            return parts.join(' ');
+        }
+        window.ppAutoFill = function () {
+            const root = window.moveTree;
+            if (!root || !root.children || !root.children.length) { showToast('Load a game with variations first'); return; }
+            const ok = a => $('ppAutoInacc').checked ? /^\?[?!]?$/.test(a) : /^\?\??$/.test(a);
+            const black = !!(window.board2 && window.board2.orientation() === 'black'), g = currentGameName();
+            let added = 0, dup = 0, seen = 0;
+            for (let n = root.children[0]; n; n = n.children && n.children[0]) {
+                const par = n.parent;
+                if (!n.san || !ok(n.annotation || '') || !par || !par.fen || !par.children || par.children.length < 2) continue;
+                par.children.slice(1).forEach(alt => {
+                    if (!alt.san || !alt.fen) return;
+                    seen++;
+                    const card = { fen: par.fen, black: black, l: par.san ? plyText(par) : '', g: g,
+                        c: alt.fen + ', Played ' + plyText(n) + ' \u2192 better: ' + lineText(alt) };
+                    if (list.some(x => x.fen === card.fen && x.c === card.c)) { dup++; return; }
+                    list.push(card); added++;
+                });
+            }
+            if (!seen) { showToast('No ? / ?? move with a better line in this game'); return; }
+            save(); renderList();
+            showToast('Added ' + added + ' card' + (added !== 1 ? 's' : '') + (dup ? ' (' + dup + ' already in the list)' : ''));
+        };
+
         // Export / load the list as a file, so it does not depend on this browser's localStorage.
         // The Print Line snippet (text, game name, removed boards, orientation) rides along.
         window.ppExportJson = function () {
