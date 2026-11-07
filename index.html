@@ -18840,7 +18840,7 @@ ${contentToAnalyze}`;
             if (!played) { showToast('No move after this one'); return; }
             if (!alts.length) { showToast('No better line after this move: pick the move BEFORE a mistake that has a variation'); return; }
             const alt = alts[0];
-            $('ppAddComment').value = alt.fen + ', Played ' + plyText(played) + ' \u2192 better: ' + lineText(alt);
+            $('ppAddComment').value = alt.fen + ', Better: ' + plyText(alt) + '\nPlayed ' + plyText(played) + ' \u2192 ' + lineText(alt);
             window.ppDraftSave();
             showToast(alts.length > 1 ? 'Filled from line 1 of ' + alts.length + ' better lines' : 'Filled from the better line');
         };
@@ -19099,7 +19099,7 @@ ${contentToAnalyze}`;
                 + '.card.fen{flex-direction:column;padding:0.1in;gap:0.03in}'
                 + '.info{font-size:9pt;color:#555}'
                 + '.gm{font-size:7.5pt;color:#555;max-height:0.28in;overflow:hidden;line-height:1.2}'
-                + '.fnote{font-size:10pt;line-height:1.25;overflow-wrap:anywhere;max-height:0.55in;overflow:hidden}'
+                + '.fnote{font-size:10pt;line-height:1.25;overflow-wrap:anywhere;max-height:0.55in;overflow:hidden}.fnote::first-line{font-weight:bold;font-size:13pt}'
                 + '.num{position:absolute;top:0.07in;left:0.1in;font-size:12pt;font-weight:700;color:#555}'
                 + '.t{line-height:1.3;overflow-wrap:anywhere}'
                 + '.t.md{font-size:15pt}.t.sm{font-size:13pt}.t.xs{font-size:11pt}'
