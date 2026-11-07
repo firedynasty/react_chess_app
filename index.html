@@ -18631,10 +18631,7 @@ ${contentToAnalyze}`;
         <button id="ppMovesToggle" onclick="ppToggleMoves()" title="Show the game's moves here and click one to use that position (main line or variation)" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">▸ Choose a position from the moves</button>
         <div id="ppMovesBox" style="display:none; max-height:220px; overflow-y:auto; padding:8px; background:#0f3460; border-radius:5px; font-family:monospace; font-size:13px; line-height:1.8; margin-bottom:8px;"></div>
         <input id="ppAddGame" type="text" spellcheck="false" autocomplete="off" placeholder="Game name (from the dropdown; edit or clear it)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#a8d8ea; border:1px solid #555; border-radius:4px; padding:6px 8px; font-size:12px; margin-bottom:10px;">
-        <input id="ppAddFen" type="text" spellcheck="false" autocomplete="off" oninput="ppFenInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('ppAddComment').focus();}" placeholder="FEN (optional): leave empty to use the board's position" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#ff9800; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:4px;">
-        <div id="ppAddFenMsg" style="font-size:11px; min-height:14px; margin-bottom:6px; color:#ff6b6b;"></div>
-        <button onclick="ppAppendFen()" title="Put the FEN of the position on the board at the start of the comment as 'FEN, ' so the back of the card prints that board" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">Append FEN ↓ to comment</button>
-        <button onclick="ppFillBetter()" title="With a move picked above (the move BEFORE the mistake), fill the comment from the better line that hangs off the next move: the FEN after its first move, then 'Played … → better: …'" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">Fill back from the better line ↓</button>
+        <button onclick="ppFillBetter()" title="With a move picked above (the move BEFORE the mistake), fill the comment from the better line that hangs off the next move: the FEN after its first move, then 'Played … → better: …'" style="width:100%; padding:6px; margin-bottom:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">⚡ Fill back from the better line ↓</button>
         <textarea id="ppAddComment" rows="3" spellcheck="false" oninput="ppDraftSave()" placeholder="Comment (Enter = add, Shift+Enter = new line)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();ppConfirmAdd();}" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:13px; margin-bottom:10px;"></textarea>
         <div style="display:flex; gap:8px;">
           <button onclick="ppConfirmAdd()" style="flex:1; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Add</button>
@@ -18666,9 +18663,10 @@ ${contentToAnalyze}`;
         <div id="ppListSummary" style="color:#aaa; font-size:12px; margin-bottom:12px;"></div>
         <div id="ppListRows"></div>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
-          <button onclick="ppAutoFill()" title="One card per ? / ?? move that has a better line: front = the position before the mistake, back = the position after the first move of the better line, with that line as the note" style="padding:8px 14px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">⚡ Add this game's mistakes</button>
+          <button onclick="ppAutoFill()" title="One card per ? / ?? move that has a better line: front = the position before the mistake, back = the position after the first move of the better line, with that line as the note" style="padding:8px 14px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-size:13px; font-weight:bold;">⚡ Pick from this game's mistakes</button>
           <label style="color:#aaa; font-size:12px;"><input type="checkbox" id="ppAutoInacc"> also ?! (inaccuracies)</label>
         </div>
+        <div id="ppAutoPick" style="display:none; margin-top:8px; padding:8px; border:1px solid rgba(255,152,0,0.5); border-radius:6px;"></div>
         <label style="display:block; color:#aaa; font-size:12px; margin-top:12px;"><input type="checkbox" id="ppOneSided"> One-sided printer (don't mirror the back sheets). Default is duplex: choose Two-sided → Flip on long edge, scale 100%, margins none.</label>
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button onclick="ppPrint()" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print</button>
@@ -18763,23 +18761,35 @@ ${contentToAnalyze}`;
                 e.setAttribute('data-pp-node', e.getAttribute('data-node-id'));
                 e.removeAttribute('data-node-id'); e.removeAttribute('onclick'); e.classList.remove('current');
             });
+            // a ⚡ after each move that has a better line hanging off the next move: one click picks it and fills the comment
+            const reg = window.moveNodeRegistry || {};
+            c.querySelectorAll('[data-pp-node]').forEach(sp => {
+                const n = reg[sp.getAttribute('data-pp-node')];
+                if (!n || !n.children || n.children.length < 2 || !n.children.slice(1).some(x => x.san && x.fen)) return;
+                const b = document.createElement('span');
+                b.className = 'pp-quick'; b.setAttribute('data-pp-q', n.nodeId); b.textContent = '\u26A1';
+                b.title = 'Use this position as the front and fill the back from the better line';
+                b.style.cssText = 'cursor:pointer; color:#ff9800; font-size:12px; margin:0 3px; user-select:none;';
+                sp.insertAdjacentElement('afterend', b);
+            });
             box.innerHTML = '';
             box.appendChild(c);
             markSel();
         }
         $('ppMovesBox').addEventListener('click', function (e) {
-            const t = e.target.closest('[data-pp-node]');
-            if (!t) return;
+            const q = e.target.closest('[data-pp-q]');
+            const t = q ? null : e.target.closest('[data-pp-node]');
+            if (!q && !t) return;
             e.stopPropagation(); e.preventDefault();
-            const n = window.moveNodeRegistry && window.moveNodeRegistry[t.getAttribute('data-pp-node')];
+            const n = window.moveNodeRegistry && window.moveNodeRegistry[q ? q.getAttribute('data-pp-q') : t.getAttribute('data-pp-node')];
             if (!n || !n.fen || !pending || !boardSvg(n.fen, false, '')) return;
             pending.fen = n.fen;
             pending.l = n.san ? n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san + (n.annotation || '') : '';
             selNode = n.nodeId;
-            $('ppAddFen').value = ''; $('ppAddFenMsg').textContent = ''; window.ppDraftSave(); // a picked move replaces any typed FEN
             $('ppAddPreview').innerHTML = boardSvg(pending.fen, pending.black, 'width:100%;height:auto;');
             $('ppAddInfo').textContent = infoLine(pending);
             markSel();
+            if (q) window.ppFillBetter();
         }, true);
         window.ppToggleMoves = function () {
             movesOpen = !movesOpen;
@@ -18801,36 +18811,14 @@ ${contentToAnalyze}`;
             let d = {};
             try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || '{}') || {}; } catch (e) {}
             $('ppAddComment').value = d.c || '';
-            $('ppAddFen').value = d.f || '';
-            $('ppAddFenMsg').textContent = '';
-            window.ppFenInput();
             $('ppAddModal').style.display = 'flex';
             $('ppAddComment').focus();
         };
 
-        // A typed FEN replaces the board's: complete it to 6 fields, or null when it is not a FEN
-        function typedFen() {
-            const t = $('ppAddFen').value.trim().split(/\s+/).filter(Boolean);
-            if (!t.length) return '';
-            if (!boardSvg(t.join(' '), false, '')) return null;
-            const d = [t[0], 'w', '-', '-', '0', '1'];
-            for (let i = 1; i < 6 && i < t.length; i++) d[i] = t[i];
-            return d.join(' ');
-        }
-        // Pull the board's FEN down into the comment as "FEN, comment" (the back of the card prints it as a board)
-        window.ppAppendFen = function () {
-            const p = currentPosition();
-            if (!p) { showToast('No board position'); return; }
-            const ta = $('ppAddComment');
-            ta.value = p.fen + ', ' + ta.value.replace(/^\s*([prnbqkPRNBQK1-8]+\/){7}[^,\n]*,?\s*/, '');
-            window.ppDraftSave();
-            ta.focus();
-            ta.setSelectionRange(ta.value.length, ta.value.length);
-        };
-        // The add dialog keeps what you last typed (FEN box + comment) until you add it
+        // The add dialog keeps what you last typed (the comment) until you add it
         const DRAFT_KEY = 'chessPrintDraft';
         window.ppDraftSave = function () {
-            try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ f: $('ppAddFen').value, c: $('ppAddComment').value })); } catch (e) {}
+            try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ c: $('ppAddComment').value })); } catch (e) {}
         };
         // The picked move is the one BEFORE the mistake (e.g. 8. Qc3). The next main-line move is what was played;
         // a variation next to it is the better line. Front stays the picked position; back = the better line's first position.
@@ -18844,21 +18832,9 @@ ${contentToAnalyze}`;
             window.ppDraftSave();
             showToast(alts.length > 1 ? 'Filled from line 1 of ' + alts.length + ' better lines' : 'Filled from the better line');
         };
-        window.ppFenInput = function () {
-            window.ppDraftSave();
-            const f = typedFen();
-            $('ppAddFenMsg').textContent = f === null ? 'Not a valid FEN' : '';
-            const show = f ? Object.assign({}, pending, { fen: f }) : pending;
-            if (!show || f === null) return;
-            $('ppAddPreview').innerHTML = boardSvg(show.fen, show.black, 'width:100%;height:auto;');
-            $('ppAddInfo').textContent = f ? infoLine({ fen: f, l: '' }) : infoLine(pending);
-        };
         window.ppCloseAdd = function () { $('ppAddModal').style.display = 'none'; pending = null; };
         window.ppConfirmAdd = function () {
             if (!pending) return;
-            const f = typedFen();
-            if (f === null) { $('ppAddFenMsg').textContent = 'Not a valid FEN'; $('ppAddFen').focus(); return; }
-            if (f) { pending.fen = f; pending.l = ''; } // typed FEN replaces the board's (the move label no longer applies)
             pending.g = $('ppAddGame').value.trim(); // pre-filled from the dropdown, editable
             pending.c = $('ppAddComment').value.trim();
             list.push(pending);
@@ -18924,26 +18900,44 @@ ${contentToAnalyze}`;
             }
             return parts.join(' ');
         }
+        let autoCands = [];
         window.ppAutoFill = function () {
-            const root = window.moveTree;
+            const root = window.moveTree, box = $('ppAutoPick');
             if (!root || !root.children || !root.children.length) { showToast('Load a game with variations first'); return; }
             const ok = a => $('ppAutoInacc').checked ? /^\?[?!]?$/.test(a) : /^\?\??$/.test(a);
             const black = !!(window.board2 && window.board2.orientation() === 'black'), g = currentGameName();
-            let added = 0, dup = 0, seen = 0;
+            autoCands = [];
             for (let n = root.children[0]; n; n = n.children && n.children[0]) {
                 const par = n.parent;
                 if (!n.san || !ok(n.annotation || '') || !par || !par.fen || !par.children || par.children.length < 2) continue;
                 par.children.slice(1).forEach(alt => {
                     if (!alt.san || !alt.fen) return;
-                    seen++;
-                    const card = { fen: par.fen, black: black, l: par.san ? plyText(par) : '', g: g,
-                        c: alt.fen + ', Played ' + plyText(n) + ' \u2192 better: ' + lineText(alt) };
-                    if (list.some(x => x.fen === card.fen && x.c === card.c)) { dup++; return; }
-                    list.push(card); added++;
+                    autoCands.push({ label: 'Played ' + plyText(n) + ' \u2192 better ' + lineText(alt),
+                        card: { fen: par.fen, black: black, l: par.san ? plyText(par) : '', g: g,
+                            c: alt.fen + ', Better: ' + plyText(alt) + '\nPlayed ' + plyText(n) + ' \u2192 ' + lineText(alt) } });
                 });
             }
-            if (!seen) { showToast('No ? / ?? move with a better line in this game'); return; }
+            if (!autoCands.length) { box.style.display = 'none'; showToast('No ? / ?? move with a better line in this game'); return; }
+            box.style.display = 'block';
+            box.innerHTML = '<div style="color:#ccc; font-size:12px; margin-bottom:6px;">Tick the mistakes you want as cards:</div>'
+                + autoCands.map((c, k) => '<label style="display:block; color:#eee; font-size:12px; padding:3px 0;"><input type="checkbox" class="pp-auto-cb" data-k="' + k + '"> '
+                    + esc(c.label.length > 110 ? c.label.slice(0, 110) + '\u2026' : c.label) + '</label>').join('')
+                + '<div style="display:flex; gap:8px; margin-top:8px;">'
+                + '<button onclick="ppAutoAll()" style="padding:5px 10px; background:#16213e; color:#aaa; border:1px solid #444; border-radius:4px; cursor:pointer; font-size:12px;">Select all</button>'
+                + '<button onclick="ppAutoAdd()" style="padding:5px 12px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">Add selected</button>'
+                + '<button onclick="document.getElementById(\'ppAutoPick\').style.display=\'none\'" style="padding:5px 10px; background:#16213e; color:#aaa; border:1px solid #444; border-radius:4px; cursor:pointer; font-size:12px;">Close</button></div>';
+        };
+        window.ppAutoAll = function () { document.querySelectorAll('#ppAutoPick .pp-auto-cb').forEach(cb => { cb.checked = true; }); };
+        window.ppAutoAdd = function () {
+            let added = 0, dup = 0;
+            document.querySelectorAll('#ppAutoPick .pp-auto-cb:checked').forEach(cb => {
+                const c = autoCands[+cb.dataset.k]; if (!c) return;
+                if (list.some(x => x.fen === c.card.fen && x.c === c.card.c)) { dup++; return; }
+                list.push(Object.assign({}, c.card)); added++;
+            });
+            if (!added && !dup) { showToast('Tick at least one mistake'); return; }
             save(); renderList();
+            $('ppAutoPick').style.display = 'none';
             showToast('Added ' + added + ' card' + (added !== 1 ? 's' : '') + (dup ? ' (' + dup + ' already in the list)' : ''));
         };
 

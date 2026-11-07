@@ -4,7 +4,6 @@
   "outputDirectory": ".",
   "functions": {
     "api/*.py": {
-      "maxDuration": 60,
       "excludeFiles": "{react-chat-report-viewer,src,documentation,removed_features,repurposeCodeExamples,reducedHtml_chess-study-tool,rag_chess,preloaded_reports,preloaded,img,animatedFlashcards}/**"
     },
     "api/*.js": {
@@ -12,10 +11,6 @@
     }
   },
   "rewrites": [
-    {
-      "source": "/looker",
-      "destination": "/chessLooker.html"
-    },
     {
       "source": "/reformatter",
       "destination": "/textReformatter.html"
