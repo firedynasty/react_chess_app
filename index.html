@@ -9437,6 +9437,18 @@
             // position list had none of those).
             applyPgnStringToBoard(pgnWithOpening);
             log('Loaded game to board', 'success');
+
+            // Point the print list's Dropbox path at this game: /vercel/chess/<game>_<datetime>.json.
+            // ('chessPrintDropboxPath' is DBX_PATH_KEY inside the print-list IIFE; ppOpenList reads it each open.)
+            try {
+                const slug = selectedLabel.replace(/^Game\s+\d+:\s*/, '').toLowerCase()
+                    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'game';
+                const d = new Date(), p2 = n => String(n).padStart(2, '0');
+                const path = '/vercel/chess/' + slug + '_' + d.getFullYear() + p2(d.getMonth() + 1) + p2(d.getDate()) + '.json';
+                localStorage.setItem('chessPrintDropboxPath', path);
+                const inp = document.getElementById('ppDbxPath');
+                if (inp) inp.value = path;
+            } catch (e) {}
         }
 
         // =====================================================================
