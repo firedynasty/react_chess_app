@@ -1439,6 +1439,7 @@
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
+            <button id="copyVarBtnMini" title="The highlighted move is inside a variation: copy that whole variation as a From Position snippet (FEN = the branch position before the variation's first move, moves renumbered from 1)" onclick="lnCopyVarSnippet(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
             <button id="pgnLibBtnMini" title="PGN Library: load a JSON of games (or a folder of .pgn files) from your computer and browse them in a sidebar" onclick="plToggle()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📚 Library</button>
@@ -5632,6 +5633,37 @@
             const info = lnMoveInfoRow();
             if (!info) { showToast('Click a move in the move list first'); return; }
             await lnCopyText(info.text, btn, '✓ Copied', 'Copied move info: ' + info.label + ' — paste it into the Transfer box');
+        }
+
+        // The highlighted move sits inside a variation: walk up while the node is its parent's
+        // children[0] (main continuation) to the variation's first move v0; par = v0.parent is the
+        // branch point. Snippet = [FEN par.fen, clocks reset to "0 1"] + the variation's main chain,
+        // renumbered from 1 ("1... Kh8 2. Rfd1 Kg8 ..." when Black moves first, like Lichess).
+        function varFromPosSnippet(node) {
+            if (!node || !node.san) return null;
+            let v0 = node, par = node.parent;
+            while (par && par.parent && par.children && par.children[0] === v0) { v0 = par; par = par.parent; }
+            if (!par || !par.fen || (par.children && par.children[0] === v0)) return null; // on the main line
+            const f = par.fen.split(' ');
+            const fen = f.slice(0, 4).join(' ') + ' 0 1';
+            const parts = [];
+            let num = 1, turn = f[1] === 'b' ? 'b' : 'w';
+            for (let n = v0; n && n.san; n = n.children && n.children[0]) {
+                if (turn === 'w') parts.push(num + '.');
+                else if (n === v0) parts.push(num + '...');
+                parts.push(n.san + (n.annotation || ''));
+                if (turn === 'b') num++;
+                turn = turn === 'w' ? 'b' : 'w';
+            }
+            return '[Variant "From Position"]\n[FEN "' + fen + '"]\n\n' + parts.join(' ');
+        }
+
+        async function lnCopyVarSnippet(btn) {
+            const node = window.currentMoveNode;
+            if (!node || !node.san) { showToast('Click a move in the move list first'); return; }
+            const text = varFromPosSnippet(node);
+            if (!text) { showToast('That move is on the main line — click a move inside a variation'); return; }
+            await lnCopyText(text, btn, '✓ Copied', 'Copied the variation as a From Position snippet');
         }
 
         // ---- Transfer to puzzles: collect fen,note rows, then paste them into vercel_fen_saver's
@@ -18524,16 +18556,25 @@ ${contentToAnalyze}`;
       <div style="background:#16213e; border-radius:10px; padding:24px; max-width:1060px; width:94%; max-height:92vh; overflow-y:auto; border:1px solid #4caf50; position:relative;">
         <button onclick="ppCloseLine()" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
         <div style="font-weight:bold; margin-bottom:4px; color:#4caf50; font-size:15px;">Print a line</div>
-        <div style="color:#aaa; font-size:12px; margin-bottom:8px;">Paste a From Position snippet, a PGN, or a list of FENs (one per line). Every position is a board, moving left to right. ✕ removes one.</div>
+        <div style="color:#aaa; font-size:12px; margin-bottom:8px;">Paste a From Position snippet, a PGN, or a list of FENs (one per line). Every position is a board, moving left to right. ✕ removes one. ＋ Add to the set collects lines in the sidebar; Print set prints them all together.</div>
+        <div style="display:flex; gap:12px; align-items:flex-start;">
+          <div id="ppLineSide" style="width:170px; flex-shrink:0;"></div>
+          <div style="flex:1; min-width:0;">
         <input id="ppLineGame" type="text" spellcheck="false" autocomplete="off" oninput="ppLineGameChanged()" placeholder="Game name (printed above the moves; from the dropdown, edit or clear it)" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#a8d8ea; border:1px solid #555; border-radius:4px; padding:6px 8px; font-size:12px; margin-bottom:6px;">
         <textarea id="ppLineText" rows="5" spellcheck="false" oninput="ppLineChanged()" placeholder='[Variant "From Position"]&#10;[FEN "..."]&#10;&#10;1... Kh8 2. Rfd1 Kg8 ...' style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:6px;"></textarea>
-        <button onclick="ppLineChanged()" title="Read the text above again and redraw every board (also brings back removed boards)" style="width:100%; padding:7px; margin-bottom:6px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">↻ Redraw the boards</button>
+        <div style="display:flex; gap:8px; margin-bottom:6px;">
+          <button onclick="ppLineChanged()" title="Read the text above again and redraw every board (also brings back removed boards)" style="flex:1; padding:7px; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">↻ Redraw the boards</button>
+          <button onclick="ppLineAddToSet()" title="Collect this line (name, boards, removed boards, flip) in the sidebar on the left, so several lines can print together" style="flex:1; padding:7px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; cursor:pointer; font-weight:bold; font-size:13px;">＋ Add to the set</button>
+        </div>
         <div id="ppLineMsg" style="font-size:12px; min-height:16px; margin-bottom:6px; color:#ff6b6b;"></div>
         <div id="ppLineBoards" style="display:flex; flex-wrap:wrap; gap:14px; justify-content:center;"></div>
         <div style="display:flex; gap:8px; margin-top:12px;">
           <button onclick="ppLineFlip()" id="ppLineFlipBtn" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">White at bottom</button>
           <button onclick="ppLineRestore()" style="flex:1; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Restore removed</button>
-          <button onclick="ppLinePrint()" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print</button>
+          <button onclick="ppLinePrint()" title="Print just the line in the editor" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print</button>
+          <button onclick="ppLinePrintSet()" id="ppLinePrintSetBtn" title="Print every line in the sidebar set, one after another (each starts on a fresh sheet with its move list in the first cell)" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">🖨 Print set (0)</button>
+        </div>
+          </div>
         </div>
       </div>
     </div>
@@ -19082,6 +19123,7 @@ ${contentToAnalyze}`;
             lineParseNow();
             lineRm = new Set((d.rm || []).filter(i => i < linePos.length));
             lineRender();
+            lineSetLoad(); lineSetRender();
             $('ppLineModal').style.display = 'flex';
             $('ppLineText').focus();
         };
@@ -19091,19 +19133,62 @@ ${contentToAnalyze}`;
         window.ppLineRemove = function (i) { lineRm.add(i); lineSave(); lineRender(); };
         window.ppLineRestore = function () { lineRm = new Set(); lineSave(); lineRender(); };
         window.ppLineFlip = function () { lineBlack = !lineBlack; lineSave(); lineRender(); };
-        window.ppLinePrint = function () {
-            const kept = linePos.filter((p, i) => !lineRm.has(i)), per = LINE_COLS * LINE_ROWS;
-            if (!kept.length) { showToast('Nothing to print: paste a snippet first'); return; }
-            // Same sheet as the flashcards (2 x 4, 8 per Letter sheet). The first cell lists the move order.
-            const cells = [{ moves: lineMoves, game: $('ppLineGame').value.trim() }].concat(kept);
+
+        // ── The set: collected lines (sidebar), printed together ──
+        const LINES_KEY = 'chessPrintLines';
+        let lineSet = [], lineSel = -1;
+        function lineSetSave() { try { localStorage.setItem(LINES_KEY, JSON.stringify(lineSet)); } catch (e) {} }
+        function lineSetLoad() { try { const a = JSON.parse(localStorage.getItem(LINES_KEY) || '[]'); lineSet = Array.isArray(a) ? a.filter(x => x && typeof x.t === 'string') : []; } catch (e) { lineSet = []; } }
+        function lineSetRender() {
+            const side = $('ppLineSide');
+            side.innerHTML = '<div style="color:#ff9800; font-size:11px; font-weight:bold; margin-bottom:4px;">Set (' + lineSet.length + ')</div>'
+                + (lineSet.length ? lineSet.map((en, i) => {
+                    const r = parseLine(en.t), kept = r.pos.length - (en.rm || []).filter(k => k < r.pos.length).length;
+                    const name = (en.g || '').trim() || (r.moves || '(empty)').slice(0, 42);
+                    return '<div onclick="ppLinePick(' + i + ')" title="' + esc(r.moves.slice(0, 200)) + '" style="cursor:pointer; padding:6px; margin-bottom:4px; background:#0f3460; border:1px solid ' + (i === lineSel ? '#ff9800' : '#444') + '; border-radius:4px;">'
+                        + '<div style="display:flex; justify-content:space-between; gap:4px;"><span style="color:#a8d8ea; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(name) + '</span>'
+                        + '<span onclick="ppLineDel(' + i + ',event)" title="Remove from the set" style="color:#c0392b; cursor:pointer; flex-shrink:0;">✕</span></div>'
+                        + '<div style="color:#888; font-size:10px;">' + kept + ' board' + (kept !== 1 ? 's' : '') + (en.b ? ' · black at bottom' : '') + '</div></div>';
+                }).join('') : '<div style="color:#666; font-size:11px;">Empty — ＋ Add to the set collects the line below.</div>');
+            $('ppLinePrintSetBtn').textContent = '🖨 Print set (' + lineSet.length + ')';
+        }
+        window.ppLineAddToSet = function () {
+            if (!$('ppLineText').value.trim() || !linePos.length) { showToast('Nothing to add: paste a snippet first'); return; }
+            const en = { t: $('ppLineText').value, g: $('ppLineGame').value, rm: Array.from(lineRm), b: lineBlack };
+            const dup = lineSet.findIndex(x => x.t === en.t); // same snippet text = same line: update it in place
+            if (dup >= 0) { lineSet[dup] = en; lineSel = dup; showToast('Updated line ' + (dup + 1) + ' in the set'); }
+            else { lineSet.push(en); lineSel = lineSet.length - 1; showToast('Added to the set (' + lineSet.length + ' line' + (lineSet.length !== 1 ? 's' : '') + ')'); }
+            lineSetSave(); lineSetRender();
+        };
+        window.ppLinePick = function (i) {
+            const en = lineSet[i]; if (!en) return;
+            $('ppLineText').value = en.t; $('ppLineGame').value = en.g || '';
+            lineBlack = !!en.b;
+            lineParseNow();
+            lineRm = new Set((en.rm || []).filter(k => k < linePos.length));
+            lineSel = i;
+            lineSave(); lineRender(); lineSetRender();
+        };
+        window.ppLineDel = function (i, ev) {
+            if (ev) ev.stopPropagation();
+            lineSet.splice(i, 1);
+            if (lineSel === i) lineSel = -1; else if (lineSel > i) lineSel--;
+            lineSetSave(); lineSetRender();
+        };
+
+        // Same sheet as the flashcards (2 x 4, 8 per Letter sheet). The first cell of each line lists its moves.
+        function lineSheetsHtml(allCells, per) {
             let sheets = '';
-            for (let i = 0; i < cells.length; i += per) {
-                const chunk = cells.slice(i, i + per);
+            for (let i = 0; i < allCells.length; i += per) {
+                const chunk = allCells.slice(i, i + per);
                 while (chunk.length < per) chunk.push(null);
                 sheets += '<div class="sheet">' + chunk.map(p => !p ? '<div class="card empty"></div>'
                     : p.moves != null ? '<div class="card"><div>' + (p.game ? '<div class="gn">' + esc(p.game) + '</div>' : '') + '<div class="mv' + (p.moves.length > 420 ? ' sm' : '') + '">' + (esc(p.moves) || 'Start position') + '</div></div></div>'
-                    : '<div class="card fen">' + boardSvg(p.fen, lineBlack, 'width:2.2in;height:2.2in;') + '<div class="lb">' + esc(p.label) + '</div></div>').join('') + '</div>';
+                    : '<div class="card fen">' + boardSvg(p.fen, p.black, 'width:2.2in;height:2.2in;') + '<div class="lb">' + esc(p.label) + '</div></div>').join('') + '</div>';
             }
+            return sheets;
+        }
+        function linePrintHtml(sheets) {
             const html = '<!doctype html><html><head><meta charset="utf-8"><title>Line</title><style>'
                 + '@page{size:letter portrait;margin:0}'
                 + 'html,body{margin:0;background:#fff;color:#000;font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif}'
@@ -19122,6 +19207,28 @@ ${contentToAnalyze}`;
             f.onload = function () { f.contentWindow.focus(); f.contentWindow.print(); setTimeout(function () { f.remove(); }, 60000); };
             f.srcdoc = html;
             document.body.appendChild(f);
+        }
+        window.ppLinePrint = function () {
+            const kept = linePos.filter((p, i) => !lineRm.has(i)), per = LINE_COLS * LINE_ROWS;
+            if (!kept.length) { showToast('Nothing to print: paste a snippet first'); return; }
+            const cells = [{ moves: lineMoves, game: $('ppLineGame').value.trim() }]
+                .concat(kept.map(p => ({ fen: p.fen, label: p.label, black: lineBlack })));
+            linePrintHtml(lineSheetsHtml(cells, per));
+        };
+        window.ppLinePrintSet = function () {
+            if (!lineSet.length) { showToast('The set is empty: ＋ Add to the set first'); return; }
+            const per = LINE_COLS * LINE_ROWS, cells = [];
+            let skipped = 0;
+            lineSet.forEach(en => {
+                const r = parseLine(en.t), rm = new Set(en.rm || []);
+                const kept = r.pos.filter((p, i) => !rm.has(i));
+                if (!kept.length) { skipped++; return; }
+                cells.push({ moves: r.moves, game: (en.g || '').trim() });
+                kept.forEach(p => cells.push({ fen: p.fen, label: p.label, black: !!en.b }));
+            });
+            if (!cells.length) { showToast('Every line in the set has all its boards removed'); return; }
+            linePrintHtml(lineSheetsHtml(cells, per));
+            if (skipped) showToast('Skipped ' + skipped + ' empty line' + (skipped !== 1 ? 's' : ''));
         };
         refreshCount();
     })();
