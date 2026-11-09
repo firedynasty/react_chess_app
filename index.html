@@ -19487,6 +19487,11 @@ ${contentToAnalyze}`;
           <button onclick="mmRun()" style="background:#0f3460; color:#00d4ff; border:1px solid #00d4ff; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:13px; font-weight:bold;">Run</button>
           <button onclick="mmCopy()" title="All of it as branch notes: FEN snippets + the lines, ready to paste into an LLM" style="background:#0f3460; color:#a8d8ea; border:1px solid #a8d8ea; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">Copy all notes</button>
           <button onclick="mmExplainAll()" title="Ask OpenAI to explain the moves no rule could tag, from the facts and lines only" style="background:#0f3460; color:#ffd43b; border:1px solid #ffd43b; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">Explain untagged</button>
+          <span style="color:#888; font-size:12px;">play out</span>
+          <input id="mmPlayoutPlies" type="number" min="0" max="200" step="2" value="16"
+                 title="How many plies a Play out adds to a line. 0 = carry on to mate or a draw."
+                 style="width:58px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:4px 6px; font-size:13px;">
+          <span style="color:#888; font-size:12px;">plies</span>
           <span id="mmStatus" style="color:#ffa94d; font-size:12px; flex:1;"></span>
           <button onclick="mmClose()" style="background:none; border:none; color:#c0392b; font-size:20px; cursor:pointer;">&times;</button>
         </div>
@@ -19998,21 +20003,40 @@ ${contentToAnalyze}`;
         function label(n) { return n.moveNumber + (n.isBlackMove ? '… ' : '. ') + n.san + (n.annotation || ''); }
         function pawns(cp) { return (cp / 100).toFixed(2); }
 
+        // A long line is clipped in the list; the pane and the notes keep all of it
+        function lineText(san) {
+            return san.length <= 14 ? san.join(' ')
+                 : san.slice(0, 14).join(' ') + ' … +' + (san.length - 14) + ' more';
+        }
+
         function branchHtml(mi, bi, b) {
-            const active = pane && pane.key === (mi + ':' + bi);
+            const key = mi + ':' + bi;
+            const active = pane && pane.key === key;
+            const busy = mmBusyKey === key;
+            const po = b.playout
+                ? '<div style="color:#2ecc71; font-size:11.5px; margin-top:3px;">played out '
+                  + b.playout.added + ' more plies — ' + esc(b.playout.outcome)
+                  + (b.playout.evalEnd === null ? '' : ', ending ' + pawns(b.playout.evalEnd) + ' (White’s view)')
+                  + '</div>'
+                : '';
             return '<div style="margin-top:7px; border-left:2px solid ' + (active ? '#00d4ff' : '#27406b') + '; padding-left:8px;">'
                 + '<div style="display:flex; gap:7px; align-items:baseline; flex-wrap:wrap;">'
                 +   '<button onclick="mmPlay(' + mi + ',' + bi + ')" style="background:' + (active ? '#00d4ff' : '#0f3460')
                 +     '; color:' + (active ? '#06243a' : '#00d4ff') + '; border:1px solid #00d4ff; border-radius:4px; padding:2px 9px; cursor:pointer; font-size:11.5px; font-weight:bold;">'
                 +     (active ? '▶ Showing' : '▶ Step') + '</button>'
+                +   '<button onclick="mmPlayOut(' + mi + ',' + bi + ')" title="Engine plays both sides on from the end of this line, so you can see the damage actually land"'
+                +     ' style="background:' + (busy ? '#2ecc71' : '#0f3460') + '; color:' + (busy ? '#06243a' : '#2ecc71')
+                +     '; border:1px solid #2ecc71; border-radius:4px; padding:2px 9px; cursor:pointer; font-size:11.5px; font-weight:bold;">'
+                +     (busy ? 'Stop' : '⏩ Play out') + '</button>'
                 +   '<span style="color:#a8d8ea; font-size:12px;">' + esc(b.label) + ':</span>'
-                +   '<span style="color:#ddd; font-family:monospace; font-size:12px;">' + esc(b.san.join(' ')) + '</span>'
+                +   '<span style="color:#ddd; font-family:monospace; font-size:12px;">' + esc(lineText(b.san)) + '</span>'
                 +   '<span style="color:#666; font-size:11px;">(' + esc(b.source) + ')</span>'
-                + '</div></div>';
+                + '</div>' + po + '</div>';
         }
 
         function render(list, mine, thresholdCp) {
             lastMine = mine; lastThreshold = thresholdCp;
+            const keepScroll = $m('mmBody') ? $m('mmBody').scrollTop : 0;
             const counts = {};
             list.forEach(f => {
                 (f.tags.length ? f.tags : [{ tag: 'untagged' }]).forEach(t => { counts[t.tag] = (counts[t.tag] || 0) + 1; });
@@ -20059,6 +20083,7 @@ ${contentToAnalyze}`;
                         + explainHtml(f)
                         + '</div>';
                 }).join('');
+            if ($m('mmBody')) $m('mmBody').scrollTop = keepScroll;
         }
 
         // Clicking the move does both: loads the position onto pane 2's board â
@@ -20100,7 +20125,11 @@ ${contentToAnalyze}`;
             }
             (f.branches || []).forEach(b => {
                 if (!b.note) return;
-                out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + '):', b.note);
+                const tail = b.playout
+                    ? ' [played on by the engine to: ' + b.playout.outcome
+                      + (b.playout.evalEnd === null ? '' : ', ending ' + pawns(b.playout.evalEnd) + ' from White’s view') + ']'
+                    : '';
+                out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + ')' + tail + ':', b.note);
             });
             return out.join('\n');
         }
@@ -20233,9 +20262,94 @@ ${contentToAnalyze}`;
             if (typeof showToast === 'function') showToast('Explained ' + todo.length + ' untagged move(s)');
         };
 
+        // ---- play out a branch ------------------------------------------
+        // The refutation PV stops after a handful of plies, which is why a
+        // move can look bad without the damage ever showing. This walks the
+        // line on exactly the terms Play Out uses (runPlayOut): re-search
+        // every ply at variation depth and take the engine's best move, until
+        // mate/draw or the ply cap. It runs on the analysis pool, not the main
+        // `stockfish` worker, so the board's own engine is left alone.
+        let mmBusyKey = null, mmCancel = false;
+
+        function outcomeOf(board, capped, cancelled) {
+            if (board.in_checkmate()) return (board.turn() === 'w' ? 'Black' : 'White') + ' mates';
+            if (board.in_stalemate()) return 'stalemate';
+            if (board.insufficient_material()) return 'draw, insufficient material';
+            if (board.in_threefold_repetition()) return 'draw by repetition';
+            if (board.in_draw()) return 'draw';
+            if (cancelled) return 'stopped';
+            return capped ? 'still going' : 'no engine move';
+        }
+
+        async function playOutFrom(fen, maxPlies, onTick) {
+            const res = { san: [], outcome: 'no engine move', evalEnd: null };
+            let b;
+            try { b = new Chess(fen); } catch (e) { return res; }
+            if (!b.fen()) return res;
+            const depth = Math.min(parseInt((document.getElementById('variation-depth') || {}).value, 10) || 12, 14);
+            const pool = await getAnalysisPool();
+            const w = pool[0];
+            const cap = maxPlies > 0 ? maxPlies : 400;
+            while (!b.game_over() && res.san.length < cap && !mmCancel) {
+                if (onTick) onTick(res.san.length);
+                const r = await analyzePositionOn(w, b.fen(), depth);
+                if (!r || !r.pvUci || !r.pvUci.length) break;
+                res.evalEnd = b.turn() === 'w' ? r.evaluation : -r.evaluation;   // White's view
+                const u = r.pvUci[0];
+                let mv = null;
+                try {
+                    mv = b.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u.length > 4 ? u[4] : undefined });
+                } catch (e) { mv = null; }
+                if (!mv) break;
+                res.san.push(mv.san);
+            }
+            res.outcome = outcomeOf(b, res.san.length >= cap, mmCancel);
+            return res;
+        }
+
+        window.mmPlayOut = async function (mi, bi) {
+            const key = mi + ':' + bi;
+            if (mmBusyKey === key) { mmCancel = true; return; }      // click again = stop
+            if (mmBusyKey) { if (typeof showToast === 'function') showToast('A play-out is already running'); return; }
+            const f = lastReview[mi];
+            const b = f && f.branches && f.branches[bi];
+            if (!b || !b.plies || !b.plies.length) return;
+
+            const cap = Math.max(0, Math.min(200, parseInt($m('mmPlayoutPlies').value, 10)));
+            mmBusyKey = key; mmCancel = false;
+            render(lastReview, lastMine, lastThreshold);
+
+            const from = b.plies[b.plies.length - 1].fen;    // carry on from where the line stops
+            try {
+                const out = await playOutFrom(from, isNaN(cap) ? 16 : cap, (n) => {
+                    $m('mmStatus').textContent = 'Playing out ' + b.label.toLowerCase() + '… ' + n + ' plies';
+                });
+                if (out.san.length) {
+                    b.san = b.san.concat(out.san);
+                    b.note = fromPos(b.base, b.san);
+                    b.plies = buildPlies(b.base, b.san);
+                    b.playout = { added: out.san.length, outcome: out.outcome, evalEnd: out.evalEnd };
+                    if (pane && pane.key === key) {          // keep the pane in step
+                        const at = pane.idx;
+                        window.mmPlay(mi, bi);
+                        window.mmGo(at);
+                    }
+                    if (typeof showToast === 'function') showToast('Played out ' + out.san.length + ' plies — ' + out.outcome);
+                } else if (typeof showToast === 'function') {
+                    showToast('Nothing to play out: ' + out.outcome);
+                }
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('Play-out failed: ' + e.message);
+                if (typeof log === 'function') log('Mistake-review play-out failed: ' + e.message, 'warning');
+            }
+            mmBusyKey = null; mmCancel = false;
+            $m('mmStatus').textContent = '';
+            render(lastReview, lastMine, lastThreshold);
+        };
+
         // Exposed so the detectors can be poked from the console (and tested)
         window.mmDebug = { attackersOf, targetsOf, tagMistake, uciLineToSan, fromPos, buildPlies,
-                           siblingLines, noteText, boardSvgMm, askOpenAI, review: () => lastReview,
+                           siblingLines, noteText, boardSvgMm, askOpenAI, playOutFrom, review: () => lastReview,
                            pane: () => pane };
     })();
     </script>
