@@ -1423,6 +1423,7 @@
             <button id="loadToBoardMini"title="Load the PGN in the text box (or the clipboard if it is empty) to the board — same as Load to Board" onclick="loadPgnToBoard()" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load to Board</button>
             <button id="ppAddBtn" title="Take the FEN of the position on the board (main line or variation), ask for a comment, and add it to the print list" onclick="ppOpenAdd()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">+ For Print (0)</button>
             <button id="ppOneShotBtn" title="Stand on the move BEFORE a mistake (the highlighted move), then one click: opens the add dialog with that position as the front and the back already filled from the better line" onclick="ppOneShot()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚡ 1 shot</button>
+            <button id="mmBtn" title="Stockfish checks the game on the board for your eval drops, then names the cause from its refutation line: hanging piece, fork, or untagged" onclick="mmOpen()" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">🔍 What went wrong</button>
             <button id="exportFenBtnMini" title="Export the FEN of the position on the board (White-to-move and Black-to-move) — same as Export FEN" onclick="document.getElementById('exportFenBtn').click()" style="background: #ff9800; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Export FEN</button>
             <button id="ppLineBtn" title="Paste a From Position snippet (FEN + moves) and print the line as boards moving left to right, one per move; ✕ removes a board" onclick="ppOpenLine()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Print Line</button>
             <button id="ppListBtn" title="Review the print list, edit comments, and print it (6 positions per page)" onclick="ppOpenList()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Print List</button>
@@ -19457,6 +19458,786 @@ ${contentToAnalyze}`;
         btn.disabled = false;
         btn.textContent = origText;
     }
+    </script>
+    <!-- ===================================================================
+         MISTAKE REVIEW (prototype) — "What went wrong"
+         Load a game, click the button: Stockfish flags your eval drops,
+         rule-based checks name the cause off the refutation line (hanging
+         piece / fork), and every mistake carries its branch notes — the
+         line you should have played, the punishment you escaped when the
+         reply blundered too — as From Position snippets.
+         Pane 2 steps through any branch on a board, the way vercel_fen_saver
+         walks a line: parse the snippet once into a FEN per ply, then move
+         between them. No server, no storage.
+         =================================================================== -->
+    <div id="mmModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:10000; align-items:center; justify-content:center;">
+      <div style="background:#16213e; border:1px solid #00d4ff; border-radius:10px; width:min(1120px,96vw); max-height:92vh; display:flex; flex-direction:column;">
+        <div style="padding:12px 18px; border-bottom:1px solid #0f3460; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <strong style="color:#00d4ff; font-size:16px;">What went wrong</strong>
+          <span style="color:#888; font-size:12px;">drop over</span>
+          <input id="mmThreshold" type="number" min="20" max="900" step="10" value="100"
+                 style="width:70px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:4px 6px; font-size:13px;">
+          <span style="color:#888; font-size:12px;">cp</span>
+          <select id="mmSide" style="background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:4px 6px; font-size:13px;">
+            <option value="auto">my moves (auto)</option>
+            <option value="w">White's moves</option>
+            <option value="b">Black's moves</option>
+            <option value="both">both sides</option>
+          </select>
+          <button onclick="mmRun()" style="background:#0f3460; color:#00d4ff; border:1px solid #00d4ff; border-radius:6px; padding:6px 14px; cursor:pointer; font-size:13px; font-weight:bold;">Run</button>
+          <button onclick="mmCopy()" title="All of it as branch notes: FEN snippets + the lines, ready to paste into an LLM" style="background:#0f3460; color:#a8d8ea; border:1px solid #a8d8ea; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">Copy all notes</button>
+          <button onclick="mmExplainAll()" title="Ask OpenAI to explain the moves no rule could tag, from the facts and lines only" style="background:#0f3460; color:#ffd43b; border:1px solid #ffd43b; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:13px;">Explain untagged</button>
+          <span id="mmStatus" style="color:#ffa94d; font-size:12px; flex:1;"></span>
+          <button onclick="mmClose()" style="background:none; border:none; color:#c0392b; font-size:20px; cursor:pointer;">&times;</button>
+        </div>
+        <div id="mmBody" style="padding:14px 18px; overflow-y:auto; display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap; flex:1; min-height:0;">
+          <div id="mmList" style="flex:1 1 400px; min-width:0; color:#eee; font-size:13px; line-height:1.55;"></div>
+          <div id="mmPane" style="flex:0 0 340px; max-width:100%; position:sticky; top:0;"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    (function () {
+        const VAL  = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 100 };
+        const NAME = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+        const GLY  = { K: ['♔', '♚'], Q: ['♕', '♛'], R: ['♖', '♜'],
+                       B: ['♗', '♝'], N: ['♘', '♞'], P: ['♙', '♟'] };
+        const MAX_PLIES = 8;
+        const $m = (id) => document.getElementById(id);
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        let lastReview = [];
+        let pane = null;   // { plies, idx, flipped, title, snippet, key }
+
+        // ---- board helpers (chess.js 0.10 here: no attackers()/isAttacked()) ----
+
+        function fenWithTurn(fen, color) {
+            const f = String(fen).split(' ');
+            if (f.length < 4) return null;
+            f[1] = color; f[3] = '-'; f[4] = '0';
+            return f.join(' ');
+        }
+
+        // Every piece of `color` that could capture on `square`. Drop an enemy
+        // queen on the square and ask for legal moves: whatever can take it
+        // attacks the square. Clearing the square first is deliberate — for a
+        // defender count that is exactly "who recaptures after it is taken".
+        // Legal (not pseudo-legal) generation means a pinned piece correctly
+        // does not count, and a pawn's forward push is never a defence.
+        // Known gap: an x-ray defender queued behind another (Q behind R on a
+        // file) is not counted; it never flips the defended / undefended call.
+        function attackersOf(fen, square, color) {
+            const f = fenWithTurn(fen, color);
+            if (!f) return [];
+            let probe;
+            try { probe = new Chess(f); } catch (e) { return []; }
+            if (!probe.fen()) return [];
+            probe.remove(square);
+            probe.put({ type: 'q', color: color === 'w' ? 'b' : 'w' }, square);
+            let moves = [];
+            try { moves = probe.moves({ verbose: true }); } catch (e) { return []; }
+            return moves.filter(m => m.to === square && m.flags.indexOf('c') !== -1)
+                        .map(m => ({ from: m.from, piece: m.piece }));
+        }
+
+        function kingSquare(fen, color) {
+            const f = fenWithTurn(fen, color);
+            if (!f) return null;
+            let b, k = null;
+            try { b = new Chess(f); } catch (e) { return null; }
+            b.board().forEach((row, r) => row.forEach((p, c) => {
+                if (p && p.type === 'k' && p.color === color) k = 'abcdefgh'[c] + (8 - r);
+            }));
+            return k;
+        }
+
+        // Pieces of victimColor that the piece on `from` can take, king included.
+        // chess.js does generate a capture onto the enemy king square, so the
+        // explicit check probe can duplicate it — keyed by square to dedupe.
+        function targetsOf(fen, from, victimColor) {
+            const mover = victimColor === 'w' ? 'b' : 'w';
+            const f = fenWithTurn(fen, mover);
+            if (!f) return [];
+            let probe;
+            try { probe = new Chess(f); } catch (e) { return []; }
+            if (!probe.fen()) return [];
+            const bySquare = new Map();
+            probe.moves({ verbose: true })
+                 .filter(m => m.from === from && m.flags.indexOf('c') !== -1)
+                 .forEach(m => bySquare.set(m.to, { square: m.to, piece: m.captured }));
+            const kSq = kingSquare(fen, victimColor);
+            if (kSq && attackersOf(fen, kSq, mover).some(a => a.from === from)) {
+                bySquare.set(kSq, { square: kSq, piece: 'k' });
+            }
+            return Array.from(bySquare.values());
+        }
+
+        function uciLineToSan(fen, uci, max) {
+            const out = [];
+            let b;
+            try { b = new Chess(fen); } catch (e) { return out; }
+            if (!b.fen()) return out;
+            for (const u of (uci || []).slice(0, max || MAX_PLIES)) {
+                if (!u || u.length < 4) break;
+                let mv = null;
+                try {
+                    mv = b.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u.length > 4 ? u[4] : undefined });
+                } catch (e) { break; }
+                if (!mv) break;
+                out.push(mv.san);
+            }
+            return out;
+        }
+
+        // ---- branch notes: the same From Position snippet the rest of the app
+        // passes around (Copy Var, Add Var. 2, the print list). Clocks reset to
+        // "0 1" and the moves renumbered from 1, so a line that starts on a
+        // Black move opens "1... Bc4+" exactly like Lichess.
+        function posBase(fen) {
+            const f = String(fen || '').split(' ');
+            return f.length >= 4 ? f.slice(0, 4).join(' ') + ' 0 1' : null;
+        }
+
+        function fromPos(baseFen, sanList) {
+            const base = posBase(baseFen);
+            if (!base || !sanList || !sanList.length) return null;
+            const parts = [];
+            let num = 1, turn = base.split(' ')[1] === 'b' ? 'b' : 'w';
+            sanList.forEach((san, i) => {
+                if (turn === 'w') parts.push(num + '.');
+                else if (i === 0) parts.push(num + '...');
+                parts.push(san);
+                if (turn === 'b') num++;
+                turn = turn === 'w' ? 'b' : 'w';
+            });
+            return '[Variant "From Position"]\n[FEN "' + base + '"]\n\n' + parts.join(' ');
+        }
+
+        // One FEN per ply, the way vercel_fen_saver's lineLoad/lineGo walk a
+        // line: resolve the whole branch up front, then stepping is just an index.
+        function buildPlies(baseFen, sanList) {
+            const base = posBase(baseFen);
+            if (!base) return [];
+            const out = [{ fen: base, san: null, label: 'start' }];
+            let b;
+            try { b = new Chess(base); } catch (e) { return out; }
+            if (!b.fen()) return out;
+            let num = 1, turn = base.split(' ')[1] === 'b' ? 'b' : 'w';
+            for (const san of (sanList || [])) {
+                let mv = null;
+                try { mv = b.move(String(san).replace(/[?!]+$/, '')); } catch (e) { mv = null; }
+                if (!mv) break;
+                out.push({ fen: b.fen(), san: san,
+                           label: num + (turn === 'w' ? '. ' : '… ') + san });
+                if (turn === 'b') num++;
+                turn = turn === 'w' ? 'b' : 'w';
+            }
+            return out;
+        }
+
+        function chainSan(first, max) {
+            const out = [];
+            for (let n = first; n && n.san && out.length < (max || MAX_PLIES); n = n.children && n.children[0]) {
+                out.push(n.san + (n.annotation || ''));
+            }
+            return out;
+        }
+
+        // The alternatives already sitting in the move tree next to `node` —
+        // the ( ... ) variations an earlier Analyze run wrote into the PGN.
+        function siblingLines(node) {
+            if (!node || !node.parent || !node.parent.children) return [];
+            return node.parent.children.filter(c => c !== node && c.san).map(c => chainSan(c, MAX_PLIES));
+        }
+
+        function branch(baseFen, sanList, label, source) {
+            if (!sanList || !sanList.length) return null;
+            return { base: posBase(baseFen), san: sanList, label: label, source: source,
+                     note: fromPos(baseFen, sanList), plies: buildPlies(baseFen, sanList) };
+        }
+
+        // ---- the tagger: read the cause off the engine's refutation line ----
+        function tagMistake(fenAfter, refSan, myColor) {
+            const tags = [];
+            if (!refSan || !refSan.length) return tags;
+            const opp = myColor === 'w' ? 'b' : 'w';
+            let board;
+            try { board = new Chess(fenAfter); } catch (e) { return tags; }
+            if (!board.fen()) return tags;
+            let mv = null;
+            try { mv = board.move(String(refSan[0]).replace(/[?!]+$/, '')); } catch (e) { return tags; }
+            if (!mv) return tags;
+            const fenAfterRef = board.fen();
+
+            if (mv.captured && (mv.flags.indexOf('c') !== -1 || mv.flags.indexOf('e') !== -1)) {
+                const defenders = attackersOf(fenAfter, mv.to, myColor);
+                const attackers = attackersOf(fenAfter, mv.to, opp);
+                if (attackers.length && !defenders.length) {
+                    tags.push({
+                        tag: 'hanging piece',
+                        text: 'Your ' + NAME[mv.captured] + ' on ' + mv.to + ' was attacked by the '
+                            + NAME[mv.piece] + ' on ' + mv.from + ' and had no defender — ' + mv.san + ' just takes it.'
+                    });
+                } else if (attackers.length && VAL[mv.captured] - VAL[mv.piece] >= 2) {
+                    tags.push({
+                        tag: 'under-defended',
+                        text: 'Your ' + NAME[mv.captured] + ' on ' + mv.to + ' was defended '
+                            + defenders.length + '× but traded down: ' + mv.san + ' gives up a '
+                            + NAME[mv.captured] + ' for a ' + NAME[mv.piece] + '.'
+                    });
+                }
+            }
+
+            const hits = targetsOf(fenAfterRef, mv.to, myColor).filter(t => t.piece && VAL[t.piece] >= 3);
+            if (hits.length >= 2) {
+                const list = hits.map(h => 'your ' + NAME[h.piece] + ' on ' + h.square).join(' and ');
+                tags.push({
+                    tag: 'fork',
+                    text: 'After ' + mv.san + ' the ' + NAME[mv.piece] + ' on ' + mv.to + ' hits ' + list + ' at once.'
+                });
+            }
+            return tags;
+        }
+
+        // ---- the run ----
+
+        function myColorGuess() {
+            const g = window.supabaseLoadedGame;
+            if (g && (g.my_color === 'white' || g.my_color === 'black')) return g.my_color[0];
+            try { if (window.board2 && window.board2.orientation) return window.board2.orientation() === 'black' ? 'b' : 'w'; } catch (e) { }
+            return 'w';
+        }
+
+        window.mmOpen = function () {
+            $m('mmModal').style.display = 'flex';
+            if (!lastReview.length) {
+                $m('mmList').innerHTML = '<div style="color:#888;">Click <b>Run</b> to check the game on the board.</div>';
+                renderPane();
+            }
+        };
+        window.mmClose = function () { $m('mmModal').style.display = 'none'; };
+
+        window.mmRun = async function () {
+            const root = window.moveTree;
+            if (!root || !root.children || !root.children.length) {
+                $m('mmList').innerHTML = '<div style="color:#ff6b6b;">No game on the board. Load one first.</div>';
+                return;
+            }
+            if (typeof getAnalysisPool !== 'function' || typeof analyzePositionOn !== 'function') {
+                $m('mmList').innerHTML = '<div style="color:#ff6b6b;">The Stockfish worker pool is not available on this page.</div>';
+                return;
+            }
+
+            const nodes = [];
+            for (let n = root.children[0]; n && n.san; n = n.children && n.children[0]) nodes.push(n);
+            if (!nodes.length) { $m('mmList').innerHTML = '<div style="color:#ff6b6b;">That game has no main line.</div>'; return; }
+
+            const want = $m('mmSide').value;
+            const mine = want === 'auto' ? myColorGuess() : want;
+            const thresholdCp = Math.max(20, parseInt($m('mmThreshold').value, 10) || 100);
+            const depth = Math.min(parseInt((document.getElementById('depth') || {}).value, 10) || 12, 14);
+
+            const fens = [root.fen].concat(nodes.map(n => n.fen));
+            if (fens.some(f => !f)) { $m('mmList').innerHTML = '<div style="color:#ff6b6b;">Some positions have no FEN — reload the game to the board.</div>'; return; }
+
+            const evalMap = window.positionEvalMap || {};
+            const pvMap = Object.assign({}, window.positionPvMap || {});
+            const evals = new Array(fens.length).fill(null);
+            const todo = [];
+            fens.forEach((f, i) => {
+                if (evalMap[f] !== undefined && evalMap[f] !== null) evals[i] = evalMap[f];
+                else todo.push(i);
+            });
+
+            const setStatus = (s) => { $m('mmStatus').textContent = s; };
+            setStatus(todo.length ? 'Stockfish: ' + todo.length + ' position(s) to eval…' : 'Using cached evals…');
+            $m('mmList').innerHTML = '<div style="color:#888;">Working…</div>';
+
+            try {
+                if (todo.length) {
+                    const pool = await getAnalysisPool();
+                    let next = 0, done = 0;
+                    await Promise.all(pool.map(async (w) => {
+                        while (next < todo.length) {
+                            const i = todo[next++];
+                            const r = await analyzePositionOn(w, fens[i], depth);
+                            if (r && r.depth > 0) {
+                                evals[i] = fens[i].split(' ')[1] === 'w' ? r.evaluation : -r.evaluation;
+                                if (r.pvUci && r.pvUci.length) pvMap[fens[i]] = r.pvUci;
+                            }
+                            done++;
+                            if (done % 5 === 0 || done === todo.length) setStatus('Stockfish: ' + done + '/' + todo.length + '…');
+                        }
+                    }));
+                }
+
+                // How much the side that just moved gave away, in centipawns
+                const lossAt = (i) => {
+                    const before = evals[i], after = evals[i + 1];
+                    if (before === null || after === null) return null;
+                    return nodes[i].isBlackMove ? after - before : before - after;
+                };
+
+                const flagged = [];
+                for (let i = 0; i < nodes.length; i++) {
+                    const side = nodes[i].isBlackMove ? 'b' : 'w';
+                    if (mine !== 'both' && side !== mine) continue;
+                    if (evals[i] === null || Math.abs(evals[i]) >= 600) continue;  // already decided: swings are noise
+                    const loss = lossAt(i);
+                    if (loss === null || loss < thresholdCp) continue;
+                    flagged.push({ i, node: nodes[i], side, fenBefore: fens[i], fenAfter: fens[i + 1],
+                                   before: evals[i], after: evals[i + 1], loss });
+                }
+
+                if (!flagged.length) {
+                    lastReview = []; pane = null;
+                    setStatus('');
+                    $m('mmList').innerHTML = '<div style="color:#51cf66;">Nothing over ' + thresholdCp
+                        + ' cp for ' + (mine === 'both' ? 'either side' : mine === 'w' ? 'White' : 'Black')
+                        + ' in this game.</div>';
+                    renderPane();
+                    return;
+                }
+
+                // Refutation line for each flagged move, and for the reply that
+                // followed it — the reply's own refutation is the punishment
+                // that never came when the reply was a blunder too.
+                const needPv = [];
+                flagged.forEach(f => {
+                    if (!pvMap[f.fenAfter]) needPv.push(f.fenAfter);
+                    const replyFen = fens[f.i + 2];
+                    if (replyFen && !pvMap[replyFen]) needPv.push(replyFen);
+                });
+                if (needPv.length) {
+                    setStatus('Refutation lines: ' + needPv.length + '…');
+                    const pool = await getAnalysisPool();
+                    let next = 0;
+                    await Promise.all(pool.map(async (w) => {
+                        while (next < needPv.length) {
+                            const fen = needPv[next++];
+                            const r = await analyzePositionOn(w, fen, depth);
+                            if (r && r.pvUci && r.pvUci.length) pvMap[fen] = r.pvUci;
+                        }
+                    }));
+                }
+
+                flagged.forEach(f => {
+                    f.refutation = uciLineToSan(f.fenAfter, pvMap[f.fenAfter], MAX_PLIES);
+
+                    // What I should have played: the ( ... ) variation already in
+                    // the PGN if there is one, else the engine's line from here.
+                    const sibs = siblingLines(f.node);
+                    let better = sibs.length ? sibs[0] : uciLineToSan(f.fenBefore, pvMap[f.fenBefore], MAX_PLIES);
+                    if (better.length && better[0].replace(/[?!]+$/, '') === f.node.san.replace(/[?!]+$/, '')) better = [];
+
+                    // What happened next, and whether they let me off
+                    f.reply = nodes[f.i + 1] || null;
+                    f.replyLoss = f.reply ? lossAt(f.i + 1) : null;
+                    f.escaped = f.replyLoss !== null && f.replyLoss >= thresholdCp;
+                    const replySibs = f.reply ? siblingLines(f.reply) : [];
+                    // always leave a line to read: their ( ... ) alternative when
+                    // there is one, otherwise the engine's continuation from here
+                    const missed = replySibs.length ? replySibs[0] : f.refutation;
+
+                    f.branches = [];
+                    const b1 = branch(f.fenBefore, better, 'You should have played', sibs.length ? 'from the PGN' : 'engine');
+                    const b2 = branch(f.fenAfter, missed,
+                                      f.escaped ? 'The punishment they missed' : 'How it gets punished',
+                                      replySibs.length ? 'from the PGN' : 'engine');
+                    const b3 = branch(f.fenBefore, chainSan(f.node, MAX_PLIES), 'What actually happened', 'the game');
+                    [b1, b2, b3].forEach(b => { if (b) f.branches.push(b); });
+
+                    f.tags = tagMistake(f.fenAfter, f.refutation, f.side);
+                });
+
+                lastReview = flagged;
+                pane = null;
+                setStatus('');
+                render(flagged, mine, thresholdCp);
+            } catch (e) {
+                setStatus('');
+                $m('mmList').innerHTML = '<div style="color:#ff6b6b;">Review failed: ' + esc(e.message) + '</div>';
+                if (typeof log === 'function') log('Mistake review failed: ' + e.message, 'error');
+            }
+        };
+
+        // ---- pane 2: the board you step through ----
+
+        // FEN -> inline SVG, unicode pieces, no libraries. flipped = Black at the bottom.
+        function boardSvgMm(fen, flipped) {
+            const rows = String(fen || '').trim().split(/\s+/)[0].split('/');
+            if (rows.length !== 8) return '';
+            const board = [];
+            for (let i = 0; i < 8; i++) {
+                const cells = [];
+                rows[i].split('').forEach(ch => {
+                    if (/[1-8]/.test(ch)) { for (let k = 0; k < +ch; k++) cells.push(null); }
+                    else cells.push(ch);
+                });
+                if (cells.length !== 8) return '';
+                board.push(cells);
+            }
+            const S = 40;
+            let sq = '<svg viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:4px;">';
+            let pcs = '';
+            for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+                sq += '<rect x="' + f * S + '" y="' + r * S + '" width="' + S + '" height="' + S
+                    + '" fill="' + ((r + f) % 2 ? '#8ca2ad' : '#dee3e6') + '"/>';
+                const pc = board[flipped ? 7 - r : r][flipped ? 7 - f : f];
+                if (!pc) continue;
+                const up = pc.toUpperCase();
+                const a = 'x="' + (f * S + S / 2) + '" y="' + (r * S + S / 2 + 1)
+                        + '" font-size="34" text-anchor="middle" dominant-baseline="central"';
+                if (pc === up) {
+                    pcs += '<text ' + a + ' fill="#fff" stroke="#fff" stroke-width="5" stroke-linejoin="round">' + GLY[up][1] + '</text>'
+                         + '<text ' + a + ' fill="#111">' + GLY[up][0] + '</text>';
+                } else {
+                    pcs += '<text ' + a + ' fill="#111" stroke="#fff" stroke-width="2.6" stroke-linejoin="round" paint-order="stroke">' + GLY[up][1] + '</text>';
+                }
+            }
+            return sq + pcs + '<rect width="320" height="320" fill="none" stroke="#0b1b2b" stroke-width="2"/></svg>';
+        }
+
+        function renderPane() {
+            const el = $m('mmPane');
+            if (!el) return;
+            if (!pane || !pane.plies || !pane.plies.length) {
+                el.innerHTML = '<div style="border:1px dashed #27406b; border-radius:8px; padding:18px; color:#7d8ea3; font-size:12px; text-align:center;">'
+                    + 'Pick a line — the <b>▶ Step</b> button on any branch loads it here.</div>';
+                return;
+            }
+            const p = pane.plies[pane.idx];
+            const strip = pane.plies.map((x, i) =>
+                '<button onclick="mmGo(' + i + ')" style="background:' + (i === pane.idx ? '#00d4ff' : '#0f3460')
+                + '; color:' + (i === pane.idx ? '#06243a' : '#a8d8ea') + '; border:1px solid '
+                + (i === pane.idx ? '#00d4ff' : '#27406b') + '; border-radius:4px; padding:2px 7px; margin:2px 3px 0 0; cursor:pointer; font-size:11.5px; font-family:monospace;">'
+                + esc(x.label) + '</button>').join('');
+
+            el.innerHTML =
+                '<div style="background:#0f1a2e; border:1px solid #27406b; border-radius:8px; padding:10px;">'
+                + '<div style="color:#00d4ff; font-size:12px; font-weight:bold; margin-bottom:2px;">' + esc(pane.title) + '</div>'
+                + '<div style="color:#7d8ea3; font-size:11px; margin-bottom:8px;">' + esc(pane.sub || '') + '</div>'
+                + boardSvgMm(p.fen, pane.flipped)
+                + '<div style="display:flex; gap:5px; margin-top:8px; align-items:center;">'
+                +   '<button onclick="mmGo(0)" title="Start" style="background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:4px 8px; cursor:pointer;">⏮</button>'
+                +   '<button onclick="mmStep(-1)" title="Back (←)" style="background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:4px 10px; cursor:pointer;">◀</button>'
+                +   '<button onclick="mmStep(1)" title="Forward (→)" style="background:#0f3460; color:#00d4ff; border:1px solid #00d4ff; border-radius:4px; padding:4px 10px; cursor:pointer; font-weight:bold;">▶</button>'
+                +   '<button onclick="mmGo(' + (pane.plies.length - 1) + ')" title="End" style="background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:4px 8px; cursor:pointer;">⏭</button>'
+                +   '<span style="color:#7d8ea3; font-size:11px;">' + pane.idx + '/' + (pane.plies.length - 1) + '</span>'
+                +   '<span style="flex:1;"></span>'
+                +   '<button onclick="mmFlip()" title="Flip the board" style="background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:4px 8px; cursor:pointer;">⇅</button>'
+                + '</div>'
+                + '<div style="margin-top:7px;">' + strip + '</div>'
+                + '<div style="color:#7d8ea3; font-size:11px; margin-top:8px;">'
+                +   (p.fen.split(' ')[1] === 'b' ? 'Black' : 'White') + ' to move</div>'
+                + '<input readonly onclick="this.select()" value="' + esc(p.fen) + '" '
+                +   'style="width:100%; box-sizing:border-box; margin-top:4px; background:#1a1a2e; color:#bcd; border:1px solid #27406b; border-radius:4px; padding:4px 6px; font-family:monospace; font-size:10.5px;">'
+                + '<div style="display:flex; gap:6px; margin-top:7px;">'
+                +   '<button onclick="mmCopyFen()" style="flex:1; background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:5px; cursor:pointer; font-size:11.5px;">Copy this FEN</button>'
+                +   '<button onclick="mmCopySnippet()" style="flex:1; background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; padding:5px; cursor:pointer; font-size:11.5px;">Copy snippet</button>'
+                + '</div>'
+                + '<button onclick="mmToBoard()" title="Put this position on the main board (pane 1)" style="width:100%; margin-top:6px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:4px; padding:5px; cursor:pointer; font-size:11.5px;">Send to the main board</button>'
+                + '</div>';
+        }
+
+        window.mmPlay = function (mi, bi) {
+            const f = lastReview[mi];
+            if (!f || !f.branches || !f.branches[bi]) return;
+            const b = f.branches[bi];
+            pane = { plies: b.plies, idx: 0, flipped: f.side === 'b', key: mi + ':' + bi,
+                     title: b.label + ': ' + b.san.join(' '),
+                     sub: label(f.node) + ' · ' + (b.source || '') + ' · ' + b.plies.length + ' position(s)',
+                     snippet: b.note };
+            renderPane();
+            render(lastReview, lastMine, lastThreshold);   // refresh which branch is marked active
+        };
+        window.mmGo = function (i) {
+            if (!pane) return;
+            pane.idx = Math.max(0, Math.min(pane.plies.length - 1, i));
+            renderPane();
+        };
+        window.mmStep = function (d) { if (pane) window.mmGo(pane.idx + d); };
+        window.mmFlip = function () { if (pane) { pane.flipped = !pane.flipped; renderPane(); } };
+        window.mmCopyFen = function () { if (pane) copyOut(pane.plies[pane.idx].fen, 'FEN copied'); };
+        window.mmCopySnippet = function () { if (pane && pane.snippet) copyOut(pane.snippet, 'Snippet copied'); };
+        window.mmToBoard = function () {
+            if (!pane) return;
+            const fen = pane.plies[pane.idx].fen;
+            const box = document.getElementById('fenInput');
+            if (box) box.value = fen;
+            try {
+                if (window.board2 && window.board2.position) window.board2.position(fen.split(' ')[0], false);
+                // board2 now shows a position that is not the highlighted move:
+                // clicking any move in the move list puts it back in step
+                if (typeof showToast === 'function') showToast('Preview on the main board \u2014 click any move to resync');
+            } catch (e) {
+                if (typeof showToast === 'function') showToast('Filled the FEN box');
+            }
+        };
+
+        // Arrow keys drive the pane while the modal is open; capture phase so the
+        // main board's own arrow-key navigation does not also fire.
+        document.addEventListener('keydown', function (e) {
+            const modal = $m('mmModal');
+            if (!modal || modal.style.display === 'none') return;
+            const t = e.target && e.target.tagName;
+            if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+            if (e.key === 'Escape') { window.mmClose(); e.stopPropagation(); return; }
+            if (!pane) return;
+            if (e.key === 'ArrowRight') { window.mmStep(1); e.preventDefault(); e.stopPropagation(); }
+            else if (e.key === 'ArrowLeft') { window.mmStep(-1); e.preventDefault(); e.stopPropagation(); }
+            else if (e.key === 'Home') { window.mmGo(0); e.preventDefault(); e.stopPropagation(); }
+            else if (e.key === 'End') { window.mmGo(pane.plies.length - 1); e.preventDefault(); e.stopPropagation(); }
+        }, true);
+
+        // ---- the list ----
+
+        const BADGE = { 'hanging piece': '#ff6b6b', 'fork': '#ffa94d', 'under-defended': '#ffd43b', 'not punished': '#845ef7' };
+        let lastMine = 'w', lastThreshold = 100;
+
+        function label(n) { return n.moveNumber + (n.isBlackMove ? '… ' : '. ') + n.san + (n.annotation || ''); }
+        function pawns(cp) { return (cp / 100).toFixed(2); }
+
+        function branchHtml(mi, bi, b) {
+            const active = pane && pane.key === (mi + ':' + bi);
+            return '<div style="margin-top:7px; border-left:2px solid ' + (active ? '#00d4ff' : '#27406b') + '; padding-left:8px;">'
+                + '<div style="display:flex; gap:7px; align-items:baseline; flex-wrap:wrap;">'
+                +   '<button onclick="mmPlay(' + mi + ',' + bi + ')" style="background:' + (active ? '#00d4ff' : '#0f3460')
+                +     '; color:' + (active ? '#06243a' : '#00d4ff') + '; border:1px solid #00d4ff; border-radius:4px; padding:2px 9px; cursor:pointer; font-size:11.5px; font-weight:bold;">'
+                +     (active ? '▶ Showing' : '▶ Step') + '</button>'
+                +   '<span style="color:#a8d8ea; font-size:12px;">' + esc(b.label) + ':</span>'
+                +   '<span style="color:#ddd; font-family:monospace; font-size:12px;">' + esc(b.san.join(' ')) + '</span>'
+                +   '<span style="color:#666; font-size:11px;">(' + esc(b.source) + ')</span>'
+                + '</div></div>';
+        }
+
+        function render(list, mine, thresholdCp) {
+            lastMine = mine; lastThreshold = thresholdCp;
+            const counts = {};
+            list.forEach(f => {
+                (f.tags.length ? f.tags : [{ tag: 'untagged' }]).forEach(t => { counts[t.tag] = (counts[t.tag] || 0) + 1; });
+                if (f.escaped) counts['not punished'] = (counts['not punished'] || 0) + 1;
+            });
+            const summary = Object.keys(counts).sort().map(k =>
+                '<span style="background:' + (BADGE[k] || '#555') + '; color:#1a1a2e; border-radius:10px; padding:1px 9px; font-size:11px; font-weight:bold; margin-right:6px;">'
+                + counts[k] + ' ' + esc(k) + '</span>').join('');
+
+            $m('mmList').innerHTML =
+                '<div style="margin-bottom:10px; color:#a8d8ea;">' + list.length + ' move'
+                + (list.length !== 1 ? 's' : '') + ' lost more than ' + thresholdCp + ' cp for '
+                + (mine === 'both' ? 'either side' : mine === 'w' ? 'White' : 'Black') + '. ' + summary + '</div>'
+                + list.map((f, i) => {
+                    const tagHtml = f.tags.length
+                        ? f.tags.map(t =>
+                            '<div style="margin-top:5px;"><span style="background:' + (BADGE[t.tag] || '#555')
+                            + '; color:#1a1a2e; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:bold;">'
+                            + esc(t.tag) + '</span> <span style="color:#eee;">' + esc(t.text) + '</span></div>').join('')
+                        : '<div style="margin-top:5px;"><span style="background:#555; color:#ddd; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:bold;">untagged</span>'
+                          + ' <span style="color:#aaa;">Neither rule fired — step through the lines below.</span></div>';
+
+                    const escaped = f.escaped
+                        ? '<div style="margin-top:5px;"><span style="background:#845ef7; color:#1a1a2e; border-radius:4px; padding:1px 7px; font-size:11px; font-weight:bold;">not punished</span>'
+                          + ' <span style="color:#eee;">They replied ' + esc(label(f.reply)) + ' and gave back '
+                          + pawns(f.replyLoss) + ' — you were never made to pay for this.</span></div>'
+                        : (f.reply ? '<div style="margin-top:5px; color:#888; font-size:12px;">They replied ' + esc(label(f.reply)) + '.</div>' : '');
+
+                    return '<div style="border-top:1px solid rgba(255,255,255,0.12); padding:10px 0;">'
+                        + '<div style="display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;">'
+                        + '<button onclick="mmJump(' + i + ')" title="Put this position on the board here, and jump the main board to it" style="background:#0f3460; color:#00d4ff; border:1px solid #00d4ff; border-radius:4px; padding:3px 10px; cursor:pointer; font-weight:bold; font-size:13px;">'
+                        + esc(label(f.node)) + '</button>'
+                        + '<span style="color:#ff6b6b; font-weight:bold;">−' + pawns(f.loss) + '</span>'
+                        + '<span style="color:#888; font-size:12px;">' + pawns(f.side === 'w' ? f.before : -f.before)
+                        + ' → ' + pawns(f.side === 'w' ? f.after : -f.after) + '</span>'
+                        + '<span style="flex:1;"></span>'
+                        + '<button onclick="mmExplain(' + i + ')" title="Ask OpenAI why this move was bad, using only the facts and lines here" style="background:#0f3460; color:#ffd43b; border:1px solid #ffd43b; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">'
+                        + (f.explaining ? '…' : f.explain ? 'Re-explain' : 'Explain') + '</button>'
+                        + '<button onclick="mmNote(' + i + ')" title="Copy just this mistake as branch notes for an LLM" style="background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">Copy notes</button>'
+                        + '</div>'
+                        + tagHtml
+                        + escaped
+                        + f.branches.map((b, bi) => branchHtml(i, bi, b)).join('')
+                        + explainHtml(f)
+                        + '</div>';
+                }).join('');
+        }
+
+        // Clicking the move does both: loads the position onto pane 2's board â
+        // the game line based at the position BEFORE the mistake and parked on
+        // the move itself, so the FEN box shows this move's position, the back
+        // arrow is "just before it" and the forward arrow plays the game on â
+        // and jumps the main board to the same move.
+        window.mmJump = function (i) {
+            const f = lastReview[i];
+            if (!f) return;
+            const bi = (f.branches || []).findIndex(b => b.source === 'the game');
+            if (bi !== -1) { window.mmPlay(i, bi); window.mmGo(1); }
+            const canJump = f.node.nodeId && window.moveNodeRegistry
+                            && window.moveNodeRegistry[f.node.nodeId] && typeof jumpToNode === 'function';
+            if (canJump) {
+                jumpToNode(f.node.nodeId);
+                if (typeof showToast === 'function') showToast(label(f.node));
+            } else if (typeof showToast === 'function') {
+                showToast(bi !== -1
+                    ? 'Shown on the board here — the main board could not jump'
+                    : 'Could not jump — the move table may need a refresh');
+            }
+        };
+
+        // One mistake as branch notes: the facts, then the lines as From
+        // Position snippets so an LLM (or Lichess) can replay each branch.
+        function noteText(f) {
+            const out = [];
+            out.push('=== ' + label(f.node) + '  (' + (f.side === 'w' ? 'White' : 'Black')
+                     + ', lost ' + pawns(f.loss) + ' pawns: '
+                     + pawns(f.side === 'w' ? f.before : -f.before) + ' → '
+                     + pawns(f.side === 'w' ? f.after : -f.after) + ') ===');
+            out.push('Cause: ' + (f.tags.length ? f.tags.map(t => t.tag).join(' + ') : 'untagged'));
+            (f.tags || []).forEach(t => out.push('  ' + t.text));
+            if (f.escaped) {
+                out.push('Not punished: they replied ' + label(f.reply) + ' and gave back ' + pawns(f.replyLoss) + ' pawns.');
+            } else if (f.reply) {
+                out.push('They replied ' + label(f.reply) + '.');
+            }
+            (f.branches || []).forEach(b => {
+                if (!b.note) return;
+                out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + '):', b.note);
+            });
+            return out.join('\n');
+        }
+
+        function copyOut(text, msg) {
+            navigator.clipboard.writeText(text)
+                .then(() => { if (typeof showToast === 'function') showToast(msg); })
+                .catch(() => { if (typeof showToast === 'function') showToast('Copy failed'); });
+        }
+
+        window.mmNote = function (i) {
+            const f = lastReview[i];
+            if (!f) return;
+            copyOut(noteText(f), 'Branch notes copied: ' + label(f.node));
+        };
+
+        window.mmCopy = function () {
+            if (!lastReview.length) { if (typeof showToast === 'function') showToast('Run the review first'); return; }
+            const head = [
+                'Chess mistake review. Evals are in pawns from the mover\'s point of view.',
+                'Each line is a From Position snippet: play it from its own [FEN].',
+                'Use only what is below; do not invent tactics that are not in these lines.',
+                ''
+            ].join('\n');
+            copyOut(head + lastReview.map(noteText).join('\n\n'), lastReview.length + ' mistakes copied as branch notes');
+        };
+
+        // ---- explain with OpenAI, from the facts only -------------------
+        // The model never sees the board or the PGN — only noteText(f): the
+        // eval drop, the rule tags, what the reply was, and the three lines as
+        // From Position snippets. It is there to put that into words, not to
+        // find tactics of its own. Same credential as the rest of the app
+        // (access code, or your own sk-... key), same /api/chat proxy, so no
+        // key is ever in the page.
+        const MM_MODEL = 'gpt-4o-mini';
+        const MM_SYSTEM = [
+            'You are a chess coach explaining ONE move that an engine flagged.',
+            'Use ONLY the facts and the lines you are given.',
+            'Never name a piece, square or tactic that does not appear in those lines.',
+            'If the facts do not explain the move, say plainly that no tactic is given,',
+            'name the move the engine preferred, and stop.',
+            'Answer in 2-4 plain sentences. No markdown, no headings, no preamble.'
+        ].join(' ');
+
+        function mmCredential() {
+            let key = '';
+            try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
+            if (!key) {
+                key = (prompt('Explaining needs an access code (or your own OpenAI API key, sk-…):') || '').trim();
+                if (key) { try { localStorage.setItem('sbReportAccessCode', key); } catch (e) { } }
+            }
+            return key;
+        }
+
+        function explainHtml(f) {
+            if (f.explaining) return '<div style="margin-top:7px; color:#ffd43b; font-size:12px;">Asking OpenAI…</div>';
+            if (f.explainError) return '<div style="margin-top:7px; color:#ff6b6b; font-size:12px;">Explain failed: ' + esc(f.explainError) + '</div>';
+            if (!f.explain) return '';
+            return '<div style="margin-top:8px; border-left:2px solid #ffd43b; padding:2px 0 2px 9px;">'
+                + '<div style="color:#ffd43b; font-size:11px; font-weight:bold; margin-bottom:2px;">OpenAI, from the facts above</div>'
+                + '<div style="color:#eee; font-size:12.5px; white-space:pre-wrap;">' + esc(f.explain) + '</div></div>';
+        }
+
+        async function askOpenAI(f, key) {
+            const body = {
+                model: MM_MODEL,
+                messages: [
+                    { role: 'system', content: MM_SYSTEM },
+                    { role: 'user', content: noteText(f)
+                        + '\n\nIn plain words: why was ' + label(f.node) + ' bad? '
+                        + (f.escaped ? 'Also say what the reply should have been, and that it was not played. ' : '')
+                        + 'Ground every claim in the lines above.' }
+                ]
+            };
+            if (key.indexOf('sk-') === 0) body.userApiKey = key; else body.accessCode = key;
+            const r = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
+            return (data.content || '').trim();
+        }
+
+        window.mmExplain = async function (i) {
+            const f = lastReview[i];
+            if (!f || f.explaining) return;
+            const key = mmCredential();
+            if (!key) { if (typeof showToast === 'function') showToast('Explain cancelled — no access code'); return; }
+            f.explaining = true; f.explainError = null;
+            render(lastReview, lastMine, lastThreshold);
+            try {
+                f.explain = await askOpenAI(f, key);
+                if (!f.explain) f.explainError = 'the model returned nothing';
+            } catch (e) {
+                f.explainError = e.message;
+                if (typeof log === 'function') log('Explain failed: ' + e.message, 'warning');
+            }
+            f.explaining = false;
+            render(lastReview, lastMine, lastThreshold);
+        };
+
+        // The untagged ones are the whole point of this button: a rule already
+        // explained the others. One at a time, so a bad key fails once, cheaply.
+        window.mmExplainAll = async function () {
+            if (!lastReview.length) { if (typeof showToast === 'function') showToast('Run the review first'); return; }
+            const todo = lastReview.map((f, i) => ({ f, i })).filter(x => !x.f.tags.length && !x.f.explain);
+            if (!todo.length) { if (typeof showToast === 'function') showToast('No untagged move left to explain'); return; }
+            const key = mmCredential();
+            if (!key) { if (typeof showToast === 'function') showToast('Explain cancelled — no access code'); return; }
+            for (const x of todo) {
+                x.f.explaining = true; x.f.explainError = null;
+                render(lastReview, lastMine, lastThreshold);
+                $m('mmStatus').textContent = 'Explaining ' + label(x.f.node) + '…';
+                try {
+                    x.f.explain = await askOpenAI(x.f, key);
+                } catch (e) {
+                    x.f.explainError = e.message;
+                    x.f.explaining = false;
+                    render(lastReview, lastMine, lastThreshold);
+                    $m('mmStatus').textContent = '';
+                    if (typeof showToast === 'function') showToast('Stopped: ' + e.message);
+                    return;   // same key will fail again — do not burn the rest
+                }
+                x.f.explaining = false;
+            }
+            $m('mmStatus').textContent = '';
+            render(lastReview, lastMine, lastThreshold);
+            if (typeof showToast === 'function') showToast('Explained ' + todo.length + ' untagged move(s)');
+        };
+
+        // Exposed so the detectors can be poked from the console (and tested)
+        window.mmDebug = { attackersOf, targetsOf, tagMistake, uciLineToSan, fromPos, buildPlies,
+                           siblingLines, noteText, boardSvgMm, askOpenAI, review: () => lastReview,
+                           pane: () => pane };
+    })();
     </script>
 </body>
 </html>
