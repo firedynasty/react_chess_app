@@ -10292,9 +10292,80 @@
         /**
          * Render the move table with clickable moves and variations
          */
+        // ---- right-click a move in the move list -------------------------
+        // The same Lichess menu the What went wrong chips give you. One
+        // delegated listener on the container covers main-line moves AND moves
+        // inside a variation — both render as a span carrying data-node-id —
+        // including moves drawn by a later re-render.
+        function mtMoveContextMenu(e) {
+            var el = e.target && e.target.closest ? e.target.closest('[data-node-id]') : null;
+            if (!el || !el.dataset.nodeId) return;      // off a move: leave the browser's own menu
+            var node = window.moveNodeRegistry && window.moveNodeRegistry[el.dataset.nodeId];
+            if (!node || !node.san || !node.fen) return;
+            var u = typeof window.mmLichessUrls === 'function' ? window.mmLichessUrls(node.fen) : null;
+            if (!u) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (typeof window.mmCloseMenu === 'function') window.mmCloseMenu();
+            jumpToNode(el.dataset.nodeId);              // the board follows the move you right-clicked
+
+            // Say so when the move is inside a variation, so you know which line you opened
+            var inVar = false;
+            for (var a = node; a && a.parent; a = a.parent) {
+                if (a.parent.children && a.parent.children.indexOf(a) > 0) { inVar = true; break; }
+            }
+            var label = node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san + (node.annotation || '');
+
+            var item = function (act, mark) {
+                return '<div class="mm-ctx-item" data-act="' + act + '" style="padding:6px 12px; cursor:pointer; white-space:nowrap; color:#e8f1f8;"'
+                    + ' onmouseover="this.style.background=\'#0f3460\'" onmouseout="this.style.background=\'transparent\'">'
+                    + mark + '</div>';
+            };
+            var menu = document.createElement('div');
+            menu.id = 'mmCtxMenu';                      // same id → the existing click-away handler closes it
+            menu.style.cssText = 'position:fixed; z-index:10001; background:#16213e; border:1px solid #629924; '
+                + 'border-radius:6px; padding:4px 0; font-size:12.5px; box-shadow:0 6px 22px rgba(0,0,0,0.5); min-width:190px;';
+            var head = document.createElement('div');
+            head.style.cssText = 'padding:4px 12px 6px; color:#7d8ea3; font-size:11px; border-bottom:1px solid #27406b; margin-bottom:3px;';
+            head.textContent = label + (inVar ? '  · in a variation' : '');
+            menu.appendChild(head);
+            menu.insertAdjacentHTML('beforeend',
+                  item('w', '<span style="color:#629924;">↗</span> Lichess — White to move' + (u.turn === 'w' ? ' <span style="color:#7d8ea3;">(as played)</span>' : ''))
+                + item('b', '<span style="color:#629924;">↗</span> Lichess — Black to move' + (u.turn === 'b' ? ' <span style="color:#7d8ea3;">(as played)</span>' : ''))
+                + item('editor', '<span style="color:#629924;">↗</span> Lichess board editor')
+                + item('fen', 'Copy this FEN'));
+            document.body.appendChild(menu);
+
+            var r = menu.getBoundingClientRect();        // keep it on screen
+            menu.style.left = Math.min(e.clientX, window.innerWidth - r.width - 8) + 'px';
+            menu.style.top = Math.min(e.clientY, window.innerHeight - r.height - 8) + 'px';
+
+            menu.addEventListener('click', function (ev) {
+                var row = ev.target.closest ? ev.target.closest('.mm-ctx-item') : null;
+                if (!row) return;
+                var act = row.getAttribute('data-act');
+                if (typeof window.mmCloseMenu === 'function') window.mmCloseMenu();
+                if (act === 'fen') {
+                    navigator.clipboard.writeText(u.fen)
+                        .then(function () { if (typeof showToast === 'function') showToast('FEN copied'); })
+                        .catch(function () { if (typeof showToast === 'function') showToast('Clipboard blocked'); });
+                    return;
+                }
+                window.open(act === 'editor' ? u.editor : act === 'b' ? u.b : u.w, '_blank', 'noopener');
+            });
+            return false;
+        }
+        window.mtMoveContextMenu = mtMoveContextMenu;
+
         function renderMoveTable(rootNode) {
             const container = document.getElementById('moveTableContainer');
             if (!container) return;
+            // Right-click menu, wired once: the container survives every re-render,
+            // so delegation keeps working for moves drawn later
+            if (!container._mtMenuWired) {
+                container.addEventListener('contextmenu', mtMoveContextMenu);
+                container._mtMenuWired = true;
+            }
 
             // Toggle button label is the source of truth for user intent:
             // "Show Moves" means the user deliberately hid the table — keep it
@@ -20694,6 +20765,8 @@ ${contentToAnalyze}`;
                 fen: [p[0], turn, castle, p[3] || '-', p[4] || '0', p[5] || '1'].join(' ')
             };
         }
+
+        window.mmLichessUrls = mmLichessUrls;   // the move list's right-click menu uses the same builder
 
         window.mmCloseMenu = function () {
             const m = $m('mmCtxMenu');
