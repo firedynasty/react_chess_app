@@ -19911,12 +19911,19 @@ ${contentToAnalyze}`;
             let m = null;
             try { m = typeof getCapturedPieces === 'function' ? getCapturedPieces(fen) : null; } catch (e) { m = null; }
             if (!m) return '';
+            // The glyphs are the pieces this side has TAKEN, so they are drawn in
+            // the opponent's colour — Black's haul is a row of white pieces. The
+            // name is spelled out because stacked above and below a board, a row
+            // of ♙♙♙ next to "+2" otherwise reads as White being the one ahead.
+            const who = side === 'w' ? 'White' : 'Black';
             const taken = side === 'w' ? m.whiteCaptured : m.blackCaptured;
             const lead = (m.advantageSide === (side === 'w' ? 'white' : 'black') && m.advantage > 0)
                 ? '+' + m.advantage : '';
-            return '<div style="display:flex; align-items:center; gap:6px; min-height:20px; font-size:16px; color:#fff; letter-spacing:1px;">'
+            return '<div title="' + who + ' has captured these, and is ' + (lead ? lead.slice(1) + ' ahead' : 'not ahead') + '"'
+                + ' style="display:flex; align-items:center; gap:6px; min-height:20px; font-size:16px; color:#fff; letter-spacing:1px;">'
+                + '<span style="color:#7d8ea3; font-size:11px; letter-spacing:0; min-width:34px;">' + who + '</span>'
                 + '<span>' + taken.join('') + '</span>'
-                + (lead ? '<span style="color:#4ade80; font-weight:bold; font-size:13px;">' + lead + '</span>' : '')
+                + (lead ? '<span style="color:#4ade80; font-weight:bold; font-size:13px; letter-spacing:0;">' + lead + '</span>' : '')
                 + '</div>';
         }
 
