@@ -20127,6 +20127,28 @@ ${contentToAnalyze}`;
             }
         };
 
+        // Where the material actually turns along a line: only the plies that
+        // change the advantage, so a long played-out branch stays one short
+        // line. This is the hard evidence an explanation should lean on.
+        function materialTrail(b) {
+            if (!b || !b.plies || !b.plies.length) return '';
+            const pts = [];
+            let last = null;
+            b.plies.forEach((p) => {
+                let m = null;
+                try { m = typeof getCapturedPieces === 'function' ? getCapturedPieces(p.fen) : null; } catch (e) { m = null; }
+                if (!m) return;
+                const sign = m.advantageSide === 'white' ? m.advantage
+                           : m.advantageSide === 'black' ? -m.advantage : 0;
+                if (last === null || sign !== last) {
+                    pts.push((p.san ? p.label : 'start') + ' = '
+                             + (sign === 0 ? 'level' : (sign > 0 ? 'White +' : 'Black +') + Math.abs(sign)));
+                    last = sign;
+                }
+            });
+            return pts.length > 1 ? pts.join(' → ') : '';
+        }
+
         // One mistake as branch notes: the facts, then the lines as From
         // Position snippets so an LLM (or Lichess) can replay each branch.
         function noteText(f) {
@@ -20149,6 +20171,8 @@ ${contentToAnalyze}`;
                       + (b.playout.evalEnd === null ? '' : ', ending ' + pawns(b.playout.evalEnd) + ' from White’s view') + ']'
                     : '';
                 out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + ')' + tail + ':', b.note);
+                const trail = materialTrail(b);
+                if (trail) out.push('material along this line: ' + trail);
             });
             return out.join('\n');
         }
@@ -20188,9 +20212,13 @@ ${contentToAnalyze}`;
             'You are a chess coach explaining ONE move that an engine flagged.',
             'Use ONLY the facts and the lines you are given.',
             'Never name a piece, square or tactic that does not appear in those lines.',
-            'If the facts do not explain the move, say plainly that no tactic is given,',
-            'name the move the engine preferred, and stop.',
-            'Answer in 2-4 plain sentences. No markdown, no headings, no preamble.'
+            'The punishment line is WHY the move was bad. Walk it: say what the opponent wins,',
+            'and name the move in that line where the material turns, quoting the material trail.',
+            'The opponent answering with a mistake is NOT a reason the move was bad.',
+            'At most mention in one clause that the punishment was there and went unplayed.',
+            'Do not pad with what the engine preferred instead unless it explains the weakness.',
+            'If no line shows a concrete gain, say exactly that, name the preferred move, and stop.',
+            'Answer in 3-6 plain sentences. No markdown, no headings, no preamble.'
         ].join(' ');
 
         function mmCredential() {
@@ -20218,9 +20246,10 @@ ${contentToAnalyze}`;
                 messages: [
                     { role: 'system', content: MM_SYSTEM },
                     { role: 'user', content: noteText(f)
-                        + '\n\nIn plain words: why was ' + label(f.node) + ' bad? '
-                        + (f.escaped ? 'Also say what the reply should have been, and that it was not played. ' : '')
-                        + 'Ground every claim in the lines above.' }
+                        + '\n\nWhy was ' + label(f.node) + ' bad? Walk the punishment line above:'
+                        + ' name the move where it turns and what the opponent wins, using the material trail.'
+                        + (f.escaped ? ' In one clause only, note that this was available and went unplayed.' : '')
+                        + ' Ground every claim in the lines and the material shown above.' }
                 ]
             };
             if (key.indexOf('sk-') === 0) body.userApiKey = key; else body.accessCode = key;
@@ -20368,7 +20397,7 @@ ${contentToAnalyze}`;
 
         // Exposed so the detectors can be poked from the console (and tested)
         window.mmDebug = { attackersOf, targetsOf, tagMistake, uciLineToSan, fromPos, buildPlies,
-                           siblingLines, noteText, boardSvgMm, materialHtml, askOpenAI, playOutFrom, review: () => lastReview,
+                           siblingLines, noteText, boardSvgMm, materialHtml, materialTrail, askOpenAI, playOutFrom, review: () => lastReview,
                            pane: () => pane };
     })();
     </script>
