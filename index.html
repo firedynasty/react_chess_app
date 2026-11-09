@@ -650,6 +650,70 @@
             margin-top: 6px;
         }
         .gdrive-cell-input:focus { outline: none; border-color: #00d4ff; }
+        /* Comment bubble on the board (chess.com-style): the ⭐ toggles it.
+           Shows the comment for the move you are standing on — PGN comments
+           (AI Comments → PGN, your own {…}) and coach-doc notes alike. */
+        #coachNoteBubble {
+            position: absolute;
+            z-index: 12;
+            width: 220px;
+            box-sizing: border-box;
+            padding: 8px 10px;
+            background: #16213e;
+            border: 2px solid #ffd700;
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+            color: #eee;
+            font-size: 12px;
+            line-height: 1.35;
+            text-align: left;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        #coachNoteBubble .cb-head {
+            color: #ffd700;
+            font-weight: bold;
+            font-size: 11px;
+            font-family: monospace;
+            margin-bottom: 3px;
+            padding-right: 14px;
+        }
+        #coachNoteBubble .cb-close {
+            position: absolute;
+            top: 3px;
+            right: 6px;
+            color: #888;
+            font-size: 13px;
+            line-height: 1;
+            font-weight: bold;
+        }
+        #coachNoteBubble:hover .cb-close { color: #ffd700; }
+        #coachNoteBubble .cb-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        #coachNoteBubble .cb-more { color: #888; font-size: 10px; margin-top: 4px; }
+        /* tail: a diamond rotated 45°, borders on the two outward sides only */
+        #coachNoteBubble .cb-tail {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #16213e;
+            transform: rotate(45deg);
+            margin-left: -6px;
+        }
+        #coachNoteBubble.cb-above .cb-tail {
+            bottom: -7px;
+            border-right: 2px solid #ffd700;
+            border-bottom: 2px solid #ffd700;
+        }
+        #coachNoteBubble.cb-below .cb-tail {
+            top: -7px;
+            border-left: 2px solid #ffd700;
+            border-top: 2px solid #ffd700;
+        }
             body.signals-off #boardCommentBar { display: none !important; }
             /* the green variation arrows show where a variation branches off */
             body.signals-off #board2ArrowSvg .arrow-line { display: none !important; }
@@ -1226,6 +1290,24 @@
         <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Just type text to attach to current move (works in variations too). Or use: "5, comment" for white's 5th, "5..., comment" for black's 5th.</p>
     </div>
 
+    <!-- + Comment — write the comment for the move you are standing on, straight into the PGN -->
+    <div id="moveCommentModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 10000; align-items: center; justify-content: center;" onclick="if (event.target === this) closeMoveCommentModal()">
+      <div style="background: #16213e; border: 1px solid #2ecc71; border-radius: 10px; padding: 16px; width: 560px; max-width: 92vw; box-shadow: 0 10px 40px rgba(0,0,0,0.6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <span style="color: #2ecc71; font-weight: bold; font-size: 14px;">💬 Comment on <span id="moveCommentMoveLabel" style="font-family: monospace; color: #ffd700;"></span></span>
+          <button onclick="closeMoveCommentModal()" style="background: none; border: none; color: #888; font-size: 20px; cursor: pointer; line-height: 1;">✕</button>
+        </div>
+        <textarea id="moveCommentInput" rows="5" placeholder="What you want to remember about this move…" style="width: 100%; box-sizing: border-box; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-size: 13px; line-height: 1.4; resize: vertical;"></textarea>
+        <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap;">
+          <button onclick="saveMoveComment()" style="padding: 8px 16px; background: #2ecc71; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Save</button>
+          <button onclick="navigator.clipboard.readText().then(function (t) { var ta = document.getElementById('moveCommentInput'); ta.value = (ta.value ? ta.value.trim() + ' ' : '') + (t || '').trim(); ta.focus(); })" style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Paste</button>
+          <button onclick="document.getElementById('moveCommentInput').value = ''; document.getElementById('moveCommentInput').focus();" style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">Clear</button>
+          <span id="moveCommentStatus" style="color: #888; font-size: 12px;"></span>
+        </div>
+        <p style="color: #666; font-size: 11px; margin: 10px 0 0 0;">Saved as a {…} comment on the move itself, so <b>Copy PGN</b> carries it and it comes back when you load that PGN again — and the ⭐ bubble shows it as you scroll through. Saving nothing clears the comment. Cmd/Ctrl+Enter saves, Esc closes.</p>
+      </div>
+    </div>
+
     <!-- All Comments Display -->
     <div id="allCommentsContainer"
          style="max-width: 1200px; margin: 10px auto; max-height: 150px; overflow-y: auto;
@@ -1416,6 +1498,8 @@
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
+            <button id="coachNoteBtnMini" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
+            <button id="addCommentBtn" title="Write or edit the comment on the move you are standing on (variations too). It goes into the PGN itself, so Copy PGN keeps it and it comes back when you load that PGN again" onclick="openMoveCommentModal()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">💬 + Comment</button>
             <button id="addVar2Btn" title="Paste a practice snippet (FEN + moves): it finds the move the FEN matches and adds the line there as the single variation" onclick="openAddVar2()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var. 2</button>
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
             <button id="practice-btn" title="Play Stockfish from this move (or the move before) and copy the moves as a From Position snippet. Your game stays loaded." onclick="openPracticeModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Practice</button>
@@ -1431,7 +1515,6 @@
             <button id="toggleSoundBtnMini" title="Turn move sounds on or off" onclick="toggleChessSound()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sound On</button>
             <button id="toggleBorderBtnMini" title="Show the eval bar, move comment bar, the board border (?? / ? / ?! moves) and the variation glow (on/off)" onclick="toggleBoardBorder()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #a8d8ea; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Signals On</button>
             <!-- Quick-access proxies so the full nav list can stay hidden -->
-            <button id="coachNoteBtnMini" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="document.getElementById('coachNoteBtn').click()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
             <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <button onclick="document.getElementById('lichessLinksBtn').click()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Lichess Links</button>
@@ -1450,7 +1533,7 @@
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
           <div style="display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; flex-shrink: 0;">
             <button id="flip_board2" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
-            <button id="coachNoteBtn" title="Show the chess coach note for this move (from Analyze with Chess Coach)" onclick="openCoachNoteForCurrentMove()" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
+            <button id="coachNoteBtn" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
             <span id="board2MoveIndicator" style="font-weight: bold; min-width: 60px; text-align: center; color: #eee; white-space: nowrap;">Start</span>
             <span id="board2MovePlayedSan" style="font-weight: bold; min-width: 50px; color: #00d4ff; font-family: monospace; white-space: nowrap;"></span>
@@ -2224,18 +2307,20 @@
         function findCoachNoteForCurrentMove() {
             var cur = getCurrentMoveKey();
             if (!cur) return null;
-            var entry = getCoachMoveNotes().map[cur.key];
-            if (!entry) {
-                // No separate coach text loaded: a real comment written into the PGN
-                // itself ({ ... } after the move, e.g. from Coach → PGN) counts as the note
+            // No coach-text entry fits this move: a real comment written into the PGN
+            // itself ({ ... } after the move, e.g. from Coach → PGN) counts as the note
+            function ownNote() {
                 var node = window.moveTree && window.currentMoveNode;
                 var own = node && typeof lnCleanComment === 'function' ? lnCleanComment(node.comment) : '';
                 if (!own) return null;
                 return { label: cur.key + ' ' + (cur.san || ''), san: cur.san, text: own };
             }
+            var entry = getCoachMoveNotes().map[cur.key];
+            if (!entry) return ownNote();
             // Tree mode: require SAN match so a variation move with the same
-            // move number doesn't show the main-line note
-            if (cur.san && entry.san && cur.san !== entry.san) return null;
+            // move number doesn't show the main-line note — but that move's own
+            // PGN comment still lights the star
+            if (cur.san && entry.san && cur.san !== entry.san) return ownNote();
             return entry;
         }
 
@@ -2282,69 +2367,242 @@
                 window._coachSrcForComments = window.textViewRawContent;
                 if (typeof updateAllCommentsDisplay === 'function') updateAllCommentsDisplay();
             }
-            var hasNote = !!findCoachNoteForCurrentMove();
+            var entry = findCoachNoteForCurrentMove();
+            var hasNote = !!entry;
+            var bubblesOn = coachBubblesOn();
             ['coachNoteBtn', 'coachNoteBtnMini'].forEach(function(id) {
                 var btn = document.getElementById(id);
                 if (!btn) return;
+                // The glyph says whether bubbles are showing; the colour says
+                // whether THIS move has a comment to show
+                btn.textContent = bubblesOn ? '⭐' : '☆';
+                btn.style.opacity = bubblesOn ? '1' : '0.6';
                 if (hasNote) {
                     btn.style.background = '#ffd700';
                     btn.style.color = '#1a1a2e';
-                    btn.style.boxShadow = '0 0 8px rgba(255,215,0,0.6)';
+                    btn.style.boxShadow = bubblesOn ? '0 0 8px rgba(255,215,0,0.6)' : 'none';
                 } else {
                     btn.style.background = '#4a4a4a';
                     btn.style.color = '#ccc';
                     btn.style.boxShadow = 'none';
                 }
             });
-            // Board badge: gold ring around the destination square plus a
-            // ★ dot in its corner, so a move with a note is visible
-            // on the board itself, not just on the button
+            drawCoachNoteBadge(hasNote && bubblesOn);
+            renderCoachNoteBubble(bubblesOn ? entry : null);
+        }
+
+        // The square the move you are standing on lands on ('f5'), or null at the
+        // root / in flat report mode
+        function coachNoteSquare() {
+            var node = window.currentMoveNode;
+            if (!node || !node.san || !node.parent || !node.parent.fen) return null;
+            try {
+                var tempChess = new Chess(node.parent.fen);
+                var mv = tempChess.move(node.san, { sloppy: true });
+                return mv ? mv.to : null;
+            } catch (e) { return null; }
+        }
+
+        // Board badge: gold ring around the destination square plus a
+        // ★ dot in its corner, so a move with a note is visible
+        // on the board itself, not just on the button
+        function drawCoachNoteBadge(show) {
             var svg = document.getElementById('board2ArrowSvg');
-            if (svg) {
-                svg.querySelectorAll('.note-badge').forEach(function(el) { el.remove(); });
-                var node = hasNote && window.currentMoveNode;
-                if (node && node.san && node.parent && node.parent.fen) {
-                    try {
-                        var tempChess = new Chess(node.parent.fen);
-                        var mv = tempChess.move(node.san, { sloppy: true });
-                        if (mv) {
-                            var c = board2SquareToCoords(mv.to);
-                            var NS = 'http://www.w3.org/2000/svg';
-                            var ring = document.createElementNS(NS, 'rect');
-                            ring.setAttribute('x', c.x - 23);
-                            ring.setAttribute('y', c.y - 23);
-                            ring.setAttribute('width', 46);
-                            ring.setAttribute('height', 46);
-                            ring.setAttribute('rx', 6);
-                            ring.setAttribute('fill', 'none');
-                            ring.setAttribute('stroke', '#ffd700');
-                            ring.setAttribute('stroke-width', 3);
-                            ring.classList.add('note-badge');
-                            svg.appendChild(ring);
-                            var dot = document.createElementNS(NS, 'circle');
-                            dot.setAttribute('cx', c.x + 14);
-                            dot.setAttribute('cy', c.y - 14);
-                            dot.setAttribute('r', 10);
-                            dot.setAttribute('fill', '#ffd700');
-                            dot.setAttribute('stroke', '#1a1a2e');
-                            dot.setAttribute('stroke-width', 1.5);
-                            dot.classList.add('note-badge');
-                            svg.appendChild(dot);
-                            var star = document.createElementNS(NS, 'text');
-                            star.setAttribute('x', c.x + 14);
-                            star.setAttribute('y', c.y - 14);
-                            star.setAttribute('text-anchor', 'middle');
-                            star.setAttribute('dominant-baseline', 'central');
-                            star.setAttribute('font-size', 12);
-                            star.setAttribute('fill', '#1a1a2e');
-                            star.textContent = '★';
-                            star.classList.add('note-badge');
-                            svg.appendChild(star);
-                        }
-                    } catch (e) { /* badge is best-effort */ }
-                }
+            if (!svg) return;
+            svg.querySelectorAll('.note-badge').forEach(function(el) { el.remove(); });
+            if (!show) return;
+            var sq = coachNoteSquare();
+            if (!sq) return;
+            try {
+                var c = board2SquareToCoords(sq);
+                var NS = 'http://www.w3.org/2000/svg';
+                var ring = document.createElementNS(NS, 'rect');
+                ring.setAttribute('x', c.x - 23);
+                ring.setAttribute('y', c.y - 23);
+                ring.setAttribute('width', 46);
+                ring.setAttribute('height', 46);
+                ring.setAttribute('rx', 6);
+                ring.setAttribute('fill', 'none');
+                ring.setAttribute('stroke', '#ffd700');
+                ring.setAttribute('stroke-width', 3);
+                ring.classList.add('note-badge');
+                svg.appendChild(ring);
+                var dot = document.createElementNS(NS, 'circle');
+                dot.setAttribute('cx', c.x + 14);
+                dot.setAttribute('cy', c.y - 14);
+                dot.setAttribute('r', 10);
+                dot.setAttribute('fill', '#ffd700');
+                dot.setAttribute('stroke', '#1a1a2e');
+                dot.setAttribute('stroke-width', 1.5);
+                dot.classList.add('note-badge');
+                svg.appendChild(dot);
+                var star = document.createElementNS(NS, 'text');
+                star.setAttribute('x', c.x + 14);
+                star.setAttribute('y', c.y - 14);
+                star.setAttribute('text-anchor', 'middle');
+                star.setAttribute('dominant-baseline', 'central');
+                star.setAttribute('font-size', 12);
+                star.setAttribute('fill', '#1a1a2e');
+                star.textContent = '★';
+                star.classList.add('note-badge');
+                svg.appendChild(star);
+            } catch (e) { /* badge is best-effort */ }
+        }
+
+        // The comment bubble itself: a speech card pinned to the move's square,
+        // the way chess.com shows a comment on a reviewed move. Click it for the
+        // full note. Entry is null when there is nothing to show (or bubbles are off).
+        function renderCoachNoteBubble(entry) {
+            var wrap = document.getElementById('board2Wrap');
+            if (!wrap) return;
+            var bub = document.getElementById('coachNoteBubble');
+            if (!entry) { if (bub) bub.remove(); return; }
+            // Hidden by a click on the bubble, until you step onto another move
+            var curId = (window.currentMoveNode && window.currentMoveNode.nodeId) || 'flat';
+            if (window._coachBubbleHidden && window._coachBubbleHidden !== curId) {
+                window._coachBubbleHidden = null;   // a different move — start showing again
+            }
+            if (window._coachBubbleHidden === curId) { if (bub) bub.remove(); return; }
+            if (!bub) {
+                bub = document.createElement('div');
+                bub.id = 'coachNoteBubble';
+                bub.title = 'Click to hide this bubble — right-click for the full note (Enter or / too)';
+                bub.onclick = function () { hideCoachNoteBubble(); };
+                bub.oncontextmenu = function (e) { e.preventDefault(); openCoachNoteForCurrentMove(); return false; };
+                wrap.appendChild(bub);
+            }
+            var text = String(entry.text || '').replace(/\s+/g, ' ').trim();
+            if (!text) { bub.remove(); return; }
+            var short = text.length > 240 ? text.slice(0, 240).replace(/\S*$/, '') + '…' : text;
+            bub.innerHTML = '';
+            var head = document.createElement('div');
+            head.className = 'cb-head';
+            head.textContent = '💬 ' + (entry.label || '').trim();
+            bub.appendChild(head);
+            var close = document.createElement('span');
+            close.className = 'cb-close';
+            close.textContent = '✕';
+            close.title = 'Hide this bubble';
+            close.onclick = function (e) { e.stopPropagation(); hideCoachNoteBubble(); };
+            bub.appendChild(close);
+            var body = document.createElement('div');
+            body.className = 'cb-text';
+            body.textContent = short;
+            bub.appendChild(body);
+            if (short !== text) {
+                var more = document.createElement('div');
+                more.className = 'cb-more';
+                more.textContent = 'right-click for all of it';
+                bub.appendChild(more);
+            }
+            var tail = document.createElement('div');
+            tail.className = 'cb-tail';
+            bub.appendChild(tail);
+
+            // Pin above the square the move landed on — below it instead when the
+            // square is near the top edge, and nudged so a 220px card stays on the board
+            var sq = coachNoteSquare();
+            var c = sq ? board2SquareToCoords(sq) : { x: 200, y: 400 };
+            var above = c.y > 150;
+            var cx = Math.min(Math.max(c.x, 112), 288);
+            bub.classList.toggle('cb-above', above);
+            bub.classList.toggle('cb-below', !above);
+            bub.style.left = (cx / 4) + '%';
+            bub.style.top = ((above ? c.y - 28 : c.y + 28) / 4) + '%';
+            bub.style.transform = 'translateX(-50%)' + (above ? ' translateY(-100%)' : '');
+            tail.style.left = (50 + (c.x - cx) / 2.2) + '%';
+        }
+
+        // ---- + Comment: the comment for the move you are standing on, written
+        // straight into the move tree so moveTreeToPgn() carries it into Copy PGN
+        // and a later Load to Board brings it back. Works in variations too.
+        function openMoveCommentModal() {
+            var node = window.moveTree && window.currentMoveNode;
+            if (!node || !node.san) {
+                if (typeof showToast === 'function') showToast('Stand on a move first (← →), then + Comment');
+                return;
+            }
+            document.getElementById('moveCommentMoveLabel').textContent =
+                node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san;
+            var ta = document.getElementById('moveCommentInput');
+            // Engine tags stay out of the editor but are kept on save
+            ta.value = String(node.comment || '').replace(/\[%(?:eval|clk)[^\]]*\]/g, '').trim();
+            document.getElementById('moveCommentStatus').textContent = '';
+            document.getElementById('moveCommentModal').style.display = 'flex';
+            setTimeout(function () { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+        }
+        window.openMoveCommentModal = openMoveCommentModal;
+
+        function closeMoveCommentModal() {
+            document.getElementById('moveCommentModal').style.display = 'none';
+        }
+        window.closeMoveCommentModal = closeMoveCommentModal;
+
+        function saveMoveComment() {
+            var node = window.moveTree && window.currentMoveNode;
+            if (!node || !node.san) { closeMoveCommentModal(); return; }
+            // Braces would close the PGN comment early; newlines collapse to spaces
+            var text = document.getElementById('moveCommentInput').value
+                .replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+            // Keep any [%eval]/[%clk] tags the move already had, in front of the text
+            var tags = (String(node.comment || '').match(/\[%(?:eval|clk)[^\]]*\]/g) || []).join(' ');
+            node.comment = [tags, text].filter(Boolean).join(' ');
+
+            updateAllCommentsDisplay();
+            var pgn = moveTreeToPgn(window.moveTree);
+            if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+            window.annotatedPgnWithVariations = pgn;
+            renderMoveTable(window.moveTree);
+            if (typeof updateReportWithPgn === 'function') updateReportWithPgn();
+            if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+
+            closeMoveCommentModal();
+            var label = node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san;
+            if (typeof showToast === 'function') {
+                showToast(text ? 'Comment saved on ' + label + ' — Copy PGN keeps it' : 'Comment cleared on ' + label);
             }
         }
+        window.saveMoveComment = saveMoveComment;
+
+        // Cmd/Ctrl+Enter saves, Esc closes — the global shortcuts ignore textareas
+        document.addEventListener('keydown', function (e) {
+            var modal = document.getElementById('moveCommentModal');
+            if (!modal || modal.style.display !== 'flex') return;
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveMoveComment(); }
+            else if (e.key === 'Escape') { e.preventDefault(); closeMoveCommentModal(); }
+        });
+
+        // Click on a bubble = put this one away. It comes back as soon as you
+        // step onto another move (or come back to this one), so nothing is lost.
+        function hideCoachNoteBubble() {
+            window._coachBubbleHidden = (window.currentMoveNode && window.currentMoveNode.nodeId) || 'flat';
+            var bub = document.getElementById('coachNoteBubble');
+            if (bub) bub.remove();
+        }
+        window.hideCoachNoteBubble = hideCoachNoteBubble;
+
+        // ⭐ = show/hide the bubbles (remembered between sessions)
+        function coachBubblesOn() {
+            if (window._coachBubblesOn === undefined) {
+                var saved = null;
+                try { saved = localStorage.getItem('coachBubblesOn'); } catch (e) {}
+                window._coachBubblesOn = (saved === null) ? true : (saved === '1');
+            }
+            return window._coachBubblesOn;
+        }
+
+        function toggleCoachBubbles() {
+            window._coachBubblesOn = !coachBubblesOn();
+            window._coachBubbleHidden = null;   // the ⭐ wins over a one-off hide
+            try { localStorage.setItem('coachBubblesOn', window._coachBubblesOn ? '1' : '0'); } catch (e) {}
+            updateCoachNoteButton();
+            if (typeof showToast === 'function') {
+                showToast(window._coachBubblesOn ? 'Comment bubbles on — right-click ⭐ for the full note' : 'Comment bubbles off');
+            }
+        }
+        window.toggleCoachBubbles = toggleCoachBubbles;
+        window.renderCoachNoteBubble = renderCoachNoteBubble;
+
         window.updateCoachNoteButton = updateCoachNoteButton;
 
         function openCoachNoteForCurrentMove() {
@@ -10503,6 +10761,14 @@
         function updateAllCommentsDisplay() {
             updateAllCommentsDisplayCore();
             if (typeof lnPickRefreshSoon === 'function') lnPickRefreshSoon(); // the pick list follows the board's comments
+            // The comments just changed (comment editor, AI Comments, play-out), so the
+            // ⭐ for the move you are standing on is restated now instead of only after
+            // you navigate away and back. Guarded: updateCoachNoteButton calls back here
+            // when the coach text itself is new.
+            if (!window._coachStarRefreshing && window.updateCoachNoteButton) {
+                window._coachStarRefreshing = true;
+                try { window.updateCoachNoteButton(); } finally { window._coachStarRefreshing = false; }
+            }
         }
 
         function updateAllCommentsDisplayCore() {
