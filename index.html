@@ -19930,7 +19930,8 @@ ${contentToAnalyze}`;
             }
             const p = pane.plies[pane.idx];
             const strip = pane.plies.map((x, i) =>
-                '<button onclick="mmGo(' + i + ')" style="background:' + (i === pane.idx ? '#00d4ff' : '#0f3460')
+                '<button onclick="mmGo(' + i + ')" oncontextmenu="return mmChipMenu(event,' + i + ')"'
+                + ' title="Click to go here · right-click to open it on Lichess" style="background:' + (i === pane.idx ? '#00d4ff' : '#0f3460')
                 + '; color:' + (i === pane.idx ? '#06243a' : '#a8d8ea') + '; border:1px solid '
                 + (i === pane.idx ? '#00d4ff' : '#27406b') + '; border-radius:4px; padding:2px 7px; margin:2px 3px 0 0; cursor:pointer; font-size:11.5px; font-family:monospace;">'
                 + esc(x.label) + '</button>').join('');
@@ -19952,6 +19953,7 @@ ${contentToAnalyze}`;
                 +   '<button onclick="mmFlip()" title="Flip the board" style="background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:4px 8px; cursor:pointer;">⇅</button>'
                 + '</div>'
                 + '<div style="margin-top:7px;">' + strip + '</div>'
+                + '<div style="color:#7d8ea3; font-size:10.5px; margin-top:4px;">right-click a move → Lichess</div>'
                 + '<div style="color:#7d8ea3; font-size:11px; margin-top:8px;">'
                 +   (p.fen.split(' ')[1] === 'b' ? 'Black' : 'White') + ' to move</div>'
                 + '<input readonly onclick="this.select()" value="' + esc(p.fen) + '" '
@@ -20006,7 +20008,11 @@ ${contentToAnalyze}`;
             if (!modal || modal.style.display === 'none') return;
             const t = e.target && e.target.tagName;
             if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
-            if (e.key === 'Escape') { window.mmClose(); e.stopPropagation(); return; }
+            if (e.key === 'Escape') {
+                if ($m('mmCtxMenu')) { window.mmCloseMenu(); } else { window.mmClose(); }
+                e.stopPropagation();
+                return;
+            }
             if (!pane) return;
             if (e.key === 'ArrowRight') { window.mmStep(1); e.preventDefault(); e.stopPropagation(); }
             else if (e.key === 'ArrowLeft') { window.mmStep(-1); e.preventDefault(); e.stopPropagation(); }
@@ -20395,9 +20401,83 @@ ${contentToAnalyze}`;
             render(lastReview, lastMine, lastThreshold);
         };
 
+        // ---- right-click a move chip: send that position to Lichess --------
+        // Same URL shape as the app's Lichess Links modal, but built from the
+        // pane's own ply FEN instead of window.currentMoveNode, so it is the
+        // position you are looking at. Castling rights are carried over from
+        // the real FEN rather than hardcoded KQkq, and en passant is dropped
+        // because it stops making sense once you force the other side to move.
+        function mmLichessUrls(fen) {
+            const p = String(fen || '').split(' ');
+            if (p.length < 2) return null;
+            const castle = p[2] && p[2] !== '' ? p[2] : '-';
+            const mk = (c) => [p[0], c, castle, '-', '0', '1'].join('_');
+            const turn = p[1] === 'b' ? 'b' : 'w';
+            return {
+                turn: turn,
+                w: 'https://lichess.org/analysis/' + mk('w'),
+                b: 'https://lichess.org/analysis/' + mk('b'),
+                editor: 'https://lichess.org/editor/' + mk(turn) + '?color=' + (turn === 'w' ? 'white' : 'black'),
+                fen: [p[0], turn, castle, p[3] || '-', p[4] || '0', p[5] || '1'].join(' ')
+            };
+        }
+
+        window.mmCloseMenu = function () {
+            const m = $m('mmCtxMenu');
+            if (m && m.parentNode) m.parentNode.removeChild(m);
+        };
+
+        window.mmChipMenu = function (e, i) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.mmCloseMenu();
+            if (!pane || !pane.plies || !pane.plies[i]) return false;
+            const ply = pane.plies[i];
+            const u = mmLichessUrls(ply.fen);
+            if (!u) return false;
+            window.mmGo(i);                       // the board follows the chip you right-clicked
+
+            const item = (label, mark) =>
+                '<div class="mm-ctx-item" data-act="' + label + '" style="padding:6px 12px; cursor:pointer; white-space:nowrap; color:#e8f1f8;"'
+                + ' onmouseover="this.style.background=\'#0f3460\'" onmouseout="this.style.background=\'transparent\'">'
+                + mark + '</div>';
+
+            const menu = document.createElement('div');
+            menu.id = 'mmCtxMenu';
+            menu.style.cssText = 'position:fixed; z-index:10001; background:#16213e; border:1px solid #629924; '
+                + 'border-radius:6px; padding:4px 0; font-size:12.5px; box-shadow:0 6px 22px rgba(0,0,0,0.5); min-width:190px;';
+            menu.innerHTML =
+                '<div style="padding:4px 12px 6px; color:#7d8ea3; font-size:11px; border-bottom:1px solid #27406b; margin-bottom:3px;">'
+                + esc(ply.label) + '</div>'
+                + item('w', '<span style="color:#629924;">↗</span> Lichess — White to move' + (u.turn === 'w' ? ' <span style="color:#7d8ea3;">(as played)</span>' : ''))
+                + item('b', '<span style="color:#629924;">↗</span> Lichess — Black to move' + (u.turn === 'b' ? ' <span style="color:#7d8ea3;">(as played)</span>' : ''))
+                + item('editor', '<span style="color:#629924;">↗</span> Lichess board editor')
+                + item('fen', 'Copy this FEN');
+            document.body.appendChild(menu);
+
+            // keep it on screen
+            const r = menu.getBoundingClientRect();
+            menu.style.left = Math.min(e.clientX, window.innerWidth - r.width - 8) + 'px';
+            menu.style.top = Math.min(e.clientY, window.innerHeight - r.height - 8) + 'px';
+
+            menu.addEventListener('click', function (ev) {
+                const row = ev.target.closest ? ev.target.closest('.mm-ctx-item') : null;
+                if (!row) return;
+                const act = row.getAttribute('data-act');
+                window.mmCloseMenu();
+                if (act === 'fen') { copyOut(u.fen, 'FEN copied'); return; }
+                const url = act === 'editor' ? u.editor : act === 'b' ? u.b : u.w;
+                window.open(url, '_blank', 'noopener');
+            });
+            return false;
+        };
+
+        // any click elsewhere dismisses it
+        document.addEventListener('click', function () { window.mmCloseMenu(); }, true);
+
         // Exposed so the detectors can be poked from the console (and tested)
         window.mmDebug = { attackersOf, targetsOf, tagMistake, uciLineToSan, fromPos, buildPlies,
-                           siblingLines, noteText, boardSvgMm, materialHtml, materialTrail, askOpenAI, playOutFrom, review: () => lastReview,
+                           siblingLines, noteText, boardSvgMm, materialHtml, materialTrail, mmLichessUrls, askOpenAI, playOutFrom, review: () => lastReview,
                            pane: () => pane };
     })();
     </script>
