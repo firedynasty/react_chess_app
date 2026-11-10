@@ -20369,38 +20369,46 @@ ${contentToAnalyze}`;
         // in the shared map, so Play out → Eval line only searches what the
         // play-out did not already cover.
         let mmEvalBusy = false;
-        window.mmLineEval = async function () {
-            if (!pane || !pane.plies || !pane.plies.length || mmEvalBusy) return;
-            if (mmBusyKey) { mmToast('A play-out is running — let it finish first'); return; }
-            if (typeof getAnalysisPool !== 'function' || typeof analyzePositionOn !== 'function') {
-                mmToast('The Stockfish worker pool is not available on this page'); return;
-            }
+
+        // Returns how many positions it had to search (0 = already known).
+        // Shared by the Eval line button and by Explain, which measures a line
+        // before it talks about it.
+        async function evalPlies(plies, label, onTick) {
+            if (typeof getAnalysisPool !== 'function' || typeof analyzePositionOn !== 'function') return -1;
             const depth = Math.min(parseInt((document.getElementById('variation-depth') || {}).value, 10) || 12, 14);
             window.positionDepthMap = window.positionDepthMap || {};
             const todo = [], seen = {};
-            pane.plies.forEach(p => {
-                if (seen[p.fen]) return;
+            (plies || []).forEach(p => {
+                if (!p.fen || seen[p.fen]) return;
                 seen[p.fen] = 1;
                 if ((window.positionDepthMap[p.fen] || 0) >= depth) return;
                 todo.push(p.fen);
             });
-            if (!todo.length) { renderPane(); mmToast('Every position on this line is already evaluated'); return; }
+            if (!todo.length) return 0;
+            const pool = await getAnalysisPool();
+            let next = 0, done = 0;
+            await Promise.all(pool.map(async (w) => {
+                while (next < todo.length) {
+                    const fen = todo[next++];
+                    noteEval(fen, await analyzePositionOn(w, fen, depth));
+                    done++;
+                    $m('mmStatus').textContent = label + ': ' + done + '/' + todo.length + '…';
+                    if (onTick && done % 3 === 0) onTick();
+                }
+            }));
+            return todo.length;
+        }
 
+        window.mmLineEval = async function () {
+            if (!pane || !pane.plies || !pane.plies.length || mmEvalBusy) return;
+            if (mmBusyKey) { mmToast('A play-out is running — let it finish first'); return; }
             mmEvalBusy = true;
             renderPane();
             try {
-                const pool = await getAnalysisPool();
-                let next = 0, done = 0;
-                await Promise.all(pool.map(async (w) => {
-                    while (next < todo.length) {
-                        const fen = todo[next++];
-                        noteEval(fen, await analyzePositionOn(w, fen, depth));
-                        done++;
-                        $m('mmStatus').textContent = 'Eval along the line: ' + done + '/' + todo.length + '…';
-                        if (done % 3 === 0) renderPane();          // the bar fills in as it goes
-                    }
-                }));
-                mmToast('Eval filled in for ' + todo.length + ' position(s) at depth ' + depth);
+                const n = await evalPlies(pane.plies, 'Eval along the line', renderPane);
+                if (n === -1) mmToast('The Stockfish worker pool is not available on this page');
+                else if (n === 0) mmToast('Every position on this line is already evaluated');
+                else mmToast('Eval filled in for ' + n + ' position(s)');
             } catch (e) {
                 mmToast('Eval failed: ' + e.message);
                 if (typeof log === 'function') log('Mistake-review line eval failed: ' + e.message, 'error');
@@ -20657,23 +20665,80 @@ ${contentToAnalyze}`;
         // Where the material actually turns along a line: only the plies that
         // change the advantage, so a long played-out branch stays one short
         // line. This is the hard evidence an explanation should lean on.
-        function materialTrail(b) {
-            if (!b || !b.plies || !b.plies.length) return '';
+        function materialSign(fen) {
+            let m = null;
+            try { m = typeof getCapturedPieces === 'function' ? getCapturedPieces(fen) : null; } catch (e) { m = null; }
+            if (!m) return null;
+            return m.advantageSide === 'white' ? m.advantage
+                 : m.advantageSide === 'black' ? -m.advantage : 0;
+        }
+
+        function materialWord(sign) {
+            return sign === 0 ? 'level' : (sign > 0 ? 'White +' : 'Black +') + Math.abs(sign);
+        }
+
+        // Halfway through an exchange the count is wildly lopsided: Rxe1+ reads
+        // as "Black +5" until Nxe1 takes it straight back on the next ply. A
+        // value that the opponent restores immediately is an exchange in
+        // progress, not a gain, and a trail that reports one makes an
+        // explanation invent a rook win in a line that is dead level.
+        const sanDest = (san) => {
+            const m = /([a-h][1-8])(?:=[QRBN])?[+#]?$/.exec(String(san || ''));
+            return m ? m[1] : null;
+        };
+
+        function materialPoints(plies) {
             const pts = [];
             let last = null;
-            b.plies.forEach((p) => {
-                let m = null;
-                try { m = typeof getCapturedPieces === 'function' ? getCapturedPieces(p.fen) : null; } catch (e) { m = null; }
-                if (!m) return;
-                const sign = m.advantageSide === 'white' ? m.advantage
-                           : m.advantageSide === 'black' ? -m.advantage : 0;
-                if (last === null || sign !== last) {
-                    pts.push((p.san ? p.label : 'start') + ' = '
-                             + (sign === 0 ? 'level' : (sign > 0 ? 'White +' : 'Black +') + Math.abs(sign)));
-                    last = sign;
-                }
+            (plies || []).forEach((p, i) => {
+                const s = materialSign(p.fen);
+                if (s === null) return;
+                const lbl = p.san ? p.label : 'start';
+                if (last === null) { pts.push({ label: lbl, v: s }); last = s; return; }
+                if (s === last) return;
+                const next = (i + 1 < plies.length) ? plies[i + 1] : null;
+                const nxt = next ? materialSign(next.fen) : null;
+                if (nxt === last) return;                              // taken straight back
+                // Recaptured on the same square next ply: still mid-exchange,
+                // even in a long chain where the count never returns to where
+                // it was (Nxe5 Nxe5 d4 Bxd4 Qxd4 ends level, not Black +3)
+                if (next && /x/.test(next.san || '') && sanDest(next.san)
+                    && sanDest(next.san) === sanDest(p.san)) return;
+                if (!next && /x/.test(p.san || '')) return;            // line stops mid-capture: unknowable
+                pts.push({ label: lbl, v: s });
+                last = s;
             });
-            return pts.length > 1 ? pts.join(' → ') : '';
+            return pts;
+        }
+
+        function materialTrail(b) {
+            if (!b || !b.plies || !b.plies.length) return '';
+            const pts = materialPoints(b.plies);
+            return pts.length > 1 ? pts.map(x => x.label + ' = ' + materialWord(x.v)).join(' → ') : '';
+        }
+
+        // The only material statement that can be leaned on, and it is measured
+        // from BEFORE the flagged move. A punishment line starts the ply after
+        // the mistake, so a pawn the mistake grabbed is already on the board:
+        // reading the line's own first ply makes a plain recapture look like
+        // the opponent winning a pawn.
+        function materialNet(b, fromFen) {
+            if (!b || !b.plies || !b.plies.length) return '';
+            const pts = materialPoints(b.plies);
+            if (!pts.length) return '';
+            const base = fromFen !== undefined ? materialSign(fromFen) : null;
+            const from = base === null || base === undefined ? pts[0].v : base;
+            const fromLabel = base === null || base === undefined ? pts[0].label : 'before the move';
+            const to = pts[pts.length - 1].v;
+            const d = to - from;
+            if (d === 0) {
+                return 'once the recaptures settle, material is unchanged (' + materialWord(to)
+                       + ' ' + (fromLabel === 'before the move' ? 'before the move' : 'at the start')
+                       + ' and at the end of this line)';
+            }
+            return 'once the recaptures settle, ' + (d > 0 ? 'White' : 'Black') + ' nets ' + Math.abs(d)
+                   + ' point(s): ' + fromLabel + ' = ' + materialWord(from)
+                   + ' → ' + pts[pts.length - 1].label + ' = ' + materialWord(to);
         }
 
         // One mistake as branch notes: the facts, then the lines as From
@@ -20698,13 +20763,17 @@ ${contentToAnalyze}`;
                       + (b.playout.evalEnd === null ? '' : ', ending ' + pawns(b.playout.evalEnd) + ' from White’s view') + ']'
                     : '';
                 out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + ')' + tail + ':', b.note);
-                const trail = materialTrail(b);
-                if (trail) out.push('material along this line: ' + trail);
                 // Stockfish's own number wherever it moves, when Eval line has
                 // been run — the hardest evidence on offer, and the thing to
-                // check an explanation against
+                // check an explanation against. It goes FIRST because it is the
+                // verdict; the material counts underneath only qualify it.
                 const ev = evalTrail(b.plies);
-                if (ev) out.push('engine eval along this line: ' + ev.replace(/\s+→\s+/g, ' -> '));
+                out.push(ev ? 'engine eval along this line: ' + ev.replace(/\s+→\s+/g, ' -> ')
+                            : 'engine eval along this line: not measured');
+                const net = materialNet(b, f.fenBefore);
+                if (net) out.push('net material: ' + net);
+                const trail = materialTrail(b);
+                if (trail) out.push('material snapshots along this line (NOT gains — only "net material" above is): ' + trail);
             });
             return out.join('\n');
         }
@@ -20780,12 +20849,22 @@ ${contentToAnalyze}`;
             'You are a chess coach explaining ONE move that an engine flagged.',
             'Use ONLY the facts and the lines you are given.',
             'Never name a piece, square or tactic that does not appear in those lines.',
-            'The punishment line is WHY the move was bad. Walk it: say what the opponent wins,',
-            'and name the move in that line where the material turns, quoting the material trail.',
+            // The engine number is the verdict. Everything below is only allowed
+            // to qualify it, because a model handed a material count will always
+            // reach for a tactic even when the line is dead level.
+            'THE ENGINE EVAL IS THE VERDICT. If "engine eval along this line" is given,',
+            'your explanation must agree with where it ends up. Never claim a side wins material',
+            'or gets a winning attack when that eval stays flat.',
+            'Material counts are snapshots, not gains. A capture that is recaptured is worth NOTHING.',
+            'Only "net material" is a real gain; never cite a number from the middle of the trail,',
+            'and never describe a move as winning a piece because the count spikes on its ply.',
+            'If the eval barely moves and net material is unchanged, then there is no tactic:',
+            'say plainly that the move costs about the eval drop and nothing concrete follows,',
+            'that the damage is positional (structure, the square it gave up, the time it lost,',
+            'the recapture it hands the opponent), and name the preferred move. Do not invent a punishment.',
+            'When there IS a real gain, walk the punishment line and name the move where it turns.',
             'The opponent answering with a mistake is NOT a reason the move was bad.',
             'At most mention in one clause that the punishment was there and went unplayed.',
-            'Do not pad with what the engine preferred instead unless it explains the weakness.',
-            'If no line shows a concrete gain, say exactly that, name the preferred move, and stop.',
             'Answer in 3-6 plain sentences. No markdown, no headings, no preamble.'
         ].join(' ');
 
@@ -20808,16 +20887,55 @@ ${contentToAnalyze}`;
                 + '<div style="color:#eee; font-size:12.5px; white-space:pre-wrap;">' + esc(f.explain) + '</div></div>';
         }
 
+        // Does the punishment line actually show a gain, or does it just sit
+        // there? Worked out here rather than left to the model, because a model
+        // asked to "name the move where it turns" will always name one.
+        function branchGain(b, side, fromFen) {
+            const out = { swing: null, gain: 0 };
+            if (!b || !b.plies || !b.plies.length) return out;
+            const evs = b.plies.map(p => mmEvalOf(p.fen)).filter(v => v !== null);
+            if (evs.length > 1) out.swing = Math.max.apply(null, evs) - Math.min.apply(null, evs);
+            const pts = materialPoints(b.plies);
+            const base = materialSign(fromFen);
+            const from = (base === null) ? (pts.length ? pts[0].v : 0) : base;
+            const net = pts.length ? pts[pts.length - 1].v - from : 0;
+            out.gain = side === 'w' ? -net : net;          // + = the opponent nets material
+            return out;
+        }
+
+        // Measure before talking: without evals the model has no verdict to
+        // agree with, and a line that goes nowhere reads like a line that was
+        // never checked. Only the punishment branch — it is the one the
+        // explanation is built on, and it keeps the wait short.
+        async function measureForExplain(f) {
+            const pun = (f.branches || []).find(b => /punish/i.test(b.label || ''));
+            if (!pun || !pun.plies || !pun.plies.length) return;
+            if (pun.plies.filter(p => mmEvalOf(p.fen) !== null).length > 1) return;   // already measured
+            try { await evalPlies(pun.plies, 'Checking the punishment line'); } catch (e) { /* explain anyway */ }
+            $m('mmStatus').textContent = '';
+        }
+
         async function askOpenAI(f, key) {
+            const pun = (f.branches || []).find(b => /punish/i.test(b.label || ''));
+            const g = branchGain(pun, f.side, f.fenBefore);
+            // measured, flat, and nothing won: there is no tactic to find here
+            const flat = g.swing !== null && g.swing < 75 && g.gain <= 0;
+            const ask = flat
+                ? 'Why was ' + label(f.node) + ' bad? The engine eval along the punishment line does NOT move'
+                  + ' and no material is won, so there is no tactic: do not describe one, and do not cite a'
+                  + ' material number from the middle of a trail. Say what the move costs in the eval drop,'
+                  + ' then explain the positional damage — the structure, the square, the tempo, the free'
+                  + ' recapture or development it hands over — and name the move that was preferred instead.'
+                : 'Why was ' + label(f.node) + ' bad? Walk the punishment line above: name the move where it'
+                  + ' turns and what the opponent actually keeps, using the net material and the engine eval.'
+                  + ' A capture that gets recaptured is not a gain.';
             const body = {
                 model: MM_MODEL,
                 messages: [
                     { role: 'system', content: MM_SYSTEM },
-                    { role: 'user', content: noteText(f)
-                        + '\n\nWhy was ' + label(f.node) + ' bad? Walk the punishment line above:'
-                        + ' name the move where it turns and what the opponent wins, using the material trail.'
+                    { role: 'user', content: noteText(f) + '\n\n' + ask
                         + (f.escaped ? ' In one clause only, note that this was available and went unplayed.' : '')
-                        + ' Ground every claim in the lines and the material shown above.' }
+                        + ' Ground every claim in the lines and the numbers shown above.' }
                 ]
             };
             if (key.indexOf('sk-') === 0) body.userApiKey = key; else body.accessCode = key;
@@ -20839,6 +20957,8 @@ ${contentToAnalyze}`;
             f.explaining = true; f.explainError = null;
             render(lastReview, lastMine, lastThreshold);
             try {
+                await measureForExplain(f);
+                render(lastReview, lastMine, lastThreshold);
                 f.explain = await askOpenAI(f, key);
                 if (!f.explain) f.explainError = 'the model returned nothing';
             } catch (e) {
@@ -20862,6 +20982,7 @@ ${contentToAnalyze}`;
                 render(lastReview, lastMine, lastThreshold);
                 $m('mmStatus').textContent = 'Explaining ' + label(x.f.node) + '…';
                 try {
+                    await measureForExplain(x.f);
                     x.f.explain = await askOpenAI(x.f, key);
                 } catch (e) {
                     x.f.explainError = e.message;
@@ -21043,7 +21164,8 @@ ${contentToAnalyze}`;
 
         // Exposed so the detectors can be poked from the console (and tested)
         window.mmDebug = { attackersOf, targetsOf, tagMistake, uciLineToSan, fromPos, buildPlies,
-                           siblingLines, noteText, boardSvgMm, materialHtml, materialTrail, mmLichessUrls, askOpenAI, playOutFrom, review: () => lastReview,
+                           siblingLines, noteText, boardSvgMm, materialHtml, materialTrail, materialNet, materialSign,
+                           mmEvalOf, evalTrail, branchGain, materialPoints, branch, mmLichessUrls, askOpenAI, playOutFrom, review: () => lastReview,
                            pane: () => pane };
     })();
     </script>
