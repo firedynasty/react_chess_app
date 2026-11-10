@@ -20121,6 +20121,7 @@ ${contentToAnalyze}`;
                             if (r && r.depth > 0) {
                                 evals[i] = fens[i].split(' ')[1] === 'w' ? r.evaluation : -r.evaluation;
                                 if (r.pvUci && r.pvUci.length) pvMap[fens[i]] = r.pvUci;
+                                noteEval(fens[i], r);     // share it with the eval bar and Get Eval
                             }
                             done++;
                             if (done % 5 === 0 || done === todo.length) setStatus('Stockfish: ' + done + '/' + todo.length + '…');
@@ -20174,6 +20175,7 @@ ${contentToAnalyze}`;
                             const fen = needPv[next++];
                             const r = await analyzePositionOn(w, fen, depth);
                             if (r && r.pvUci && r.pvUci.length) pvMap[fen] = r.pvUci;
+                            noteEval(fen, r);
                         }
                     }));
                 }
@@ -20279,6 +20281,135 @@ ${contentToAnalyze}`;
                 + '</div>';
         }
 
+        function mmToast(m) { if (typeof showToast === 'function') showToast(m); }
+
+        // ---- the engine's own number, so a line can be checked instead of believed ----
+        // Every eval this modal produces is written back into the app's own
+        // positionEvalMap (White's point of view, same key and sign as Get Eval
+        // and Analyze Game), so the main board's eval bar and a saved report
+        // pick them up too, and nothing is searched twice.
+        function noteEval(fen, r) {
+            if (!fen || !r || !(r.depth > 0)) return;
+            window.positionEvalMap = window.positionEvalMap || {};
+            window.positionDepthMap = window.positionDepthMap || {};
+            if ((window.positionDepthMap[fen] || 0) > r.depth) return;   // keep the deeper search
+            window.positionEvalMap[fen] = fen.split(' ')[1] === 'w' ? r.evaluation : -r.evaluation;
+            window.positionDepthMap[fen] = r.depth;
+        }
+
+        // Same lookup the main eval bar uses, including its board+turn fallback
+        // for evals loaded from a saved report
+        function mmEvalOf(fen) {
+            if (!fen) return null;
+            const m = window.positionEvalMap;
+            if (m && m[fen] !== undefined && m[fen] !== null) return m[fen];
+            const m2 = window.positionEvalMap2;
+            if (m2) {
+                const p = fen.split(' ');
+                const v = m2[p[0] + ' ' + p[1]];
+                if (v !== undefined && v !== null) return v;
+            }
+            return null;
+        }
+
+        // Named sides rather than a bare sign: "+1.2" above a board is the same
+        // trap the material strips had
+        function cpText(cp) {
+            if (Math.abs(cp) >= 9000) return (cp > 0 ? 'White' : 'Black') + ' mates in ' + (10000 - Math.abs(cp));
+            if (Math.abs(cp) < 15) return 'level';
+            return (cp > 0 ? 'White +' : 'Black +') + (Math.abs(cp) / 100).toFixed(2);
+        }
+
+        // The app's own bar, at pane size: tanh(cp/400) either side of the middle
+        function evalBarHtml(fen) {
+            const cp = mmEvalOf(fen);
+            const known = cp !== null;
+            const pct = known ? 50 + Math.tanh(cp / 400) * 50 : 50;
+            return '<div title="' + (known ? 'Stockfish on this exact position: ' + esc(cpText(cp))
+                                           : 'No eval for this position yet — press Eval line') + '"'
+                + ' style="display:flex; align-items:center; gap:7px; margin-bottom:6px;">'
+                + '<div style="flex:1; height:10px; background:#111; border-radius:3px; overflow:hidden; display:flex;'
+                +   ' opacity:' + (known ? '1' : '0.3') + ';">'
+                +   '<div style="background:#3a3a3a; height:100%; width:' + (100 - pct) + '%;"></div>'
+                +   '<div style="background:#ffffff; height:100%; width:' + pct + '%;"></div>'
+                + '</div>'
+                + '<span style="font-family:monospace; font-size:11px; font-weight:bold; min-width:92px; text-align:right;'
+                +   ' color:' + (known ? (cp >= 0 ? '#f0d9b5' : '#aaa') : '#55657a') + ';">'
+                +   (known ? esc(cpText(cp)) : 'no eval') + '</span>'
+                + '</div>';
+        }
+
+        // Where the eval actually turns along the line — the same shape as
+        // materialTrail, and the answer to "did the advantage ever show up?".
+        // Only moves of 0.75+ pawns are worth a point, plus wherever it ends.
+        function evalTrail(plies) {
+            const known = [];
+            (plies || []).forEach((p) => {
+                const cp = mmEvalOf(p.fen);
+                if (cp !== null) known.push({ cp: cp, lbl: p.san ? p.label : 'start' });
+            });
+            if (known.length < 2) return '';
+            const pts = [];
+            let last = null;
+            known.forEach((k, i) => {
+                // first and last known point always, so a line that goes nowhere
+                // says so instead of showing nothing at all
+                if (last === null || Math.abs(k.cp - last) >= 75 || i === known.length - 1) {
+                    pts.push(k.lbl + ' = ' + cpText(k.cp));
+                    last = k.cp;
+                }
+            });
+            if (pts.length < 2) return '';
+            const lo = Math.min.apply(null, known.map(k => k.cp));
+            const hi = Math.max.apply(null, known.map(k => k.cp));
+            return pts.join('  →  ') + (hi - lo < 75 ? '  (never moves more than ¾ of a pawn)' : '');
+        }
+
+        // Stockfish over every position of the line in the pane. The results go
+        // in the shared map, so Play out → Eval line only searches what the
+        // play-out did not already cover.
+        let mmEvalBusy = false;
+        window.mmLineEval = async function () {
+            if (!pane || !pane.plies || !pane.plies.length || mmEvalBusy) return;
+            if (mmBusyKey) { mmToast('A play-out is running — let it finish first'); return; }
+            if (typeof getAnalysisPool !== 'function' || typeof analyzePositionOn !== 'function') {
+                mmToast('The Stockfish worker pool is not available on this page'); return;
+            }
+            const depth = Math.min(parseInt((document.getElementById('variation-depth') || {}).value, 10) || 12, 14);
+            window.positionDepthMap = window.positionDepthMap || {};
+            const todo = [], seen = {};
+            pane.plies.forEach(p => {
+                if (seen[p.fen]) return;
+                seen[p.fen] = 1;
+                if ((window.positionDepthMap[p.fen] || 0) >= depth) return;
+                todo.push(p.fen);
+            });
+            if (!todo.length) { renderPane(); mmToast('Every position on this line is already evaluated'); return; }
+
+            mmEvalBusy = true;
+            renderPane();
+            try {
+                const pool = await getAnalysisPool();
+                let next = 0, done = 0;
+                await Promise.all(pool.map(async (w) => {
+                    while (next < todo.length) {
+                        const fen = todo[next++];
+                        noteEval(fen, await analyzePositionOn(w, fen, depth));
+                        done++;
+                        $m('mmStatus').textContent = 'Eval along the line: ' + done + '/' + todo.length + '…';
+                        if (done % 3 === 0) renderPane();          // the bar fills in as it goes
+                    }
+                }));
+                mmToast('Eval filled in for ' + todo.length + ' position(s) at depth ' + depth);
+            } catch (e) {
+                mmToast('Eval failed: ' + e.message);
+                if (typeof log === 'function') log('Mistake-review line eval failed: ' + e.message, 'error');
+            }
+            mmEvalBusy = false;
+            $m('mmStatus').textContent = '';
+            renderPane();
+        };
+
         function renderPane() {
             const el = $m('mmPane');
             if (!el) return;
@@ -20288,17 +20419,22 @@ ${contentToAnalyze}`;
                 return;
             }
             const p = pane.plies[pane.idx];
-            const strip = pane.plies.map((x, i) =>
-                '<button onclick="mmGo(' + i + ')" oncontextmenu="return mmChipMenu(event,' + i + ')"'
-                + ' title="Click to go here · right-click to open it on Lichess" style="background:' + (i === pane.idx ? '#00d4ff' : '#0f3460')
+            const strip = pane.plies.map((x, i) => {
+                const cp = mmEvalOf(x.fen);
+                return '<button onclick="mmGo(' + i + ')" oncontextmenu="return mmChipMenu(event,' + i + ')"'
+                + ' title="' + (cp === null ? 'No eval yet' : 'Stockfish: ' + esc(cpText(cp)))
+                + ' · click to go here · right-click to open it on Lichess" style="background:' + (i === pane.idx ? '#00d4ff' : '#0f3460')
                 + '; color:' + (i === pane.idx ? '#06243a' : '#a8d8ea') + '; border:1px solid '
                 + (i === pane.idx ? '#00d4ff' : '#27406b') + '; border-radius:4px; padding:2px 7px; margin:2px 3px 0 0; cursor:pointer; font-size:11.5px; font-family:monospace;">'
-                + esc(x.label) + '</button>').join('');
+                + esc(x.label) + '</button>';
+            }).join('');
+            const trail = evalTrail(pane.plies);
 
             el.innerHTML =
                 '<div style="background:#0f1a2e; border:1px solid #27406b; border-radius:8px; padding:10px;">'
                 + '<div style="color:#00d4ff; font-size:12px; font-weight:bold; margin-bottom:2px;">' + esc(pane.title) + '</div>'
                 + '<div style="color:#7d8ea3; font-size:11px; margin-bottom:8px;">' + esc(pane.sub || '') + '</div>'
+                + evalBarHtml(p.fen)
                 + materialHtml(p.fen, pane.flipped ? 'w' : 'b')
                 + boardSvgMm(p.fen, pane.flipped)
                 + materialHtml(p.fen, pane.flipped ? 'b' : 'w')
@@ -20312,6 +20448,17 @@ ${contentToAnalyze}`;
                 +   '<button onclick="mmFlip()" title="Flip the board" style="background:#0f3460; color:#a8d8ea; border:1px solid #27406b; border-radius:4px; padding:4px 8px; cursor:pointer;">⇅</button>'
                 + '</div>'
                 + '<div style="margin-top:7px;">' + strip + '</div>'
+                + (trail
+                    ? '<div title="Only the plies where the engine\'s number actually moves by three quarters of a pawn or more"'
+                      + ' style="color:#a8d8ea; font-size:10.5px; margin-top:5px; line-height:1.5;">'
+                      + '<span style="color:#7d8ea3;">eval along this line:</span> ' + esc(trail) + '</div>'
+                    : '')
+                + '<button onclick="mmLineEval()" ' + (mmEvalBusy ? 'disabled ' : '')
+                +   'title="Run Stockfish on every position of this line, at the variation depth, and show its number for each one. The same evals the rest of the app uses, so nothing is searched twice."'
+                +   ' style="width:100%; margin-top:7px; background:' + (mmEvalBusy ? '#2a2a3e' : 'linear-gradient(90deg,#f57f17,#ff6f00)')
+                +   '; color:' + (mmEvalBusy ? '#7d8ea3' : '#fff') + '; border:none; border-radius:4px; padding:6px; cursor:'
+                +   (mmEvalBusy ? 'default' : 'pointer') + '; font-size:11.5px; font-weight:bold;">'
+                +   (mmEvalBusy ? 'Getting eval…' : '📊 Eval line') + '</button>'
                 + '<div style="color:#7d8ea3; font-size:10.5px; margin-top:4px;">right-click a move → Lichess</div>'
                 + '<div style="color:#7d8ea3; font-size:11px; margin-top:8px;">'
                 +   (p.fen.split(' ')[1] === 'b' ? 'Black' : 'White') + ' to move</div>'
@@ -20553,6 +20700,11 @@ ${contentToAnalyze}`;
                 out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + ')' + tail + ':', b.note);
                 const trail = materialTrail(b);
                 if (trail) out.push('material along this line: ' + trail);
+                // Stockfish's own number wherever it moves, when Eval line has
+                // been run — the hardest evidence on offer, and the thing to
+                // check an explanation against
+                const ev = evalTrail(b.plies);
+                if (ev) out.push('engine eval along this line: ' + ev.replace(/\s+→\s+/g, ' -> '));
             });
             return out.join('\n');
         }
@@ -20756,7 +20908,9 @@ ${contentToAnalyze}`;
             const cap = maxPlies > 0 ? maxPlies : 400;
             while (!b.game_over() && res.san.length < cap && !mmCancel) {
                 if (onTick) onTick(res.san.length);
-                const r = await analyzePositionOn(w, b.fen(), depth);
+                const at = b.fen();
+                const r = await analyzePositionOn(w, at, depth);
+                noteEval(at, r);          // the play-out searches every ply anyway — keep the number
                 if (!r || !r.pvUci || !r.pvUci.length) break;
                 res.evalEnd = b.turn() === 'w' ? r.evaluation : -r.evaluation;   // White's view
                 const u = r.pvUci[0];
