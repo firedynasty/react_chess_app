@@ -2516,30 +2516,44 @@
         // ---- + Comment: the comment for the move you are standing on, written
         // straight into the move tree so moveTreeToPgn() carries it into Copy PGN
         // and a later Load to Board brings it back. Works in variations too.
-        function openMoveCommentModal() {
-            var node = window.moveTree && window.currentMoveNode;
+        // The move being commented on. Normally the one you are standing on,
+        // but another panel (What went wrong) can hand in a node of its own, so
+        // you can comment a move without having to walk the board to it first.
+        var commentTargetNode = null;
+
+        function openMoveCommentModal(node, prefill, note) {
+            node = (node && node.san) ? node : (window.moveTree && window.currentMoveNode);
             if (!node || !node.san) {
                 if (typeof showToast === 'function') showToast('Stand on a move first (← →), then + Comment');
                 return;
             }
+            commentTargetNode = node;
             document.getElementById('moveCommentMoveLabel').textContent =
                 node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san;
             var ta = document.getElementById('moveCommentInput');
             // Engine tags stay out of the editor but are kept on save
             ta.value = String(node.comment || '').replace(/\[%(?:eval|clk)[^\]]*\]/g, '').trim();
-            document.getElementById('moveCommentStatus').textContent = '';
-            document.getElementById('moveCommentModal').style.display = 'flex';
+            // A caller may seed the box, but never over a comment you already wrote
+            var seeded = false;
+            if (!ta.value && prefill) { ta.value = String(prefill).trim(); seeded = true; }
+            document.getElementById('moveCommentStatus').textContent = seeded && note ? note : '';
+            var modal = document.getElementById('moveCommentModal');
+            // Sits above the What went wrong modal when it opened from there
+            var over = document.getElementById('mmModal');
+            modal.style.zIndex = (over && over.style.display === 'flex') ? '10003' : '10000';
+            modal.style.display = 'flex';
             setTimeout(function () { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
         }
         window.openMoveCommentModal = openMoveCommentModal;
 
         function closeMoveCommentModal() {
             document.getElementById('moveCommentModal').style.display = 'none';
+            commentTargetNode = null;
         }
         window.closeMoveCommentModal = closeMoveCommentModal;
 
         function saveMoveComment() {
-            var node = window.moveTree && window.currentMoveNode;
+            var node = commentTargetNode || (window.moveTree && window.currentMoveNode);
             if (!node || !node.san) { closeMoveCommentModal(); return; }
             // Braces would close the PGN comment early; newlines collapse to spaces
             var text = document.getElementById('moveCommentInput').value
@@ -2555,6 +2569,7 @@
             renderMoveTable(window.moveTree);
             if (typeof updateReportWithPgn === 'function') updateReportWithPgn();
             if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+            if (window.mmRerender) window.mmRerender();   // the mistake cards show the note too
 
             closeMoveCommentModal();
             var label = node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san;
@@ -20352,6 +20367,9 @@ ${contentToAnalyze}`;
             if (!modal || modal.style.display === 'none') return;
             const t = e.target && e.target.tagName;
             if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+            // The comment editor opens on top of this one: Esc there closes it, not us
+            const cm = document.getElementById('moveCommentModal');
+            if (cm && cm.style.display === 'flex') return;
             if (e.key === 'Escape') {
                 if ($m('mmCtxMenu')) { window.mmCloseMenu(); } else { window.mmClose(); }
                 e.stopPropagation();
@@ -20434,6 +20452,15 @@ ${contentToAnalyze}`;
                           + pawns(f.replyLoss) + ' — you were never made to pay for this.</span></div>'
                         : (f.reply ? '<div style="margin-top:5px; color:#888; font-size:12px;">They replied ' + esc(label(f.reply)) + '.</div>' : '');
 
+                    // Your own comment on the move, read straight from the tree,
+                    // so it shows here as well as in the PGN and on the board
+                    const note = commentOf(f);
+                    const noteHtml = note
+                        ? '<div style="margin-top:8px; border-left:2px solid #2ecc71; padding:2px 0 2px 9px;">'
+                          + '<div style="color:#2ecc71; font-size:11px; font-weight:bold; margin-bottom:2px;">Your comment on this move, in the PGN</div>'
+                          + '<div style="color:#eee; font-size:12.5px; white-space:pre-wrap;">' + esc(note) + '</div></div>'
+                        : '';
+
                     return '<div style="border-top:1px solid rgba(255,255,255,0.12); padding:10px 0;">'
                         + '<div style="display:flex; gap:10px; align-items:baseline; flex-wrap:wrap;">'
                         + '<button onclick="mmJump(' + i + ')" title="Put this position on the board here, and jump the main board to it" style="background:#0f3460; color:#00d4ff; border:1px solid #00d4ff; border-radius:4px; padding:3px 10px; cursor:pointer; font-weight:bold; font-size:13px;">'
@@ -20445,11 +20472,14 @@ ${contentToAnalyze}`;
                         + '<button onclick="mmExplain(' + i + ')" title="Ask OpenAI why this move was bad, using only the facts and lines here" style="background:#0f3460; color:#ffd43b; border:1px solid #ffd43b; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">'
                         + (f.explaining ? '…' : f.explain ? 'Re-explain' : 'Explain') + '</button>'
                         + '<button onclick="mmNote(' + i + ')" title="Copy just this mistake as branch notes for an LLM" style="background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">Copy notes</button>'
+                        + '<button onclick="mmComment(' + i + ')" title="Write this onto the move as a PGN comment, the same editor as 💬 + Comment. Copy PGN carries it, it comes back when you load that PGN again, and the ⭐ bubble shows it on the board. An explanation above seeds the box." style="background:#0f3460; color:#2ecc71; border:1px solid #2ecc71; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">'
+                        + (note ? '💬 Edit note' : '💬 Comment') + '</button>'
                         + '</div>'
                         + tagHtml
                         + escaped
                         + f.branches.map((b, bi) => branchHtml(i, bi, b)).join('')
                         + explainHtml(f)
+                        + noteHtml
                         + '</div>';
                 }).join('');
             if ($m('mmBody')) $m('mmBody').scrollTop = keepScroll;
@@ -20537,6 +20567,42 @@ ${contentToAnalyze}`;
             const f = lastReview[i];
             if (!f) return;
             copyOut(noteText(f), 'Branch notes copied: ' + label(f.node));
+        };
+
+        // ---- 💬 Comment: the same + Comment editor, pointed at this mistake's
+        // move instead of the one you are standing on, so what you learn here
+        // goes into the PGN itself and comes back with the game. The live tree
+        // node is the one in the registry when the table has been re-rendered
+        // since the review ran; f.node is the same object otherwise.
+        function liveNode(f) {
+            if (!f || !f.node) return null;
+            const id = f.node.nodeId;
+            if (id && window.moveNodeRegistry && window.moveNodeRegistry[id]) return window.moveNodeRegistry[id];
+            return f.node.san ? f.node : null;
+        }
+
+        function commentOf(f) {
+            const n = liveNode(f);
+            if (!n) return '';
+            return String(n.comment || '').replace(/\[%(?:eval|clk)[^\]]*\]/g, '').trim();
+        }
+
+        window.mmComment = function (i) {
+            const f = lastReview[i];
+            if (!f) return;
+            const n = liveNode(f);
+            if (!n || typeof openMoveCommentModal !== 'function') {
+                if (typeof showToast === 'function') showToast('Could not reach that move in the tree — refresh the move table');
+                return;
+            }
+            // An explanation already in words is the obvious first draft, but it
+            // only ever seeds an empty box, and the status line says where it came from
+            openMoveCommentModal(n, f.explain || '', 'Seeded from the OpenAI explanation — edit it down before saving');
+        };
+
+        // Saving a comment re-renders the cards so the note shows up here too
+        window.mmRerender = function () {
+            if ($m('mmModal') && $m('mmModal').style.display === 'flex') render(lastReview, lastMine, lastThreshold);
         };
 
         window.mmCopy = function () {
