@@ -1499,6 +1499,9 @@
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
             <button id="coachNoteBtnMini" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
+            <button id="mstSideBtn" title="Whose mistakes the , and . keys hop between — click to cycle White → Black → Both. The number is how many ?, ?? and ?! moves that side has on the main line of this game" onclick="mstToggleSide()" style="background: #0f3460; color: #eeeeee; border: 1px solid #eeeeee; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ White (0)</button>
+            <button id="mstPrevBtn" title="Jump back to that side's previous mistake (same as the , key)" onclick="mstStep(-1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">, ◀ ⚠</button>
+            <button id="mstNextBtn" title="Jump to that side's next mistake (same as the . key)" onclick="mstStep(1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ ▶ .</button>
             <button id="addCommentBtn" title="Write or edit the comment on the move you are standing on (variations too). It goes into the PGN itself, so Copy PGN keeps it and it comes back when you load that PGN again" onclick="openMoveCommentModal()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">💬 + Comment</button>
             <button id="addVar2Btn" title="Paste a practice snippet (FEN + moves): it finds the move the FEN matches and adds the line there as the single variation" onclick="openAddVar2()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var. 2</button>
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
@@ -1666,7 +1669,7 @@
             <div style="background:#16213e; border-radius:10px; padding:20px; max-width:480px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #ff9800; position:relative;">
               <button onclick="document.getElementById('hintsModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
               <div style="font-weight:bold; color:#ff9800; font-size:15px; margin-bottom:10px;">Keyboard hints</div>
-              <table style="font-size:13px; border-collapse:collapse;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">← / →</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next move (→ or PageDown or Space = next)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Space</kbd></td><td style="padding:4px 0; color:#ddd;">Next move</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">9</kbd></td><td style="padding:4px 0; color:#ddd;">Paste clipboard into the PGN box and Load to Board</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">0</kbd></td><td style="padding:4px 0; color:#ddd;">Go to move — type 48 + Enter (48b = Black's move)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↑</kbd></td><td style="padding:4px 0; color:#ddd;">Exit the variation back to the main line</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↓</kbd></td><td style="padding:4px 0; color:#ddd;">Step into a variation</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Tab</kbd></td><td style="padding:4px 0; color:#ddd;">Cycle variations (adds one if none)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Esc</kbd></td><td style="padding:4px 0; color:#ddd;">Remove the variation at this move / close a modal</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">/</kbd></td><td style="padding:4px 0; color:#ddd;">Toggle the coach note</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Enter</kbd></td><td style="padding:4px 0; color:#ddd;">Open the coach note (gold star)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">[ / ]</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next saved position</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#00d4ff; font-family:monospace;">Add Var. 2</kbd></td><td style="padding:4px 0; color:#ddd;">Button. Paste a practice snippet (FEN position + moves) and it adds the line as a variation at the move that FEN matches, replacing that move's existing variations</td></tr></table>
+              <table style="font-size:13px; border-collapse:collapse;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">← / →</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next move (→ or PageDown or Space = next)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Space</kbd></td><td style="padding:4px 0; color:#ddd;">Next move</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">9</kbd></td><td style="padding:4px 0; color:#ddd;">Paste clipboard into the PGN box and Load to Board</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">0</kbd></td><td style="padding:4px 0; color:#ddd;">Go to move — type 48 + Enter (48b = Black's move)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↑</kbd></td><td style="padding:4px 0; color:#ddd;">Exit the variation back to the main line</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↓</kbd></td><td style="padding:4px 0; color:#ddd;">Step into a variation</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Tab</kbd></td><td style="padding:4px 0; color:#ddd;">Cycle variations (adds one if none)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Esc</kbd></td><td style="padding:4px 0; color:#ddd;">Remove the variation at this move / close a modal</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">/</kbd></td><td style="padding:4px 0; color:#ddd;">Toggle the coach note</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Enter</kbd></td><td style="padding:4px 0; color:#ddd;">Open the coach note (gold star)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">[ / ]</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next saved position</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">, / .</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next mistake (?, ??, ?!) by the side the ⚠ button names — click it to cycle White → Black → Both</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#00d4ff; font-family:monospace;">Add Var. 2</kbd></td><td style="padding:4px 0; color:#ddd;">Button. Paste a practice snippet (FEN position + moves) and it adds the line as a variation at the move that FEN matches, replacing that move's existing variations</td></tr></table>
             </div>
           </div>
 
@@ -10482,6 +10485,9 @@
             // Every load path funnels through here, so keep the tab strip's
             // titles (White vs Black from the PGN headers) up to date.
             if (typeof pgnTabRenderStrip === 'function') pgnTabRenderStrip();
+
+            // and the ⚠ mistake-hop button's count for the new game
+            if (typeof mstSyncBtn === 'function') mstSyncBtn();
         }
 
         /**
@@ -11808,6 +11814,95 @@
             }
             updateBoard2MoveIndicator(window.studyReportPositionIndex);
         }
+
+
+        // ── Mistake hopping: , and . walk the game's ?/??/?! moves ──────────
+        // The move list already paints those moves; this walks them. The side
+        // filter is the whole point: White's blunders and Black's are two
+        // different post-mortems, so mstSide picks whose. Position is compared
+        // by ply ordinal rather than node identity, so hopping still works
+        // while you are standing inside a variation.
+        window.mstSide = 'w';            // 'w' | 'b' | 'both'
+
+        function mstSideLabel() {
+            return window.mstSide === 'w' ? 'White' : (window.mstSide === 'b' ? 'Black' : 'Both');
+        }
+
+        // "Is a mistake" = the move list gave it a colour: ?? ? ?! yes, ! and !? no.
+        // Reusing getAnnotationColor keeps the two in step by construction.
+        function mstIsMistake(node) {
+            return !!(node && node.san && getAnnotationColor(node.annotation));
+        }
+
+        function mstSideMatches(node) {
+            if (window.mstSide === 'both') return true;
+            return window.mstSide === 'b' ? !!node.isBlackMove : !node.isBlackMove;
+        }
+
+        // Main line only: a ? inside a variation is engine output, not something
+        // that happened in the game.
+        function mstCollect() {
+            const out = [];
+            if (!window.moveTree) return out;
+            let node = (window.moveTree.children && window.moveTree.children[0]) || null;
+            while (node) {
+                if (mstIsMistake(node) && mstSideMatches(node)) out.push(node);
+                node = (node.children && node.children.length > 0) ? node.children[0] : null;
+            }
+            return out;
+        }
+
+        function mstPly(node) {
+            if (!node || !node.san) return 0;        // start position sorts before move 1
+            return node.moveNumber * 2 + (node.isBlackMove ? 1 : 0);
+        }
+
+        function mstStep(dir) {
+            if (!window.moveTree) { showToast('No game on the board'); return; }
+            const list = mstCollect();
+            if (!list.length) {
+                showToast('No ' + mstSideLabel().toLowerCase() + ' mistakes in this game');
+                return;
+            }
+
+            const here = mstPly(window.currentMoveNode);
+            let idx = -1;
+            if (dir > 0) {
+                for (let i = 0; i < list.length; i++) if (mstPly(list[i]) > here) { idx = i; break; }
+            } else {
+                for (let i = list.length - 1; i >= 0; i--) if (mstPly(list[i]) < here) { idx = i; break; }
+            }
+            // Past the last one (or before the first): wrap round rather than
+            // dead-end, so holding . cycles the game's mistakes.
+            if (idx === -1) idx = dir > 0 ? 0 : list.length - 1;
+
+            // No toast: the move list highlight and the board say where you landed,
+            // and a popup on every , / . press sits in the way.
+            jumpToNode(list[idx].nodeId);
+        }
+
+        function mstToggleSide() {
+            window.mstSide = window.mstSide === 'w' ? 'b' : (window.mstSide === 'b' ? 'both' : 'w');
+            mstSyncBtn();            // the button's own label is the feedback
+        }
+
+        // Called from renderMoveTable — every load path funnels through it, so
+        // the count on the button always matches the game on the board.
+        function mstSyncBtn() {
+            const btn = document.getElementById('mstSideBtn');
+            if (!btn) return;
+            const n = mstCollect().length;
+            btn.textContent = '⚠ ' + mstSideLabel() + ' (' + n + ')';
+            const col = window.mstSide === 'w' ? '#eeeeee' : (window.mstSide === 'b' ? '#9aa6b2' : '#ff9800');
+            btn.style.color = n ? col : '#666';
+            btn.style.borderColor = n ? col : '#666';
+        }
+
+        // Inline onclick handlers only see globals — export or the buttons are dead.
+        window.mstStep = mstStep;
+        window.mstToggleSide = mstToggleSide;
+        window.mstSyncBtn = mstSyncBtn;
+        window.mstCollect = mstCollect;
 
         /**
          * Collect all main-line moves that have branch points (children.length > 1).
@@ -14216,6 +14311,11 @@
                     // [ / ] = previous / next saved position (the ◀ ▶ buttons in the Positions
                     // panel). With ⌘ / Ctrl held they fall through to the browser (⌘[ = Back).
                     lnPosStep(e.key === '[' ? -1 : 1);
+                    e.preventDefault();
+                } else if ((e.key === ',' || e.key === '.') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // , / . = previous / next mistake by the side the ⚠ button names
+                    // (White → Black → Both). Main line only.
+                    mstStep(e.key === '.' ? 1 : -1);
                     e.preventDefault();
                 } else if (e.key === 'Tab') {
                     // Tab = same as Cycle Var.: enter the variation, step through its
