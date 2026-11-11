@@ -638,6 +638,33 @@
         .gdrive-csv-table tbody tr { cursor: pointer; }
         .gdrive-csv-table tbody tr:hover { background: #1a1a2e; }
         .gdrive-csv-table tbody tr.gdrive-selected-row { background: #2a2a5e; outline: 1px solid #61dafb; }
+        .gdrive-picker-overlay { display:none; position:fixed; inset:0; z-index:12000; background:rgba(0,0,0,.78); align-items:center; justify-content:center; padding:18px; }
+        .gdrive-picker-panel { width:min(980px, 96vw); max-height:90vh; overflow:hidden; display:flex; flex-direction:column; background:#101a2d; border:1px solid #2873a3; border-radius:12px; box-shadow:0 18px 60px rgba(0,0,0,.65); color:#eee; }
+        .gdrive-picker-head { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid #263750; }
+        .gdrive-picker-head h2 { margin:0; color:#61dafb; font-size:18px; }
+        .gdrive-picker-head button { margin-left:auto; background:transparent; border:0; color:#aaa; font-size:24px; cursor:pointer; }
+        #gdrive-picker-back-btn:not([hidden]) + button { margin-left:0 !important; }
+        .gdrive-picker-tools { display:flex; flex-wrap:wrap; gap:8px; padding:12px 18px; border-bottom:1px solid #263750; }
+        .gdrive-picker-tools input { flex:1 1 240px; min-width:0; padding:9px 11px; border-radius:6px; border:1px solid #34506f; background:#0b1423; color:#eee; }
+        .gdrive-picker-tools button, .gdrive-picker-sheet { padding:8px 12px; border:1px solid #2873a3; border-radius:6px; background:#12365a; color:#e8f7ff; cursor:pointer; }
+        .gdrive-picker-tools button:hover, .gdrive-picker-sheet:hover { background:#1c527f; }
+        .gdrive-picker-content { flex:1 1 auto; min-height:0; overflow-y:auto; padding:14px 18px 20px; }
+        .gdrive-picker-status { min-height:18px; margin-bottom:10px; color:#9eabbc; font-size:13px; }
+        .gdrive-picker-file { display:flex; flex-direction:column; gap:3px; width:100%; margin:0 0 7px; padding:10px 12px; text-align:left; border:1px solid #293b55; border-radius:7px; background:#15243a; color:#eee; cursor:pointer; }
+        .gdrive-picker-file:hover { border-color:#61dafb; background:#1a2d48; }
+        .gdrive-picker-file small { color:#93a6bc; }
+        .gdrive-picker-section { margin-top:16px; }
+        .gdrive-picker-section h3 { margin:0 0 8px; color:#b7d9ed; font-size:14px; }
+        .gdrive-picker-sheets { display:flex; flex-wrap:wrap; gap:7px; }
+        .gdrive-picker-sheet.active { background:#198754; border-color:#28a745; }
+        .gdrive-picker-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:9px; max-height:52vh; overflow-y:auto; padding:2px 5px 2px 2px; }
+        .gdrive-picker-card { min-width:0; padding:11px 12px; text-align:left; border:1px solid #2a405d; border-radius:8px; background:#15243a; color:#eee; cursor:pointer; }
+        .gdrive-picker-card:hover { border-color:#61dafb; background:#1a2d48; }
+        .gdrive-picker-card:disabled { cursor:default; opacity:.55; }
+        .gdrive-picker-card-title { display:block; margin-bottom:6px; color:#fff; font-weight:700; overflow-wrap:anywhere; }
+        .gdrive-picker-card-preview { display:block; color:#a8b8cb; font:12px/1.45 monospace; max-height:70px; overflow:hidden; white-space:pre-wrap; overflow-wrap:anywhere; }
+        .gdrive-picker-card-meta { display:block; margin-top:7px; color:#61dafb; font-size:11px; }
+        @media (max-width:600px) { .gdrive-picker-overlay { padding:8px; } .gdrive-picker-panel { width:100%; max-height:94vh; } .gdrive-picker-content { padding:12px; } .gdrive-picker-cards { grid-template-columns:1fr; max-height:54vh; } }
         .gdrive-cell-input {
             width: 100%;
             padding: 8px 10px;
@@ -886,31 +913,12 @@
                 <span id="sbGameLink" title="Deep link (?game_id=...) to the game currently loaded from Supabase" style="font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></span>
                 <button id="sbCopyGameLinkBtn" onclick="sbCopyGameLink(this)" title="Copy the deep link to the clipboard" style="margin-left: 8px; padding: 2px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 12px;">📋 Copy URL</button>
             </div>
-            <!-- Google Doc loader — sign in + Recent; picking a Doc loads its text into the coach-note source (window.textViewRawContent) so the ⭐ button works -->
+            <!-- Google Sheets game picker — sign in, choose a spreadsheet and tab, then load a card onto the board -->
             <div style="margin-top: 10px; border-top: 1px solid #2a2a4e; padding-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                <button id="gnSignInBtn" onclick="gnSignIn()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">G Sign In</button>
-                <button id="gnRecentBtn" onclick="gnToggleRecentDropdown()" disabled title="Pick a recent Google Doc to load as coach analysis" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Recent ▾</button>
-                <button id="gnGamesBtn" onclick="gnToggleGamesDropdown()" disabled title="List Docs in the chess/games folder — filtered by the name input when it has text (10 most recent matches), otherwise sorted by name" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Games ▾</button>
-                <button id="gnChessBtn" onclick="gnToggleChessDropdown()" disabled title="List Docs in the chess/vercel_chess Drive folder (and its subfolders) — filtered by the name input when it has text, otherwise sorted by name" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Chess ▾</button>
-                <input id="gnGamesFilter" onkeydown="if(event.key==='Enter')gnQueryGamesDropdown()" placeholder="games filter (name)…" title="Filter the Games ▾ list by Doc name (e.g. an opponent's name); press Enter to search" style="width: 130px; background: #0f3460; border: 1px solid #00d4ff; color: #eee; padding: 6px 8px; border-radius: 6px; font-size: 12px;">
-                <span id="gnDocName" style="font-size: 12px; color: #888; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
-                <span id="gnStatus" style="font-size: 12px; color: #888;"></span>
+                <button id="gnSignInBtn" onclick="gdriveSignIn()" style="background: #6c5ce7; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Sign in with Google</button>
+                <button id="gnRecentBtn" onclick="gdriveOpenPicker()" disabled title="Browse recent Google Sheets or search by name, then choose a sheet and game card" style="background: #137333; color: #fff; border: 1px solid #34a853; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Recent Sheets ▾</button>
+                <span id="gdriveTopStatus" style="font-size: 12px; color: #888;"></span>
             </div>
-            <!-- Append row: shown once a Doc is loaded via Recent ▾; notes go to the END of that Doc -->
-            <div id="gnAppendRow" hidden style="margin-top: 8px;">
-                <textarea id="gnNoteInput" placeholder="Note to append to the loaded Doc… (the game label and a separator line are added automatically)" style="width: 100%; height: 60px; background: #0f3460; border: 1px solid #1a1a2e; color: #eee; padding: 10px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; resize: vertical;"></textarea>
-                <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-                    <button id="gnInsertMoveBtn" onclick="gnInsertMoveRef()" title="Insert the current move (e.g. **11... Nh5** — ) into the note at the cursor" style="background: #17a2b8; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">+ Move</button>
-                    <button id="gnBulletizeBtn" onclick="gnBulletizeNote()" title="Reformat the note into '- ' bullet lines, 2 sentences each (headings, bullets, numbered lines and chess move dots are preserved)" style="background: #6c5ce7; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">• Bullets</button>
-                    <button id="gnAppendBtn" onclick="gnAppendNote()" title="Append the note to the end of the loaded Google Doc" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Append Note to Doc</button>
-                    <button id="gnOcrBtn" onclick="gnOcrPickImage()" title="OCR an image with OpenAI (gpt-4o-mini) — the extracted text lands in the note box for review, then Append sends it to the Doc. You can also paste an image straight into the note box." style="background: #e67e22; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">📷 OCR</button>
-                    <input type="file" id="gnOcrFileInput" accept="image/*" hidden>
-                </div>
-            </div>
-            <div id="gnRecentDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
-            <div id="gnChessDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
-            <div id="gnGamesDropdown" hidden style="position: fixed; z-index: 10001; background: #1e293b; border: 1px solid #334155; border-radius: 8px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); min-width: 220px; max-width: 320px; max-height: 240px; overflow-y: auto;"></div>
-
             <div id="sbReportModal" onclick="if (event.target === this) sbCloseReportModal()" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 16px;">
                 <div style="background: #16213e; border: 1px solid #2a2a4e; border-radius: 10px; width: min(1100px, 100%); height: 90vh; display: flex; flex-direction: column; overflow: hidden;">
                     <div style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #2a2a4e;">
@@ -1945,6 +1953,7 @@
             </select>
             <button onclick="gdriveCopyAll()" style="padding: 5px 12px; background: #8e44ad; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Copy</button>
             <button onclick="gdriveClear()" style="padding: 5px 12px; background: #333; color: #888; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Clear</button>
+            <button id="gdrive-browse-btn" onclick="gdriveOpenPicker()" disabled style="padding: 6px 14px; background: #0f6b87; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px;">Browse Games</button>
             <button id="gdrive-auth-btn" onclick="gdriveSignIn()" style="padding: 6px 14px; background: #333; color: #eee; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; margin-left: auto;">Sign In</button>
         </div>
         <div id="gdrive-status" style="margin-top: 6px; color: #888; font-size: 12px;"></div>
@@ -1975,6 +1984,33 @@
             <button onclick="document.getElementById('gdrive-cell1-input').value=''; document.getElementById('gdrive-cell2-input').value=''; document.getElementById('gdrive-cell3-input').value='';" style="padding: 8px 18px; background: #dc3545; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; white-space: nowrap; margin-bottom: 1px; margin-left: 4px;">Clear Inputs</button>
         </div>
         <div id="gdrive-table-area"></div>
+    </div>
+
+    <div id="gdrive-picker-modal" class="gdrive-picker-overlay" role="dialog" aria-modal="true" aria-labelledby="gdrive-picker-title" onclick="if(event.target===this)gdriveClosePicker()">
+      <section class="gdrive-picker-panel">
+        <header class="gdrive-picker-head">
+          <h2 id="gdrive-picker-title">Choose a Google spreadsheet</h2>
+          <button type="button" id="gdrive-picker-back-btn" hidden style="margin-left:auto; background:#12365a; border:1px solid #2873a3; border-radius:6px; padding:6px 10px; color:#eee; font-size:13px; cursor:pointer;">Back</button>
+          <button type="button" aria-label="Close" onclick="gdriveClosePicker()">&times;</button>
+        </header>
+        <div id="gdrive-picker-tools" class="gdrive-picker-tools">
+          <input id="gdrive-picker-search" type="search" placeholder="Find a spreadsheet by name" aria-label="Search Google spreadsheets">
+          <button type="button" id="gdrive-picker-search-btn">Search</button>
+          <button type="button" id="gdrive-picker-recent-btn">Recent</button>
+        </div>
+        <div class="gdrive-picker-content">
+          <div id="gdrive-picker-status" class="gdrive-picker-status" aria-live="polite"></div>
+          <div id="gdrive-picker-files"></div>
+          <section id="gdrive-picker-sheet-section" class="gdrive-picker-section" hidden>
+            <h3 id="gdrive-picker-sheet-heading">Sheets</h3>
+            <div id="gdrive-picker-sheets" class="gdrive-picker-sheets"></div>
+          </section>
+          <section id="gdrive-picker-card-section" class="gdrive-picker-section" hidden>
+            <h3 id="gdrive-picker-card-heading">Choose a game (column 2 loads to the board)</h3>
+            <div id="gdrive-picker-cards" class="gdrive-picker-cards"></div>
+          </section>
+        </div>
+      </section>
     </div>
 
     <!-- Dropbox File Browser Sidebar -->
@@ -14310,6 +14346,13 @@
                     board2NextMove();
                     if (nextBtn) nextBtn.focus();
                     e.preventDefault();
+                } else if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                    // F = flip the main board (same action as the Flip Board button)
+                    const flipBoardBtn = document.getElementById('flip_board2');
+                    if (flipBoardBtn) {
+                        flipBoardBtn.click();
+                        e.preventDefault();
+                    }
                 } else if (e.key === 'ArrowUp') {
                     // If the coach note / text view modal is open, ArrowUp closes it
                     // (Escape does the same) instead of exiting the variation
@@ -15968,7 +16011,7 @@ End with a Socratic question about a specific position to help me learn.`
             // Sync latest FULL-GAME coach report into the Text View modal (View Text
             // button). Only a report with the per-move section ("Why the Bad Moves
             // Were Bad") may replace window.textViewRawContent — a single-move
-            // "Ask Coach" answer must NOT wipe coach notes loaded from a Google Doc.
+            // "Ask Coach" answer must NOT wipe coach notes loaded from another source.
             useEffect(() => {
                 const lastAssistant = [...messages].reverse().find(
                     m => m.role === 'assistant' && !m.content.startsWith('Error:')
@@ -16609,7 +16652,7 @@ ${contentToAnalyze}`;
                 }
             };
 
-            // Chat transcript + the loaded game's deep link (shared by Copy Chat and Save as new Doc)
+            // Chat transcript + the loaded game's deep link for Copy Chat
             const buildChatText = () => {
                 let chatText = messages
                     .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
@@ -16627,73 +16670,6 @@ ${contentToAnalyze}`;
                     if (lines.length) chatText += '\n\nGame details:\n' + lines.join('\n');
                 }
                 return chatText;
-            };
-
-            // Save chat as a new Google Doc in Drive/Documents/notes/hobbies/chess/games
-            const [savingDoc, setSavingDoc] = useState(false);
-            const [docTitle, setDocTitle] = useState('');
-            const saveChatAsNewDoc = async () => {
-                if (messages.length === 0) {
-                    alert('No messages to save');
-                    return;
-                }
-                if (!window.gnSaveNewDoc) {
-                    alert('Google Drive saving is not available');
-                    return;
-                }
-                setSavingDoc(true);
-                try {
-                    const opp = window.sbGetOpponentName && window.sbGetOpponentName();
-                    // A typed title wins; otherwise fall back to the opponent auto-label
-                    const label = docTitle.trim() || (opp ? 'vs ' + opp : '');
-                    const doc = await window.gnSaveNewDoc(buildChatText(), label);
-                    alert('Saved new Google Doc: ' + doc.name);
-                } catch (err) {
-                    alert('Save to Google Docs failed: ' + err.message);
-                } finally {
-                    setSavingDoc(false);
-                }
-            };
-
-            // Append just the last Ask-Coach Q&A (the selected move's analysis) to the loaded Doc
-            const [appendingNote, setAppendingNote] = useState(false);
-            const appendMoveNoteToDoc = async () => {
-                // Walk back to the last assistant answer and the user question before it
-                let i = messages.length - 1;
-                while (i >= 0 && messages[i].role !== 'assistant') i--;
-                if (i < 0) {
-                    alert('No coach answer to save yet — ask about a move first');
-                    return;
-                }
-                let j = i - 1;
-                while (j >= 0 && messages[j].role !== 'user') j--;
-                const pair = j >= 0 ? [messages[j], messages[i]] : [messages[i]];
-                // Header the ⭐ parser can find after the Doc is reloaded: the first
-                // bold move in the Q&A (e.g. **20. Rf5?**) on its own line.
-                const moveM = pair.map(msg => msg.content).join('\n')
-                    .match(/\*\*(\d+(?:\.\.\.|\.)\s*[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2})\*\*/);
-                let text = '-----------------------------';
-                if (moveM) text += '\n**' + moveM[1] + '**\n';
-                text += '\n' + pair
-                    .map(msg => msg.role === 'user'
-                        ? 'User: ' + msg.content
-                        : 'Assistant:\n' + (window.gnBulletizeText ? window.gnBulletizeText(msg.content) : msg.content))
-                    .join('\n\n');
-                const gameLink = window.sbGetGameLink && window.sbGetGameLink();
-                if (gameLink) text += '\n\nGame link: ' + gameLink;
-                if (!window.gnAppendToLoadedDoc) {
-                    alert('Google Drive saving is not available');
-                    return;
-                }
-                setAppendingNote(true);
-                try {
-                    const doc = await window.gnAppendToLoadedDoc(text);
-                    alert('Appended move note to: ' + doc.name);
-                } catch (err) {
-                    alert('Append failed: ' + err.message);
-                } finally {
-                    setAppendingNote(false);
-                }
             };
 
             // Copy chat
@@ -16963,35 +16939,6 @@ ${contentToAnalyze}`;
                             Copy Chat
                         </button>
 
-                        {/* Save as Google Doc (new Doc, named with date/time) */}
-                        <button
-                            onClick={saveChatAsNewDoc}
-                            disabled={savingDoc}
-                            title="Save this chat as a new Google Doc in Drive: Documents/notes/hobbies/chess/games"
-                            style={{ ...styles.button, background: '#6c5ce7', color: 'white', opacity: savingDoc ? 0.6 : 1 }}
-                        >
-                            {savingDoc ? 'Saving…' : 'Save as Google Doc'}
-                        </button>
-                        <input
-                            type="text"
-                            value={docTitle}
-                            onChange={(e) => setDocTitle(e.target.value)}
-                            placeholder="Doc title (optional)"
-                            title="Title for the Google Doc. The date/time is added in front. Empty = auto-label (vs opponent when a Supabase game is loaded)."
-                            style={{ ...styles.input, minWidth: '180px' }}
-                        />
-                        <span style={{ fontSize: '12px', color: '#888' }}>will be saved in Documents/notes/hobbies/chess/games</span>
-
-                        {/* Append only the last Ask-Coach Q&A (the selected move) to the loaded Doc */}
-                        <button
-                            onClick={appendMoveNoteToDoc}
-                            disabled={appendingNote}
-                            title="Append the last Ask-Coach question + answer (for the selected move) to the end of the Google Doc loaded via Recent ▾"
-                            style={{ ...styles.button, background: '#e91e63', color: 'white', opacity: appendingNote ? 0.6 : 1 }}
-                        >
-                            {appendingNote ? 'Appending…' : 'Append Move Note'}
-                        </button>
-
                         {/* Clear Chat */}
                         <button
                             onClick={() => { setMessages([]); setChatEnabled(false); }}
@@ -17087,15 +17034,16 @@ ${contentToAnalyze}`;
     <script>
     (function() {
         const GDRIVE_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
-        const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets';
-        const GDRIVE_FILE_SEARCH = 'chessable';
+        const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets';
 
         let gdriveAccessToken = null;
         let gdriveTokenClient = null;
         let gdriveWorkbook = null;
         let gdriveSelectedRow = null;
         let gdriveFileId = null;
+        let gdriveFileName = '';
         let gdriveCurrentDataRows = [];  // store parsed data rows (excluding header) for row navigation
+        let gdrivePickerSheetName = '';
 
         function gdriveParseCsvRows(text) {
             const rows = [];
@@ -17150,8 +17098,12 @@ ${contentToAnalyze}`;
                         if (response.access_token) {
                             gdriveAccessToken = response.access_token;
                             document.getElementById('gdrive-auth-btn').textContent = 'Sign Out';
-                            gdriveSetStatus('Signed in. Loading ' + GDRIVE_FILE_SEARCH + '...');
-                            gdriveLoadChessable();
+                            document.getElementById('gdrive-browse-btn').disabled = false;
+                            document.getElementById('gnSignInBtn').textContent = 'Sign out of Google';
+                            document.getElementById('gnRecentBtn').disabled = false;
+                            document.getElementById('gdriveTopStatus').textContent = 'Signed in to Google Sheets';
+                            gdriveSetStatus('Signed in. Choose a spreadsheet to browse games.');
+                            gdriveOpenPicker();
                         }
                     },
                 });
@@ -17170,7 +17122,13 @@ ${contentToAnalyze}`;
                 gdriveAccessToken = null;
                 gdriveWorkbook = null;
                 gdriveFileId = null;
+                gdriveFileName = '';
                 document.getElementById('gdrive-auth-btn').textContent = 'Sign In';
+                document.getElementById('gdrive-browse-btn').disabled = true;
+                document.getElementById('gnSignInBtn').textContent = 'Sign in with Google';
+                document.getElementById('gnRecentBtn').disabled = true;
+                document.getElementById('gdriveTopStatus').textContent = 'Signed out';
+                gdriveClosePicker();
                 var sel = document.getElementById('gdrive-sheet-select');
                 sel.innerHTML = '<option value="">Sign in to load sheets</option>';
                 sel.disabled = true;
@@ -17188,29 +17146,270 @@ ${contentToAnalyze}`;
             }
         };
 
-        async function gdriveLoadChessable() {
+        function gdrivePickerStatus(message) {
+            var el = document.getElementById('gdrive-picker-status');
+            if (el) el.textContent = message || '';
+        }
+
+        function gdriveClearPickerSelection() {
+            document.getElementById('gdrive-picker-files').hidden = false;
+            document.getElementById('gdrive-picker-tools').hidden = false;
+            document.getElementById('gdrive-picker-sheet-section').hidden = true;
+            document.getElementById('gdrive-picker-card-section').hidden = true;
+            document.getElementById('gdrive-picker-sheets').replaceChildren();
+            document.getElementById('gdrive-picker-cards').replaceChildren();
+            document.getElementById('gdrive-picker-back-btn').hidden = true;
+            document.getElementById('gdrive-picker-back-btn').textContent = 'Back';
+            document.getElementById('gdrive-picker-title').textContent = 'Choose a Google spreadsheet';
+            gdrivePickerSheetName = '';
+        }
+
+        window.gdriveClosePicker = function() {
+            var modal = document.getElementById('gdrive-picker-modal');
+            if (modal) modal.style.display = 'none';
+        };
+
+        window.gdriveOpenPicker = function() {
+            if (!gdriveAccessToken) {
+                if (gdriveTokenClient) gdriveTokenClient.requestAccessToken();
+                else gdriveSetStatus('Google API not loaded yet. Try again.');
+                return;
+            }
+            document.getElementById('gdrive-picker-modal').style.display = 'flex';
+            document.getElementById('gdrive-picker-search').value = '';
+            gdriveClearPickerSelection();
+            gdrivePickerListFiles('');
+        };
+
+        async function gdrivePickerListFiles(searchText) {
+            if (!gdriveAccessToken) return;
+            var filesEl = document.getElementById('gdrive-picker-files');
+            filesEl.replaceChildren();
+            gdriveClearPickerSelection();
+            filesEl.hidden = false;
+            document.getElementById('gdrive-picker-tools').hidden = false;
+            gdrivePickerStatus(searchText ? 'Searching spreadsheets…' : 'Loading recent spreadsheets…');
+
+            var q = "mimeType='application/vnd.google-apps.spreadsheet' and trashed=false";
+            if (searchText) {
+                var escapedName = searchText.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                q += " and name contains '" + escapedName + "'";
+            }
+            var params = new URLSearchParams({
+                q: q,
+                pageSize: '100',
+                orderBy: 'modifiedTime desc',
+                fields: 'files(id,name,mimeType,modifiedTime)'
+            });
             try {
-                var query = encodeURIComponent("name contains '" + GDRIVE_FILE_SEARCH + "' and trashed=false and mimeType='application/vnd.google-apps.spreadsheet'");
-                var resp = await fetch('https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name,mimeType)&orderBy=name', {
+                var resp = await fetch('https://www.googleapis.com/drive/v3/files?' + params.toString(), {
                     headers: { Authorization: 'Bearer ' + gdriveAccessToken }
                 });
-                if (!resp.ok) throw new Error('Search failed');
+                if (!resp.ok) {
+                    var err = await resp.json().catch(function() { return {}; });
+                    throw new Error(err.error && err.error.message ? err.error.message : 'HTTP ' + resp.status);
+                }
                 var data = await resp.json();
-                if (!data.files || data.files.length === 0) {
-                    gdriveSetStatus('No "' + GDRIVE_FILE_SEARCH + '" spreadsheet found');
+                var files = data.files || [];
+                if (!files.length) {
+                    gdrivePickerStatus(searchText ? 'No spreadsheets found with that name.' : 'No recent spreadsheets found. Search by name to find one.');
                     return;
                 }
-                var file = data.files[0];
-                gdriveSetStatus('Loading "' + file.name + '"...');
-                await gdriveLoadSpreadsheet(file.id, file.name);
+                gdrivePickerStatus(searchText ? 'Select a spreadsheet from the search results:' : 'Recent spreadsheets — select one to choose a sheet:');
+                files.forEach(function(file) {
+                    var button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'gdrive-picker-file';
+                    var name = document.createElement('span');
+                    name.textContent = file.name || '(Untitled spreadsheet)';
+                    var meta = document.createElement('small');
+                    meta.textContent = file.modifiedTime ? 'Modified ' + new Date(file.modifiedTime).toLocaleString() : 'Google spreadsheet';
+                    button.append(name, meta);
+                    button.addEventListener('click', function() { gdrivePickerSelectFile(file); });
+                    filesEl.appendChild(button);
+                });
             } catch (err) {
-                gdriveSetStatus('Error: ' + err.message);
+                gdrivePickerStatus('Could not list spreadsheets: ' + err.message);
             }
         }
+
+        async function gdrivePickerSelectFile(file) {
+            gdrivePickerStatus('Loading "' + (file.name || 'spreadsheet') + '"…');
+            gdrivePickerClearSectionsAfterFiles();
+            var loaded = await gdriveLoadSpreadsheet(file.id, file.name || '(Untitled spreadsheet)');
+            if (!loaded) {
+                document.getElementById('gdrive-picker-files').hidden = false;
+                document.getElementById('gdrive-picker-tools').hidden = false;
+                gdrivePickerStatus('Could not open spreadsheet. ' + (document.getElementById('gdrive-status').textContent || ''));
+                return;
+            }
+
+            document.getElementById('gdrive-picker-files').hidden = true;
+            document.getElementById('gdrive-picker-tools').hidden = true;
+            document.querySelector('#gdrive-picker-modal .gdrive-picker-content').scrollTop = 0;
+            document.getElementById('gdrive-picker-title').textContent = 'Choose a sheet';
+            document.getElementById('gdrive-picker-back-btn').textContent = 'Back to spreadsheets';
+            document.getElementById('gdrive-picker-back-btn').hidden = false;
+            var section = document.getElementById('gdrive-picker-sheet-section');
+            var sheets = document.getElementById('gdrive-picker-sheets');
+            document.getElementById('gdrive-picker-sheet-heading').textContent = 'Sheets in ' + gdriveFileName;
+            sheets.replaceChildren();
+            section.hidden = false;
+            gdriveWorkbook.SheetNames.forEach(function(sheetName) {
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'gdrive-picker-sheet';
+                button.textContent = sheetName;
+                button.addEventListener('click', function() {
+                    sheets.querySelectorAll('.gdrive-picker-sheet').forEach(function(item) { item.classList.remove('active'); });
+                    button.classList.add('active');
+                    gdrivePickerRenderCards(sheetName);
+                });
+                sheets.appendChild(button);
+            });
+            gdrivePickerStatus('');
+        }
+
+        function gdrivePickerClearSectionsAfterFiles() {
+            document.getElementById('gdrive-picker-sheet-section').hidden = true;
+            document.getElementById('gdrive-picker-card-section').hidden = true;
+            document.getElementById('gdrive-picker-sheets').replaceChildren();
+            document.getElementById('gdrive-picker-cards').replaceChildren();
+            gdrivePickerSheetName = '';
+        }
+
+        function gdrivePickerLooksLikeHeader(row) {
+            var first = String(row && row[0] || '').trim().toLowerCase();
+            var second = String(row && row[1] || '').trim().toLowerCase();
+            var nameWords = ['name', 'title', 'opening', 'front', 'game', 'label'];
+            var pgnWords = ['pgn', 'fen', 'moves', 'back', 'game pgn', 'position', 'pgn/fen', 'fen/pgn', 'pgn / fen', 'fen / pgn'];
+            return nameWords.indexOf(first) >= 0 && pgnWords.indexOf(second) >= 0;
+        }
+
+        function gdrivePickerRenderCards(sheetName) {
+            if (!gdriveWorkbook || !gdriveWorkbook.Sheets[sheetName]) return;
+            var sheetSelect = document.getElementById('gdrive-sheet-select');
+            if (sheetSelect) sheetSelect.value = sheetName;
+            var sheet = gdriveWorkbook.Sheets[sheetName];
+            var rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '', blankrows: true });
+            var firstDataIndex = rawRows.length && gdrivePickerLooksLikeHeader(rawRows[0]) ? 1 : 0;
+            var cards = document.getElementById('gdrive-picker-cards');
+            var section = document.getElementById('gdrive-picker-card-section');
+            var records = [];
+
+            rawRows.forEach(function(row, index) {
+                if (index < firstDataIndex) return;
+                row = row || [];
+                var name = String(row[0] == null ? '' : row[0]).trim();
+                var content = String(row[1] == null ? '' : row[1]).trim().replace(/""/g, '"');
+                if (!name && !content) return;
+                records.push({ name: name || ('Game ' + (index + 1)), content: content, sheetRow: index + 1 });
+            });
+
+            gdrivePickerSheetName = sheetName;
+            document.getElementById('gdrive-picker-card-heading').textContent = sheetName + ' — choose a game (column 2 loads to the board)';
+            cards.replaceChildren();
+            document.getElementById('gdrive-picker-sheet-section').hidden = true;
+            section.hidden = false;
+            document.getElementById('gdrive-picker-title').textContent = 'Choose a game';
+            document.getElementById('gdrive-picker-back-btn').textContent = 'Back to sheets';
+            document.getElementById('gdrive-picker-back-btn').hidden = false;
+            document.querySelector('#gdrive-picker-modal .gdrive-picker-content').scrollTop = 0;
+
+            if (!records.length) {
+                gdrivePickerStatus('This sheet has no game rows.');
+                return;
+            }
+
+            records.forEach(function(record) {
+                var card = document.createElement('button');
+                card.type = 'button';
+                card.className = 'gdrive-picker-card';
+                card.disabled = !record.content;
+                var title = document.createElement('span');
+                title.className = 'gdrive-picker-card-title';
+                title.textContent = record.name;
+                var preview = document.createElement('span');
+                preview.className = 'gdrive-picker-card-preview';
+                preview.textContent = record.content ? (record.content.length > 230 ? record.content.slice(0, 230) + '…' : record.content) : 'No PGN/FEN in column 2';
+                var meta = document.createElement('span');
+                meta.className = 'gdrive-picker-card-meta';
+                meta.textContent = 'Row ' + record.sheetRow + (record.content ? ' · click to load' : ' · empty');
+                card.append(title, preview, meta);
+                card.addEventListener('click', function() { gdrivePickerLoadCard(record); });
+                cards.appendChild(card);
+            });
+            gdrivePickerStatus(records.length + ' game row' + (records.length === 1 ? '' : 's') + ' in "' + sheetName + '". Scroll and choose one to load it on the board.');
+        }
+
+        function gdrivePickerLoadCard(record) {
+            var text = String(record.content || '').trim();
+            if (!text) return;
+            var fenMatch = text.match(/^([rnbqkp1-8/]+\s+[wb]\s+(?:KQkq|-|[KQkq]+)\s+(?:-|[a-h][36])\s+\d+\s+\d+)$/i);
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).catch(function() {});
+                document.getElementById('gdrive-cell1-input').value = record.name;
+                document.getElementById('gdrive-cell2-input').value = text;
+                window.textViewRawContent = text;
+                window.textViewTitle = record.name;
+                if (fenMatch) {
+                    window.loadedFenVariants = ['[Variant "From Position"]\n[FEN "' + fenMatch[1] + '"]\n\n'];
+                    window.loadFenVariantByIndex(0);
+                } else if (typeof applyPgnStringToBoard === 'function') {
+                    applyPgnStringToBoard(text);
+                } else {
+                    var textarea = document.getElementById('pgnInput');
+                    if (!textarea || typeof loadPgnToBoard !== 'function') throw new Error('PGN board loader is unavailable');
+                    textarea.value = text;
+                    loadPgnToBoard();
+                }
+                gdriveSetStatus('Loaded "' + record.name + '" from ' + gdriveFileName + ' → ' + gdrivePickerSheetName);
+                gdrivePickerStatus('Loaded "' + record.name + '" onto the board.');
+                window.gdriveClosePicker();
+            } catch (err) {
+                gdrivePickerStatus('Could not load "' + record.name + '": ' + err.message);
+            }
+        }
+
+        document.getElementById('gdrive-picker-search-btn').addEventListener('click', function() {
+            gdrivePickerListFiles(document.getElementById('gdrive-picker-search').value.trim());
+        });
+        document.getElementById('gdrive-picker-search').addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') gdrivePickerListFiles(this.value.trim());
+        });
+        document.getElementById('gdrive-picker-recent-btn').addEventListener('click', function() {
+            document.getElementById('gdrive-picker-search').value = '';
+            gdrivePickerListFiles('');
+        });
+        document.getElementById('gdrive-picker-back-btn').addEventListener('click', function() {
+            var cards = document.getElementById('gdrive-picker-card-section');
+            var sheets = document.getElementById('gdrive-picker-sheet-section');
+            if (!cards.hidden) {
+                cards.hidden = true;
+                sheets.hidden = false;
+                document.querySelector('#gdrive-picker-modal .gdrive-picker-content').scrollTop = 0;
+                document.getElementById('gdrive-picker-title').textContent = 'Choose a sheet';
+                this.textContent = 'Back to spreadsheets';
+                gdrivePickerStatus('');
+            } else if (!sheets.hidden) {
+                sheets.hidden = true;
+                document.getElementById('gdrive-picker-files').hidden = false;
+                document.getElementById('gdrive-picker-tools').hidden = false;
+                document.querySelector('#gdrive-picker-modal .gdrive-picker-content').scrollTop = 0;
+                document.getElementById('gdrive-picker-title').textContent = 'Choose a Google spreadsheet';
+                this.hidden = true;
+                gdrivePickerStatus('Select a spreadsheet to choose one of its sheets.');
+            }
+        });
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') window.gdriveClosePicker();
+        });
 
         async function gdriveLoadSpreadsheet(fileId, fileName) {
             try {
                 gdriveFileId = fileId;
+                gdriveFileName = fileName || gdriveFileName;
+                gdriveWorkbook = null;
                 var exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
                 var resp = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=' + encodeURIComponent(exportMime), {
                     headers: { Authorization: 'Bearer ' + gdriveAccessToken }
@@ -17229,8 +17428,10 @@ ${contentToAnalyze}`;
                 });
                 sel.disabled = false;
                 gdriveSetStatus('Loaded "' + fileName + '" — ' + gdriveWorkbook.SheetNames.length + ' sheets');
+                return true;
             } catch (err) {
                 gdriveSetStatus('Error: ' + err.message);
+                return false;
             }
         }
 
@@ -17603,595 +17804,6 @@ ${contentToAnalyze}`;
             gdriveSetStatus('');
         };
 
-    })();
-    </script>
-
-    <!-- Google Doc loader — sign in, pick a recent Doc, load its text as the coach-note source -->
-    <script>
-    (function() {
-        var GN_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
-        var gnAccessToken = null;
-        var gnTokenClient = null;
-        var gnDismissListener = null;
-        var gnAuthWaiters = []; // resolved when a token arrives (see gnEnsureSignedIn)
-        var gnLoadedDoc = null; // { id, name } — the Doc loaded via Recent ▾; notes append to its end
-
-        function gnSetStatus(msg) {
-            var el = document.getElementById('gnStatus');
-            if (el) el.textContent = msg || '';
-        }
-
-        function gnInitClient() {
-            if (window.google && window.google.accounts) {
-                gnTokenClient = window.google.accounts.oauth2.initTokenClient({
-                    client_id: GN_CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/drive', // read Docs for Recent + create new Docs in the chess/games folder
-                    callback: function (resp) {
-                        if (resp.access_token) {
-                            gnAccessToken = resp.access_token;
-                            document.getElementById('gnSignInBtn').textContent = 'G Sign Out';
-                            document.getElementById('gnRecentBtn').disabled = false;
-                            document.getElementById('gnGamesBtn').disabled = false;
-                            document.getElementById('gnChessBtn').disabled = false;
-                            gnSetStatus('Signed in to Google');
-                            gnAuthWaiters.splice(0).forEach(function (w) { w.resolve(); });
-                        } else {
-                            gnSetStatus('Google sign-in failed: ' + (resp.error || 'unknown error'));
-                            gnAuthWaiters.splice(0).forEach(function (w) { w.reject(new Error('Google sign-in failed: ' + (resp.error || 'unknown error'))); });
-                        }
-                    }
-                });
-            } else {
-                setTimeout(gnInitClient, 100);
-            }
-        }
-        gnInitClient();
-
-        window.gnSignIn = function () {
-            if (gnAccessToken) {
-                try { window.google.accounts.oauth2.revoke(gnAccessToken); } catch (e) { }
-                gnAccessToken = null;
-                document.getElementById('gnSignInBtn').textContent = 'G Sign In';
-                document.getElementById('gnRecentBtn').disabled = true;
-                document.getElementById('gnGamesBtn').disabled = true;
-                document.getElementById('gnChessBtn').disabled = true;
-                gnCloseDropdowns();
-                gnSetStatus('Signed out of Google');
-            } else if (gnTokenClient) {
-                gnTokenClient.requestAccessToken();
-            } else {
-                gnSetStatus('Google API not loaded yet. Try again.');
-            }
-        };
-
-        window.gnToggleRecentDropdown = function () {
-            var wasOpen = !document.getElementById('gnRecentDropdown').hidden;
-            gnCloseDropdowns();
-            if (wasOpen) return;
-            gnFetchRecentFiles();
-        };
-
-        window.gnToggleChessDropdown = function () {
-            var wasOpen = !document.getElementById('gnChessDropdown').hidden;
-            gnCloseDropdowns();
-            if (wasOpen) return;
-            gnFetchChessFiles();
-        };
-
-        window.gnToggleGamesDropdown = function () {
-            var wasOpen = !document.getElementById('gnGamesDropdown').hidden;
-            gnCloseDropdowns();
-            if (wasOpen) return;
-            gnFetchGamesFiles();
-        };
-
-        function gnFetchRecentFiles() {
-            var btn = document.getElementById('gnRecentBtn');
-            btn.textContent = 'Loading…';
-            var q = encodeURIComponent("mimeType='application/vnd.google-apps.document' and trashed=false");
-            var url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
-                '&orderBy=viewedByMeTime+desc&pageSize=10&fields=files(id,name,viewedByMeTime)';
-            fetch(url, { headers: { Authorization: 'Bearer ' + gnAccessToken } })
-                .then(function (r) { return r.json(); })
-                .then(function (data) { gnOpenFilesDropdown('gnRecentDropdown', 'gnRecentBtn', data.files || [], 'No recent Docs found'); })
-                .catch(function (err) { gnSetStatus('Error fetching recent files: ' + err.message); })
-                .finally(function () { btn.textContent = 'Recent ▾'; });
-        }
-
-        // Re-query the games list with the current filter text (Enter in the input)
-        window.gnQueryGamesDropdown = function () {
-            gnCloseDropdowns();
-            gnFetchGamesFiles();
-        };
-
-        // Docs in the chess/games save folder: with filter text, 10 most recent
-        // name matches; without it, sorted by name (a large folder stays navigable)
-        function gnFetchGamesFiles() {
-            var btn = document.getElementById('gnGamesBtn');
-            var filterEl = document.getElementById('gnGamesFilter');
-            var filter = filterEl ? filterEl.value.trim() : '';
-            btn.textContent = 'Loading…';
-            gnResolveSaveFolder()
-                .then(function (folderId) {
-                    var q = "'" + folderId + "' in parents and mimeType='application/vnd.google-apps.document' and trashed=false";
-                    if (filter) q += " and name contains '" + filter.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-                    var url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
-                        '&orderBy=' + (filter ? 'modifiedTime+desc' : 'name') +
-                        '&pageSize=10&fields=files(id,name,modifiedTime)';
-                    return fetch(url, { headers: { Authorization: 'Bearer ' + gnAccessToken } })
-                        .then(function (r) { return r.json(); });
-                })
-                .then(function (data) {
-                    gnOpenFilesDropdown('gnGamesDropdown', 'gnGamesBtn', data.files || [],
-                        filter ? 'No games Docs matching "' + filter + '"' : 'No Docs in the games folder');
-                })
-                .catch(function (err) { gnSetStatus('Error fetching games folder: ' + err.message); })
-                .finally(function () { btn.textContent = 'Games ▾'; });
-        }
-
-        // Docs in My Drive/Documents/notes/hobbies/chess/vercel_chess and its subfolders (one level down).
-        // Same filter rule as Games: name text -> 10 most recent matches, otherwise sorted by name.
-        var GN_CHESS_FOLDER_ID = '1KBroG2U0H_RluAh2fYmzOR4lBocDF2HK';
-        function gnFetchChessFiles() {
-            var btn = document.getElementById('gnChessBtn');
-            var filterEl = document.getElementById('gnGamesFilter');
-            var filter = filterEl ? filterEl.value.trim() : '';
-            var auth = { headers: { Authorization: 'Bearer ' + gnAccessToken } };
-            btn.textContent = 'Loading…';
-            var subQ = "'" + GN_CHESS_FOLDER_ID + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
-            fetch('https://www.googleapis.com/drive/v3/files?fields=files(id)&q=' + encodeURIComponent(subQ), auth)
-                .then(function (r) { return r.json(); })
-                .then(function (sub) {
-                    var parents = [GN_CHESS_FOLDER_ID].concat((sub.files || []).map(function (f) { return f.id; }));
-                    var q = '(' + parents.map(function (id) { return "'" + id + "' in parents"; }).join(' or ') + ")" +
-                        " and mimeType='application/vnd.google-apps.document' and trashed=false";
-                    if (filter) q += " and name contains '" + filter.replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'";
-                    var url = 'https://www.googleapis.com/drive/v3/files?q=' + encodeURIComponent(q) +
-                        '&orderBy=' + (filter ? 'modifiedTime+desc' : 'name') +
-                        '&pageSize=10&fields=files(id,name,modifiedTime)';
-                    return fetch(url, auth).then(function (r) { return r.json(); });
-                })
-                .then(function (data) {
-                    if (data.error) throw new Error(data.error.message);
-                    gnOpenFilesDropdown('gnChessDropdown', 'gnChessBtn', data.files || [],
-                        filter ? 'No Docs matching "' + filter + '" in vercel_chess' : 'No Docs in the vercel_chess folder yet');
-                })
-                .catch(function (err) { gnSetStatus('Error fetching vercel_chess folder: ' + err.message); })
-                .finally(function () { btn.textContent = 'Chess ▾'; });
-        }
-
-        function gnOpenFilesDropdown(dropdownId, btnId, files, emptyMsg) {
-            var dropdown = document.getElementById(dropdownId);
-            dropdown.innerHTML = '';
-            var rect = document.getElementById(btnId).getBoundingClientRect();
-            var left = Math.min(rect.left, window.innerWidth - 320 - 8);
-            dropdown.style.top = (rect.bottom + 4) + 'px';
-            dropdown.style.left = Math.max(8, left) + 'px';
-            if (files.length === 0) {
-                var empty = document.createElement('div');
-                empty.style.cssText = 'padding:8px 10px; font-size:12px; color:#94a3b8;';
-                empty.textContent = emptyMsg;
-                dropdown.appendChild(empty);
-            } else {
-                files.forEach(function (f) {
-                    var item = document.createElement('button');
-                    item.type = 'button';
-                    item.textContent = f.name;
-                    item.style.cssText = 'display:block; width:100%; text-align:left; padding:8px 10px; border:none; border-bottom:1px solid #334155; background:#1e293b; color:#e2e8f0; font-size:12px; cursor:pointer; word-break:break-word;';
-                    item.addEventListener('click', function () {
-                        gnCloseDropdowns();
-                        gnLoadDoc(f.id, f.name);
-                    });
-                    dropdown.appendChild(item);
-                });
-            }
-            dropdown.hidden = false;
-            if (!gnDismissListener) {
-                setTimeout(function () {
-                    gnDismissListener = function (e) {
-                        ['gnRecentDropdown', 'gnGamesDropdown', 'gnChessDropdown'].forEach(function (id) {
-                            var dd = document.getElementById(id);
-                            if (dd && !dd.hidden && !dd.contains(e.target)) gnCloseDropdowns();
-                        });
-                    };
-                    document.addEventListener('click', gnDismissListener);
-                }, 0);
-            }
-        }
-        function gnCloseDropdowns() {
-            ['gnRecentDropdown', 'gnGamesDropdown', 'gnChessDropdown'].forEach(function (id) {
-                var dd = document.getElementById(id);
-                if (dd) dd.hidden = true;
-            });
-            if (gnDismissListener) {
-                document.removeEventListener('click', gnDismissListener);
-                gnDismissListener = null;
-            }
-        }
-
-        // ---- Save as a new Google Doc in My Drive/Documents/notes/hobbies/chess/games ----
-        var GN_SAVE_PATH = ['Documents', 'notes', 'hobbies', 'chess', 'games'];
-        var GN_SAVE_FOLDER_KEY = 'chessAnalysis:saveFolderId';
-
-        // Resolves once a token exists, prompting Google sign-in if needed (call from a click).
-        window.gnEnsureSignedIn = function () {
-            if (gnAccessToken) return Promise.resolve();
-            if (!gnTokenClient) return Promise.reject(new Error('Google API not loaded yet. Try again.'));
-            return new Promise(function (resolve, reject) {
-                gnAuthWaiters.push({ resolve: resolve, reject: reject });
-                gnTokenClient.requestAccessToken();
-            });
-        };
-
-        function gnDriveJson(url, opts) {
-            opts = opts || {};
-            opts.headers = Object.assign({ Authorization: 'Bearer ' + gnAccessToken }, opts.headers || {});
-            return fetch(url, opts).then(function (r) {
-                if (!r.ok) return r.json().catch(function () { return {}; }).then(function (e) {
-                    throw new Error((e.error && e.error.message) || ('HTTP ' + r.status));
-                });
-                return r.json();
-            });
-        }
-
-        // Walks the path by folder name from My Drive root; never creates folders.
-        function gnResolveSaveFolder() {
-            var cached = null;
-            try { cached = localStorage.getItem(GN_SAVE_FOLDER_KEY); } catch (e) { }
-            var verify = cached
-                ? gnDriveJson('https://www.googleapis.com/drive/v3/files/' + cached + '?fields=id,trashed')
-                    .then(function (f) { return f.trashed ? null : f.id; }).catch(function () { return null; })
-                : Promise.resolve(null);
-            return verify.then(function (id) {
-                if (id) return id;
-                return GN_SAVE_PATH.reduce(function (chain, name) {
-                    return chain.then(function (parentId) {
-                        var q = "'" + parentId + "' in parents and name='" + name.replace(/'/g, "\\'") +
-                            "' and mimeType='application/vnd.google-apps.folder' and trashed=false";
-                        return gnDriveJson('https://www.googleapis.com/drive/v3/files?fields=files(id,name)&q=' + encodeURIComponent(q))
-                            .then(function (data) {
-                                if (!data.files || !data.files.length) throw new Error('Folder not found in Drive: ' + GN_SAVE_PATH.join('/') + ' (missing "' + name + '")');
-                                return data.files[0].id;
-                            });
-                    });
-                }, Promise.resolve('root')).then(function (folderId) {
-                    try { localStorage.setItem(GN_SAVE_FOLDER_KEY, folderId); } catch (e) { }
-                    return folderId;
-                });
-            });
-        }
-
-        // Creates a new Google Doc named "<date time> <label>" from plain text.
-        // Resolves to { id, name, url }.
-        window.gnSaveNewDoc = function (text, label) {
-            var d = new Date();
-            function p2(n) { return (n < 10 ? '0' : '') + n; }
-            var stamp = d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + '.' + p2(d.getMinutes());
-            var name = (stamp + ' ' + (label || 'chess coach chat')).replace(/[\/\\\0]/g, '-').trim();
-            return window.gnEnsureSignedIn()
-                .then(gnResolveSaveFolder)
-                .then(function (folderId) {
-                    var boundary = 'gnboundary' + Date.now();
-                    var meta = { name: name, mimeType: 'application/vnd.google-apps.document', parents: [folderId] };
-                    var body = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
-                        '\r\n--' + boundary + '\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n' + text + '\r\n--' + boundary + '--';
-                    return gnDriveJson('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'multipart/related; boundary=' + boundary },
-                        body: body
-                    });
-                })
-                .then(function (f) { return { id: f.id, name: f.name, url: f.webViewLink }; });
-        };
-
-        // Last ?game_id= URL in the text wins (a Doc may have several appended chats).
-        // Same source rule as the page's own ?game_id= param.
-        function gnFindGameLink(text) {
-            var matches = text.match(/https?:\/\/\S*?[?&]game_?id=[^\s&)]+(?:&source=\w+)?/gi);
-            if (!matches) return null;
-            try {
-                var u = new URL(matches[matches.length - 1]);
-                var gameId = u.searchParams.get('game_id') || u.searchParams.get('gameid') || u.searchParams.get('gameId');
-                if (!gameId) return null;
-                return { gameId: gameId, source: u.searchParams.get('source') || window.sbInferSourceFromGameId(gameId) };
-            } catch (e) { return null; }
-        }
-
-        // Exports the Doc as plain text and hands it to the coach-note parser
-        // (getCoachMoveNotes re-parses whenever window.textViewRawContent changes).
-        function gnLoadDoc(fileId, fileName) {
-            gnSetStatus('Loading "' + fileName + '"…');
-            fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=text/plain', {
-                headers: { Authorization: 'Bearer ' + gnAccessToken }
-            })
-                .then(function (r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                    return r.text();
-                })
-                .then(function (text) {
-                    // If the Doc carries a "Game link: ...?game_id=<id>" line (as written by
-                    // Copy Chat), load that game first — loading a game may reset the text
-                    // view, so the coach text is applied only after it finishes.
-                    var link = gnFindGameLink(text);
-                    var loading = link ? window.sbLoadGameByIdAndSource(link.source, link.gameId) : Promise.resolve();
-                    return loading.then(function () {
-                        window.textViewRawContent = text;
-                        window.textViewTitle = fileName;
-                        gnLoadedDoc = { id: fileId, name: fileName };
-                        document.getElementById('gnDocName').textContent = '→ ' + fileName;
-                        document.getElementById('gnAppendRow').hidden = false;
-                        if (window.updateCoachNoteButton) window.updateCoachNoteButton();
-                        gnSetStatus('Loaded "' + fileName + '" as coach analysis' + (link ? ' + game ' + link.gameId : ''));
-                    });
-                })
-                .catch(function (err) {
-                    gnSetStatus('Load failed: ' + err.message);
-                });
-        }
-
-        // ---- Append text to the currently LOADED Doc ----
-
-        window.gnGetLoadedDoc = function () { return gnLoadedDoc; };
-
-        // Inserts text at the END of the loaded Doc — never touches or replaces
-        // whatever's already in the doc. Resolves to gnLoadedDoc. Rejects when
-        // no Doc has been loaded via Recent ▾.
-        window.gnAppendToLoadedDoc = function (text) {
-            if (!gnLoadedDoc) return Promise.reject(new Error('Load a Google Doc first (Recent ▾)'));
-            return window.gnEnsureSignedIn()
-                .then(function () {
-                    return gnDriveJson('https://docs.googleapis.com/v1/documents/' + gnLoadedDoc.id);
-                })
-                .then(function (doc) {
-                    var endIndex = doc.body.content[doc.body.content.length - 1].endIndex;
-                    var normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-                    var insertAt = Math.max(1, endIndex - 1);
-                    var toInsert = (endIndex > 2 ? '\n\n' : '') + normalized;
-                    return gnDriveJson('https://docs.googleapis.com/v1/documents/' + gnLoadedDoc.id + ':batchUpdate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ requests: [{ insertText: { location: { index: insertAt }, text: toInsert } }] })
-                    });
-                })
-                .then(function () { return gnLoadedDoc; });
-        };
-
-        // Current board move as "11... Nh5" / "4. f4", or '' at the root.
-        function gnCurrentMoveLabel() {
-            var node = window.currentMoveNode;
-            if (!node || node.nodeId === 'root') return '';
-            return node.moveNumber + (node.isBlackMove ? '...' : '.') + ' ' + (node.san || '');
-        }
-
-        // Bulletize: regroup plain-text paragraphs into "- " bullet lines, a
-        // couple of sentences each (like the parse_* helper pages, but in place).
-        // Chess move numbers are shielded before sentence splitting so "20. Rf5"
-        // and "20... Rde8" don't break apart; decimals like 1.05 have no space
-        // after the dot so the lazy sentence match already skips them. Lines
-        // that are already structured — headings, bullets, **move** headers,
-        // code/FEN lines, separators — pass through untouched; numbered
-        // outline lines ("1. **Material…**:") become "- " bullets.
-        window.gnBulletizeText = function (text, perBullet) {
-            if (!text) return text;
-            var group = perBullet || 2;
-            var SH = '\u0001';
-            function shield(s) {
-                return s
-                    .replace(/(\d+)\.\.\./g, '$1' + SH + SH + SH)
-                    .replace(/(\d+)\.\s+(?=[KQRBN][a-h1-8x=+#]|[a-h][1-8x=+#])/g, '$1' + SH + ' ');
-            }
-            function unshield(s) { return s.split(SH).join('.'); }
-            function splitSentences(s) {
-                var m = shield(s).match(/.*?[.!?]+["')\]]*(?=\s|$)|.+$/g);
-                return (m || []).map(function (x) { return unshield(x.trim()); }).filter(Boolean);
-            }
-            function isStructural(line) {
-                return /^\s*(?:[-*•]\s+|#{1,6}\s|\*\*\d+(?:\.\.\.|\.)\s|`|-{5,}\s*$)/.test(line);
-            }
-            var out = [], para = [];
-            function flush() {
-                if (!para.length) return;
-                var sentences = splitSentences(para.join(' '));
-                for (var i = 0; i < sentences.length; i += group) {
-                    out.push('- ' + sentences.slice(i, i + group).join(' '));
-                }
-                para = [];
-            }
-            text.replace(/\r\n/g, '\n').split('\n').forEach(function (line) {
-                var numbered = line.match(/^(\s*)\d+[\.)]\s+(.*)$/);
-                // Numbered outline lines become "- " bullets too — except a
-                // list-numbered move header ("10. **20. Rf5**"), which the ⭐
-                // parser keys on and must stay exactly as-is.
-                if (numbered && !/^\*\*\d/.test(numbered[2])) {
-                    flush();
-                    out.push(numbered[1] + '- ' + numbered[2]);
-                } else if (!line.trim() || isStructural(line)) {
-                    flush();
-                    out.push(line);
-                } else {
-                    para.push(line.trim());
-                }
-            });
-            flush();
-            return out.join('\n');
-        };
-
-        // • Bullets button: bulletize the note textarea in place.
-        window.gnBulletizeNote = function () {
-            var input = document.getElementById('gnNoteInput');
-            if (!input.value.trim()) { gnSetStatus('Paste some text first'); return; }
-            input.value = window.gnBulletizeText(input.value);
-            gnSetStatus('Formatted into bullets');
-            input.focus();
-        };
-
-        // + Move button: the header goes at the TOP of the note (first line), not
-        // at the cursor — existing text stays below it. If the first line is
-        // already a bare + Move header ("**20. Rf5** — " with nothing typed yet),
-        // it is replaced, so re-clicking after navigating swaps the move instead
-        // of stacking headers.
-        window.gnInsertMoveRef = function () {
-            var input = document.getElementById('gnNoteInput');
-            var label = gnCurrentMoveLabel();
-            if (!label) { gnSetStatus('No move on the board to reference'); return; }
-            var header = '**' + label + '** — ';
-            var bareTop = /^\s*\*\*\d+(?:\.\.\.|\.)\s*[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*\s*[—:–-]?\s*(\n|$)/;
-            var m = input.value.match(bareTop);
-            if (m) {
-                input.value = header + input.value.slice(m[0].length - (m[1] === '\n' ? 1 : 0));
-            } else {
-                input.value = header + (input.value.trim() ? '\n' : '') + input.value;
-            }
-            input.focus();
-            input.selectionStart = input.selectionEnd = header.length; // right after "— "
-        };
-
-        // Append Note button: "-----------------------------\n<game label>\n\n<typed note>".
-        window.gnAppendNote = function () {
-            var input = document.getElementById('gnNoteInput');
-            var text = input.value.trim();
-            if (!text) { gnSetStatus('Type a note first'); return; }
-            // The note needs a + Move header line ("**20. Rf5** — ...") or the ⭐
-            // won't recognize it when the Doc is reloaded.
-            if (!/^\s*\*\*\d+(?:\.\.\.|\.)\s*[A-Za-z][A-Za-z0-9x=+#-]*[?!]{0,2}\*\*/m.test(text)) {
-                gnSetStatus('Click + Move first to tag the move for ⭐');
-                alert('Click "+ Move" first to add the move you want this note to show in ⭐.');
-                return;
-            }
-            var game = window.supabaseLoadedGame;
-            var noteText = '-----------------------------\n' + ((game && game.label) || 'Untitled game') + '\n\n' + text;
-            var btn = document.getElementById('gnAppendBtn');
-            btn.disabled = true;
-            gnSetStatus('Appending…');
-            window.gnAppendToLoadedDoc(noteText)
-                .then(function (doc) {
-                    input.value = '';
-                    gnSetStatus('Appended to "' + doc.name + '"');
-                })
-                .catch(function (err) {
-                    gnSetStatus('Append failed: ' + err.message);
-                })
-                .finally(function () {
-                    btn.disabled = false;
-                });
-        };
-
-        // ---- OCR an image into the note box (OpenAI gpt-4o-mini vision) ----
-        // The extracted text lands in gnNoteInput for review; the existing
-        // Append Note to Doc button then sends it to the loaded Google Doc.
-
-        // Downscale to OpenAI's high-res vision limit (1568px long edge) so
-        // phone photos don't blow up token cost; small images pass through.
-        function gnImageToDataUrl(file) {
-            return new Promise(function (resolve, reject) {
-                var img = new Image();
-                var url = URL.createObjectURL(file);
-                img.onload = function () {
-                    URL.revokeObjectURL(url);
-                    var MAX = 1568;
-                    var w = img.naturalWidth, h = img.naturalHeight;
-                    var scale = Math.min(1, MAX / Math.max(w, h));
-                    if (scale === 1) {
-                        var fr = new FileReader();
-                        fr.onload = function () { resolve(fr.result); };
-                        fr.onerror = function () { reject(new Error('Could not read the image file')); };
-                        fr.readAsDataURL(file);
-                        return;
-                    }
-                    var canvas = document.createElement('canvas');
-                    canvas.width = Math.round(w * scale);
-                    canvas.height = Math.round(h * scale);
-                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.9));
-                };
-                img.onerror = function () { reject(new Error('That file does not look like an image')); };
-                img.src = url;
-            });
-        }
-
-        // Shared credential: the report feature's access code (or the user's
-        // own OpenAI key — anything starting with sk- goes as userApiKey).
-        function gnOcrCredential() {
-            var key = '';
-            try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
-            if (!key) {
-                key = (prompt('OCR needs an access code (or your own OpenAI API key, sk-…):') || '').trim();
-                if (key) { try { localStorage.setItem('sbReportAccessCode', key); } catch (e) { } }
-            }
-            return key;
-        }
-
-        window.gnOcrImageFile = function (file) {
-            if (!file) return;
-            var key = gnOcrCredential();
-            if (!key) { gnSetStatus('OCR cancelled — no access code'); return; }
-            gnSetStatus('OCR: reading image…');
-            gnImageToDataUrl(file)
-                .then(function (dataUrl) {
-                    gnSetStatus('OCR: extracting text…');
-                    return fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            model: 'gpt-4o-mini',
-                            accessCode: key.indexOf('sk-') === 0 ? undefined : key,
-                            userApiKey: key.indexOf('sk-') === 0 ? key : undefined,
-                            messages: [{
-                                role: 'user',
-                                content: [
-                                    { type: 'text', text: 'Extract all text from this image exactly as written. Preserve line breaks, lists, headings, and any chess notation. Return only the extracted text — no commentary.' },
-                                    { type: 'image_url', image_url: { url: dataUrl } }
-                                ]
-                            }]
-                        })
-                    }).then(function (r) {
-                        return r.json().catch(function () { return {}; }).then(function (data) {
-                            if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
-                            return data.content || '';
-                        });
-                    });
-                })
-                .then(function (text) {
-                    text = text.trim();
-                    if (!text) { gnSetStatus('OCR found no text in the image'); return; }
-                    var input = document.getElementById('gnNoteInput');
-                    input.value = input.value.trim() ? input.value.replace(/\s+$/, '') + '\n\n' + text : text;
-                    input.focus();
-                    gnSetStatus('OCR done — review the note, + Move to tag it, then Append');
-                })
-                .catch(function (err) {
-                    gnSetStatus('OCR failed: ' + err.message);
-                });
-        };
-
-        window.gnOcrPickImage = function () {
-            var fi = document.getElementById('gnOcrFileInput');
-            if (fi) fi.click();
-        };
-
-        // Wire the hidden file input, and let a pasted screenshot in the note
-        // box go straight to OCR instead of being dropped as binary junk.
-        (function gnWireOcr() {
-            var fi = document.getElementById('gnOcrFileInput');
-            if (fi) fi.addEventListener('change', function () {
-                var f = fi.files && fi.files[0];
-                fi.value = '';
-                if (f) window.gnOcrImageFile(f);
-            });
-            var input = document.getElementById('gnNoteInput');
-            if (input) input.addEventListener('paste', function (e) {
-                var items = e.clipboardData && e.clipboardData.items;
-                if (!items) return;
-                for (var i = 0; i < items.length; i++) {
-                    if (items[i].type.indexOf('image/') === 0) {
-                        e.preventDefault();
-                        var f = items[i].getAsFile();
-                        if (f) window.gnOcrImageFile(f);
-                        return;
-                    }
-                }
-            });
-        })();
     })();
     </script>
 
