@@ -1506,6 +1506,7 @@
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
+            <button title="Choose a recent Google Sheet or search by name, then load a game card onto the board" onclick="gdriveOpenPicker()" style="background: #137333; color: white; border: 1px solid #34a853; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sheets ▾</button>
             <button id="coachNoteBtnMini" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button id="mstSideBtn" title="Whose mistakes the , and . keys hop between — click to cycle White → Black → Both. The number is how many ?, ?? and ?! moves that side has on the main line of this game" onclick="mstToggleSide()" style="background: #0f3460; color: #eeeeee; border: 1px solid #eeeeee; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ White (0)</button>
             <button id="mstPrevBtn" title="Jump back to that side's previous mistake (same as the , key)" onclick="mstStep(-1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">, ◀ ⚠</button>
@@ -17093,6 +17094,7 @@ ${contentToAnalyze}`;
     (function() {
         const GDRIVE_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
         const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets';
+        const GDRIVE_PICKER_LAST_KEY = 'chessAnalysis:lastGoogleSheetGamePickerSelection';
 
         let gdriveAccessToken = null;
         let gdriveTokenClient = null;
@@ -17209,6 +17211,29 @@ ${contentToAnalyze}`;
             if (el) el.textContent = message || '';
         }
 
+        function gdrivePickerReadLastSelection() {
+            try {
+                var saved = JSON.parse(localStorage.getItem(GDRIVE_PICKER_LAST_KEY) || 'null');
+                if (saved && saved.fileId && saved.fileName && saved.sheetName) return saved;
+            } catch (e) {}
+            return null;
+        }
+
+        function gdrivePickerRememberSelection(sheetName) {
+            if (!gdriveFileId || !gdriveFileName || !sheetName) return;
+            try {
+                localStorage.setItem(GDRIVE_PICKER_LAST_KEY, JSON.stringify({
+                    fileId: gdriveFileId,
+                    fileName: gdriveFileName,
+                    sheetName: sheetName
+                }));
+            } catch (e) {}
+        }
+
+        function gdrivePickerForgetLastSelection() {
+            try { localStorage.removeItem(GDRIVE_PICKER_LAST_KEY); } catch (e) {}
+        }
+
         function gdriveClearPickerSelection() {
             document.getElementById('gdrive-picker-files').hidden = false;
             document.getElementById('gdrive-picker-tools').hidden = false;
@@ -17236,8 +17261,29 @@ ${contentToAnalyze}`;
             document.getElementById('gdrive-picker-modal').style.display = 'flex';
             document.getElementById('gdrive-picker-search').value = '';
             gdriveClearPickerSelection();
-            gdrivePickerListFiles('');
+            gdrivePickerRestoreLastSelection();
         };
+
+        async function gdrivePickerRestoreLastSelection() {
+            var saved = gdrivePickerReadLastSelection();
+            if (!saved) {
+                await gdrivePickerListFiles('');
+                return;
+            }
+
+            document.getElementById('gdrive-picker-files').hidden = true;
+            document.getElementById('gdrive-picker-tools').hidden = true;
+            gdrivePickerStatus('Opening ' + saved.fileName + ' — ' + saved.sheetName + '…');
+            var loaded = await gdriveLoadSpreadsheet(saved.fileId, saved.fileName);
+            if (loaded && gdriveWorkbook && gdriveWorkbook.Sheets[saved.sheetName]) {
+                gdrivePickerRenderCards(saved.sheetName);
+                return;
+            }
+
+            gdrivePickerForgetLastSelection();
+            await gdrivePickerListFiles('');
+            gdrivePickerStatus('Could not reopen the saved sheet. Choose a spreadsheet again.');
+        }
 
         async function gdrivePickerListFiles(searchText) {
             if (!gdriveAccessToken) return;
@@ -17365,6 +17411,7 @@ ${contentToAnalyze}`;
             });
 
             gdrivePickerSheetName = sheetName;
+            gdrivePickerRememberSelection(sheetName);
             document.getElementById('gdrive-picker-card-heading').textContent = sheetName + ' — choose a game (column 2 loads to the board)';
             cards.replaceChildren();
             document.getElementById('gdrive-picker-sheet-section').hidden = true;
