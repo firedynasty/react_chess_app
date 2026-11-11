@@ -1505,6 +1505,7 @@
             <button id="practice-btn" title="Play Stockfish from this move (or the move before) and copy the moves as a From Position snippet. Your game stays loaded." onclick="openPracticeModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Practice</button>
             <button id="oneline-btn" title="Flatten a multi-line PGN / From Position snippet to a single line for a Google Sheets cell" onclick="openOneLineModal()" style="background: #0f3460; color: #e91e63; border: 1px solid #e91e63; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">1-Line</button>
             <button id="loadToBoardMini"title="Load the PGN in the text box (or the clipboard if it is empty) to the board — same as Load to Board" onclick="loadPgnToBoard()" style="background: #28a745; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load to Board</button>
+            <button id="loadAnalyzeMini" title="Load the PGN in the text box (or the clipboard if it is empty) AND run the Stockfish pass on it — a practice snippet on one line works too" onclick="loadAndAnalyze()" style="background: #1e7e34; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Load &amp; Analyze</button>
             <button id="ppAddBtn" title="Take the FEN of the position on the board (main line or variation), ask for a comment, and add it to the print list" onclick="ppOpenAdd()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">+ For Print (0)</button>
             <button id="ppOneShotBtn" title="Stand on the move BEFORE a mistake (the highlighted move), then one click: opens the add dialog with that position as the front and the back already filled from the better line" onclick="ppOneShot()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚡ 1 shot</button>
             <button id="mmBtn" title="Stockfish checks the game on the board for your eval drops, then names the cause from its refutation line: hanging piece, fork, or untagged" onclick="mmOpen()" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">🔍 What went wrong</button>
@@ -1752,7 +1753,18 @@
               <div style="font-weight:bold; margin-bottom:6px; color:#ff9800; font-size:15px;">Practice snippet</div>
               <div id="practiceResultInfo" style="color:#aaa; font-size:12px; margin-bottom:10px;"></div>
               <textarea id="practiceResultText" readonly rows="7" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;"></textarea>
-              <button id="practiceCopyBtn" onclick="practiceCopy(this)" style="width:100%; padding:10px; margin-bottom:8px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy snippet</button>
+              <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <button id="practiceCopyBtn" onclick="practiceCopy(this)" title="Copy the snippet exactly as it reads in the box" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy snippet</button>
+                <button id="practiceFlattenBtn" onclick="practiceToggleFlatten(this)" title="Show the same snippet as one line, in its own box below, to copy into a Google Sheets cell or a message" style="flex:1; padding:10px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Flatten</button>
+              </div>
+
+              <!-- The same snippet as one line. A box of its own: the snippet above stays
+                   the multi-line original, because Save to puzzles reads that one. -->
+              <div id="practiceOneLineWrap" style="display:none; margin-bottom:10px;">
+                <div style="color:#e91e63; font-size:12px; margin-bottom:4px;">One line — copy from here</div>
+                <textarea id="practiceOneLineOut" readonly rows="3" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #e91e63; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:6px;"></textarea>
+                <button id="practiceOneLineCopyBtn" onclick="practiceCopyOneLine(this)" style="width:100%; padding:8px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">Copy line</button>
+              </div>
               <a id="practiceLichessLink" href="https://lichess.org/analysis" target="_blank" rel="noopener" title="Open the Lichess analysis board" style="display:block; box-sizing:border-box; text-align:center; text-decoration:none; width:100%; padding:10px; margin-bottom:8px; background:#0f3460; color:#8bc34a; border:1px solid #8bc34a; border-radius:6px; font-weight:bold; font-size:14px;">Open in Lichess analysis ↗</a>
               <div style="display:flex; gap:8px;">
                 <button onclick="document.getElementById('practiceResultModal').style.display='none'" style="flex:1; padding:10px; background:#0f3460; color:#ff9800; border:1px solid #ff9800; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Keep playing</button>
@@ -3919,6 +3931,7 @@
                     if (severity) {
                         mistakes.push({
                             notation, move: move.san, severity,
+                            ply: i,   // position in the movetext: the only key that survives renumbering
                             evalBefore: evalBeforeForDisplay,
                             evalAfter: evalAfterForDisplay,
                             swing, fen: fenBefore
@@ -4631,17 +4644,48 @@
                 cleanedPgn = cleanPgn(pgn);
             }
 
-            // Match move patterns like "1. e4" or "1... e5"
-            const movePattern = /(\d+\.{1,3})\s*([KQRBNP]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O)/g;
-
-            let result = cleanedPgn.replace(movePattern, (match, notation, move) => {
-                const key = notation + ' ' + move;
-                const annotation = annotationMap[key];
-                if (annotation) {
-                    return notation + ' ' + move + annotation;
+            // Prefer the ply index when the caller supplies one. Matching on the
+            // notation string ("9... Bxd6") fails twice over on a From Position
+            // game: its movetext is renumbered from 1 while the analysis reports
+            // the FEN's own numbers, and a Black move written without a "9..."
+            // prefix has no notation to key on at all. Ply is just the move's
+            // place in the movetext, so neither can throw it off.
+            const plyMap = {};
+            let hasPly = false;
+            for (const m of mistakes) {
+                if (typeof m.ply === 'number') {
+                    plyMap[m.ply] = m.severity === 'BLUNDER' ? '??' : '?';
+                    hasPly = true;
                 }
-                return match;
-            });
+            }
+
+            let result;
+            if (hasPly) {
+                // A SAN token, with any number glued to its front ("9...Bxd6") and any
+                // marks already on its back ("Bxd6?!") — both have to be recognised, or
+                // the skipped token desyncs every ply after it.
+                const SAN_TOKEN = /^(\d+\.{1,3})?([KQRBNP]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O-O|O-O)([+#]?)([?!]*)$/;
+                let ply = 0;
+                result = cleanedPgn.split(/\s+/).map(tok => {
+                    const m = tok.match(SAN_TOKEN);
+                    if (!m) return tok;                   // move number alone, result, header text
+                    const annotation = plyMap[ply++];
+                    if (!annotation) return tok;          // keep whatever marks it already had
+                    return (m[1] || '') + m[2] + m[3] + annotation;
+                }).join(' ');
+            } else {
+                // Match move patterns like "1. e4" or "1... e5"
+                const movePattern = /(\d+\.{1,3})\s*([KQRBNP]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?|O-O-O|O-O)/g;
+
+                result = cleanedPgn.replace(movePattern, (match, notation, move) => {
+                    const key = notation + ' ' + move;
+                    const annotation = annotationMap[key];
+                    if (annotation) {
+                        return notation + ' ' + move + annotation;
+                    }
+                    return match;
+                });
+            }
 
             // Add opening comment after first move (only opening, not personal comments)
             if (openingComment) {
@@ -5227,6 +5271,45 @@
                 return;
             }
             applyPgnStringToBoard(pgnString);
+        }
+
+        // Load to Board + Analyze Game in one press: put the PGN in #pgnInput (from the
+        // clipboard when the box is empty, the rule Load to Board uses), then press the
+        // real Analyze Game button.
+        //
+        // It presses the button instead of calling analyzeGame() because that button
+        // carries two guards worth keeping: it stays disabled until Stockfish answers
+        // "readyok", and disabled again for the whole of a run. Calling analyzeGame()
+        // directly sailed past both — it could start before the engine was up, or start
+        // a second pass on top of a running one, the two sharing window.moveTree,
+        // positionEvalMap and the worker pool.
+        async function loadAndAnalyze() {
+            const ta = document.getElementById('pgnInput');
+            const btn = document.getElementById('analyzeBtn');
+            if (!ta || !btn) return;
+            const say = (m) => { if (typeof showToast === 'function') showToast(m); else log(m, 'warning'); };
+
+            if (!ta.value.trim()) {
+                try {
+                    ta.value = (await navigator.clipboard.readText()).trim();
+                } catch (err) { /* clipboard blocked and the box is empty */ }
+            }
+            if (!ta.value.trim()) { say('No PGN in the box or the clipboard'); return; }
+
+            if (btn.disabled) {
+                // disabled while the engine is up = a pass is already running; don't stack another
+                if (typeof window._sfReady === 'function' && window._sfReady()) {
+                    say('An analysis is already running — let it finish');
+                    return;
+                }
+                say('Stockfish is still loading...');
+                const t0 = Date.now();
+                while (btn.disabled && Date.now() - t0 < 20000) {
+                    await new Promise(r => setTimeout(r, 250));
+                }
+                if (btn.disabled) { say('Stockfish did not finish loading — try again'); return; }
+            }
+            btn.click();
         }
 
         // ============================================================
@@ -18226,8 +18309,12 @@ ${contentToAnalyze}`;
             return true;
         }
 
-        // Moves played from startFen as a Lichess-style From Position snippet (numbered from 1)
-        function practiceSnippet(startFen, sans) {
+        // Moves played from startFen as a Lichess-style From Position snippet (numbered from 1).
+        // meta = { startLabel, side, levelLabel, result } adds the tags that say which engine
+        // level this was and how it ended, so the snippet still explains itself weeks later.
+        // The tags go BEFORE [Variant "From Position"], because several loaders here match
+        // [Variant ...] immediately followed by [FEN ...] and read the movetext after it.
+        function practiceSnippet(startFen, sans, meta) {
             const blackFirst = startFen.split(' ')[1] === 'b';
             const parts = [];
             sans.forEach((san, i) => {
@@ -18236,7 +18323,16 @@ ${contentToAnalyze}`;
                 else if (i === 0) parts.push(((ply - 1) / 2 + 1) + '... ' + san);
                 else parts.push(san);
             });
-            return '[Variant "From Position"]\n[FEN "' + startFen + '"]\n\n' + parts.join(' ');
+            let tags = '';
+            if (meta) {
+                const engine = 'Stockfish level ' + (meta.levelLabel || '?');
+                const q = (v) => String(v).replace(/"/g, "'");
+                tags += '[Event "Practice from ' + q(meta.startLabel || 'a position') + '"]\n';
+                tags += '[White "' + q(meta.side === 'white' ? 'Me' : engine) + '"]\n';
+                tags += '[Black "' + q(meta.side === 'white' ? engine : 'Me') + '"]\n';
+                tags += '[Result "' + (meta.result || '*') + '"]\n';
+            }
+            return tags + '[Variant "From Position"]\n[FEN "' + startFen + '"]\n\n' + parts.join(' ');
         }
 
         function practiceChosenStartNode() {
@@ -18280,10 +18376,15 @@ ${contentToAnalyze}`;
             const side = document.getElementById('practiceSide').value;
             const level = parseInt(document.getElementById('practiceLevel').value);
             const prev = window._practice;
+            const lvlSel = document.getElementById('practiceLevel');
+            const lvlOpt = lvlSel.options[lvlSel.selectedIndex];
             window._practice = {
                 startFen: startFen,
                 startLabel: (before ? 'before ' : 'after ') + practiceMoveLabel(anchor),
                 side: side,
+                level: level,
+                // "5 - Medium" reads better in a tag than a bare 5
+                levelLabel: (lvlOpt ? lvlOpt.textContent : String(level)).trim(),
                 origNode: anchor,
                 // keep the very first orientation / signals state when restarting inside a practice
                 origOrientation: prev ? prev.origOrientation : (window.board2 ? window.board2.orientation() : 'white'),
@@ -18311,8 +18412,16 @@ ${contentToAnalyze}`;
             document.getElementById('practiceResultInfo').textContent =
                 'From ' + p.startLabel + ' · you played ' + (p.side === 'white' ? 'White' : 'Black') + ' · ' + state +
                 (sans.length === 0 ? ' — just the position so far' : '');
-            document.getElementById('practiceResultText').value = practiceSnippet(p.startFen, sans);
+            // PGN result from the board: the side to move in a checkmate is the one that lost
+            let result = '*';
+            if (chess.in_checkmate()) result = chess.turn() === 'w' ? '0-1' : '1-0';
+            else if (chess.in_stalemate() || chess.in_draw()) result = '1/2-1/2';
+            const snip = practiceSnippet(p.startFen, sans, {
+                startLabel: p.startLabel, side: p.side, levelLabel: p.levelLabel, result: result
+            });
+            document.getElementById('practiceResultText').value = snip;
             document.getElementById('practiceCopyBtn').textContent = 'Copy snippet';
+            practiceSyncOneLine();   // keep the one-line box current as the engine replies
             const modal = document.getElementById('practiceResultModal');
             const wasOpen = modal.style.display === 'flex'; // a live refresh keeps the note and category as typed
             modal.style.display = 'flex';
@@ -18344,7 +18453,8 @@ ${contentToAnalyze}`;
             if (!p) return;
             const link = typeof lnCurrentGameLink === 'function' ? lnCurrentGameLink() : '';
             document.getElementById('practiceSaveNote').value =
-                (link ? link + ' — ' : '') + 'practice from ' + p.startLabel + ', played as ' + (p.side === 'white' ? 'White' : 'Black');
+                (link ? link + ' — ' : '') + 'practice from ' + p.startLabel + ', played as ' + (p.side === 'white' ? 'White' : 'Black') +
+                (p.levelLabel ? ' vs Stockfish level ' + p.levelLabel : '');
             document.getElementById('practiceSaveNewCategory').value = '';
             practiceSaveMsg('');
             puzzleShowRowLink('practiceSaveLink', null);
@@ -18409,12 +18519,63 @@ ${contentToAnalyze}`;
             if (window._practice) setTimeout(practiceShowResult, 600);
         }
 
-        function practiceCopy(btn) {
-            const ta = document.getElementById('practiceResultText');
-            const done = () => { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy snippet'; }, 1500); };
-            const fallback = () => { ta.select(); try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Press ⌘C'; } };
-            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(done).catch(fallback);
+        function practiceCopyText(text, btn, label) {
+            const done = () => { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = label; }, 1500); };
+            // the flattened text isn't in any field, so the no-clipboard path needs its own
+            const fallback = () => {
+                const tmp = document.createElement('textarea');
+                tmp.value = text;
+                tmp.style.cssText = 'position:fixed; left:-9999px; top:0;';
+                document.body.appendChild(tmp);
+                tmp.select();
+                try { document.execCommand('copy'); done(); } catch (e) { btn.textContent = 'Press \u2318C'; }
+                document.body.removeChild(tmp);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(fallback);
             else fallback();
+        }
+
+        function practiceCopy(btn) {
+            practiceCopyText(document.getElementById('practiceResultText').value, btn, 'Copy snippet');
+        }
+
+        // One line, tags kept: what a Sheets cell or a chat message wants.
+        // The tags run together with no gap ([Event "..."][White "..."]...[FEN "..."]), the
+        // same shape as the [Variant "From Position"][FEN "..."] rows already in the table,
+        // then one space before the movetext.
+        window._practiceOneLine = false;   // which form the snippet box is showing
+        function practiceFlatten(text) {
+            return text.replace(/\s+/g, ' ').trim().replace(/\]\s+\[/g, '][');
+        }
+
+        // Flatten writes to a box of its own and never touches the snippet above it.
+        // Save to puzzles reads that snippet textarea, so flattening it in place changed
+        // what got written to the table — and made the duplicate check miss rows saved
+        // in the other shape.
+        function practiceToggleFlatten(btn) {
+            window._practiceOneLine = !window._practiceOneLine;
+            practiceSyncOneLine();
+            if (window._practiceOneLine) {
+                const out = document.getElementById('practiceOneLineOut');
+                out.focus();
+                out.select();        // ready for ⌘C without reaching for the button
+            }
+        }
+
+        function practiceSyncOneLine() {
+            const wrap = document.getElementById('practiceOneLineWrap');
+            const out = document.getElementById('practiceOneLineOut');
+            const btn = document.getElementById('practiceFlattenBtn');
+            if (!wrap || !out) return;
+            wrap.style.display = window._practiceOneLine ? 'block' : 'none';
+            if (window._practiceOneLine) {
+                out.value = practiceFlatten(document.getElementById('practiceResultText').value);
+            }
+            if (btn) btn.textContent = window._practiceOneLine ? 'Hide line' : 'Flatten';
+        }
+
+        function practiceCopyOneLine(btn) {
+            practiceCopyText(document.getElementById('practiceOneLineOut').value, btn, 'Copy line');
         }
 
         // Coach → PGN: graft the coach's "### Move 5... Nd4?" sections onto a pasted PGN
@@ -18606,6 +18767,10 @@ ${contentToAnalyze}`;
         window.practiceBack = practiceBack;
         window.practiceShowResult = practiceShowResult;
         window.practiceCopy = practiceCopy;
+        // these are called from onclick= in the practice modal, so they have to be
+        // on window: this script's functions are not global on their own
+        window.practiceToggleFlatten = practiceToggleFlatten;
+        window.practiceCopyOneLine = practiceCopyOneLine;
         window.openOneLineModal = openOneLineModal;
         window.openCoachPgnModal = openCoachPgnModal;
         window.coachPgnMerge = coachPgnMerge;
