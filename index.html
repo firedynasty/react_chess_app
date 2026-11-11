@@ -11819,9 +11819,8 @@
         // ── Mistake hopping: , and . walk the game's ?/??/?! moves ──────────
         // The move list already paints those moves; this walks them. The side
         // filter is the whole point: White's blunders and Black's are two
-        // different post-mortems, so mstSide picks whose. Position is compared
-        // by ply ordinal rather than node identity, so hopping still works
-        // while you are standing inside a variation.
+        // different post-mortems, so mstSide picks whose. Where you are is an
+        // index into the main line (see mstAnchor) — never move numbers.
         window.mstSide = 'w';            // 'w' | 'b' | 'both'
 
         function mstSideLabel() {
@@ -11839,22 +11838,47 @@
             return window.mstSide === 'b' ? !!node.isBlackMove : !node.isBlackMove;
         }
 
+        // The main line as an array: position is then an index into it, and the
+        // next mistake is simply the next index.
+        function mstMainLine() {
+            const line = [];
+            if (!window.moveTree) return line;
+            let node = (window.moveTree.children && window.moveTree.children[0]) || null;
+            while (node) {
+                line.push(node);
+                node = (node.children && node.children.length > 0) ? node.children[0] : null;
+            }
+            return line;
+        }
+
         // Main line only: a ? inside a variation is engine output, not something
         // that happened in the game.
         function mstCollect() {
-            const out = [];
-            if (!window.moveTree) return out;
-            let node = (window.moveTree.children && window.moveTree.children[0]) || null;
-            while (node) {
-                if (mstIsMistake(node) && mstSideMatches(node)) out.push(node);
-                node = (node.children && node.children.length > 0) ? node.children[0] : null;
-            }
-            return out;
+            return mstMainLine().filter(function (n) { return mstIsMistake(n) && mstSideMatches(n); });
         }
 
-        function mstPly(node) {
-            if (!node || !node.san) return 0;        // start position sorts before move 1
-            return node.moveNumber * 2 + (node.isBlackMove ? 1 : 0);
+        // Where a hop counts from. Standing inside a variation that is the
+        // MAIN-LINE move the variation branches off — the move being refuted —
+        // not the variation move you are literally on. Its number runs ahead:
+        // inside 32. Qxf8+?? ( 32. Bc1+ g5 33. Rf6+ Qg6 34. Qxf8+ ) you stand on
+        // a move numbered 33 or 34, so counting from that number walked straight
+        // past the real 33. Qf2?? and landed on 34. b4??. Nested variations climb
+        // out one level per pass until the node is on the main line.
+        function mstAnchor() {
+            let node = window.currentMoveNode;
+            if (!node || !node.san) return null;              // start of the game
+            for (let guard = 0; node && guard < 500; guard++) {
+                // nearest ancestor-or-self that is not its parent's main
+                // continuation — that node is a variation's first move
+                let walk = node, varRoot = null;
+                while (walk && walk.parent) {
+                    if (walk.parent.children[0] !== walk) { varRoot = walk; break; }
+                    walk = walk.parent;
+                }
+                if (!varRoot) return node;                    // already on the main line
+                node = varRoot.parent.children[0];            // the move it replaces
+            }
+            return node;
         }
 
         function mstStep(dir) {
@@ -11865,12 +11889,17 @@
                 return;
             }
 
-            const here = mstPly(window.currentMoveNode);
+            const line = mstMainLine();
+            const pos = new Map();
+            line.forEach(function (n, i) { pos.set(n, i); });
+            const anchor = mstAnchor();
+            const here = pos.has(anchor) ? pos.get(anchor) : -1;   // -1 = start of the game
+
             let idx = -1;
             if (dir > 0) {
-                for (let i = 0; i < list.length; i++) if (mstPly(list[i]) > here) { idx = i; break; }
+                for (let i = 0; i < list.length; i++) if (pos.get(list[i]) > here) { idx = i; break; }
             } else {
-                for (let i = list.length - 1; i >= 0; i--) if (mstPly(list[i]) < here) { idx = i; break; }
+                for (let i = list.length - 1; i >= 0; i--) if (pos.get(list[i]) < here) { idx = i; break; }
             }
             // Past the last one (or before the first): wrap round rather than
             // dead-end, so holding . cycles the game's mistakes.
@@ -11903,6 +11932,7 @@
         window.mstToggleSide = mstToggleSide;
         window.mstSyncBtn = mstSyncBtn;
         window.mstCollect = mstCollect;
+        window.mstAnchor = mstAnchor;
 
         /**
          * Collect all main-line moves that have branch points (children.length > 1).
