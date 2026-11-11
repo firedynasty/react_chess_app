@@ -1535,11 +1535,29 @@
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
-            <button id="copyVarBtnMini" title="The highlighted move is inside a variation: copy that whole variation as a From Position snippet (FEN = the branch position before the variation's first move, moves renumbered from 1)" onclick="lnCopyVarSnippet(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
+            <button id="copyVarBtnMini" title="Open the current variation, or the first alternative attached to the highlighted main-line move, as a From Position snippet to copy or flatten" onclick="lnOpenVarSnippetModal()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
             <button id="pgnLibBtnMini" title="PGN Library: load a JSON of games (or a folder of .pgn files) from your computer and browse them in a sidebar" onclick="plToggle()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📚 Library</button>
             <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Hints</button>
+          </div>
+        </div>
+        <div id="copyVarResultModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10000; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+          <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #e91e63; position:relative;">
+            <button onclick="document.getElementById('copyVarResultModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+            <div style="font-weight:bold; margin-bottom:6px; color:#e91e63; font-size:15px;">Variation snippet</div>
+            <div style="color:#aaa; font-size:12px; margin-bottom:10px;">Copy the snippet as shown, or flatten it to one line.</div>
+            <textarea id="copyVarResultText" readonly rows="7" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;"></textarea>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+              <button id="copyVarResultCopyBtn" onclick="lnCopyVarResult(this)" title="Copy the snippet exactly as it reads in the box" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy snippet</button>
+              <button id="copyVarFlattenBtn" onclick="lnShowVarFlatten()" title="Show the same variation as one line in its own box below" style="flex:1; padding:10px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Flatten</button>
+            </div>
+            <div id="copyVarOneLineWrap" style="display:none; margin-bottom:10px;">
+              <div style="color:#e91e63; font-size:12px; margin-bottom:4px;">One line — copy from here</div>
+              <textarea id="copyVarOneLineOut" readonly rows="3" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #e91e63; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:6px;"></textarea>
+              <button id="copyVarOneLineCopyBtn" onclick="lnCopyVarOneLine(this)" style="width:100%; padding:8px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">Copy line</button>
+            </div>
+            <button onclick="document.getElementById('copyVarResultModal').style.display='none'" style="width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Close</button>
           </div>
         </div>
         <div id="navBtnsContent" style="display: none; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -6054,13 +6072,53 @@
             return '[Variant "From Position"]\n[FEN "' + fen + '"]\n\n' + parts.join(' ');
         }
 
-        async function lnCopyVarSnippet(btn) {
+        function lnOpenVarSnippetModal() {
             const node = window.currentMoveNode;
             if (!node || !node.san) { showToast('Click a move in the move list first'); return; }
-            const text = varFromPosSnippet(node);
-            if (!text) { showToast('That move is on the main line — click a move inside a variation'); return; }
+            let text = varFromPosSnippet(node);
+            if (!text) {
+                // A main-line mistake and its alternatives share the position before the move.
+                // Match Cycle Var: use the first alternative without moving the board into it.
+                const parent = node.parent;
+                const alternative = parent && parent.children && parent.children[0] === node
+                    ? parent.children[1] : null;
+                text = varFromPosSnippet(alternative);
+            }
+            if (!text) { showToast('No variation attached to this move'); return; }
+            document.getElementById('copyVarResultText').value = text;
+            document.getElementById('copyVarOneLineOut').value = '';
+            document.getElementById('copyVarOneLineWrap').style.display = 'none';
+            document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
+            document.getElementById('copyVarResultModal').style.display = 'flex';
+        }
+
+        async function lnCopyVarResult(btn) {
+            const text = document.getElementById('copyVarResultText').value.trim();
+            if (!text) { showToast('Open a variation snippet first'); return; }
             await lnCopyText(text, btn, '✓ Copied', 'Copied the variation as a From Position snippet');
         }
+
+        function lnShowVarFlatten() {
+            const wrap = document.getElementById('copyVarOneLineWrap');
+            const out = document.getElementById('copyVarOneLineOut');
+            if (!wrap || !out) return;
+            // Practice's formatter is private to its script; format this modal's snippet here.
+            out.value = document.getElementById('copyVarResultText').value
+                .replace(/\s+/g, ' ').trim().replace(/\]\s+\[/g, '][');
+            wrap.style.display = 'block';
+            out.focus();
+            out.select();
+        }
+
+        async function lnCopyVarOneLine(btn) {
+            const text = document.getElementById('copyVarOneLineOut').value.trim();
+            if (!text) { showToast('Open a variation snippet first'); return; }
+            await lnCopyText(text, btn, '✓ Copied', 'Copied the variation as one line');
+        }
+        window.lnOpenVarSnippetModal = lnOpenVarSnippetModal;
+        window.lnCopyVarResult = lnCopyVarResult;
+        window.lnShowVarFlatten = lnShowVarFlatten;
+        window.lnCopyVarOneLine = lnCopyVarOneLine;
 
         // ---- Transfer to puzzles: collect fen,note rows, then paste them into vercel_fen_saver's
         // "Bulk add rows" box. Nothing is written to the puzzles table from here: that app keeps
