@@ -664,6 +664,18 @@
         .gdrive-picker-card-title { display:block; margin-bottom:6px; color:#fff; font-weight:700; overflow-wrap:anywhere; }
         .gdrive-picker-card-preview { display:block; color:#a8b8cb; font:12px/1.45 monospace; max-height:70px; overflow:hidden; white-space:pre-wrap; overflow-wrap:anywhere; }
         .gdrive-picker-card-meta { display:block; margin-top:7px; color:#61dafb; font-size:11px; }
+        .gdrive-picker-mode-toggle { display:flex; gap:7px; margin:0 0 12px; }
+        .gdrive-picker-mode-toggle button { padding:7px 16px; border:1px solid #2873a3; border-radius:6px; background:#12365a; color:#e8f7ff; cursor:pointer; }
+        .gdrive-picker-mode-toggle button.active { background:#198754; border-color:#28a745; color:#fff; font-weight:700; }
+        .gdrive-picker-write { display:grid; gap:10px; max-width:760px; }
+        .gdrive-picker-write[hidden] { display:none; }
+        .gdrive-picker-write label { display:grid; gap:5px; color:#b7d9ed; font-size:13px; }
+        .gdrive-picker-write input, .gdrive-picker-write textarea { width:100%; padding:9px 11px; border:1px solid #34506f; border-radius:6px; background:#0b1423; color:#eee; font:13px/1.45 monospace; }
+        .gdrive-picker-write textarea { min-height:230px; resize:vertical; }
+        .gdrive-picker-write-actions { display:flex; flex-wrap:wrap; gap:8px; }
+        .gdrive-picker-write-actions button { padding:8px 13px; border:1px solid #2873a3; border-radius:6px; background:#12365a; color:#e8f7ff; cursor:pointer; }
+        .gdrive-picker-write-actions button.primary { background:#198754; border-color:#28a745; font-weight:700; }
+        .gdrive-picker-write-actions button:disabled { opacity:.55; cursor:wait; }
         @media (max-width:600px) { .gdrive-picker-overlay { padding:8px; } .gdrive-picker-panel { width:100%; max-height:94vh; } .gdrive-picker-content { padding:12px; } .gdrive-picker-cards { grid-template-columns:1fr; max-height:54vh; } }
         .gdrive-cell-input {
             width: 100%;
@@ -2026,7 +2038,26 @@
           </section>
           <section id="gdrive-picker-card-section" class="gdrive-picker-section" hidden>
             <h3 id="gdrive-picker-card-heading">Choose a game (column 2 loads to the board)</h3>
-            <div id="gdrive-picker-cards" class="gdrive-picker-cards"></div>
+            <div class="gdrive-picker-mode-toggle" role="group" aria-label="Sheet access mode">
+              <button type="button" id="gdrive-picker-read-mode" class="active" aria-pressed="true">Read</button>
+              <button type="button" id="gdrive-picker-write-mode" aria-pressed="false">Write</button>
+            </div>
+            <div id="gdrive-picker-read-panel">
+              <div id="gdrive-picker-cards" class="gdrive-picker-cards"></div>
+            </div>
+            <div id="gdrive-picker-write-panel" class="gdrive-picker-write" hidden>
+              <p style="margin:0;color:#9eabbc;font-size:13px">Append a game to <span id="gdrive-picker-write-target"></span>. The game name goes in column A and PGN/FEN in column B.</p>
+              <label>Game name
+                <input id="gdrive-picker-write-name" type="text" placeholder="Opening or game name">
+              </label>
+              <label>PGN or FEN
+                <textarea id="gdrive-picker-write-content" spellcheck="false" placeholder="Paste PGN/FEN or use the current board position"></textarea>
+              </label>
+              <div class="gdrive-picker-write-actions">
+                <button type="button" id="gdrive-picker-use-board">Use current board</button>
+                <button type="button" id="gdrive-picker-append" class="primary">Append to sheet</button>
+              </div>
+            </div>
           </section>
         </div>
       </section>
@@ -17104,6 +17135,7 @@ ${contentToAnalyze}`;
         let gdriveFileName = '';
         let gdriveCurrentDataRows = [];  // store parsed data rows (excluding header) for row navigation
         let gdrivePickerSheetName = '';
+        let gdrivePickerMode = 'read';
 
         function gdriveParseCsvRows(text) {
             const rows = [];
@@ -17211,6 +17243,90 @@ ${contentToAnalyze}`;
             if (el) el.textContent = message || '';
         }
 
+        function gdrivePickerSetMode(mode) {
+            gdrivePickerMode = mode === 'write' ? 'write' : 'read';
+            var isWrite = gdrivePickerMode === 'write';
+            document.getElementById('gdrive-picker-read-mode').classList.toggle('active', !isWrite);
+            document.getElementById('gdrive-picker-read-mode').setAttribute('aria-pressed', String(!isWrite));
+            document.getElementById('gdrive-picker-write-mode').classList.toggle('active', isWrite);
+            document.getElementById('gdrive-picker-write-mode').setAttribute('aria-pressed', String(isWrite));
+            document.getElementById('gdrive-picker-read-panel').hidden = isWrite;
+            document.getElementById('gdrive-picker-write-panel').hidden = !isWrite;
+            if (isWrite) {
+                document.getElementById('gdrive-picker-write-target').textContent = gdriveFileName + ' → ' + gdrivePickerSheetName;
+                if (!document.getElementById('gdrive-picker-write-content').value.trim()) gdrivePickerUseCurrentBoard();
+            }
+        }
+
+        function gdrivePickerCurrentGameText() {
+            var pgn = '';
+            if (window.moveTree && typeof moveTreeToPgn === 'function') {
+                try { pgn = moveTreeToPgn(window.moveTree) || ''; } catch (e) {}
+            }
+            pgn = pgn || window.currentLoadedPgn || window.annotatedPgnWithVariations || '';
+            if (pgn && String(pgn).trim()) return String(pgn).trim();
+            var pgnInput = document.getElementById('pgnInput');
+            if (pgnInput && pgnInput.value.trim()) return pgnInput.value.trim();
+            try {
+                if (typeof getTypedChess === 'function') return getTypedChess().fen();
+                if (window.board2 && typeof window.board2.fen === 'function') return window.board2.fen();
+            } catch (e) {}
+            return '';
+        }
+
+        function gdrivePickerUseCurrentBoard() {
+            var content = gdrivePickerCurrentGameText();
+            document.getElementById('gdrive-picker-write-content').value = content;
+            gdrivePickerStatus(content ? 'Current board PGN/FEN copied into the write form. Review it, then append.' : 'No PGN/FEN found on the current board. Paste one into the field to append.');
+        }
+
+        async function gdrivePickerAppendGame() {
+            if (!gdriveAccessToken) { gdrivePickerStatus('Sign in with Google before writing.'); return; }
+            if (!gdriveFileId || !gdrivePickerSheetName) { gdrivePickerStatus('Choose a spreadsheet and sheet first.'); return; }
+            var name = document.getElementById('gdrive-picker-write-name').value.trim();
+            var content = document.getElementById('gdrive-picker-write-content').value.trim();
+            if (!name) { gdrivePickerStatus('Enter a game name before appending.'); return; }
+            if (!content) { gdrivePickerStatus('Enter PGN/FEN or use the current board before appending.'); return; }
+
+            var button = document.getElementById('gdrive-picker-append');
+            button.disabled = true;
+            gdrivePickerStatus('Appending game to "' + gdrivePickerSheetName + '"…');
+            try {
+                var range = "'" + gdrivePickerSheetName.replace(/'/g, "''") + "'!A:B";
+                var encodedRange = encodeURIComponent(range).replace(/'/g, '%27');
+                var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(gdriveFileId) + '/values/' + encodedRange + ':append?valueInputOption=RAW&insertDataOption=INSERT_ROWS';
+                var resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: 'Bearer ' + gdriveAccessToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ values: [[name, content]] })
+                });
+                if (!resp.ok) {
+                    var errData = await resp.json().catch(function() { return {}; });
+                    throw new Error(errData.error && errData.error.message ? errData.error.message : 'HTTP ' + resp.status);
+                }
+                gdriveSetStatus('Appended "' + name + '" to ' + gdriveFileName + ' → ' + gdrivePickerSheetName);
+                gdrivePickerStatus('Appended "' + name + '" to this sheet.');
+                // Refresh the local workbook so Read mode immediately includes the new card.
+                var loaded = await gdriveLoadSpreadsheet(gdriveFileId, gdriveFileName);
+                if (loaded) {
+                    gdrivePickerRenderCards(gdrivePickerSheetName);
+                    gdrivePickerSetMode('write');
+                    gdrivePickerStatus('Appended "' + name + '". The sheet is refreshed; switch to Read to see the new card.');
+                } else {
+                    gdrivePickerStatus('Appended "' + name + '", but the sheet could not be refreshed. Reopen this sheet to see the new card.');
+                }
+                document.getElementById('gdrive-picker-write-name').value = '';
+                document.getElementById('gdrive-picker-write-content').value = '';
+            } catch (err) {
+                gdrivePickerStatus('Could not append game: ' + err.message);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
         function gdrivePickerReadLastSelection() {
             try {
                 var saved = JSON.parse(localStorage.getItem(GDRIVE_PICKER_LAST_KEY) || 'null');
@@ -17245,6 +17361,7 @@ ${contentToAnalyze}`;
             document.getElementById('gdrive-picker-back-btn').textContent = 'Back';
             document.getElementById('gdrive-picker-title').textContent = 'Choose a Google spreadsheet';
             gdrivePickerSheetName = '';
+            gdrivePickerSetMode('read');
         }
 
         window.gdriveClosePicker = function() {
@@ -17412,6 +17529,7 @@ ${contentToAnalyze}`;
 
             gdrivePickerSheetName = sheetName;
             gdrivePickerRememberSelection(sheetName);
+            gdrivePickerSetMode('read');
             document.getElementById('gdrive-picker-card-heading').textContent = sheetName + ' — choose a game (column 2 loads to the board)';
             cards.replaceChildren();
             document.getElementById('gdrive-picker-sheet-section').hidden = true;
@@ -17479,6 +17597,15 @@ ${contentToAnalyze}`;
         document.getElementById('gdrive-picker-search-btn').addEventListener('click', function() {
             gdrivePickerListFiles(document.getElementById('gdrive-picker-search').value.trim());
         });
+        document.getElementById('gdrive-picker-read-mode').addEventListener('click', function() {
+            gdrivePickerSetMode('read');
+            gdrivePickerStatus('Choose a game to load its column B PGN/FEN onto the board.');
+        });
+        document.getElementById('gdrive-picker-write-mode').addEventListener('click', function() {
+            gdrivePickerSetMode('write');
+        });
+        document.getElementById('gdrive-picker-use-board').addEventListener('click', gdrivePickerUseCurrentBoard);
+        document.getElementById('gdrive-picker-append').addEventListener('click', gdrivePickerAppendGame);
         document.getElementById('gdrive-picker-search').addEventListener('keydown', function(event) {
             if (event.key === 'Enter') gdrivePickerListFiles(this.value.trim());
         });
