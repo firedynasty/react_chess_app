@@ -1054,8 +1054,7 @@
             <thead>
               <tr>
                 <th id="lnGridTh_id" onclick="lnGridSortBy('id')" title="Sort by row #" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">#</th>
-                <th id="lnGridTh_category" onclick="lnGridSortBy('category')" title="Sort by category (the part of name before the colon)" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">category</th>
-                <th id="lnGridTh_note" onclick="lnGridSortBy('note')" title="Sort by the variation (the part after the colon)" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">variation</th>
+                <th id="lnGridTh_name" onclick="lnGridSortBy('name')" title="Sort by name" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">category</th>
                 <th id="lnGridTh_side" onclick="lnGridSortBy('side')" title="Sort by the side to move in the start position" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">turn</th>
                 <th id="lnGridTh_moves" onclick="lnGridSortBy('moves')" title="Sort by the moves" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">moves</th>
                 <th style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap; cursor:default;"></th>
@@ -1391,6 +1390,8 @@
             <button onclick="document.getElementById('board2NextMove').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next →</button>
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
+            <button id="copyVarBtnMini" title="Open the current variation, or the first alternative attached to the highlighted main-line move, as a From Position snippet to copy or flatten" onclick="lnOpenVarSnippetModal()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
+            <button id="viewVarBtnMini" title="Browse the saved rows as a sortable grid (chess_variations, or whichever table you last viewed)" onclick="lnGridOpen()" style="background: #0f3460; color: #6c5ce7; border: 1px solid #6c5ce7; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📊 View</button>
             <button title="Choose a recent Google Sheet or search by name, then load a game card onto the board" onclick="gdriveOpenPicker()" style="background: #137333; color: white; border: 1px solid #34a853; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sheets ▾</button>
             <button id="coachNoteBtnMini" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button id="mstSideBtn" title="Whose mistakes the , and . keys hop between — click to cycle White → Black → Both. The number is how many ?, ?? and ?! moves that side has on the main line of this game" onclick="mstToggleSide()" style="background: #0f3460; color: #eeeeee; border: 1px solid #eeeeee; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ White (0)</button>
@@ -1421,8 +1422,6 @@
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
-            <button id="copyVarBtnMini" title="Open the current variation, or the first alternative attached to the highlighted main-line move, as a From Position snippet to copy or flatten" onclick="lnOpenVarSnippetModal()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
-            <button id="viewVarBtnMini" title="Browse the saved rows as a sortable grid (chess_variations, or whichever table you last viewed)" onclick="lnGridOpen()" style="background: #0f3460; color: #6c5ce7; border: 1px solid #6c5ce7; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📊 View</button>
             <button id="nextVarBtnMini" title="Load the next saved row on the board, in the grid's current order and filter. Wraps around at the end." onclick="lnGridNext(this)" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next ▶</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="pgnLibBtnMini" title="PGN Library: load a JSON of games (or a folder of .pgn files) from your computer and browse them in a sidebar" onclick="plToggle()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📚 Library</button>
@@ -1446,13 +1445,9 @@
             </div>
             <div style="border-top:1px solid #333; margin-bottom:10px; padding-top:12px;">
               <div style="color:#6c5ce7; font-size:12px; font-weight:bold; margin-bottom:2px;">Save to Supabase</div>
-              <div style="color:#aaa; font-size:11px; margin-bottom:6px;">Appends a row to <code style="color:#ddd;">chess_variations</code>. Stored like <code style="color:#ddd;">chess_puzzles_redone</code>: the two boxes join into one <code style="color:#ddd;">name</code> as <code style="color:#ddd;">category: variation</code>, the snippet (one line) goes in <code style="color:#ddd;">pgn</code>.</div>
-              <div style="display:flex; gap:6px; margin-bottom:6px;">
-                <input id="copyVarSaveCat" list="copyVarCatList" type="text" spellcheck="false" oninput="lnVarNamePreview()" placeholder="category, e.g. stonewall" title="The part before the colon. Existing categories autocomplete." onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="flex:1; min-width:0; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace; box-sizing:border-box;">
-                <input id="copyVarSaveNote" type="text" spellcheck="false" oninput="lnVarNamePreview()" placeholder="variation, e.g. attack the knight" title="The part after the colon" onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="flex:2; min-width:0; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace; box-sizing:border-box;">
-              </div>
-              <datalist id="copyVarCatList"></datalist>
-              <div id="copyVarNamePreview" style="color:#888; font-size:11px; margin-bottom:6px; min-height:14px;"></div>
+              <div style="color:#aaa; font-size:11px; margin-bottom:6px;">Appends a row to <code style="color:#ddd;">chess_variations</code>, which has two columns: the box below is the row's <code style="color:#ddd;">name</code>, the snippet (one line) goes in <code style="color:#ddd;">pgn</code>.</div>
+              <input id="copyVarSaveName" list="copyVarNameList" type="text" spellcheck="false" placeholder="name, e.g. stonewall_attack_the_knight" title="The row&#39;s name in chess_variations. Existing names autocomplete." onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="width:100%; box-sizing:border-box; margin-bottom:6px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace;">
+              <datalist id="copyVarNameList"></datalist>
               <button id="copyVarSaveBtn" onclick="lnSaveVarToSupabase(this)" title="Append this variation to chess_variations as a new row" style="width:100%; padding:10px; background:#6c5ce7; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Append to chess_variations</button>
               <div id="copyVarSaveStatus" style="font-size:11px; margin-top:6px; min-height:14px;"></div>
             </div>
@@ -5079,10 +5074,9 @@
             document.getElementById('copyVarOneLineOut').value = '';
             document.getElementById('copyVarOneLineWrap').style.display = 'none';
             document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
-            document.getElementById('copyVarSaveNote').value = '';
+            lnVarResetName();
             lnVarSaveMsg('');
-            lnVarNamePreview();
-            lnVarLoadCategories(false);
+            lnVarLoadNames(false);
             document.getElementById('copyVarResultModal').style.display = 'flex';
         }
 
@@ -5109,25 +5103,12 @@
             if (!text) { showToast('Open a variation snippet first'); return; }
             await lnCopyText(text, btn, '✓ Copied', 'Copied the variation as one line');
         }
-        // ---- Save a variation to Supabase, in the two-column shape vercel_fen_saver uses for
-        // chess_puzzles_redone: one `name` cell carrying "category: variation", and the snippet
-        // in `pgn`. LN_SEP matches that repo's SB_SEP, so names round-trip between the two apps.
-        // /api/lines reaches any chess_* table with name + pgn columns, so no endpoint is needed.
+        // ---- Save a variation to Supabase. chess_variations has two columns, so the box holds
+        // the row's `name` verbatim and the snippet goes in `pgn`. LN_SEP still matches
+        // vercel_fen_saver's SB_SEP, so a name typed with a colon still matches that repo's shape,
+        // but nothing here joins or splits one any more: LN_SEP is only the trim point below.
         const LN_VAR_TABLE = 'chess_variations';
         const LN_SEP = ': ';
-
-        function lnJoinName(category, note) {
-            const c = String(category || '').trim(), n = String(note || '').trim();
-            return c && n ? c + LN_SEP + n : (c || n);
-        }
-
-        // The split takes the FIRST separator, so a variation may itself contain ": ".
-        function lnSplitName(name) {
-            const s = String(name || '');
-            const i = s.indexOf(LN_SEP);
-            return i === -1 ? { category: s, note: '' }
-                            : { category: s.slice(0, i), note: s.slice(i + LN_SEP.length) };
-        }
 
         function lnVarSaveMsg(msg, ok) {
             const el = document.getElementById('copyVarSaveStatus');
@@ -5136,38 +5117,38 @@
             el.style.color = ok ? '#27ae60' : '#e91e63';
         }
 
-        // Shows the row's `name` exactly as it will be stored, as you type.
-        function lnVarNamePreview() {
-            const el = document.getElementById('copyVarNamePreview');
+        // One box, one `name`. After a save, and when the modal reopens, keep the part up to the
+        // first ": " when a name used that convention, so a run of rows in one category does not
+        // retype it; a flat name like blunder_piece clears outright.
+        function lnVarResetName() {
+            const el = document.getElementById('copyVarSaveName');
             if (!el) return;
-            const name = lnJoinName(document.getElementById('copyVarSaveCat').value,
-                                    document.getElementById('copyVarSaveNote').value);
-            el.textContent = name ? 'name \u2192 ' + name : '';
+            const i = el.value.indexOf(LN_SEP);
+            el.value = i === -1 ? '' : el.value.slice(0, i + LN_SEP.length);
         }
 
-        // Existing categories (the part of `name` before the first ": ") autocomplete in the
-        // category box, the way the puzzles page suggests them. Cached per page load.
-        let lnVarCats = [];
-        async function lnVarLoadCategories(force) {
-            if (lnVarCats.length && !force) return;
+        // Existing names autocomplete in the box, the way the puzzles page suggests them.
+        // Cached per page load; the grid's delete clears it.
+        let lnVarNames = [];
+        async function lnVarLoadNames(force) {
+            if (lnVarNames.length && !force) return;
             try {
                 const q = new URLSearchParams({ action: 'list', table: LN_VAR_TABLE });
                 const r = await fetch('/api/lines?' + q);
                 const rows = await r.json();
                 if (!r.ok || !Array.isArray(rows)) return;
-                lnVarCats = Array.from(new Set(rows.map(x => lnSplitName(x.name).category).filter(Boolean))).sort();
-                const dl = document.getElementById('copyVarCatList');
-                if (dl) dl.innerHTML = lnVarCats.map(c => '<option value="' + pzEsc(c) + '"></option>').join('');
+                lnVarNames = Array.from(new Set(rows.map(x => x.name).filter(Boolean))).sort();
+                const dl = document.getElementById('copyVarNameList');
+                if (dl) dl.innerHTML = lnVarNames.map(n => '<option value="' + pzEsc(n) + '"></option>').join('');
             } catch (e) { /* suggestions are optional */ }
         }
 
         async function lnSaveVarToSupabase(btn) {
-            const catEl = document.getElementById('copyVarSaveCat');
-            const noteEl = document.getElementById('copyVarSaveNote');
-            const name = lnJoinName(catEl && catEl.value, noteEl && noteEl.value);
+            const nameEl = document.getElementById('copyVarSaveName');
+            const name = String(nameEl && nameEl.value || '').trim();
             const snippet = document.getElementById('copyVarResultText').value.trim();
             if (!snippet) { lnVarSaveMsg('Open a variation snippet first'); return; }
-            if (!name) { lnVarSaveMsg('Fill in a category or a variation \u2014 together they are the name'); if (catEl) catEl.focus(); return; }
+            if (!name) { lnVarSaveMsg('Give the row a name'); if (nameEl) nameEl.focus(); return; }
             if (/^\d+$/.test(name)) { lnVarSaveMsg('The name can\'t be all digits \u2014 a number means the row #'); return; }
             // Store it flattened, one line per row, like the rows kept in the sheet.
             const pgn = snippet.replace(/\s+/g, ' ').trim().replace(/\]\s+\[/g, '][');
@@ -5181,9 +5162,8 @@
                 const id = data.row && data.row.id;
                 lnVarSaveMsg('Saved "' + name + '"' + (id ? ' as row #' + id : '') + ' to ' + LN_VAR_TABLE, true);
                 showToast('Saved "' + name + '"');
-                if (noteEl) noteEl.value = '';   // the category stays, for the next variation in it
-                lnVarNamePreview();
-                lnVarLoadCategories(true);
+                lnVarResetName();
+                lnVarLoadNames(true);
             } catch (e) {
                 lnVarSaveMsg('Save failed: ' + e.message);
             } finally {
@@ -5195,7 +5175,6 @@
         window.lnShowVarFlatten = lnShowVarFlatten;
         window.lnCopyVarOneLine = lnCopyVarOneLine;
         window.lnSaveVarToSupabase = lnSaveVarToSupabase;
-        window.lnVarNamePreview = lnVarNamePreview;
 
         // ---- Grid view of a chess_* table: sortable, filterable, click a row to load it.
         // One request pulls id + name + pgn (action=list&cols=full), so sorting and filtering
@@ -5218,20 +5197,16 @@
         // Pull a table into lnGridRows. Used both by the grid and by Next \u25b6, which steps
         // through the rows without opening it, so the fetch is separate from the modal.
         async function lnGridFetch(table) {
-            lnGridTableName = table || lnGridTableName || lnTable() || LN_VAR_TABLE;
+            lnGridTableName = table || lnGridTableName || LN_VAR_TABLE;
             try {
                 const q = new URLSearchParams({ action: 'list', table: lnGridTableName, cols: 'full' });
                 const r = await fetch('/api/lines?' + q);
                 const rows = await r.json();
                 if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
-                lnGridRows = rows.map(x => {
-                    const parts = lnSplitName(x.name);
-                    return {
-                        id: x.id, name: x.name || '', pgn: x.pgn || '',
-                        category: parts.category, note: parts.note,
-                        side: lnGridSide(x.pgn), moves: lnGridMoves(x.pgn)
-                    };
-                });
+                lnGridRows = rows.map(x => ({
+                    id: x.id, name: x.name || '', pgn: x.pgn || '',
+                    side: lnGridSide(x.pgn), moves: lnGridMoves(x.pgn)
+                }));
                 return '';
             } catch (e) {
                 lnGridRows = [];
@@ -5241,7 +5216,10 @@
 
         async function lnGridOpen(table) {
             if (table && table !== lnGridTableName) lnGridIdx = -1;  // a different table restarts Next
-            lnGridTableName = table || lnGridTableName || lnTable() || LN_VAR_TABLE;
+            // No argument — the mini bar's 📊 View — opens chess_variations unless the grid has
+            // already shown another table this page load. #lnTableSelect in the pane no longer
+            // decides it: that dropdown is the save/load target, and it starts on chess_lines.
+            lnGridTableName = table || lnGridTableName || LN_VAR_TABLE;
             document.getElementById('lnGridTitle').textContent = lnGridTableName;
             document.getElementById('lnGridModal').style.display = 'flex';
             lnGridMsg('Loading\u2026');
@@ -5294,7 +5272,7 @@
             const view = lnGridView();
             const dir = lnGridSort.dir;
 
-            [['id', '#'], ['category', 'category'], ['note', 'variation'], ['side', 'turn'], ['moves', 'moves']].forEach(pair => {
+            [['id', '#'], ['name', 'name'], ['side', 'turn'], ['moves', 'moves']].forEach(pair => {
                 const th = document.getElementById('lnGridTh_' + pair[0]);
                 if (th) th.textContent = pair[1] + (lnGridSort.key === pair[0] ? (dir > 0 ? ' \u25b2' : ' \u25bc') : '');
             });
@@ -5303,7 +5281,7 @@
                 (view.length !== lnGridRows.length ? ' of ' + lnGridRows.length : '');
 
             if (!view.length) {
-                body.innerHTML = '<tr><td colspan="6" style="padding:14px; color:#888; text-align:center;">' +
+                body.innerHTML = '<tr><td colspan="5" style="padding:14px; color:#888; text-align:center;">' +
                     (lnGridRows.length ? 'Nothing matches that filter' : 'No rows yet') + '</td></tr>';
                 return;
             }
@@ -5313,8 +5291,7 @@
                 'onmouseover="this.style.background=\'#16213e\'" onmouseout="this.style.background=\'\'" ' +
                 'style="cursor:pointer;">' +
                 '<td style="' + cell + ' color:#888; white-space:nowrap;">' + r.id + '</td>' +
-                '<td style="' + cell + ' color:#6c5ce7; white-space:nowrap;">' + pzEsc(r.category) + '</td>' +
-                '<td style="' + cell + ' color:#eee;">' + pzEsc(r.note) + '</td>' +
+                '<td style="' + cell + ' color:#6c5ce7; white-space:nowrap;">' + pzEsc(r.name) + '</td>' +
                 '<td style="' + cell + ' white-space:nowrap; color:' + (r.side === 'black' ? '#ffd43b' : '#00d4ff') + ';">' + (r.side || '\u2014') + '</td>' +
                 '<td style="' + cell + ' color:#aaa; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + pzEsc(r.moves) + '</td>' +
                 '<td style="' + cell + ' white-space:nowrap;">' +
@@ -5380,7 +5357,7 @@
                 lnGridIdx = -1;
                 lnGridMsg('Deleted #' + id + ' \u2014 ' + row.name);
                 lnGridRender();
-                if (lnGridTableName === LN_VAR_TABLE) lnVarCats = [];  // a category may be gone now
+                if (lnGridTableName === LN_VAR_TABLE) lnVarNames = [];  // a name may be gone now
             } catch (e) {
                 lnGridMsg('Delete failed: ' + e.message);
             }

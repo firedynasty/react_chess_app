@@ -20,12 +20,12 @@ code rather than read off the button, so check it before acting on it.
 | 861 | `—` | Clear | `clearResults` | [core-board](01-core-board.md) |
 | 866 | `gnSignInBtn` | Sign in with Google | `gdriveSignIn` | [sheets-drive](14-sheets-drive.md) |
 | 867 | `gnRecentBtn` | Recent Sheets ▾ | `gdriveOpenPicker` | [sheets-drive](14-sheets-drive.md) |
-| 910 | `toggleReportBtn` | Show Report | `(inline fn) @10684` | [study-tool-report](17-study-tool-report.md) |
-| 946 | `loadPgnFromHighlight` | Load PGN from Highlight **(hidden)** | `(inline fn) @13558` | [study-tool-report](17-study-tool-report.md) |
-| 947 | `loadFenVariantFromHighlight` | Load [Fen Variant] from Highlight **(hidden)** | `(inline fn) @13599` | [study-tool-report](17-study-tool-report.md) |
-| 948 | `copyReportText` | Copy Text | `(inline fn) @13636` | [study-tool-report](17-study-tool-report.md) |
-| 949 | `saveReportBtn` | 💾 Save Report | `(inline fn) @12930` | [study-tool-report](17-study-tool-report.md) |
-| 950 | `editViewToggleBtn` | Edit | `(inline fn) @12849` | [study-tool-report](17-study-tool-report.md) |
+| 910 | `toggleReportBtn` | Show Report | `(inline fn) @10661` | [study-tool-report](17-study-tool-report.md) |
+| 946 | `loadPgnFromHighlight` | Load PGN from Highlight **(hidden)** | `(inline fn) @13535` | [study-tool-report](17-study-tool-report.md) |
+| 947 | `loadFenVariantFromHighlight` | Load [Fen Variant] from Highlight **(hidden)** | `(inline fn) @13576` | [study-tool-report](17-study-tool-report.md) |
+| 948 | `copyReportText` | Copy Text | `(inline fn) @13613` | [study-tool-report](17-study-tool-report.md) |
+| 949 | `saveReportBtn` | 💾 Save Report | `(inline fn) @12907` | [study-tool-report](17-study-tool-report.md) |
+| 950 | `editViewToggleBtn` | Edit | `(inline fn) @12826` | [study-tool-report](17-study-tool-report.md) |
 | 966 | `—` | Append to Report | `pasteIntoReport` | [study-tool-report](17-study-tool-report.md) |
 | 970 | `—` | 📋 Paste from Clipboard | `readText, then, getElementById` | [study-tool-report](17-study-tool-report.md) |
 | 974 | `—` | Clear | `getElementById` | [study-tool-report](17-study-tool-report.md) |
@@ -41,253 +41,253 @@ code rather than read off the button, so check it before acting on it.
 | 1034 | `—` | ↻ | `lnLoadRows` | [supabase-lines](04-supabase-lines.md) |
 | 1043 | `—` | ✕ | `getElementById` | [supabase-lines](04-supabase-lines.md) |
 | 1050 | `—` | ↻ | `lnGridOpen` | [supabase-lines](04-supabase-lines.md) |
-| 1068 | `—` | Close | `getElementById` | [supabase-lines](04-supabase-lines.md) |
-| 1076 | `loadAnalysisReport` | Load Analysis Report (from clipboard) | `(inline fn) @12594` | [study-tool-report](17-study-tool-report.md) |
-| 1077 | `selectReportFolder` | 📂 Select Reports Folder | `proxy → #reportFolderInput` | [study-tool-report](17-study-tool-report.md) |
-| 1079 | `loadPreloadedReports` | 📋 Preloaded Reports **(hidden)** | `(inline fn) @12640` | [study-tool-report](17-study-tool-report.md) |
-| 1081 | `viewPreloadedReports` | 📋 View Reports **(hidden)** | `openReportFilesModal @12698` | [study-tool-report](17-study-tool-report.md) |
-| 1085 | `appendByOpeningBtn` | 📚 Append Opening Reports **(hidden)** | `(inline fn) @12763` | [study-tool-report](17-study-tool-report.md) |
-| 1096 | `analyze-variation-btn` | Analyze (Tab) | `analyzeForVariation` | [variations](07-variations.md) |
-| 1107 | `fill-variations-btn` | Fill Variations | `fillMissingVariations` | [variations](07-variations.md) |
-| 1117 | `add-variation-btn` | Add to PGN | `addVariationToPgn` | [variations](07-variations.md) |
-| 1121 | `—` | Hide | `clearVariationResult` | [variations](07-variations.md) |
-| 1142 | `insert-variation-btn` | Insert as Variation | `insertPastedVariation` | [variations](07-variations.md) |
-| 1146 | `—` | 📋 Paste from Clipboard | `readText, then, getElementById` | [variations](07-variations.md) |
-| 1150 | `—` | Clear | `getElementById, resetDragBuild` | [variations](07-variations.md) |
-| 1169 | `—` | Insert Comment | `insertPastedComment` | [move-comment](11-move-comment.md) |
-| 1173 | `—` | 📋 Paste from Clipboard | `readText, then, getElementById` | [move-comment](11-move-comment.md) |
-| 1177 | `—` | Clear | `getElementById` | [move-comment](11-move-comment.md) |
-| 1191 | `—` | ✕ | `closeMoveCommentModal` | [move-comment](11-move-comment.md) |
-| 1195 | `—` | Save | `saveMoveComment` | [move-comment](11-move-comment.md) |
-| 1196 | `—` | 📋 Paste | `readText, then, getElementById, trim` | [move-comment](11-move-comment.md) |
-| 1197 | `—` | Clear | `getElementById, getElementById, focus` | [move-comment](11-move-comment.md) |
-| 1261 | `—` | Snippet | `practiceShowResult` | [practice](08-practice.md) |
-| 1262 | `—` | Back to game | `practiceBack` | [practice](08-practice.md) |
-| 1276 | `fileSectionPrev` | ◀ | `(inline fn) @12439` | [study-tool-report](17-study-tool-report.md) |
-| 1282 | `fileSectionNext` | ▶ | `(inline fn) @12451` | [study-tool-report](17-study-tool-report.md) |
-| 1312 | `—` | Apply | `applyTypedMove` | [typed-move](19-typed-move.md) |
-| 1313 | `board2CompactBtn` | ⊡ Small | `toggleBoard2Compact` | [study-tool-report](17-study-tool-report.md) |
-| 1314 | `—` | Copy + Lichess Editor | `copyTypedStatusAndOpenEditor` | [typed-move](19-typed-move.md) |
-| 1318 | `—` | 📋 Copy | `writeText, getElementById` | [typed-move](19-typed-move.md) |
-| 1340 | `—` | New Game | `startStockfishGame` | [typed-move](19-typed-move.md) |
-| 1341 | `—` | From Position | `startStockfishFromPosition` | [typed-move](19-typed-move.md) |
-| 1348 | `—` | Lichess ↗ | `getTypedChess, fen, open, replace` | [typed-move](19-typed-move.md) |
-| 1365 | `—` | Insert as Variation | `getElementById, getElementById, insertPastedVariation, getElementById` | [variations](07-variations.md) |
-| 1369 | `—` | Paste from Clipboard | `readText, then, getElementById` | [variations](07-variations.md) |
-| 1373 | `—` | Clear | `getElementById` | [variations](07-variations.md) |
-| 1386 | `toggleNavBtnsBtn` | ▶ Show Nav Buttons | `getElementById, getElementById` | [core-board](01-core-board.md) |
-| 1390 | `—` | ← Prev | `proxy → #board2PrevMove` | [study-tool-report](17-study-tool-report.md) |
-| 1391 | `—` | Next → | `proxy → #board2NextMove` | [study-tool-report](17-study-tool-report.md) |
-| 1392 | `cycleVarBtn` | Cycle Var. | `cycleVariationStepOut @11059` | [variations](07-variations.md) |
-| 1393 | `—` | ↑ Up Out | `exitVariationToBranchMainLineMove, showToast` | [variations](07-variations.md) |
-| 1394 | `—` | Sheets ▾ | `gdriveOpenPicker` | [sheets-drive](14-sheets-drive.md) |
-| 1395 | `coachNoteBtnMini` | ⭐ | `toggleCoachBubbles` | [move-comment](11-move-comment.md) |
-| 1396 | `mstSideBtn` | ⚠ White (0) | `mstToggleSide` | [mistake-hop](10-mistake-hop.md) |
-| 1397 | `mstPrevBtn` | , ◀ ⚠ | `mstStep` | [mistake-hop](10-mistake-hop.md) |
-| 1398 | `mstNextBtn` | ⚠ ▶ . | `mstStep` | [mistake-hop](10-mistake-hop.md) |
-| 1399 | `addCommentBtn` | 💬 + Comment | `openMoveCommentModal` | [move-comment](11-move-comment.md) |
-| 1400 | `addVar2Btn` | Add Var. 2 | `openAddVar2` | [practice](08-practice.md) |
-| 1401 | `playout-btn` | Play Out | `playOutToEnd` | [variations](07-variations.md) |
-| 1402 | `practice-btn` | Practice | `openPracticeModal` | [practice](08-practice.md) |
-| 1403 | `oneline-btn` | 1-Line | `openOneLineModal` | [variations](07-variations.md) |
-| 1404 | `loadToBoardMini` | Load to Board | `loadPgnToBoard` | [core-board](01-core-board.md) |
-| 1405 | `loadAnalyzeMini` | Load & Analyze | `loadAndAnalyze` | [practice](08-practice.md) |
-| 1406 | `ppAddBtn` | + For Print (0) | `ppOpenAdd` | [print-cards](12-print-cards.md) |
-| 1407 | `ppOneShotBtn` | ⚡ 1 shot | `ppOneShot` | [print-cards](12-print-cards.md) |
-| 1408 | `mmBtn` | 🔍 What went wrong | `mmOpen` | [what-went-wrong](09-what-went-wrong.md) |
-| 1409 | `exportFenBtnMini` | Export FEN | `proxy → #exportFenBtn` | [fen-export](18-fen-export.md) |
-| 1410 | `ppLineBtn` | Print Line | `ppOpenLine` | [print-cards](12-print-cards.md) |
-| 1411 | `ppListBtn` | Print List | `ppOpenList` | [print-cards](12-print-cards.md) |
-| 1412 | `coachpgn-btn` | AI → PGN | `openCoachPgnModal` | [coach-ai](16-coach-ai.md) |
-| 1413 | `toggleSoundBtnMini` | Sound On | `toggleChessSound` | [core-board](01-core-board.md) |
-| 1414 | `toggleBorderBtnMini` | Signals On | `toggleBoardBorder` | [core-board](01-core-board.md) |
-| 1416 | `—` | 💬 Coach Chat | `openChessCoachChatModal` | [coach-ai](16-coach-ai.md) |
-| 1417 | `—` | Flip Board | `proxy → #flip_board2` | [study-tool-report](17-study-tool-report.md) |
-| 1418 | `—` | Lichess Links | `proxy → #lichessLinksBtn` | [core-board](01-core-board.md) |
-| 1419 | `showOpeningBtn` | 📖 Opening | `showOpeningToast` | [core-board](01-core-board.md) |
-| 1420 | `—` | Reanalyze | `proxy → #analyzeGameBtn` | [core-board](01-core-board.md) |
-| 1421 | `getEvalBtnMini` | Get Eval | `proxy → #getEvalBtn` | [study-tool-report](17-study-tool-report.md) |
-| 1422 | `copyBoardPgnBtnMini` | Copy PGN | `copyPgnToClipboard` | [core-board](01-core-board.md) |
-| 1423 | `copyMoveInfoBtnMini` | Copy Move Info | `lnCopyMoveInfo` | [supabase-lines](04-supabase-lines.md) |
-| 1424 | `copyVarBtnMini` | Copy Var | `lnOpenVarSnippetModal` | [supabase-lines](04-supabase-lines.md) |
-| 1425 | `viewVarBtnMini` | 📊 View | `lnGridOpen` | [supabase-lines](04-supabase-lines.md) |
-| 1426 | `nextVarBtnMini` | Next ▶ | `lnGridNext` | [supabase-lines](04-supabase-lines.md) |
-| 1427 | `savePuzzleBtnMini` | Save → Puzzles | `openPuzzleSaveModal` | [puzzles-save](06-puzzles-save.md) |
-| 1428 | `pgnLibBtnMini` | 📚 Library | `plToggle` | [pgn-library](13-pgn-library.md) |
-| 1429 | `—` | Hints | `openHintsModal` | [core-board](01-core-board.md) |
-| 1434 | `—` | ✕ | `getElementById` | ~[core-board](01-core-board.md) |
-| 1439 | `copyVarResultCopyBtn` | Copy snippet | `lnCopyVarResult` | [supabase-lines](04-supabase-lines.md) |
-| 1440 | `copyVarFlattenBtn` | Flatten | `lnShowVarFlatten` | [supabase-lines](04-supabase-lines.md) |
-| 1445 | `copyVarOneLineCopyBtn` | Copy line | `lnCopyVarOneLine` | [supabase-lines](04-supabase-lines.md) |
-| 1456 | `copyVarSaveBtn` | Append to chess_variations | `lnSaveVarToSupabase` | [supabase-lines](04-supabase-lines.md) |
-| 1459 | `—` | Close | `getElementById` | ~[supabase-lines](04-supabase-lines.md) |
-| 1464 | `flip_board2` | Flip Board | `(inline fn) @11726` | [study-tool-report](17-study-tool-report.md) |
-| 1465 | `coachNoteBtn` | ⭐ | `toggleCoachBubbles` | [move-comment](11-move-comment.md) |
-| 1466 | `—` | 💬 Coach Chat | `openChessCoachChatModal` | [coach-ai](16-coach-ai.md) |
-| 1469 | `board2PrevMove` | ← Prev | `board2PrevMove @11051` | [study-tool-report](17-study-tool-report.md) |
-| 1471 | `board2NextMove` | Next → | `board2NextMove @11046` | [study-tool-report](17-study-tool-report.md) |
-| 1477 | `analyze-variation-btn2` | Add Var. | `analyzeForVariation` | [variations](07-variations.md) |
-| 1480 | `clearVariationsBtn` | Clear Var. | `(inline fn) @11752` | [variations](07-variations.md) |
-| 1482 | `loadClipboardPgnBtn` | Load Annotated PGN | `(inline fn) @11076` | [study-tool-report](17-study-tool-report.md) |
-| 1483 | `loadFullReportBtn` | Load Report | `(inline fn) @11115` | [study-tool-report](17-study-tool-report.md) |
-| 1484 | `analyzeGameBtn` | Analyze Game | `analyzeLoadedGame` | [study-tool-report](17-study-tool-report.md) |
-| 1485 | `getEvalBtn` | Get Eval | `getEvalForLoadedPgn @11070` | [study-tool-report](17-study-tool-report.md) |
-| 1486 | `copyEvalsBtn` | 📋 Copy Evals | `copyEvalsForPaste` | [study-tool-report](17-study-tool-report.md) |
-| 1496 | `prevVariant` | ← Prev FEN/PGN **(hidden)** | `(inline fn) @12405` | [study-tool-report](17-study-tool-report.md) |
-| 1497 | `nextVariant` | Next FEN/PGN → **(hidden)** | `(inline fn) @12422` | [study-tool-report](17-study-tool-report.md) |
-| 1498 | `gdriveRowUp` | ↑ Prev Row | `(inline fn) @15885` | [sheets-drive](14-sheets-drive.md) |
-| 1499 | `gdriveRowDown` | Next Row ↓ | `(inline fn) @15891` | [sheets-drive](14-sheets-drive.md) |
-| 1503 | `gdriveRowCopyBtn` | Copy | `(inline fn) @15899` | [sheets-drive](14-sheets-drive.md) |
-| 1505 | `copyBoardPgnBtn` | Copy PGN | `copyPgnToClipboard` | [core-board](01-core-board.md) |
-| 1506 | `downloadPgnBtn` | Download PGN | `downloadPgn` | [core-board](01-core-board.md) |
-| 1507 | `updateReportBtn` | Update Report **(hidden)** | `updateReportWithPgn` | [study-tool-report](17-study-tool-report.md) |
-| 1508 | `loadFenBtn` | Load FEN | `(inline fn) @11173` | [fen-export](18-fen-export.md) |
-| 1509 | `fenColorToggleBtn` | White | `(inline fn) @11522` | [fen-export](18-fen-export.md) |
-| 1510 | `exportFenBtn` | Export FEN | `(inline fn) @11623` | [fen-export](18-fen-export.md) |
-| 1511 | `lichessLinksBtn` | Lichess Links | `(inline fn) @11682` | [core-board](01-core-board.md) |
-| 1512 | `toggleChatBtn` | Toggle Chat | `getElementById` | [core-board](01-core-board.md) |
-| 1513 | `toggleSoundBtn` | Sound On | `toggleChessSound` | [core-board](01-core-board.md) |
-| 1514 | `toggleBorderBtn` | Signals On | `toggleBoardBorder` | [core-board](01-core-board.md) |
-| 1515 | `viewTextBtn` | View Text | `openTextViewModal` | [text-view](20-text-view.md) |
-| 1516 | `toggleTypedMoveBtn` | Type/Play | `getElementById, gradient, stopStockfishGame` | [typed-move](19-typed-move.md) |
-| 1517 | `toggleMoveTableBtn` | Hide Moves | `(inline fn) @11735` | [core-board](01-core-board.md) |
-| 1518 | `toggleAddVarBtn` | Add Var | `getElementById, gradient` | [core-board](01-core-board.md) |
-| 1519 | `castleBtn` | Castle | `showCastleMenu` | [typed-move](19-typed-move.md) |
-| 1521 | `downloadBoardImagesBtn` | Download Images | `downloadBoardImages` | [fen-export](18-fen-export.md) |
-| 1527 | `reportAppendVariantBtn` | Report Append Variant **(hidden)** | `(inline fn) @12895` | [study-tool-report](17-study-tool-report.md) |
-| 1544 | `—` | ✕ | `getElementById` | [variations](07-variations.md) |
-| 1553 | `—` | Copy White to Move | `copyLichessFromPos` | [variations](07-variations.md) |
-| 1554 | `—` | Copy Black to Move | `copyLichessFromPos` | [variations](07-variations.md) |
-| 1563 | `—` | Build new PGN (adds line + copies full PGN) | `buildLichessPlayout` | [variations](07-variations.md) |
-| 1571 | `—` | Copy White Analysis URL | `writeText, getElementById` | [variations](07-variations.md) |
-| 1578 | `—` | Copy Black Analysis URL | `writeText, getElementById` | [variations](07-variations.md) |
-| 1586 | `—` | Copy Editor URL | `writeText, getElementById` | [variations](07-variations.md) |
-| 1595 | `—` | ✕ | `getElementById` | [core-board](01-core-board.md) |
-| 1604 | `—` | ✕ | `closeAddVar2` | [variations](07-variations.md) |
-| 1610 | `addVar2Go` | Add as variation | `commitAddVar2` | [variations](07-variations.md) |
-| 1625 | `—` | ✕ | `getElementById` | [practice](08-practice.md) |
-| 1635 | `—` | Start practice | `practiceStart` | [practice](08-practice.md) |
-| 1636 | `—` | Cancel | `getElementById` | [practice](08-practice.md) |
-| 1643 | `—` | ✕ | `getElementById` | [coach-ai](16-coach-ai.md) |
-| 1651 | `—` | Merge into PGN | `coachPgnMerge` | [coach-ai](16-coach-ai.md) |
-| 1652 | `coachPgnLineBtn` | Single line: ON | `coachPgnToggleLine` | [coach-ai](16-coach-ai.md) |
-| 1653 | `—` | Clear | `coachPgnClear` | [coach-ai](16-coach-ai.md) |
-| 1657 | `coachPgnCopyBtn` | Copy PGN | `coachPgnCopy` | [coach-ai](16-coach-ai.md) |
-| 1664 | `—` | ✕ | `getElementById` | [variations](07-variations.md) |
-| 1669 | `oneLinePasteBtn` | Paste & Copy | `oneLinePaste` | [variations](07-variations.md) |
-| 1670 | `oneLineTagBtn` | Remove Tags: OFF | `oneLineToggleTags` | [variations](07-variations.md) |
-| 1673 | `oneLineCopyBtn` | Copy single line | `oneLineCopy` | [variations](07-variations.md) |
-| 1680 | `—` | ✕ | `getElementById` | [practice](08-practice.md) |
-| 1685 | `practiceCopyBtn` | Copy snippet | `practiceCopy` | [practice](08-practice.md) |
-| 1686 | `practiceFlattenBtn` | Flatten | `practiceToggleFlatten` | [practice](08-practice.md) |
-| 1694 | `practiceOneLineCopyBtn` | Copy line | `practiceCopyOneLine` | [practice](08-practice.md) |
-| 1698 | `—` | Keep playing | `getElementById` | [practice](08-practice.md) |
-| 1699 | `—` | Back to game | `practiceBack` | [practice](08-practice.md) |
-| 1710 | `practiceSaveBtn` | Save to puzzles | `practiceSave` | [practice](08-practice.md) |
-| 1723 | `—` | ✕ | `closePuzzleSaveModal` | [puzzles-save](06-puzzles-save.md) |
-| 1736 | `pzSaveBtn` | Save to puzzles | `pzSave` | [puzzles-save](06-puzzles-save.md) |
-| 1745 | `—` | ✕ | `getElementById` | [variations](07-variations.md) |
-| 1753 | `playoutModalHereBtn` | — | `playoutModalChoose` | [variations](07-variations.md) |
-| 1754 | `playoutModalPrevBtn` | — | `playoutModalChoose` | [variations](07-variations.md) |
-| 1755 | `—` | Cancel | `getElementById` | [variations](07-variations.md) |
-| 1762 | `—` | ✕ | `getElementById` | [fen-export](18-fen-export.md) |
-| 1770 | `—` | Copy White FEN | `copyExportedFen` | [fen-export](18-fen-export.md) |
-| 1778 | `—` | Copy Black FEN | `copyExportedFen` | [fen-export](18-fen-export.md) |
-| 1787 | `—` | + Add White FEN | `fenQueueAddWhite` | [fen-export](18-fen-export.md) |
-| 1788 | `—` | + Add Black FEN | `fenQueueAddBlack` | [fen-export](18-fen-export.md) |
-| 1789 | `—` | Download CSV | `fenQueueDownload` | [fen-export](18-fen-export.md) |
-| 1793 | `—` | Clear queue | `fenQueueClear` | [fen-export](18-fen-export.md) |
-| 1802 | `—` | ✕ | `getElementById` | [text-view](20-text-view.md) |
-| 1806 | `—` | Copy Formatted | `copyTextViewFormatted` | [text-view](20-text-view.md) |
-| 1807 | `—` | Copy One-Line | `copyTextViewOneLine` | [variations](07-variations.md) |
-| 1819 | `—` | ✕ | `getElementById` | [sheets-drive](14-sheets-drive.md) |
-| 1828 | `—` | ✕ | `getElementById` | [fen-export](18-fen-export.md) |
-| 1833 | `—` | Cancel | `getElementById` | [fen-export](18-fen-export.md) |
-| 1834 | `—` | Load | `submitLoadFenModal` | [fen-export](18-fen-export.md) |
-| 1842 | `toggleReportLoaderBtn` | ▶ Report Loader | `getElementById` | [study-tool-report](17-study-tool-report.md) |
-| 1848 | `parseReportBtn` | Parse Report | `parseAnalysisReport` | [study-tool-report](17-study-tool-report.md) |
-| 1852 | `loadReportSectionBtn` | Load Selected | `loadReportSection` | [study-tool-report](17-study-tool-report.md) |
-| 1853 | `loadHighlightedBtn` | Load Highlighted Text | `loadHighlightedText` | [study-tool-report](17-study-tool-report.md) |
-| 1871 | `—` | Copy | `gdriveCopyAll` | [sheets-drive](14-sheets-drive.md) |
-| 1872 | `—` | Clear | `gdriveClear` | [sheets-drive](14-sheets-drive.md) |
-| 1873 | `gdrive-browse-btn` | Browse Games | `gdriveOpenPicker` | [sheets-drive](14-sheets-drive.md) |
-| 1874 | `gdrive-auth-btn` | Sign In | `gdriveSignIn` | [sheets-drive](14-sheets-drive.md) |
-| 1899 | `—` | Save Row | `gdriveSaveRow` | [sheets-drive](14-sheets-drive.md) |
-| 1900 | `—` | Replace Row | `gdriveReplaceRow` | [sheets-drive](14-sheets-drive.md) |
-| 1901 | `—` | Clear Inputs | `getElementById, getElementById, getElementById` | [sheets-drive](14-sheets-drive.md) |
-| 1910 | `gdrive-picker-back-btn` | Back | `(inline fn) @15645` | [sheets-drive](14-sheets-drive.md) |
-| 1911 | `—` | × | `gdriveClosePicker` | [sheets-drive](14-sheets-drive.md) |
-| 1915 | `gdrive-picker-search-btn` | Search | `(inline fn) @15626` | [sheets-drive](14-sheets-drive.md) |
-| 1916 | `gdrive-picker-recent-btn` | Recent | `(inline fn) @15641` | [sheets-drive](14-sheets-drive.md) |
-| 1928 | `gdrive-picker-read-mode` | Read | `(inline fn) @15629` | [sheets-drive](14-sheets-drive.md) |
-| 1929 | `gdrive-picker-write-mode` | Write | `(inline fn) @15633` | [sheets-drive](14-sheets-drive.md) |
-| 1943 | `gdrive-picker-use-board` | Use current board | `gdrivePickerUseCurrentBoard @15636` | [sheets-drive](14-sheets-drive.md) |
-| 1944 | `gdrive-picker-append` | Append to sheet | `(inline fn) @15478` | [sheets-drive](14-sheets-drive.md) |
-| 1958 | `—` | × | `plToggle` | [pgn-library](13-pgn-library.md) |
-| 1961 | `—` | ⬆ Load JSON | `proxy → #plJsonInput` | [pgn-library](13-pgn-library.md) |
-| 1962 | `—` | 📁 Load folder | `proxy → #plFolderInput` | [pgn-library](13-pgn-library.md) |
-| 1963 | `—` | ⬇ Export JSON | `plExportJson` | [pgn-library](13-pgn-library.md) |
-| 1969 | `—` | ◀ Prev | `plStep` | [pgn-library](13-pgn-library.md) |
-| 1970 | `—` | Next ▶ | `plStep` | [pgn-library](13-pgn-library.md) |
-| 1984 | `closeReportFilesModal` | Close | `(inline fn) @12831` | [study-tool-report](17-study-tool-report.md) |
-| 5321 | `—` | \ud83d\udccb | `stopPropagation, lnGridCopy` | [supabase-lines](04-supabase-lines.md) |
-| 5322 | `—` | \ud83d\uddd1 | `stopPropagation, lnGridDelete` | [supabase-lines](04-supabase-lines.md) |
-| 10618 | `—` | Load | `—` | ~[study-tool-report](17-study-tool-report.md) |
-| 10804 | `—` | ' + icon + ' O-O (\u2192' + dir + ') | `applyCastle` | [typed-move](19-typed-move.md) |
-| 10808 | `—` | ' + icon + ' O-O-O (\u2192' + dir + ') | `applyCastle` | [typed-move](19-typed-move.md) |
-| 14052 | `—` | ✕ | `closeChessCoachChatModal` | [coach-ai](16-coach-ai.md) |
-| 14917 | `—` | window.closeChessCoachChatModal && window.closeChessCoachChatModal()} *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
-| 14930 | `—` | setAiProvider('ChatGPT')} style={{ ...styles.providerBtn, ...(aiProvid *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
-| 14939 | `—` | setAiProvider('Anthropic')} style={{ ...styles.providerBtn, ...(aiProv *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
-| 14961 | `—` | { const code = prompt("Enter access code for Stanley's key:"); if (cod *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15007 | `—` | 🤖 Analyze with Chess Coach *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15016 | `aiCommentsBtn` | window.aiCommentKeyMoves && window.aiCommentKeyMoves()} style={{ ...st *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
-| 15026 | `—` | 🎯 Ask Coach About Selected Move *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15035 | `—` | 📋 Retrieve Prompt *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15044 | `—` | 🔍 Reanalyze with Higher Model *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15054 | `—` | Copy Chat *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15062 | `—` | { setMessages([]); setChatEnabled(false); }} style={{ ...styles.button *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 15127 | `—` | Send *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
-| 17060 | `—` | ✕ | `ppCloseAdd` | [print-cards](12-print-cards.md) |
-| 17065 | `ppMovesToggle` | ▸ Choose a position from the moves | `ppToggleMoves` | [print-cards](12-print-cards.md) |
-| 17068 | `—` | ⚡ Fill back from the better line ↓ | `ppFillBetter` | [print-cards](12-print-cards.md) |
-| 17071 | `—` | Add | `ppConfirmAdd` | [print-cards](12-print-cards.md) |
-| 17072 | `—` | Cancel | `ppCloseAdd` | [print-cards](12-print-cards.md) |
-| 17078 | `—` | ✕ | `ppCloseLine` | [print-cards](12-print-cards.md) |
-| 17087 | `—` | ↻ Redraw the boards | `ppLineChanged` | [print-cards](12-print-cards.md) |
-| 17088 | `—` | ＋ Add to the set | `ppLineAddToSet` | [print-cards](12-print-cards.md) |
-| 17093 | `ppLineFlipBtn` | White at bottom | `ppLineFlip` | [print-cards](12-print-cards.md) |
-| 17094 | `—` | Restore removed | `ppLineRestore` | [print-cards](12-print-cards.md) |
-| 17095 | `—` | 🖨 Print | `ppLinePrint` | [print-cards](12-print-cards.md) |
-| 17096 | `ppLinePrintSetBtn` | 🖨 Print set (0) | `ppLinePrintSet` | [print-cards](12-print-cards.md) |
-| 17104 | `—` | ✕ | `ppCloseList` | [print-cards](12-print-cards.md) |
-| 17109 | `—` | ⚡ Pick from this game's mistakes | `ppAutoFill` | [print-cards](12-print-cards.md) |
-| 17115 | `—` | 🖨 Print | `ppPrint` | [print-cards](12-print-cards.md) |
-| 17116 | `ppClearBtn` | Clear all | `ppClear` | [print-cards](12-print-cards.md) |
-| 17119 | `—` | ⬇ Export JSON | `ppExportJson` | [print-cards](12-print-cards.md) |
-| 17120 | `—` | ⬆ Load JSON (replaces) | `proxy → #ppLoadFile` | [print-cards](12-print-cards.md) |
-| 17301 | `—` | ✕ | `ppRemove` | [print-cards](12-print-cards.md) |
-| 17370 | `—` | Select all | `ppAutoAll` | [print-cards](12-print-cards.md) |
-| 17371 | `—` | Add selected | `ppAutoAdd` | [print-cards](12-print-cards.md) |
-| 17372 | `—` | Close | `getElementById` | [print-cards](12-print-cards.md) |
-| 17528 | `—` | ✕ | `ppLineRemove` | [print-cards](12-print-cards.md) |
-| 17910 | `—` | Run | `mmRun` | [what-went-wrong](09-what-went-wrong.md) |
-| 17911 | `—` | Copy all notes | `mmCopy` | [what-went-wrong](09-what-went-wrong.md) |
-| 17912 | `—` | Explain untagged | `mmExplainAll` | [what-went-wrong](09-what-went-wrong.md) |
-| 17919 | `—` | × | `mmClose` | [what-went-wrong](09-what-went-wrong.md) |
-| 18501 | `—` | ' + esc(x.label) + ' | `mmGo` | [what-went-wrong](09-what-went-wrong.md) |
-| 18519 | `—` | ⏮ | `mmGo` | [what-went-wrong](09-what-went-wrong.md) |
-| 18520 | `—` | ◀ | `mmStep` | [what-went-wrong](09-what-went-wrong.md) |
-| 18521 | `—` | ▶ | `mmStep` | [what-went-wrong](09-what-went-wrong.md) |
-| 18522 | `—` | ⏭ | `mmGo` | [what-went-wrong](09-what-went-wrong.md) |
-| 18525 | `—` | ⇅ | `mmFlip` | [what-went-wrong](09-what-went-wrong.md) |
-| 18533 | `—` | ' + (mmEvalBusy ? 'Getting eval…' : '📊 Eval line') + ' | `mmLineEval` | [what-went-wrong](09-what-went-wrong.md) |
-| 18545 | `—` | Copy this FEN | `mmCopyFen` | [what-went-wrong](09-what-went-wrong.md) |
-| 18546 | `—` | Copy snippet | `mmCopySnippet` | [what-went-wrong](09-what-went-wrong.md) |
-| 18548 | `—` | Send to the main board | `mmToBoard` | [what-went-wrong](09-what-went-wrong.md) |
-| 18635 | `—` | ' + (active ? '▶ Showing' : '▶ Step') + ' | `mmPlay` | [what-went-wrong](09-what-went-wrong.md) |
-| 18638 | `—` | ' + (busy ? 'Stop' : '⏩ Play out') + ' | `mmPlayOut` | [what-went-wrong](09-what-went-wrong.md) |
-| 18690 | `—` | ' + esc(label(f.node)) + ' | `mmJump` | [what-went-wrong](09-what-went-wrong.md) |
-| 18696 | `—` | ' + (f.explaining ? '…' : f.explain ? 'Re-explain' : 'Explain') + ' | `mmExplain` | [what-went-wrong](09-what-went-wrong.md) |
-| 18698 | `—` | Copy notes | `mmNote` | [what-went-wrong](09-what-went-wrong.md) |
-| 18699 | `—` | ' + (note ? '💬 Edit note' : '💬 Comment') + ' | `mmComment` | [what-went-wrong](09-what-went-wrong.md) |
+| 1067 | `—` | Close | `getElementById` | [supabase-lines](04-supabase-lines.md) |
+| 1075 | `loadAnalysisReport` | Load Analysis Report (from clipboard) | `(inline fn) @12571` | [study-tool-report](17-study-tool-report.md) |
+| 1076 | `selectReportFolder` | 📂 Select Reports Folder | `proxy → #reportFolderInput` | [study-tool-report](17-study-tool-report.md) |
+| 1078 | `loadPreloadedReports` | 📋 Preloaded Reports **(hidden)** | `(inline fn) @12617` | [study-tool-report](17-study-tool-report.md) |
+| 1080 | `viewPreloadedReports` | 📋 View Reports **(hidden)** | `openReportFilesModal @12675` | [study-tool-report](17-study-tool-report.md) |
+| 1084 | `appendByOpeningBtn` | 📚 Append Opening Reports **(hidden)** | `(inline fn) @12740` | [study-tool-report](17-study-tool-report.md) |
+| 1095 | `analyze-variation-btn` | Analyze (Tab) | `analyzeForVariation` | [variations](07-variations.md) |
+| 1106 | `fill-variations-btn` | Fill Variations | `fillMissingVariations` | [variations](07-variations.md) |
+| 1116 | `add-variation-btn` | Add to PGN | `addVariationToPgn` | [variations](07-variations.md) |
+| 1120 | `—` | Hide | `clearVariationResult` | [variations](07-variations.md) |
+| 1141 | `insert-variation-btn` | Insert as Variation | `insertPastedVariation` | [variations](07-variations.md) |
+| 1145 | `—` | 📋 Paste from Clipboard | `readText, then, getElementById` | [variations](07-variations.md) |
+| 1149 | `—` | Clear | `getElementById, resetDragBuild` | [variations](07-variations.md) |
+| 1168 | `—` | Insert Comment | `insertPastedComment` | [move-comment](11-move-comment.md) |
+| 1172 | `—` | 📋 Paste from Clipboard | `readText, then, getElementById` | [move-comment](11-move-comment.md) |
+| 1176 | `—` | Clear | `getElementById` | [move-comment](11-move-comment.md) |
+| 1190 | `—` | ✕ | `closeMoveCommentModal` | [move-comment](11-move-comment.md) |
+| 1194 | `—` | Save | `saveMoveComment` | [move-comment](11-move-comment.md) |
+| 1195 | `—` | 📋 Paste | `readText, then, getElementById, trim` | [move-comment](11-move-comment.md) |
+| 1196 | `—` | Clear | `getElementById, getElementById, focus` | [move-comment](11-move-comment.md) |
+| 1260 | `—` | Snippet | `practiceShowResult` | [practice](08-practice.md) |
+| 1261 | `—` | Back to game | `practiceBack` | [practice](08-practice.md) |
+| 1275 | `fileSectionPrev` | ◀ | `(inline fn) @12416` | [study-tool-report](17-study-tool-report.md) |
+| 1281 | `fileSectionNext` | ▶ | `(inline fn) @12428` | [study-tool-report](17-study-tool-report.md) |
+| 1311 | `—` | Apply | `applyTypedMove` | [typed-move](19-typed-move.md) |
+| 1312 | `board2CompactBtn` | ⊡ Small | `toggleBoard2Compact` | [study-tool-report](17-study-tool-report.md) |
+| 1313 | `—` | Copy + Lichess Editor | `copyTypedStatusAndOpenEditor` | [typed-move](19-typed-move.md) |
+| 1317 | `—` | 📋 Copy | `writeText, getElementById` | [typed-move](19-typed-move.md) |
+| 1339 | `—` | New Game | `startStockfishGame` | [typed-move](19-typed-move.md) |
+| 1340 | `—` | From Position | `startStockfishFromPosition` | [typed-move](19-typed-move.md) |
+| 1347 | `—` | Lichess ↗ | `getTypedChess, fen, open, replace` | [typed-move](19-typed-move.md) |
+| 1364 | `—` | Insert as Variation | `getElementById, getElementById, insertPastedVariation, getElementById` | [variations](07-variations.md) |
+| 1368 | `—` | Paste from Clipboard | `readText, then, getElementById` | [variations](07-variations.md) |
+| 1372 | `—` | Clear | `getElementById` | [variations](07-variations.md) |
+| 1385 | `toggleNavBtnsBtn` | ▶ Show Nav Buttons | `getElementById, getElementById` | [core-board](01-core-board.md) |
+| 1389 | `—` | ← Prev | `proxy → #board2PrevMove` | [study-tool-report](17-study-tool-report.md) |
+| 1390 | `—` | Next → | `proxy → #board2NextMove` | [study-tool-report](17-study-tool-report.md) |
+| 1391 | `cycleVarBtn` | Cycle Var. | `cycleVariationStepOut @11036` | [variations](07-variations.md) |
+| 1392 | `—` | ↑ Up Out | `exitVariationToBranchMainLineMove, showToast` | [variations](07-variations.md) |
+| 1393 | `copyVarBtnMini` | Copy Var | `lnOpenVarSnippetModal` | [supabase-lines](04-supabase-lines.md) |
+| 1394 | `viewVarBtnMini` | 📊 View | `lnGridOpen` | [supabase-lines](04-supabase-lines.md) |
+| 1395 | `—` | Sheets ▾ | `gdriveOpenPicker` | [sheets-drive](14-sheets-drive.md) |
+| 1396 | `coachNoteBtnMini` | ⭐ | `toggleCoachBubbles` | [move-comment](11-move-comment.md) |
+| 1397 | `mstSideBtn` | ⚠ White (0) | `mstToggleSide` | [mistake-hop](10-mistake-hop.md) |
+| 1398 | `mstPrevBtn` | , ◀ ⚠ | `mstStep` | [mistake-hop](10-mistake-hop.md) |
+| 1399 | `mstNextBtn` | ⚠ ▶ . | `mstStep` | [mistake-hop](10-mistake-hop.md) |
+| 1400 | `addCommentBtn` | 💬 + Comment | `openMoveCommentModal` | [move-comment](11-move-comment.md) |
+| 1401 | `addVar2Btn` | Add Var. 2 | `openAddVar2` | [practice](08-practice.md) |
+| 1402 | `playout-btn` | Play Out | `playOutToEnd` | [variations](07-variations.md) |
+| 1403 | `practice-btn` | Practice | `openPracticeModal` | [practice](08-practice.md) |
+| 1404 | `oneline-btn` | 1-Line | `openOneLineModal` | [variations](07-variations.md) |
+| 1405 | `loadToBoardMini` | Load to Board | `loadPgnToBoard` | [core-board](01-core-board.md) |
+| 1406 | `loadAnalyzeMini` | Load & Analyze | `loadAndAnalyze` | [practice](08-practice.md) |
+| 1407 | `ppAddBtn` | + For Print (0) | `ppOpenAdd` | [print-cards](12-print-cards.md) |
+| 1408 | `ppOneShotBtn` | ⚡ 1 shot | `ppOneShot` | [print-cards](12-print-cards.md) |
+| 1409 | `mmBtn` | 🔍 What went wrong | `mmOpen` | [what-went-wrong](09-what-went-wrong.md) |
+| 1410 | `exportFenBtnMini` | Export FEN | `proxy → #exportFenBtn` | [fen-export](18-fen-export.md) |
+| 1411 | `ppLineBtn` | Print Line | `ppOpenLine` | [print-cards](12-print-cards.md) |
+| 1412 | `ppListBtn` | Print List | `ppOpenList` | [print-cards](12-print-cards.md) |
+| 1413 | `coachpgn-btn` | AI → PGN | `openCoachPgnModal` | [coach-ai](16-coach-ai.md) |
+| 1414 | `toggleSoundBtnMini` | Sound On | `toggleChessSound` | [core-board](01-core-board.md) |
+| 1415 | `toggleBorderBtnMini` | Signals On | `toggleBoardBorder` | [core-board](01-core-board.md) |
+| 1417 | `—` | 💬 Coach Chat | `openChessCoachChatModal` | [coach-ai](16-coach-ai.md) |
+| 1418 | `—` | Flip Board | `proxy → #flip_board2` | [study-tool-report](17-study-tool-report.md) |
+| 1419 | `—` | Lichess Links | `proxy → #lichessLinksBtn` | [core-board](01-core-board.md) |
+| 1420 | `showOpeningBtn` | 📖 Opening | `showOpeningToast` | [core-board](01-core-board.md) |
+| 1421 | `—` | Reanalyze | `proxy → #analyzeGameBtn` | [core-board](01-core-board.md) |
+| 1422 | `getEvalBtnMini` | Get Eval | `proxy → #getEvalBtn` | [study-tool-report](17-study-tool-report.md) |
+| 1423 | `copyBoardPgnBtnMini` | Copy PGN | `copyPgnToClipboard` | [core-board](01-core-board.md) |
+| 1424 | `copyMoveInfoBtnMini` | Copy Move Info | `lnCopyMoveInfo` | [supabase-lines](04-supabase-lines.md) |
+| 1425 | `nextVarBtnMini` | Next ▶ | `lnGridNext` | [supabase-lines](04-supabase-lines.md) |
+| 1426 | `savePuzzleBtnMini` | Save → Puzzles | `openPuzzleSaveModal` | [puzzles-save](06-puzzles-save.md) |
+| 1427 | `pgnLibBtnMini` | 📚 Library | `plToggle` | [pgn-library](13-pgn-library.md) |
+| 1428 | `—` | Hints | `openHintsModal` | [core-board](01-core-board.md) |
+| 1433 | `—` | ✕ | `getElementById` | ~[core-board](01-core-board.md) |
+| 1438 | `copyVarResultCopyBtn` | Copy snippet | `lnCopyVarResult` | [supabase-lines](04-supabase-lines.md) |
+| 1439 | `copyVarFlattenBtn` | Flatten | `lnShowVarFlatten` | [supabase-lines](04-supabase-lines.md) |
+| 1444 | `copyVarOneLineCopyBtn` | Copy line | `lnCopyVarOneLine` | [supabase-lines](04-supabase-lines.md) |
+| 1451 | `copyVarSaveBtn` | Append to chess_variations | `lnSaveVarToSupabase` | [supabase-lines](04-supabase-lines.md) |
+| 1454 | `—` | Close | `getElementById` | ~[supabase-lines](04-supabase-lines.md) |
+| 1459 | `flip_board2` | Flip Board | `(inline fn) @11703` | [study-tool-report](17-study-tool-report.md) |
+| 1460 | `coachNoteBtn` | ⭐ | `toggleCoachBubbles` | [move-comment](11-move-comment.md) |
+| 1461 | `—` | 💬 Coach Chat | `openChessCoachChatModal` | [coach-ai](16-coach-ai.md) |
+| 1464 | `board2PrevMove` | ← Prev | `board2PrevMove @11028` | [study-tool-report](17-study-tool-report.md) |
+| 1466 | `board2NextMove` | Next → | `board2NextMove @11023` | [study-tool-report](17-study-tool-report.md) |
+| 1472 | `analyze-variation-btn2` | Add Var. | `analyzeForVariation` | [variations](07-variations.md) |
+| 1475 | `clearVariationsBtn` | Clear Var. | `(inline fn) @11729` | [variations](07-variations.md) |
+| 1477 | `loadClipboardPgnBtn` | Load Annotated PGN | `(inline fn) @11053` | [study-tool-report](17-study-tool-report.md) |
+| 1478 | `loadFullReportBtn` | Load Report | `(inline fn) @11092` | [study-tool-report](17-study-tool-report.md) |
+| 1479 | `analyzeGameBtn` | Analyze Game | `analyzeLoadedGame` | [study-tool-report](17-study-tool-report.md) |
+| 1480 | `getEvalBtn` | Get Eval | `getEvalForLoadedPgn @11047` | [study-tool-report](17-study-tool-report.md) |
+| 1481 | `copyEvalsBtn` | 📋 Copy Evals | `copyEvalsForPaste` | [study-tool-report](17-study-tool-report.md) |
+| 1491 | `prevVariant` | ← Prev FEN/PGN **(hidden)** | `(inline fn) @12382` | [study-tool-report](17-study-tool-report.md) |
+| 1492 | `nextVariant` | Next FEN/PGN → **(hidden)** | `(inline fn) @12399` | [study-tool-report](17-study-tool-report.md) |
+| 1493 | `gdriveRowUp` | ↑ Prev Row | `(inline fn) @15862` | [sheets-drive](14-sheets-drive.md) |
+| 1494 | `gdriveRowDown` | Next Row ↓ | `(inline fn) @15868` | [sheets-drive](14-sheets-drive.md) |
+| 1498 | `gdriveRowCopyBtn` | Copy | `(inline fn) @15876` | [sheets-drive](14-sheets-drive.md) |
+| 1500 | `copyBoardPgnBtn` | Copy PGN | `copyPgnToClipboard` | [core-board](01-core-board.md) |
+| 1501 | `downloadPgnBtn` | Download PGN | `downloadPgn` | [core-board](01-core-board.md) |
+| 1502 | `updateReportBtn` | Update Report **(hidden)** | `updateReportWithPgn` | [study-tool-report](17-study-tool-report.md) |
+| 1503 | `loadFenBtn` | Load FEN | `(inline fn) @11150` | [fen-export](18-fen-export.md) |
+| 1504 | `fenColorToggleBtn` | White | `(inline fn) @11499` | [fen-export](18-fen-export.md) |
+| 1505 | `exportFenBtn` | Export FEN | `(inline fn) @11600` | [fen-export](18-fen-export.md) |
+| 1506 | `lichessLinksBtn` | Lichess Links | `(inline fn) @11659` | [core-board](01-core-board.md) |
+| 1507 | `toggleChatBtn` | Toggle Chat | `getElementById` | [core-board](01-core-board.md) |
+| 1508 | `toggleSoundBtn` | Sound On | `toggleChessSound` | [core-board](01-core-board.md) |
+| 1509 | `toggleBorderBtn` | Signals On | `toggleBoardBorder` | [core-board](01-core-board.md) |
+| 1510 | `viewTextBtn` | View Text | `openTextViewModal` | [text-view](20-text-view.md) |
+| 1511 | `toggleTypedMoveBtn` | Type/Play | `getElementById, gradient, stopStockfishGame` | [typed-move](19-typed-move.md) |
+| 1512 | `toggleMoveTableBtn` | Hide Moves | `(inline fn) @11712` | [core-board](01-core-board.md) |
+| 1513 | `toggleAddVarBtn` | Add Var | `getElementById, gradient` | [core-board](01-core-board.md) |
+| 1514 | `castleBtn` | Castle | `showCastleMenu` | [typed-move](19-typed-move.md) |
+| 1516 | `downloadBoardImagesBtn` | Download Images | `downloadBoardImages` | [fen-export](18-fen-export.md) |
+| 1522 | `reportAppendVariantBtn` | Report Append Variant **(hidden)** | `(inline fn) @12872` | [study-tool-report](17-study-tool-report.md) |
+| 1539 | `—` | ✕ | `getElementById` | [variations](07-variations.md) |
+| 1548 | `—` | Copy White to Move | `copyLichessFromPos` | [variations](07-variations.md) |
+| 1549 | `—` | Copy Black to Move | `copyLichessFromPos` | [variations](07-variations.md) |
+| 1558 | `—` | Build new PGN (adds line + copies full PGN) | `buildLichessPlayout` | [variations](07-variations.md) |
+| 1566 | `—` | Copy White Analysis URL | `writeText, getElementById` | [variations](07-variations.md) |
+| 1573 | `—` | Copy Black Analysis URL | `writeText, getElementById` | [variations](07-variations.md) |
+| 1581 | `—` | Copy Editor URL | `writeText, getElementById` | [variations](07-variations.md) |
+| 1590 | `—` | ✕ | `getElementById` | [core-board](01-core-board.md) |
+| 1599 | `—` | ✕ | `closeAddVar2` | [variations](07-variations.md) |
+| 1605 | `addVar2Go` | Add as variation | `commitAddVar2` | [variations](07-variations.md) |
+| 1620 | `—` | ✕ | `getElementById` | [practice](08-practice.md) |
+| 1630 | `—` | Start practice | `practiceStart` | [practice](08-practice.md) |
+| 1631 | `—` | Cancel | `getElementById` | [practice](08-practice.md) |
+| 1638 | `—` | ✕ | `getElementById` | [coach-ai](16-coach-ai.md) |
+| 1646 | `—` | Merge into PGN | `coachPgnMerge` | [coach-ai](16-coach-ai.md) |
+| 1647 | `coachPgnLineBtn` | Single line: ON | `coachPgnToggleLine` | [coach-ai](16-coach-ai.md) |
+| 1648 | `—` | Clear | `coachPgnClear` | [coach-ai](16-coach-ai.md) |
+| 1652 | `coachPgnCopyBtn` | Copy PGN | `coachPgnCopy` | [coach-ai](16-coach-ai.md) |
+| 1659 | `—` | ✕ | `getElementById` | [variations](07-variations.md) |
+| 1664 | `oneLinePasteBtn` | Paste & Copy | `oneLinePaste` | [variations](07-variations.md) |
+| 1665 | `oneLineTagBtn` | Remove Tags: OFF | `oneLineToggleTags` | [variations](07-variations.md) |
+| 1668 | `oneLineCopyBtn` | Copy single line | `oneLineCopy` | [variations](07-variations.md) |
+| 1675 | `—` | ✕ | `getElementById` | [practice](08-practice.md) |
+| 1680 | `practiceCopyBtn` | Copy snippet | `practiceCopy` | [practice](08-practice.md) |
+| 1681 | `practiceFlattenBtn` | Flatten | `practiceToggleFlatten` | [practice](08-practice.md) |
+| 1689 | `practiceOneLineCopyBtn` | Copy line | `practiceCopyOneLine` | [practice](08-practice.md) |
+| 1693 | `—` | Keep playing | `getElementById` | [practice](08-practice.md) |
+| 1694 | `—` | Back to game | `practiceBack` | [practice](08-practice.md) |
+| 1705 | `practiceSaveBtn` | Save to puzzles | `practiceSave` | [practice](08-practice.md) |
+| 1718 | `—` | ✕ | `closePuzzleSaveModal` | [puzzles-save](06-puzzles-save.md) |
+| 1731 | `pzSaveBtn` | Save to puzzles | `pzSave` | [puzzles-save](06-puzzles-save.md) |
+| 1740 | `—` | ✕ | `getElementById` | [variations](07-variations.md) |
+| 1748 | `playoutModalHereBtn` | — | `playoutModalChoose` | [variations](07-variations.md) |
+| 1749 | `playoutModalPrevBtn` | — | `playoutModalChoose` | [variations](07-variations.md) |
+| 1750 | `—` | Cancel | `getElementById` | [variations](07-variations.md) |
+| 1757 | `—` | ✕ | `getElementById` | [fen-export](18-fen-export.md) |
+| 1765 | `—` | Copy White FEN | `copyExportedFen` | [fen-export](18-fen-export.md) |
+| 1773 | `—` | Copy Black FEN | `copyExportedFen` | [fen-export](18-fen-export.md) |
+| 1782 | `—` | + Add White FEN | `fenQueueAddWhite` | [fen-export](18-fen-export.md) |
+| 1783 | `—` | + Add Black FEN | `fenQueueAddBlack` | [fen-export](18-fen-export.md) |
+| 1784 | `—` | Download CSV | `fenQueueDownload` | [fen-export](18-fen-export.md) |
+| 1788 | `—` | Clear queue | `fenQueueClear` | [fen-export](18-fen-export.md) |
+| 1797 | `—` | ✕ | `getElementById` | [text-view](20-text-view.md) |
+| 1801 | `—` | Copy Formatted | `copyTextViewFormatted` | [text-view](20-text-view.md) |
+| 1802 | `—` | Copy One-Line | `copyTextViewOneLine` | [variations](07-variations.md) |
+| 1814 | `—` | ✕ | `getElementById` | [sheets-drive](14-sheets-drive.md) |
+| 1823 | `—` | ✕ | `getElementById` | [fen-export](18-fen-export.md) |
+| 1828 | `—` | Cancel | `getElementById` | [fen-export](18-fen-export.md) |
+| 1829 | `—` | Load | `submitLoadFenModal` | [fen-export](18-fen-export.md) |
+| 1837 | `toggleReportLoaderBtn` | ▶ Report Loader | `getElementById` | [study-tool-report](17-study-tool-report.md) |
+| 1843 | `parseReportBtn` | Parse Report | `parseAnalysisReport` | [study-tool-report](17-study-tool-report.md) |
+| 1847 | `loadReportSectionBtn` | Load Selected | `loadReportSection` | [study-tool-report](17-study-tool-report.md) |
+| 1848 | `loadHighlightedBtn` | Load Highlighted Text | `loadHighlightedText` | [study-tool-report](17-study-tool-report.md) |
+| 1866 | `—` | Copy | `gdriveCopyAll` | [sheets-drive](14-sheets-drive.md) |
+| 1867 | `—` | Clear | `gdriveClear` | [sheets-drive](14-sheets-drive.md) |
+| 1868 | `gdrive-browse-btn` | Browse Games | `gdriveOpenPicker` | [sheets-drive](14-sheets-drive.md) |
+| 1869 | `gdrive-auth-btn` | Sign In | `gdriveSignIn` | [sheets-drive](14-sheets-drive.md) |
+| 1894 | `—` | Save Row | `gdriveSaveRow` | [sheets-drive](14-sheets-drive.md) |
+| 1895 | `—` | Replace Row | `gdriveReplaceRow` | [sheets-drive](14-sheets-drive.md) |
+| 1896 | `—` | Clear Inputs | `getElementById, getElementById, getElementById` | [sheets-drive](14-sheets-drive.md) |
+| 1905 | `gdrive-picker-back-btn` | Back | `(inline fn) @15622` | [sheets-drive](14-sheets-drive.md) |
+| 1906 | `—` | × | `gdriveClosePicker` | [sheets-drive](14-sheets-drive.md) |
+| 1910 | `gdrive-picker-search-btn` | Search | `(inline fn) @15603` | [sheets-drive](14-sheets-drive.md) |
+| 1911 | `gdrive-picker-recent-btn` | Recent | `(inline fn) @15618` | [sheets-drive](14-sheets-drive.md) |
+| 1923 | `gdrive-picker-read-mode` | Read | `(inline fn) @15606` | [sheets-drive](14-sheets-drive.md) |
+| 1924 | `gdrive-picker-write-mode` | Write | `(inline fn) @15610` | [sheets-drive](14-sheets-drive.md) |
+| 1938 | `gdrive-picker-use-board` | Use current board | `gdrivePickerUseCurrentBoard @15613` | [sheets-drive](14-sheets-drive.md) |
+| 1939 | `gdrive-picker-append` | Append to sheet | `(inline fn) @15455` | [sheets-drive](14-sheets-drive.md) |
+| 1953 | `—` | × | `plToggle` | [pgn-library](13-pgn-library.md) |
+| 1956 | `—` | ⬆ Load JSON | `proxy → #plJsonInput` | [pgn-library](13-pgn-library.md) |
+| 1957 | `—` | 📁 Load folder | `proxy → #plFolderInput` | [pgn-library](13-pgn-library.md) |
+| 1958 | `—` | ⬇ Export JSON | `plExportJson` | [pgn-library](13-pgn-library.md) |
+| 1964 | `—` | ◀ Prev | `plStep` | [pgn-library](13-pgn-library.md) |
+| 1965 | `—` | Next ▶ | `plStep` | [pgn-library](13-pgn-library.md) |
+| 1979 | `closeReportFilesModal` | Close | `(inline fn) @12808` | [study-tool-report](17-study-tool-report.md) |
+| 5298 | `—` | \ud83d\udccb | `stopPropagation, lnGridCopy` | [supabase-lines](04-supabase-lines.md) |
+| 5299 | `—` | \ud83d\uddd1 | `stopPropagation, lnGridDelete` | [supabase-lines](04-supabase-lines.md) |
+| 10595 | `—` | Load | `—` | ~[study-tool-report](17-study-tool-report.md) |
+| 10781 | `—` | ' + icon + ' O-O (\u2192' + dir + ') | `applyCastle` | [typed-move](19-typed-move.md) |
+| 10785 | `—` | ' + icon + ' O-O-O (\u2192' + dir + ') | `applyCastle` | [typed-move](19-typed-move.md) |
+| 14029 | `—` | ✕ | `closeChessCoachChatModal` | [coach-ai](16-coach-ai.md) |
+| 14894 | `—` | window.closeChessCoachChatModal && window.closeChessCoachChatModal()} *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
+| 14907 | `—` | setAiProvider('ChatGPT')} style={{ ...styles.providerBtn, ...(aiProvid *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
+| 14916 | `—` | setAiProvider('Anthropic')} style={{ ...styles.providerBtn, ...(aiProv *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
+| 14938 | `—` | { const code = prompt("Enter access code for Stanley's key:"); if (cod *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 14984 | `—` | 🤖 Analyze with Chess Coach *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 14993 | `aiCommentsBtn` | window.aiCommentKeyMoves && window.aiCommentKeyMoves()} style={{ ...st *(jsx)* | `—` | [coach-ai](16-coach-ai.md) |
+| 15003 | `—` | 🎯 Ask Coach About Selected Move *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 15012 | `—` | 📋 Retrieve Prompt *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 15021 | `—` | 🔍 Reanalyze with Higher Model *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 15031 | `—` | Copy Chat *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 15039 | `—` | { setMessages([]); setChatEnabled(false); }} style={{ ...styles.button *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 15104 | `—` | Send *(jsx)* | `—` | ~[coach-ai](16-coach-ai.md) |
+| 17037 | `—` | ✕ | `ppCloseAdd` | [print-cards](12-print-cards.md) |
+| 17042 | `ppMovesToggle` | ▸ Choose a position from the moves | `ppToggleMoves` | [print-cards](12-print-cards.md) |
+| 17045 | `—` | ⚡ Fill back from the better line ↓ | `ppFillBetter` | [print-cards](12-print-cards.md) |
+| 17048 | `—` | Add | `ppConfirmAdd` | [print-cards](12-print-cards.md) |
+| 17049 | `—` | Cancel | `ppCloseAdd` | [print-cards](12-print-cards.md) |
+| 17055 | `—` | ✕ | `ppCloseLine` | [print-cards](12-print-cards.md) |
+| 17064 | `—` | ↻ Redraw the boards | `ppLineChanged` | [print-cards](12-print-cards.md) |
+| 17065 | `—` | ＋ Add to the set | `ppLineAddToSet` | [print-cards](12-print-cards.md) |
+| 17070 | `ppLineFlipBtn` | White at bottom | `ppLineFlip` | [print-cards](12-print-cards.md) |
+| 17071 | `—` | Restore removed | `ppLineRestore` | [print-cards](12-print-cards.md) |
+| 17072 | `—` | 🖨 Print | `ppLinePrint` | [print-cards](12-print-cards.md) |
+| 17073 | `ppLinePrintSetBtn` | 🖨 Print set (0) | `ppLinePrintSet` | [print-cards](12-print-cards.md) |
+| 17081 | `—` | ✕ | `ppCloseList` | [print-cards](12-print-cards.md) |
+| 17086 | `—` | ⚡ Pick from this game's mistakes | `ppAutoFill` | [print-cards](12-print-cards.md) |
+| 17092 | `—` | 🖨 Print | `ppPrint` | [print-cards](12-print-cards.md) |
+| 17093 | `ppClearBtn` | Clear all | `ppClear` | [print-cards](12-print-cards.md) |
+| 17096 | `—` | ⬇ Export JSON | `ppExportJson` | [print-cards](12-print-cards.md) |
+| 17097 | `—` | ⬆ Load JSON (replaces) | `proxy → #ppLoadFile` | [print-cards](12-print-cards.md) |
+| 17278 | `—` | ✕ | `ppRemove` | [print-cards](12-print-cards.md) |
+| 17347 | `—` | Select all | `ppAutoAll` | [print-cards](12-print-cards.md) |
+| 17348 | `—` | Add selected | `ppAutoAdd` | [print-cards](12-print-cards.md) |
+| 17349 | `—` | Close | `getElementById` | [print-cards](12-print-cards.md) |
+| 17505 | `—` | ✕ | `ppLineRemove` | [print-cards](12-print-cards.md) |
+| 17887 | `—` | Run | `mmRun` | [what-went-wrong](09-what-went-wrong.md) |
+| 17888 | `—` | Copy all notes | `mmCopy` | [what-went-wrong](09-what-went-wrong.md) |
+| 17889 | `—` | Explain untagged | `mmExplainAll` | [what-went-wrong](09-what-went-wrong.md) |
+| 17896 | `—` | × | `mmClose` | [what-went-wrong](09-what-went-wrong.md) |
+| 18478 | `—` | ' + esc(x.label) + ' | `mmGo` | [what-went-wrong](09-what-went-wrong.md) |
+| 18496 | `—` | ⏮ | `mmGo` | [what-went-wrong](09-what-went-wrong.md) |
+| 18497 | `—` | ◀ | `mmStep` | [what-went-wrong](09-what-went-wrong.md) |
+| 18498 | `—` | ▶ | `mmStep` | [what-went-wrong](09-what-went-wrong.md) |
+| 18499 | `—` | ⏭ | `mmGo` | [what-went-wrong](09-what-went-wrong.md) |
+| 18502 | `—` | ⇅ | `mmFlip` | [what-went-wrong](09-what-went-wrong.md) |
+| 18510 | `—` | ' + (mmEvalBusy ? 'Getting eval…' : '📊 Eval line') + ' | `mmLineEval` | [what-went-wrong](09-what-went-wrong.md) |
+| 18522 | `—` | Copy this FEN | `mmCopyFen` | [what-went-wrong](09-what-went-wrong.md) |
+| 18523 | `—` | Copy snippet | `mmCopySnippet` | [what-went-wrong](09-what-went-wrong.md) |
+| 18525 | `—` | Send to the main board | `mmToBoard` | [what-went-wrong](09-what-went-wrong.md) |
+| 18612 | `—` | ' + (active ? '▶ Showing' : '▶ Step') + ' | `mmPlay` | [what-went-wrong](09-what-went-wrong.md) |
+| 18615 | `—` | ' + (busy ? 'Stop' : '⏩ Play out') + ' | `mmPlayOut` | [what-went-wrong](09-what-went-wrong.md) |
+| 18667 | `—` | ' + esc(label(f.node)) + ' | `mmJump` | [what-went-wrong](09-what-went-wrong.md) |
+| 18673 | `—` | ' + (f.explaining ? '…' : f.explain ? 'Re-explain' : 'Explain') + ' | `mmExplain` | [what-went-wrong](09-what-went-wrong.md) |
+| 18675 | `—` | Copy notes | `mmNote` | [what-went-wrong](09-what-went-wrong.md) |
+| 18676 | `—` | ' + (note ? '💬 Edit note' : '💬 Comment') + ' | `mmComment` | [what-went-wrong](09-what-went-wrong.md) |
