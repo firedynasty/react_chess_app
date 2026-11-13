@@ -1,10 +1,10 @@
 # Feature inventory
 
-`index.html` is 20,396 lines with **298 buttons** and **26 `…Modal` overlays**
+`index.html` is 20,370 lines with **297 buttons** and **26 `…Modal` overlays**
 (`grep -c 'id="[^"]*[Mm]odal"'`). This directory maps every
 button to the feature that owns it, so a cut is a lookup instead of a hunt.
 
-- **[BUTTONS.md](BUTTONS.md)** — all 298 buttons, sorted by line, each linked to its feature file.
+- **[BUTTONS.md](BUTTONS.md)** — all 297 buttons, sorted by line, each linked to its feature file.
   Generated. Rerun `python3 features/extract_buttons.py` after every edit; line numbers move.
 - **`NN-<feature>.md`** — one file per feature: its buttons, its API endpoints, its localStorage
   keys, its other files, and a keep/cut verdict. Hand-written. These are yours to argue with.
@@ -50,14 +50,14 @@ Not feature count. **Duplicate paths to four jobs:**
 |---|---|
 | Get a game onto the board | ~9 |
 | Attach a variation to a move | 8 |
-| Get a line out as text | 41 buttons, 31 `clipboard.writeText` calls |
+| Get a line out as text | 39 buttons, 29 `clipboard.writeText` calls |
 | Print study cards | 8 |
 
 ## Verdicts
 
 | # | Feature | Buttons | Verdict |
 |---|---|---:|---|
-| 01 | [Core board + move navigation](01-core-board.md) | 23 | KEEP |
+| 01 | [Core board + move navigation](01-core-board.md) | 22 | KEEP |
 | 02 | [chess.com / Lichess fetchers](02-game-sources.md) | 3 | CUT (keep one) |
 | 03 | [Supabase game library](03-supabase-games.md) | 17 | **CUT — biggest single win** |
 | 04 | [Supabase Lines pane](04-supabase-lines.md) | 20 | KEEP |

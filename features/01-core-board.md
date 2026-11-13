@@ -4,9 +4,9 @@
 
 The board itself: load a PGN, step through moves, flip, sound, signals, opening toast, Hints modal.
 
-**Entry point.** Always visible — the mini quick-access bar (index.html:1484-1528) and the control row below the board (index.html:1563-1626).
+**Entry point.** Always visible — the mini quick-access bar (index.html:1467-1513) and the control row below the board (index.html:1547-1611).
 
-**Footprint.** 23 buttons · 95 lines of `index.html` match the owning pattern (see `extract_buttons.py` RULES)
+**Footprint.** 22 buttons · 95 lines of `index.html` match the owning pattern (see `extract_buttons.py` RULES)
 
 **localStorage.** `chessSoundEnabled` · `boardBorderEnabled` · `variationArrowsEnabled`
 
@@ -16,29 +16,28 @@ The board itself: load a PGN, step through moves, flip, sound, signals, opening 
 
 | line | id | label | handler |
 |---:|---|---|---|
-| 861 | `analyzeBtn` | Analyze Game | `analyzeGame` |
-| 863 | `—` | Hints | `openHintsModal` |
-| 865 | `copyPgnBtn` | Copy PGN | `async @13497` |
-| 866 | `—` | Clear | `clearResults` |
-| 1483 | `toggleNavBtnsBtn` | ▶ Show Nav Buttons | `getElementById, getElementById` |
-| 1501 | `loadToBoardMini` | Load to Board | `loadPgnToBoard` |
-| 1510 | `toggleSoundBtnMini` | Sound On | `toggleChessSound` |
-| 1511 | `toggleBorderBtnMini` | Signals On | `toggleBoardBorder` |
-| 1515 | `—` | Lichess Links | `proxy → `#lichessLinksBtn`` |
-| 1516 | `showOpeningBtn` | 📖 Opening | `showOpeningToast` |
-| 1517 | `—` | Reanalyze | `proxy → `#analyzeGameBtn`` |
-| 1519 | `copyBoardPgnBtnMini` | Copy PGN | `copyPgnToClipboard` |
-| 1527 | `—` | Hints | `openHintsModal` |
-| 1532 | `—` | ✕ *(~inherited)* | `getElementById` |
-| 1603 | `copyBoardPgnBtn` | Copy PGN | `copyPgnToClipboard` |
-| 1604 | `downloadPgnBtn` | Download PGN | `downloadPgn` |
-| 1609 | `lichessLinksBtn` | Lichess Links | `function @13453` |
-| 1610 | `toggleChatBtn` | Toggle Chat | `getElementById` |
-| 1611 | `toggleSoundBtn` | Sound On | `toggleChessSound` |
-| 1612 | `toggleBorderBtn` | Signals On | `toggleBoardBorder` |
-| 1615 | `toggleMoveTableBtn` | Hide Moves | `function @13531` |
-| 1616 | `toggleAddVarBtn` | Add Var | `getElementById, gradient` |
-| 1693 | `—` | ✕ | `getElementById` |
+| 858 | `analyzeBtn` | Analyze Game | `analyzeGame` |
+| 860 | `—` | Hints | `openHintsModal` |
+| 861 | `—` | Clear | `clearResults` |
+| 1468 | `toggleNavBtnsBtn` | ▶ Show Nav Buttons | `getElementById, getElementById` |
+| 1486 | `loadToBoardMini` | Load to Board | `loadPgnToBoard` |
+| 1495 | `toggleSoundBtnMini` | Sound On | `toggleChessSound` |
+| 1496 | `toggleBorderBtnMini` | Signals On | `toggleBoardBorder` |
+| 1500 | `—` | Lichess Links | `proxy → `#lichessLinksBtn`` |
+| 1501 | `showOpeningBtn` | 📖 Opening | `showOpeningToast` |
+| 1502 | `—` | Reanalyze | `proxy → `#analyzeGameBtn`` |
+| 1504 | `copyBoardPgnBtnMini` | Copy PGN | `copyPgnToClipboard` |
+| 1512 | `—` | Hints | `openHintsModal` |
+| 1517 | `—` | ✕ *(~inherited)* | `getElementById` |
+| 1588 | `copyBoardPgnBtn` | Copy PGN | `copyPgnToClipboard` |
+| 1589 | `downloadPgnBtn` | Download PGN | `downloadPgn` |
+| 1594 | `lichessLinksBtn` | Lichess Links | `function @12803` |
+| 1595 | `toggleChatBtn` | Toggle Chat | `getElementById` |
+| 1596 | `toggleSoundBtn` | Sound On | `toggleChessSound` |
+| 1597 | `toggleBorderBtn` | Signals On | `toggleBoardBorder` |
+| 1600 | `toggleMoveTableBtn` | Hide Moves | `function @12856` |
+| 1601 | `toggleAddVarBtn` | Add Var | `getElementById, gradient` |
+| 1678 | `—` | ✕ | `getElementById` |
 
 ## Notes
 
@@ -46,6 +45,22 @@ The board itself: load a PGN, step through moves, flip, sound, signals, opening 
 - But see `duplicate-controls.md` — a third of these buttons exist twice.
 
 ## Culled
+
+- **`copyPgnBtn` "Copy PGN"** — removed, the one in the paste-PGN row above `Clear`. Element was
+  at `index.html:861`; binding block and anonymous handler at `index.html:12845-12868` (24 lines).
+  The handler was an inline closure, so nothing else could call it; no `window` export, no
+  localStorage, no shortcut, and the only reads of the id were its own "Copied!" / "No PGN!" /
+  "Failed" text flashes inside that closure.
+  Redundant with three other `Copy PGN` buttons: `copyBoardPgnBtnMini` (`1504`, mini bar),
+  `copyBoardPgnBtn` (`1588`, control row) — both `copyPgnToClipboard()` — and `coachPgnCopyBtn`
+  in the coach modal.
+  **One behaviour went with it.** This button was the only one that fell back to the raw
+  `#pgnInput` textarea when `window.moveTree` was null, so "paste a PGN, copy it straight back
+  out without loading it" is gone. `copyPgnToClipboard()` falls back to `window.currentLoadedPgn`
+  / `window.annotatedPgnWithVariations` instead and logs *No PGN available to copy* when neither
+  is set. The textarea's text is still selectable by hand.
+  Also dropped `copyPgnBtn` from the `core-board` RULES pattern; the other two classify through
+  `copyPgnToClipboard`.
 
 - **`loadToBoard` "Load to Board"** — removed. Element was at `index.html:863` in the paste-PGN
   button row; binding block at `index.html:13496-13500` (comment + `const` alias + `if` guard +

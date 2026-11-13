@@ -2,7 +2,7 @@
 
 **Verdict: COLLAPSE to three functions.**
 
-`index.html` has **31 `clipboard.writeText` calls** and **16 `clipboard.readText` calls**, behind **41 buttons**. They move three shapes of thing:
+`index.html` has **29 `clipboard.writeText` calls** and **14 `clipboard.readText` calls**, behind **39 buttons**. They move three shapes of thing:
 
 1. **a FEN** — `copyExportedFen`, `mmCopyFen`, `gdriveCopyCell`, the three `fenLichessModal` URL buttons
 2. **a From-Position snippet** — `lnCopyVarResult`, `practiceCopy`, `mmCopySnippet`, and the
@@ -27,12 +27,10 @@ fourth at `1468` are the same story on the read side.
 
 | line | id | label | handler | feature |
 |---:|---|---|---|---|
-| 867 | `copyPgnBtn` | Copy PGN | `async @13546` | [core-board](01-core-board.md) |
 | 926 | `sbCopyGameLinkBtn` | 📋 Copy URL | `sbCopyGameLink` | [supabase-games](03-supabase-games.md) |
 | 938 | `sbCopySectionBtn` | Copy Selected | `sbCopyReportSection` | [supabase-games](03-supabase-games.md) |
 | 939 | `—` | Copy All | `sbCopyReport` | [supabase-games](03-supabase-games.md) |
 | 1037 | `copyReportText` | Copy Text | `function @15481` | [study-tool-report](17-study-tool-report.md) |
-| 1078 | `—` | 📋 Copy PGN | `pzCopyPgn` | [puzzles-save](06-puzzles-save.md) |
 | 1100 | `—` | 📋 Copy all rows | `lnXferCopy` | [puzzles-transfer](05-puzzles-transfer.md) |
 | 1413 | `—` | Copy + Lichess Editor | `copyTypedStatusAndOpenEditor` | [typed-move](19-typed-move.md) |
 | 1417 | `—` | 📋 Copy | `writeText, getElementById` | [typed-move](19-typed-move.md) |

@@ -60,7 +60,7 @@ RULES = [
                        r'|copyTypedStatus'),
  ('core-board',        r'loadPgnToBoard|analyzeGame|copyPgnToClipboard|downloadPgn|toggleChessSound'
                        r'|toggleBoardBorder|openHintsModal|hintsModal|clearResults|flip_board2'
-                       r'|board2PrevMove|board2NextMove|loadCurrentBtn|copyPgnBtn'
+                       r'|board2PrevMove|board2NextMove|loadCurrentBtn'
                        r'|toggleMoveTable|toggleAddVarBtn|toggleNavBtnsBtn|showOpeningToast'
                        r'|toggleChatBtn|loadAndAnalyze|lichessLinks|showOpening'),
 ]

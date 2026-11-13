@@ -122,9 +122,8 @@ and `#dropboxSearchBtn` were the second half of each, so `#-` → `saveMoveComme
 - `index.html:2113` `#closeReportFilesModal` → `function @14676` · [study-tool-report](17-study-tool-report.md)
 - `index.html:19228` `#-` → `getElementById` · [print-cards](12-print-cards.md)
 
-**copy pgn** — 4 buttons
+**copy pgn** — 3 buttons
 
-- `index.html:867` `#copyPgnBtn` → `async @13546` · [core-board](01-core-board.md)
 - `index.html:1521` `#copyBoardPgnBtnMini` → `copyPgnToClipboard` · [core-board](01-core-board.md)
 - `index.html:1605` `#copyBoardPgnBtn` → `copyPgnToClipboard` · [core-board](01-core-board.md)
 - `index.html:1757` `#coachPgnCopyBtn` → `coachPgnCopy` · [coach-ai](16-coach-ai.md)

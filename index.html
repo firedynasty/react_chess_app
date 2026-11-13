@@ -858,7 +858,6 @@
                 <button id="analyzeBtn" onclick="analyzeGame()" disabled>Analyze Game</button>
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
                 <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800;">Hints</button>
-                <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
             </div>
 
@@ -12839,31 +12838,6 @@
                     } else info.textContent = 'Open a game first.';
                     try { document.getElementById('fenLichessPasteArea').value = localStorage.getItem('lichessPlayoutText') || ''; } catch (e) {}
                     document.getElementById('fenLichessModal').style.display = 'flex';
-                });
-            }
-
-            // Copy PGN to clipboard
-            const copyPgnBtn = document.getElementById('copyPgnBtn');
-            if (copyPgnBtn) {
-                copyPgnBtn.addEventListener('click', async function() {
-                    // When a game is on the board, copy the tree (variations + grafted
-                    // AI comments) like the mini Copy PGN does — the textarea is the
-                    // raw pre-analysis PGN and doesn't have them. No tree = textarea.
-                    if (window.moveTree) { copyPgnToClipboard(); return; }
-                    const pgn = document.getElementById('pgnInput').value.trim();
-                    if (!pgn) {
-                        copyPgnBtn.textContent = 'No PGN!';
-                        setTimeout(() => { copyPgnBtn.textContent = 'Copy PGN'; }, 1500);
-                        return;
-                    }
-                    try {
-                        await navigator.clipboard.writeText(pgn);
-                        copyPgnBtn.textContent = 'Copied!';
-                        setTimeout(() => { copyPgnBtn.textContent = 'Copy PGN'; }, 1500);
-                    } catch (err) {
-                        copyPgnBtn.textContent = 'Failed';
-                        setTimeout(() => { copyPgnBtn.textContent = 'Copy PGN'; }, 1500);
-                    }
                 });
             }
 
