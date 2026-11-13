@@ -1,7 +1,7 @@
 // Vercel Serverless Function — Supabase `puzzles` table proxy
 // Keeps SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY server-side. service_role
 // is required (not the anon key) because RLS on `puzzles` has no
-// anon/authenticated policies — same pattern as api/games.js.
+// anon/authenticated policies — same pattern as api/lines.js.
 //
 // The `puzzles` table lives in the same Supabase project as this app's games / chess_*
 // tables and is shared with the vercel_fen_saver app. Supabase is its source of truth.

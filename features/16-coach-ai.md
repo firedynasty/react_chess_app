@@ -43,8 +43,12 @@ A RAG-backed chess coach chat (ChatGPT or Anthropic), AI comments on key moves, 
 - `💬 Coach Chat` is two buttons calling one function (1515 mini bar, 1566 old row).
 - Inside the React modal: `🤖 Analyze with Chess Coach`, `🎯 Ask Coach About Selected Move`, `📋 Retrieve Prompt`, `🔍 Reanalyze with Higher Model`, `Copy Chat`, `Send`, a clear, and a provider pair. Six ways to ask one question.
 - The `/api/rag-chess` + `chess_knowledge.txt` side is the only non-trivial backend you still run. Keep it, prune its buttons.
-- **Coupling.** The access-code prompt inside the React block writes `sbReportAccessCode`
-  (`index.html:16819`), a key owned by [03-supabase-games.md](03-supabase-games.md). When that
-  feature is cut, this prompt needs its own key, or Coach Chat loses its auth.
+- **Coupling — now ours.** The access-code prompt inside the React block writes
+  `sbReportAccessCode` (`index.html:14969`). The key was named after
+  [03-supabase-games.md](03-supabase-games.md), but it outlived that feature's removal precisely
+  because this prompt, `Save board PGN`, `AI Comments` and the mistake explainer all read it.
+  **This feature owns the key now** — renaming it is a free cleanup, but it has to be renamed in
+  all nine places at once (`index.html:4704`, `4708`, `4867`, `5374`, `5685`, `5688`, `14969`,
+  `18942`, `18945`), and every browser that holds the old key loses its code.
 - The whole `<script type="text/babel">` block (`index.html:15912` to roughly `17000`) is this one
   component. `extract_buttons.py` assigns every button in that range here for that reason.

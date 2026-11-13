@@ -85,7 +85,7 @@ independent reason to start there. Deleting these eight changes nothing on scree
 | 1607 | `updateReportBtn` | Update Report | `updateReportWithPgn` |
 | 1627 | `reportAppendVariantBtn` | Report Append Variant | `function @14740` |
 
-## 31 labels appearing on more than one button
+## 29 labels appearing on more than one button
 
 `Clear`, `Close`, `Cancel`, `Save`, `Load` repeat because each modal has its own — that is fine.
 The ones to act on are marked **identical handler**: two buttons, one function, no reason.
@@ -94,11 +94,16 @@ The **save** and **search** pairs dropped off this list when Dropbox went: `#dro
 and `#dropboxSearchBtn` were the second half of each, so `#-` → `saveMoveComment` and
 `#gdrive-picker-search-btn` are now the only buttons with those labels.
 
+Two more went with the Supabase game library ([03-supabase-games.md](03-supabase-games.md)):
+`#sbLoadGameBtn` was the second half of **load selected**, so `#loadReportSectionBtn` is the only
+**Load Selected** left; **📋 copy url** is gone entirely, because both halves
+(`#sbCopyGameLinkBtn` and the mini bar's `#copyGameLinkBtnMini`) were that feature's.
+`#sbClearReportBtn` left the **clear** group at the same time.
 
-**clear** — 10 buttons
+
+**clear** — 9 buttons
 
 - `index.html:868` `#-` → `clearResults` · [core-board](01-core-board.md)
-- `index.html:916` `#sbClearReportBtn` → `sbClearReportList` · [supabase-games](03-supabase-games.md)
 - `index.html:1064` `#-` → `getElementById` · [study-tool-report](17-study-tool-report.md)
 - `index.html:1101` `#-` → `lnXferClear` · [puzzles-transfer](05-puzzles-transfer.md)
 - `index.html:1249` `#-` → `getElementById, resetDragBuild` · [variations](07-variations.md)
@@ -201,11 +206,6 @@ and `#dropboxSearchBtn` were the second half of each, so `#-` → `saveMoveComme
 - `index.html:1517` `#-` → `proxy → #lichessLinksBtn` · [core-board](01-core-board.md)
 - `index.html:1611` `#lichessLinksBtn` → `function @13455` · [core-board](01-core-board.md)
 
-**load selected** — 2 buttons
-
-- `index.html:904` `#sbLoadGameBtn` → `sbLoadSelectedGame` · [supabase-games](03-supabase-games.md)
-- `index.html:1952` `#loadReportSectionBtn` → `loadReportSection` · [study-tool-report](17-study-tool-report.md)
-
 **next →** — 2 buttons
 
 - `index.html:1490` `#-` → `proxy → #board2NextMove` · [study-tool-report](17-study-tool-report.md)
@@ -250,11 +250,6 @@ and `#dropboxSearchBtn` were the second half of each, so `#-` → `saveMoveComme
 
 - `index.html:1129` `#-` → `lnGridOpen` · [supabase-lines](04-supabase-lines.md)
 - `index.html:1524` `#viewVarBtnMini` → `lnGridOpen` · [supabase-lines](04-supabase-lines.md)
-
-**📋 copy url** — 2 buttons  — **identical handler**
-
-- `index.html:926` `#sbCopyGameLinkBtn` → `sbCopyGameLink` · [supabase-games](03-supabase-games.md)
-- `index.html:1527` `#copyGameLinkBtnMini` → `sbCopyGameLink` · [supabase-games](03-supabase-games.md)
 
 **📥 fetch games** — 2 buttons
 
