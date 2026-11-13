@@ -1,0 +1,313 @@
+<!--
+  Google Drive Sheets Loader — Self-Contained Feature
+  ====================================================
+  Loads a Google Sheets spreadsheet via OAuth, shows a sheet dropdown,
+  renders the data as a clickable table (row click copies a cell to clipboard).
+
+  HOW TO REPURPOSE:
+  1. Copy the 3 sections below into any HTML page:
+     a) <head>  — external scripts + CSS
+     b) <body>  — HTML container
+     c) bottom  — <script> block (place after the HTML container)
+
+  2. Replace GDRIVE_CLIENT_ID with your own Google OAuth Client ID.
+
+  3. In gdriveLoadChessable(), change the search query to match your file:
+       name contains 'YOUR_FILE_NAME'
+     Or replace the whole function to accept a search input.
+
+  4. Google Cloud Console setup:
+     - Create OAuth 2.0 Client ID (Web application) at:
+       https://console.cloud.google.com/apis/credentials
+     - Add your domain to "Authorized JavaScript origins"
+       (e.g., https://your-app.vercel.app AND http://localhost:3000)
+     - Enable "Google Drive API" under APIs & Services > Library
+
+  5. The XLSX library (SheetJS) is loaded from CDN — no npm install needed.
+-->
+
+<!-- ============================================================= -->
+<!-- SECTION 1: Add these to your <head> tag                       -->
+<!-- ============================================================= -->
+<!--
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+<style>
+    .gdrive-csv-table-wrapper { max-height: 500px; overflow: auto; margin-top: 10px; }
+    .gdrive-csv-table { width: 100%; border-collapse: collapse; font-size: 13px; font-family: monospace; }
+    .gdrive-csv-table th { background: #1a1a3e; color: #61dafb; padding: 8px 12px; text-align: left; border: 1px solid #333; position: sticky; top: 0; z-index: 1; }
+    .gdrive-csv-table td { padding: 6px 12px; border: 1px solid #333; color: #eee; }
+    .gdrive-csv-table tbody tr { cursor: pointer; }
+    .gdrive-csv-table tbody tr:hover { background: #1a1a2e; }
+    .gdrive-csv-table tbody tr.gdrive-selected-row { background: #2a2a5e; outline: 1px solid #61dafb; }
+</style>
+-->
+
+
+<!-- ============================================================= -->
+<!-- SECTION 2: Add this HTML container wherever you want it        -->
+<!-- ============================================================= -->
+
+<div id="gdrive-container" style="max-width: 1200px; margin: 20px auto; padding: 15px; background: #16213e; border-radius: 8px; border: 1px solid #1a1a2e;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <span style="color: #34a853; font-weight: bold; font-size: 14px;">Google Drive</span>
+        <select id="gdrive-sheet-select" style="padding: 6px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; font-size: 13px; min-width: 160px;" disabled>
+            <option value="">Sign in to load sheets</option>
+        </select>
+        <!-- Cell Radio — value="1" = column B (Cell 2), value="2" = column C (Cell 3) -->
+        <label style="color: #aaa; font-size: 12px; cursor: pointer; margin-left: 10px;"><input type="radio" name="gdriveCopyCell" value="1" checked style="margin-right: 3px;">Cell 2</label>
+        <label style="color: #aaa; font-size: 12px; cursor: pointer;"><input type="radio" name="gdriveCopyCell" value="2" style="margin-right: 3px;">Cell 3</label>
+        <button onclick="gdriveCopyAll()" style="padding: 5px 12px; background: #8e44ad; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Copy</button>
+        <button onclick="gdriveClear()" style="padding: 5px 12px; background: #333; color: #888; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">Clear</button>
+        <button id="gdrive-auth-btn" onclick="gdriveSignIn()" style="padding: 6px 14px; background: #333; color: #eee; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; margin-left: auto;">Sign In</button>
+    </div>
+    <div id="gdrive-status" style="margin-top: 6px; color: #888; font-size: 12px;"></div>
+    <div id="gdrive-table-area"></div>
+</div>
+
+
+<!-- ============================================================= -->
+<!-- SECTION 3: Add this <script> after the HTML container          -->
+<!-- ============================================================= -->
+
+<script>
+    (function() {
+        // =====================================================
+        // CONFIG — Change these to repurpose
+        // =====================================================
+        const GDRIVE_CLIENT_ID = '1095683227908-7ro25k16mprkf408i3lf583gti8v759b.apps.googleusercontent.com';
+        const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+        const GDRIVE_FILE_SEARCH = 'chessable';  // <-- change this to auto-load a different file
+
+        let gdriveAccessToken = null;
+        let gdriveTokenClient = null;
+        let gdriveWorkbook = null;
+        let gdriveSelectedRow = null;
+
+        // =====================================================
+        // CSV PARSER (handles quoted fields with commas/newlines)
+        // =====================================================
+        function gdriveParseCsvRows(text) {
+            const rows = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const ch = text[i];
+                if (inQuotes) {
+                    if (ch === '"' && text[i + 1] === '"') { current += '"'; i++; }
+                    else if (ch === '"') { inQuotes = false; }
+                    else { current += ch; }
+                } else {
+                    if (ch === '"') { inQuotes = true; }
+                    else if (ch === ',') { rows.push(current); current = ''; }
+                    else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+                        rows.push(current); current = '';
+                        if (ch === '\r') i++;
+                        return { cells: rows, rest: text.slice(i + 1) };
+                    } else { current += ch; }
+                }
+            }
+            rows.push(current);
+            return { cells: rows, rest: '' };
+        }
+
+        function gdriveParseCsv(text) {
+            const result = [];
+            let remaining = text.trim();
+            while (remaining.length > 0) {
+                const { cells, rest } = gdriveParseCsvRows(remaining);
+                result.push(cells);
+                remaining = rest;
+            }
+            return result;
+        }
+
+        function gdriveSetStatus(msg) {
+            document.getElementById('gdrive-status').textContent = msg;
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        // =====================================================
+        // GOOGLE OAUTH
+        // =====================================================
+        function gdriveInitClient() {
+            if (window.google && window.google.accounts) {
+                gdriveTokenClient = window.google.accounts.oauth2.initTokenClient({
+                    client_id: GDRIVE_CLIENT_ID,
+                    scope: GDRIVE_SCOPES,
+                    callback: function(response) {
+                        if (response.access_token) {
+                            gdriveAccessToken = response.access_token;
+                            document.getElementById('gdrive-auth-btn').textContent = 'Sign Out';
+                            gdriveSetStatus('Signed in. Loading ' + GDRIVE_FILE_SEARCH + '...');
+                            gdriveLoadChessable();
+                        }
+                    },
+                });
+            }
+        }
+
+        // Wait for Google Identity Services script to load
+        const checkGoogle = setInterval(function() {
+            if (window.google && window.google.accounts) {
+                clearInterval(checkGoogle);
+                gdriveInitClient();
+            }
+        }, 200);
+
+        // Sign in / Sign out toggle
+        window.gdriveSignIn = function() {
+            if (gdriveAccessToken) {
+                gdriveAccessToken = null;
+                gdriveWorkbook = null;
+                document.getElementById('gdrive-auth-btn').textContent = 'Sign In';
+                var sel = document.getElementById('gdrive-sheet-select');
+                sel.innerHTML = '<option value="">Sign in to load sheets</option>';
+                sel.disabled = true;
+                document.getElementById('gdrive-table-area').innerHTML = '';
+                gdriveSetStatus('Signed out');
+                return;
+            }
+            if (gdriveTokenClient) {
+                gdriveTokenClient.requestAccessToken();
+            } else {
+                gdriveSetStatus('Google API not loaded yet. Try again.');
+            }
+        };
+
+        // =====================================================
+        // LOAD SPREADSHEET
+        // Change GDRIVE_FILE_SEARCH above to auto-load a
+        // different file, or replace this function with a
+        // search input for dynamic lookup.
+        // =====================================================
+        async function gdriveLoadChessable() {
+            try {
+                var query = encodeURIComponent(
+                    "name contains '" + GDRIVE_FILE_SEARCH + "' and trashed=false and mimeType='application/vnd.google-apps.spreadsheet'"
+                );
+                var resp = await fetch(
+                    'https://www.googleapis.com/drive/v3/files?q=' + query + '&fields=files(id,name,mimeType)&orderBy=name',
+                    { headers: { Authorization: 'Bearer ' + gdriveAccessToken } }
+                );
+                if (!resp.ok) throw new Error('Search failed');
+                var data = await resp.json();
+                if (!data.files || data.files.length === 0) {
+                    gdriveSetStatus('No "' + GDRIVE_FILE_SEARCH + '" spreadsheet found');
+                    return;
+                }
+                var file = data.files[0];
+                gdriveSetStatus('Loading "' + file.name + '"...');
+                await gdriveLoadSpreadsheet(file.id, file.name);
+            } catch (err) {
+                gdriveSetStatus('Error: ' + err.message);
+            }
+        }
+
+        // Export as XLSX, parse with SheetJS, populate sheet dropdown
+        async function gdriveLoadSpreadsheet(fileId, fileName) {
+            try {
+                var exportMime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+                var resp = await fetch(
+                    'https://www.googleapis.com/drive/v3/files/' + fileId + '/export?mimeType=' + encodeURIComponent(exportMime),
+                    { headers: { Authorization: 'Bearer ' + gdriveAccessToken } }
+                );
+                if (!resp.ok) throw new Error('Export failed');
+                var arrayBuffer = await resp.arrayBuffer();
+                gdriveWorkbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+
+                var sel = document.getElementById('gdrive-sheet-select');
+                sel.innerHTML = '<option value="">-- select sheet --</option>';
+                gdriveWorkbook.SheetNames.forEach(function(name) {
+                    var opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    sel.appendChild(opt);
+                });
+                sel.disabled = false;
+                gdriveSetStatus('Loaded "' + fileName + '" — ' + gdriveWorkbook.SheetNames.length + ' sheets');
+            } catch (err) {
+                gdriveSetStatus('Error: ' + err.message);
+            }
+        }
+
+        // =====================================================
+        // RENDER TABLE + ROW CLICK TO COPY
+        // =====================================================
+        function gdriveRenderSheet(sheetName) {
+            if (!gdriveWorkbook) return;
+            var sheet = gdriveWorkbook.Sheets[sheetName];
+            var csv = XLSX.utils.sheet_to_csv(sheet);
+            var rows = gdriveParseCsv(csv);
+            if (rows.length === 0) {
+                document.getElementById('gdrive-table-area').innerHTML = '';
+                gdriveSetStatus('Sheet "' + sheetName + '" is empty');
+                return;
+            }
+
+            var header = rows[0];
+            var html = '<div class="gdrive-csv-table-wrapper"><table class="gdrive-csv-table"><thead><tr>';
+            header.forEach(function(h) { html += '<th>' + escapeHtml(h) + '</th>'; });
+            html += '</tr></thead><tbody>';
+            rows.slice(1).forEach(function(row, ri) {
+                html += '<tr data-row-index="' + ri + '">';
+                row.forEach(function(cell) { html += '<td>' + escapeHtml(cell) + '</td>'; });
+                html += '</tr>';
+            });
+            html += '</tbody></table></div>';
+            document.getElementById('gdrive-table-area').innerHTML = html;
+            gdriveSelectedRow = null;
+
+            // Row click — copies the cell at the selected radio column index
+            document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(tr) {
+                tr.addEventListener('click', function() {
+                    var ri = parseInt(tr.dataset.rowIndex);
+                    var dataRows = rows.slice(1);
+                    var cellIdx = parseInt(document.querySelector('input[name="gdriveCopyCell"]:checked').value);
+                    var cellText = (dataRows[ri] && dataRows[ri][cellIdx]) || '';
+
+                    document.querySelectorAll('.gdrive-csv-table tbody tr').forEach(function(r) { r.classList.remove('gdrive-selected-row'); });
+                    tr.classList.add('gdrive-selected-row');
+                    gdriveSelectedRow = ri;
+
+                    navigator.clipboard.writeText(cellText).then(function() {
+                        gdriveSetStatus('Copied "' + (cellText.length > 40 ? cellText.substring(0, 40) + '...' : cellText) + '" to clipboard');
+                    });
+                });
+            });
+
+            gdriveSetStatus('Loaded sheet "' + sheetName + '" — ' + (rows.length - 1) + ' rows');
+        }
+
+        // =====================================================
+        // DROPDOWN + BUTTONS
+        // =====================================================
+        document.getElementById('gdrive-sheet-select').addEventListener('change', function() {
+            if (this.value) gdriveRenderSheet(this.value);
+            else document.getElementById('gdrive-table-area').innerHTML = '';
+        });
+
+        // Copy entire sheet as CSV
+        window.gdriveCopyAll = function() {
+            if (!gdriveWorkbook) return;
+            var sel = document.getElementById('gdrive-sheet-select').value;
+            if (!sel) return;
+            var sheet = gdriveWorkbook.Sheets[sel];
+            var csv = XLSX.utils.sheet_to_csv(sheet);
+            navigator.clipboard.writeText(csv).then(function() {
+                gdriveSetStatus('Copied sheet "' + sel + '" to clipboard');
+            });
+        };
+
+        // Clear table display
+        window.gdriveClear = function() {
+            document.getElementById('gdrive-table-area').innerHTML = '';
+            document.getElementById('gdrive-sheet-select').selectedIndex = 0;
+            gdriveSetStatus('');
+        };
+    })();
+</script>
