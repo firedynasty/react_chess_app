@@ -25,4 +25,4 @@ Load a JSON of games or a folder of .pgn/.txt files and browse them in a sidebar
 ## Notes
 
 - Seven buttons, and it is the eleventh way to get a game onto the board. Its `⬇ Export JSON` (2092) duplicates print-cards' (18969).
-- If you keep any file-based loader, keep the Dropbox PGN one — it at least reaches files not already on disk.
+- The Dropbox PGN loader this note used to recommend keeping is gone ([15-dropbox.md](15-dropbox.md)), so if you keep a file-based loader at all, it is this one or nothing.

@@ -36,7 +36,6 @@ RULES = [
  ('print-cards',       r'\bpp[A-Z]\w*|ppLoadFile'),
  ('pgn-library',       r'\bplStep|plToggle|plExportJson|plJsonInput|plFolderInput'),
  ('sheets-drive',      r'gdrive|gnSignInBtn|gnRecentBtn'),
- ('dropbox',           r'dropbox|dbPgnBtn|dbSaveBtn|dbLoginBtn|dbFilesBtn|dbLogoutBtn'),
  ('what-went-wrong',   r'\bmm[A-Z]\w*'),
  ('mistake-hop',       r'\bmst[A-Z]\w*'),
  ('practice',          r'practice'),

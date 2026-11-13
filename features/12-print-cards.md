@@ -8,9 +8,8 @@ Collect positions and print them as front/back study cards, 8 per sheet; or past
 
 **Footprint.** 29 buttons · 144 lines of `index.html` match the owning pattern (see `extract_buttons.py` RULES)
 
-**localStorage.** `chessPrintDropboxPath`
 
-**Other files.** `puzzles.html` · `animatedFlashcards/` · `api/dropbox-config.js`
+**Other files.** `puzzles.html` · `animatedFlashcards/`
 
 ## Buttons
 
@@ -38,8 +37,6 @@ Collect positions and print them as front/back study cards, 8 per sheet; or past
 | 18925 | `ppClearBtn` | Clear all | `ppClear` |
 | 18928 | `—` | ⬇ Export JSON | `ppExportJson` |
 | 18929 | `—` | ⬆ Load JSON (replaces) | `proxy → `#ppLoadFile`` |
-| 18935 | `—` | ☁ Save to Dropbox | `ppDbxSave` |
-| 18936 | `—` | ☁ Load from Dropbox (replaces) | `ppDbxLoad` |
 | 19116 | `—` | ✕ | `ppRemove` |
 | 19185 | `—` | Select all | `ppAutoAll` |
 | 19186 | `—` | Add selected | `ppAutoAdd` |
@@ -48,6 +45,6 @@ Collect positions and print them as front/back study cards, 8 per sheet; or past
 
 ## Notes
 
-- Three modals, 29 buttons, two Print buttons (18945 and 18965), two Export JSON buttons (18969 and features/pgn-library 2092), and a Dropbox save/load pair on top.
+- Three modals, 27 buttons, two Print buttons, and two Export JSON buttons (one here, one in [pgn-library](13-pgn-library.md)). The Dropbox save/load pair that used to sit on top of this is gone — see [15-dropbox.md](15-dropbox.md). `⬇ Export JSON` / `⬆ Load JSON (replaces)` is now the only way the list leaves this browser.
 - `ppLine*` (paste a line → print its boards) is a strict subset of what `ppList*` already does with a one-entry set. Fold it in; that is ~11 buttons and one modal gone.
 - Also drop `fen-export`'s `fenQueue*` CSV queue — it is the pre-Print-List version of this same idea.

@@ -1,9 +1,10 @@
 # Feature inventory
 
-`index.html` is 21,142 lines with **315 buttons** and **42 modals**. This directory maps every
+`index.html` is 20,396 lines with **298 buttons** and **26 `…Modal` overlays**
+(`grep -c 'id="[^"]*[Mm]odal"'`). This directory maps every
 button to the feature that owns it, so a cut is a lookup instead of a hunt.
 
-- **[BUTTONS.md](BUTTONS.md)** — all 315 buttons, sorted by line, each linked to its feature file.
+- **[BUTTONS.md](BUTTONS.md)** — all 298 buttons, sorted by line, each linked to its feature file.
   Generated. Rerun `python3 features/extract_buttons.py` after every edit; line numbers move.
 - **`NN-<feature>.md`** — one file per feature: its buttons, its API endpoints, its localStorage
   keys, its other files, and a keep/cut verdict. Hand-written. These are yours to argue with.
@@ -47,7 +48,7 @@ Not feature count. **Duplicate paths to four jobs:**
 
 | Job | Entry points today |
 |---|---|
-| Get a game onto the board | ~10 |
+| Get a game onto the board | ~9 |
 | Attach a variation to a move | 8 |
 | Get a line out as text | 41 buttons, 31 `clipboard.writeText` calls |
 | Print study cards | 8 |
@@ -61,24 +62,24 @@ Not feature count. **Duplicate paths to four jobs:**
 | 03 | [Supabase game library](03-supabase-games.md) | 17 | **CUT — biggest single win** |
 | 04 | [Supabase Lines pane](04-supabase-lines.md) | 20 | KEEP |
 | 05 | [Transfer to puzzles](05-puzzles-transfer.md) | 4 | KEEP |
-| 06 | [Save → Puzzles](06-puzzles-save.md) | 7 | MERGE into 05 |
+| 06 | [Save → Puzzles](06-puzzles-save.md) | 3 | MERGE into 05 |
 | 07 | [Variation adders](07-variations.md) | 34 | CUT — keep 2 of 8 |
 | 08 | [Practice](08-practice.md) | 15 | KEEP, trim copy row |
 | 09 | [What went wrong](09-what-went-wrong.md) | 21 | KEEP |
 | 10 | [Mistake hop](10-mistake-hop.md) | 3 | KEEP |
 | 11 | [Move comments + bubbles](11-move-comment.md) | 10 | KEEP |
-| 12 | [Print list + Print Line](12-print-cards.md) | 29 | MERGE two modals into one |
+| 12 | [Print list + Print Line](12-print-cards.md) | 27 | MERGE two modals into one |
 | 13 | [PGN Library sidebar](13-pgn-library.md) | 7 | CUT |
 | 14 | [Google Sheets + Drive](14-sheets-drive.md) | 22 | CUT the write/table half |
-| 15 | [Dropbox](15-dropbox.md) | 11 | KEEP, consolidate entry points |
+| 15 | [Dropbox](15-dropbox.md) | — | **REMOVED** |
 | 16 | [Coach Chat + AI → PGN](16-coach-ai.md) | 21 | KEEP, cut the extra buttons |
 | 17 | [Study tool: board2 + report](17-study-tool-report.md) | 39 | CUT most of it |
 | 18 | [FEN export / queue / images](18-fen-export.md) | 16 | CUT the queue |
 | 19 | [Type/Play + vs Stockfish](19-typed-move.md) | 10 | KEEP |
 | 20 | [View Text modal](20-text-view.md) | 3 | MERGE into clipboard work |
 
-Eleven keeps, nine cuts or merges. The keeps are, with one exception, everything you built in the
-last three months.
+Ten keeps, nine cuts or merges, one done. The keeps are, with one exception, everything you built
+in the last three months.
 
 ## Cut order
 
@@ -87,7 +88,9 @@ Risk rises as you go down. Stop whenever you like — every step stands on its o
 1. **[duplicate-controls.md](duplicate-controls.md)** — 8 provably dead `display:none` buttons
    (nothing in the file ever reveals them) and 7 buttons whose only job is clicking another
    visible button. Zero UI change, zero risk. Six of the eight belong to step 2.
-   *Started:* `#loadToBoard` is gone; `#loadToBoardMini` keeps the paste → board workflow.
+   *Started:* `#loadToBoard` is gone (`#loadToBoardMini` keeps the paste → board workflow), and
+   all 11 Dropbox buttons went with [15-dropbox.md](15-dropbox.md), three of them hidden-but-live.
+   The four `#pzPgnSection` buttons misfiled under [06](06-puzzles-save.md) are gone too.
 2. **[17-study-tool-report.md](17-study-tool-report.md)** — the report half. Largest family,
    oldest code, six of its buttons already hidden. Leave `board2*` alone; that IS the main board.
 3. **[03-supabase-games.md](03-supabase-games.md)** — retires `/api/games`, `/api/staging`,
@@ -136,8 +139,8 @@ One feature per commit, named for the feature.
    `const btn = document.getElementById('updateReportBtn'); btn.textContent = 'Updated!'`,
    unguarded. Delete only the element and that line throws on the next move. The trace flags every
    id read that is not the click binding.
-3. **`display:none` is not dead.** Five hidden buttons are revealed by JS once Dropbox signs in or
-   reports load. The trace prints `REVEALED by JS at [...]` versus `reveal never`.
+3. **`display:none` is not dead.** Two hidden buttons are revealed by JS once reports load (three
+   more were, until Dropbox went). The trace prints `REVEALED by JS at [...]` versus `reveal never`.
 
 A worked example, start to finish, is in [01-core-board.md](01-core-board.md) under `## Culled`.
 

@@ -11,8 +11,9 @@ removed. `index.html:1170` says so out loud:
 Nothing here is a feature decision. It is the same feature, wired twice.
 
 **Done so far.** `#loadToBoard` (the **load to board** pair) is culled — see
-[01-core-board.md](01-core-board.md) `## Culled`. Line numbers below are pre-cull and shift by
-one or two; work from the ids.
+[01-core-board.md](01-core-board.md) `## Culled` — and all 11 Dropbox buttons went with the
+feature ([15-dropbox.md](15-dropbox.md)), which also took three of the five hidden-but-revealed
+ones. Line numbers below are pre-cull; work from the ids.
 
 ## 11 buttons whose only job is clicking another button
 
@@ -37,19 +38,20 @@ hidden `<input type="file">`, not a button. That is the standard way to style a 
 those stay. The other **seven** (lines 1489, 1490, 1508, 1516, 1517, 1519, 1520) are a visible
 button clicking a second visible button in the row below it. Those are the free deletes.
 
-## 13 buttons shipped with `display:none`
+## 10 buttons shipped with `display:none`
 
 Hidden in the markup, still in the DOM, still with a click handler bound. **But hidden is not the
-same as dead** — five of these are revealed by JS when their feature becomes available, so check
+same as dead** — two of these are revealed by JS when their feature becomes available, so check
 before deleting:
 
 | id | revealed at | why |
 |---|---|---|
-| `dbFilesBtn` | `index.html:2903` | appears after Dropbox sign-in |
-| `dbLogoutBtn` | `index.html:2904` | appears after Dropbox sign-in |
-| `dbSaveBtn` | `index.html:2905` | appears after Dropbox sign-in |
 | `viewPreloadedReports` | `index.html:14468`, `14519` | appears once reports load |
 | `appendByOpeningBtn` | `index.html:14601` | appears once reports load |
+
+The three Dropbox ones that used to head this table — `dbFilesBtn`, `dbLogoutBtn`, `dbSaveBtn`,
+revealed by `updateDropboxButtons()` after sign-in — are gone with the feature
+([15-dropbox.md](15-dropbox.md)).
 
 **The other eight are never revealed by anything.** No `style.display` assignment anywhere in the
 file sets them visible. They are dead UI with live handlers attached:
@@ -68,16 +70,13 @@ file sets them visible. They are dead UI with live handlers attached:
 Six of the eight belong to [17-study-tool-report.md](17-study-tool-report.md), which is the
 independent reason to start there. Deleting these eight changes nothing on screen.
 
-## All 13, as found
+## All 10, as found
 
 | line | id | label | handler |
 |---:|---|---|---|
 | 862 | `analyzeFenBtn` | Analyze Position | `analyzeFen` |
 | 1035 | `loadPgnFromHighlight` | Load PGN from Highlight | `function @15403` |
 | 1036 | `loadFenVariantFromHighlight` | Load [Fen Variant] from Highlight | `function @15444` |
-| 1039 | `dbSaveBtn` | 💾 DB Save | `dropboxSaveReport @3269` |
-| 1174 | `dbFilesBtn` | DB Files | `openDropboxSidebar @3265` |
-| 1175 | `dbLogoutBtn` | DB Logout | `dropboxSignOut @3266` |
 | 1178 | `loadPreloadedReports` | 📋 Preloaded Reports | `async @14485` |
 | 1180 | `viewPreloadedReports` | 📋 View Reports | `openReportFilesModal @14543` |
 | 1184 | `appendByOpeningBtn` | 📚 Append Opening Reports | `async @14608` |
@@ -86,10 +85,14 @@ independent reason to start there. Deleting these eight changes nothing on scree
 | 1607 | `updateReportBtn` | Update Report | `updateReportWithPgn` |
 | 1627 | `reportAppendVariantBtn` | Report Append Variant | `function @14740` |
 
-## 33 labels appearing on more than one button
+## 31 labels appearing on more than one button
 
 `Clear`, `Close`, `Cancel`, `Save`, `Load` repeat because each modal has its own — that is fine.
 The ones to act on are marked **identical handler**: two buttons, one function, no reason.
+
+The **save** and **search** pairs dropped off this list when Dropbox went: `#dropboxSaveConfirmBtn`
+and `#dropboxSearchBtn` were the second half of each, so `#-` → `saveMoveComment` and
+`#gdrive-picker-search-btn` are now the only buttons with those labels.
 
 
 **clear** — 10 buttons
@@ -214,20 +217,10 @@ The ones to act on are marked **identical handler**: two buttons, one function, 
 - `index.html:1525` `#nextVarBtnMini` → `lnGridNext` · [supabase-lines](04-supabase-lines.md)
 - `index.html:2099` `#-` → `plStep` · [pgn-library](13-pgn-library.md)
 
-**save** — 2 buttons
-
-- `index.html:1294` `#-` → `saveMoveComment` · [move-comment](11-move-comment.md)
-- `index.html:2069` `#dropboxSaveConfirmBtn` → `dropboxConfirmSave @3272` · [dropbox](15-dropbox.md)
-
 **save to puzzles** — 2 buttons
 
 - `index.html:1810` `#practiceSaveBtn` → `practiceSave` · [practice](08-practice.md)
 - `index.html:1836` `#pzSaveBtn` → `pzSave` · [puzzles-save](06-puzzles-save.md)
-
-**search** — 2 buttons
-
-- `index.html:2015` `#gdrive-picker-search-btn` → `function @17476` · [sheets-drive](14-sheets-drive.md)
-- `index.html:2063` `#dropboxSearchBtn` → `function @3287` · [dropbox](15-dropbox.md)
 
 **signals on** — 2 buttons  — **identical handler**
 
