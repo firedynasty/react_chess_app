@@ -1,10 +1,10 @@
 # Feature inventory
 
-`index.html` is 20,370 lines with **297 buttons** and **26 `…Modal` overlays**
+`index.html` is 19,242 lines with **280 buttons** and **25 `…Modal` overlays**
 (`grep -c 'id="[^"]*[Mm]odal"'`). This directory maps every
 button to the feature that owns it, so a cut is a lookup instead of a hunt.
 
-- **[BUTTONS.md](BUTTONS.md)** — all 297 buttons, sorted by line, each linked to its feature file.
+- **[BUTTONS.md](BUTTONS.md)** — all 280 buttons, sorted by line, each linked to its feature file.
   Generated. Rerun `python3 features/extract_buttons.py` after every edit; line numbers move.
 - **`NN-<feature>.md`** — one file per feature: its buttons, its API endpoints, its localStorage
   keys, its other files, and a keep/cut verdict. Hand-written. These are yours to argue with.
@@ -48,7 +48,7 @@ Not feature count. **Duplicate paths to four jobs:**
 
 | Job | Entry points today |
 |---|---|
-| Get a game onto the board | ~9 |
+| Get a game onto the board | ~9 → ~5 (four went with [03](03-supabase-games.md)) |
 | Attach a variation to a move | 8 |
 | Get a line out as text | 39 buttons, 29 `clipboard.writeText` calls |
 | Print study cards | 8 |
@@ -59,7 +59,7 @@ Not feature count. **Duplicate paths to four jobs:**
 |---|---|---:|---|
 | 01 | [Core board + move navigation](01-core-board.md) | 22 | KEEP |
 | 02 | [chess.com / Lichess fetchers](02-game-sources.md) | 3 | CUT (keep one) |
-| 03 | [Supabase game library](03-supabase-games.md) | 17 | **CUT — biggest single win** |
+| 03 | [Supabase game library](03-supabase-games.md) | — | **REMOVED** |
 | 04 | [Supabase Lines pane](04-supabase-lines.md) | 20 | KEEP |
 | 05 | [Transfer to puzzles](05-puzzles-transfer.md) | 4 | KEEP |
 | 06 | [Save → Puzzles](06-puzzles-save.md) | 3 | MERGE into 05 |
@@ -78,7 +78,7 @@ Not feature count. **Duplicate paths to four jobs:**
 | 19 | [Type/Play + vs Stockfish](19-typed-move.md) | 10 | KEEP |
 | 20 | [View Text modal](20-text-view.md) | 3 | MERGE into clipboard work |
 
-Ten keeps, nine cuts or merges, one done. The keeps are, with one exception, everything you built
+Ten keeps, eight cuts or merges, two done. The keeps are, with one exception, everything you built
 in the last three months.
 
 ## Cut order
@@ -90,11 +90,14 @@ Risk rises as you go down. Stop whenever you like — every step stands on its o
    visible button. Zero UI change, zero risk. Six of the eight belong to step 2.
    *Started:* `#loadToBoard` is gone (`#loadToBoardMini` keeps the paste → board workflow), and
    all 11 Dropbox buttons went with [15-dropbox.md](15-dropbox.md), three of them hidden-but-live.
-   The four `#pzPgnSection` buttons misfiled under [06](06-puzzles-save.md) are gone too.
+   The four `#pzPgnSection` buttons misfiled under [06](06-puzzles-save.md) are gone too, and the
+   **load selected** and **📋 copy url** pairs went with [03](03-supabase-games.md).
 2. **[17-study-tool-report.md](17-study-tool-report.md)** — the report half. Largest family,
    oldest code, six of its buttons already hidden. Leave `board2*` alone; that IS the main board.
-3. **[03-supabase-games.md](03-supabase-games.md)** — retires `/api/games`, `/api/staging`,
-   `/api/game-report` and 3 localStorage keys. Finishes the deletions already staged in your index.
+3. **[03-supabase-games.md](03-supabase-games.md)** — **done.** `/api/games`, `/api/staging` and
+   `/api/game-report` are gone, with 17 buttons, two localStorage keys (`sbReportAccessCode` was
+   never this feature's alone and stayed), the whole `?game_id=` deep link, and 1,128 lines of
+   `index.html`. The file is now the record of what it cost.
 4. **[clipboard-sprawl.md](clipboard-sprawl.md)** — 41 buttons down to three functions. Cannot
    touch the move tree, so it is safe; biggest visible-clutter win per line changed.
 5. **[13-pgn-library.md](13-pgn-library.md)**, **[18-fen-export.md](18-fen-export.md)** (queue only),
@@ -165,9 +168,14 @@ Two traps the inventory already knows about:
 - Deleting a button is not deleting a feature. Its handler, its modal `<div>`, its
   `window.x = x` export and its localStorage key all live elsewhere in the file. Each feature file
   lists them.
-- Some buttons are the only caller of a function another feature also needs. `sbCopyGameLink` is
-  the live example: the mini bar's `📋 Copy URL` calls it, so it has to move out before
-  `03-supabase-games.md` is deleted.
+- Some buttons are the only caller of a function another feature also needs, so check for a
+  second caller before deleting a handler — but check which way the dependency runs.
+  `sbCopyGameLink` was the worked example: the mini bar's `📋 Copy URL` called it, so the plan was
+  to move it out before cutting [03-supabase-games.md](03-supabase-games.md). The trace showed the
+  opposite. The only writer of `window.supabaseLoadedGame` was *inside* the cut, so the mini button
+  could only ever have reported *"No Supabase game loaded"*, and it went too. A shared **key** can
+  still outlive its feature: `sbReportAccessCode` did, and
+  [16-coach-ai.md](16-coach-ai.md) owns it now.
 
 ## Non-feature cleanup
 
