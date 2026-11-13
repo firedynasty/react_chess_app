@@ -860,8 +860,6 @@
             <div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                 <button id="analyzeBtn" onclick="analyzeGame()" disabled>Analyze Game</button>
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
-                <button id="loadCurrentBtn" style="background: #28a745; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">Load Current</button>
-                <button id="loadToBoard" style="background: #28a745; color: white;">Load to Board</button>
                 <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800;">Hints</button>
                 <button id="dbPgnBtn" title="Sign in to Dropbox, then pick a .pgn file to load to the board" style="background: #0061fe; color: white;">Dropbox PGN</button>
                 <button id="copyPgnBtn" style="background: #17a2b8; color: white;">Copy PGN</button>
@@ -1082,76 +1080,16 @@
       </div>
     </div>
     <!-- Side pane (pane 2): the ☰ button opens it beside the board (pane 1). It holds the Supabase
-         panels: Positions (pick moves + browse), Transfer to puzzles, and saved Lines. -->
-    <button id="lnPaneBtn" onclick="lnPaneToggle()" title="Open the Supabase pane: positions, transfer to puzzles, saved lines" aria-label="Open the Supabase pane">☰</button>
+         panels: Transfer to puzzles, and saved Lines. -->
+    <button id="lnPaneBtn" onclick="lnPaneToggle()" title="Open the Supabase pane: transfer to puzzles, saved lines" aria-label="Open the Supabase pane">☰</button>
     <div id="supabase_fens_pgns">
       <div id="lnPaneHeader">
         <span>Supabase</span>
         <button onclick="lnPaneToggle(false)" title="Close the pane" aria-label="Close the pane">✕</button>
       </div>
-      <div id="posSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
-        <div style="display: flex; align-items: center; gap: 8px;">
-          <div style="color: #888; flex: 1;">Positions from your games — pick moves from the game on the board and save them to the chess_positions table (blunders, missed tactics, commented ideas), each linking back to its game</div>
-          <button id="lnPosToggleBtn" onclick="lnPosToggle()" title="Hide / show this panel" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px; white-space: nowrap;">Hide ▴</button>
-        </div>
-        <div id="lnPosBody" style="margin-top: 8px;">
-          <div id="lnPickSection">
-            <div style="color: #00d4ff; font-weight: bold; margin-bottom: 6px;">1 · Save from the game on the board</div>
-            <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-              <span style="color: #888;">Category</span>
-              <select id="lnPickCategory" onchange="lnPickCategoryChanged()" title="Category the saved positions are filed under" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 160px;">
-                <option value="">(no category)</option>
-                <option value="__new__">+ New category…</option>
-              </select>
-              <input type="text" id="lnPickNewCategory" oninput="lnPickCategoryChanged()" placeholder="new category, e.g. french_defense" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; min-width: 200px; display: none;">
-              <span style="color: #888; margin-left: 8px;">Game</span>
-              <span id="lnPickGameLabel" style="color: #00d4ff; display: none;"></span>
-              <input type="text" id="lnPickGameName" oninput="lnPickRefreshSoon()" title="A name for this game (it is stored in chess_lines so the positions can link back to it)" placeholder="name this game" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px; flex: 1; min-width: 220px;">
-            </div>
-            <div id="lnPickList" style="max-height: 240px; overflow-y: auto; margin-top: 8px; border: 1px solid #1a1a2e; border-radius: 5px; background: #0f3460; font-size: 13px;"></div>
-            <div style="display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px;">
-              <button onclick="lnPickSelect('all')" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">All</button>
-              <button onclick="lnPickSelect('none')" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">None</button>
-              <button onclick="lnPickSelect('blunder')" title="Tick only the blunders" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">Blunders</button>
-              <button onclick="lnPickSelect('tactic')" title="Tick only the missed tactics" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">Tactics</button>
-              <button onclick="lnPickSelect('idea')" title="Tick only the commented ideas" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">Ideas</button>
-              <button onclick="lnPickRefresh(true)" title="Rebuild the list from the game on the board (after Analyze or AI Comments)" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px;">↻</button>
-              <span style="flex: 1;"></span>
-              <button id="lnPickSaveBtn" onclick="lnPickSave()" title="Save the ticked moves as training positions (adds or updates; never deletes). If the game isn't in Supabase it is stored in chess_lines under the name above." style="padding: 8px 18px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">💾 Save 0 selected</button>
-            </div>
-            <div id="lnPickStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
-          </div>
-          <div style="color: #00d4ff; font-weight: bold; margin: 14px 0 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">2 · Browse saved positions <span style="color: #888; font-weight: normal;">(the filters below only change this list, not what gets saved)</span></div>
-        <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px;">
-          <select id="lnPosKind" onchange="lnPosFilterChanged()" title="Filter by kind" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="">all kinds</option>
-            <option value="blunder">blunder</option>
-            <option value="idea">idea</option>
-            <option value="tactic">tactic</option>
-          </select>
-          <select id="lnPosCategory" onchange="lnPosFilterChanged()" title="Filter by category (the label you gave when saving)" style="padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="">all categories</option>
-          </select>
-          <select id="lnPosGame" onchange="lnPosFilterChanged()" title="Filter by game" style="flex: 1; min-width: 200px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
-            <option value="">all games</option>
-          </select>
-          <button onclick="lnPosFirst()" title="Jump to the first position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">&laquo;</button>
-          <button onclick="lnPosStep(-1)" title="Previous position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">◀</button>
-          <span id="lnPosCounter" style="color: #eee; min-width: 54px; text-align: center;">0/0</span>
-          <button onclick="lnPosStep(1)" title="Next position" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">▶</button>
-          <button onclick="lnPosOpenGame()" title="Load the full game this position came from and jump to the move" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Open game</button>
-          <button onclick="lnPosDelete()" title="Delete the saved position shown now (asks to confirm; needs the access code). The full game stays saved." style="padding: 8px 14px; background: #c0392b; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">🗑 Delete</button>
-          <button onclick="lnPosExportRow(this)" title="Copy the position shown now as one fen,note row (fen = From Position PGN with its comments; note = the move's comment + kind, move and game link), then paste it into the Transfer box below" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">📋 Copy position</button>
-          <button onclick="lnPosExportAll(this)" title="Copy every position currently listed (respecting the filters) as fen,note rows, one after another, then paste them into the Transfer box below" style="padding: 8px 14px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">📋 Copy all listed</button>
-          <button onclick="lnPosLoad()" title="Refresh the positions list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
-        </div>
-        <div id="lnPosInfo" style="margin-top: 4px; font-size: 12px; color: #00d4ff;"></div>
-          <div id="lnPosStatus" style="margin-top: 4px; font-size: 12px; color: #888;"></div>
-        </div>
-      </div>
       <div id="xferSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <div style="color: #888; flex: 1;">Transfer to puzzles — copy rows with Copy position, Copy all listed or Copy Move Info, paste them here (⌘V), pick a category, and Send: they go straight into the shared Supabase puzzles table (the one vercel_fen_saver reads), skipping any FEN already in that category. Needs the access code.</div>
+          <div style="color: #888; flex: 1;">Transfer to puzzles — copy rows with Copy Move Info, paste them here (⌘V), pick a category, and Send: they go straight into the shared Supabase puzzles table (the one vercel_fen_saver reads), skipping any FEN already in that category. Needs the access code.</div>
           <button id="lnXferToggleBtn" onclick="lnXferToggle()" title="Hide / show this panel" style="padding: 6px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 13px; white-space: nowrap;">Hide ▴</button>
         </div>
         <div id="lnXferBody" style="margin-top: 8px;">
@@ -1168,7 +1106,7 @@
             <button onclick="lnXferSend()" title="Send every row in the box to the puzzles table under the chosen category (asks to confirm; needs the access code)" style="padding: 8px 18px; background: #27ae60; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">⬆ Send to puzzles</button>
           </div>
           <div id="lnXferStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
-          <textarea id="lnXferText" rows="6" oninput="lnXferSync()" spellcheck="false" placeholder="Paste fen,note rows here (⌘V) — copy them with Copy position, Copy all listed or Copy Move Info. Each row's first cell is the whole PGN in quotes. Edit freely, pick a category, then Send to puzzles." style="width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+          <textarea id="lnXferText" rows="6" oninput="lnXferSync()" spellcheck="false" placeholder="Paste fen,note rows here (⌘V) — copy them with Copy Move Info. Each row's first cell is the whole PGN in quotes. Edit freely, pick a category, then Send to puzzles." style="width: 100%; box-sizing: border-box; margin-top: 8px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
         </div>
       </div>
       <div id="lnSection" style="margin: 12px auto; max-width: 1200px; padding: 10px; background: #16213e; border-radius: 8px; font-family: monospace; font-size: 14px;">
@@ -1186,10 +1124,42 @@
           </select>
           <input type="text" id="lnRowNumInput" placeholder="row # or name" onkeydown="if(event.key==='Enter')lnLoadRowByRef()" style="width: 170px; padding: 8px 10px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; font-family: monospace; font-size: 14px;">
           <button onclick="lnLoadRowByRef()" title="Load a row from the selected table onto the board — by row # (digits) or by exact name" style="padding: 8px 14px; background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">Load</button>
+          <button onclick="lnGridOpen()" title="Open the selected table as a sortable grid: click a column to sort, a row to load it on the board" style="padding: 8px 14px; background: #6c5ce7; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-family: monospace; font-weight: bold; font-size: 14px;">📊 View</button>
           <button onclick="lnLoadRows()" title="Refresh the row list" style="padding: 8px 12px; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 5px; cursor: pointer; font-family: monospace; font-size: 14px;">↻</button>
         </div>
         <div id="lnStatus" style="margin-top: 6px; font-size: 12px; color: #888;"></div>
         <div id="lnLink" title="Link that loads this row (?line=<row # or name>) — click to select, then copy" style="margin-top: 4px; font-size: 12px; color: #00d4ff; user-select: all; word-break: break-all;"></div>
+      </div>
+    </div>
+    <!-- Grid view of a chess_* table (the View button in the Lines panel) -->
+    <div id="lnGridModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.75); z-index:10001; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
+      <div style="background:#16213e; border-radius:10px; padding:20px; width:min(1100px, 94vw); max-height:88vh; display:flex; flex-direction:column; border:1px solid #6c5ce7; position:relative; font-family:monospace;">
+        <button onclick="document.getElementById('lnGridModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
+        <div style="font-weight:bold; color:#6c5ce7; font-size:15px;">Saved rows — <span id="lnGridTitle">chess_variations</span></div>
+        <div style="color:#888; font-size:12px; margin:4px 0 10px;">Click a column heading to sort, a row to load it on the board.</div>
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+          <select id="lnGridTableSel" onchange="lnGridOpen(this.value)" title="Which chess_* table to show" style="padding:8px 10px; background:#0f3460; color:#eee; border:1px solid #1a1a2e; border-radius:5px; font-family:monospace; font-size:13px;"></select>
+          <input id="lnGridSearch" type="text" oninput="lnGridRender()" spellcheck="false" placeholder="Filter by name or moves…" style="flex:1; padding:8px 10px; background:#0f3460; color:#eee; border:1px solid #1a1a2e; border-radius:5px; font-family:monospace; font-size:13px;">
+          <span id="lnGridCount" style="color:#eee; font-size:12px; min-width:76px; text-align:right;">0 rows</span>
+          <button onclick="lnGridOpen()" title="Reload from Supabase" style="padding:8px 12px; background:#0f3460; color:#eee; border:1px solid #1a1a2e; border-radius:5px; cursor:pointer; font-family:monospace; font-size:13px;">↻</button>
+        </div>
+        <div style="flex:1; overflow:auto; border:1px solid #1a1a2e; border-radius:6px; background:#0f3460;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead>
+              <tr>
+                <th id="lnGridTh_id" onclick="lnGridSortBy('id')" title="Sort by row #" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">#</th>
+                <th id="lnGridTh_category" onclick="lnGridSortBy('category')" title="Sort by category (the part of name before the colon)" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">category</th>
+                <th id="lnGridTh_note" onclick="lnGridSortBy('note')" title="Sort by the variation (the part after the colon)" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">variation</th>
+                <th id="lnGridTh_side" onclick="lnGridSortBy('side')" title="Sort by the side to move in the start position" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">turn</th>
+                <th id="lnGridTh_moves" onclick="lnGridSortBy('moves')" title="Sort by the moves" style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap;">moves</th>
+                <th style="padding:8px 10px; text-align:left; background:#0f3460; color:#00d4ff; border-bottom:1px solid #1a1a2e; cursor:pointer; position:sticky; top:0; white-space:nowrap; cursor:default;"></th>
+              </tr>
+            </thead>
+            <tbody id="lnGridBody"></tbody>
+          </table>
+        </div>
+        <div id="lnGridStatus" style="margin-top:6px; font-size:12px; color:#888; min-height:15px;"></div>
+        <button onclick="document.getElementById('lnGridModal').style.display='none'" style="margin-top:8px; width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Close</button>
       </div>
     </div>
     <!-- Next-comment bar: shows ONE comment (current or next up) above the board, so it stays visible
@@ -1389,7 +1359,7 @@
             <button onclick="practiceBack()" title="Leave practice and return to the move you started from" style="flex: 1; padding: 7px; background: #0f3460; color: #eee; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">Back to game</button>
           </div>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↓ = step into a variation | ↑ = exit variation (closes note if open) | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation | [ ] = previous / next saved position</p>
+        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↓ = step into a variation | ↑ = exit variation (closes note if open) | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation</p>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -1549,6 +1519,8 @@
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
             <button id="copyVarBtnMini" title="Open the current variation, or the first alternative attached to the highlighted main-line move, as a From Position snippet to copy or flatten" onclick="lnOpenVarSnippetModal()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
+            <button id="viewVarBtnMini" title="Browse the saved rows as a sortable grid (chess_variations, or whichever table you last viewed)" onclick="lnGridOpen()" style="background: #0f3460; color: #6c5ce7; border: 1px solid #6c5ce7; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📊 View</button>
+            <button id="nextVarBtnMini" title="Load the next saved row on the board, in the grid's current order and filter. Wraps around at the end." onclick="lnGridNext(this)" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next ▶</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
             <button id="copyGameLinkBtnMini" title="Copy the deep link to this game, opening on the highlighted move (adds &ply=)" onclick="sbCopyGameLink(this)" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📋 Copy URL</button>
             <button id="pgnLibBtnMini" title="PGN Library: load a JSON of games (or a folder of .pgn files) from your computer and browse them in a sidebar" onclick="plToggle()" style="background: #0f3460; color: #4caf50; border: 1px solid #4caf50; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📚 Library</button>
@@ -1569,6 +1541,18 @@
               <div style="color:#e91e63; font-size:12px; margin-bottom:4px;">One line — copy from here</div>
               <textarea id="copyVarOneLineOut" readonly rows="3" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #e91e63; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:6px;"></textarea>
               <button id="copyVarOneLineCopyBtn" onclick="lnCopyVarOneLine(this)" style="width:100%; padding:8px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:13px;">Copy line</button>
+            </div>
+            <div style="border-top:1px solid #333; margin-bottom:10px; padding-top:12px;">
+              <div style="color:#6c5ce7; font-size:12px; font-weight:bold; margin-bottom:2px;">Save to Supabase</div>
+              <div style="color:#aaa; font-size:11px; margin-bottom:6px;">Appends a row to <code style="color:#ddd;">chess_variations</code>. Stored like <code style="color:#ddd;">chess_puzzles_redone</code>: the two boxes join into one <code style="color:#ddd;">name</code> as <code style="color:#ddd;">category: variation</code>, the snippet (one line) goes in <code style="color:#ddd;">pgn</code>.</div>
+              <div style="display:flex; gap:6px; margin-bottom:6px;">
+                <input id="copyVarSaveCat" list="copyVarCatList" type="text" spellcheck="false" oninput="lnVarNamePreview()" placeholder="category, e.g. stonewall" title="The part before the colon. Existing categories autocomplete." onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="flex:1; min-width:0; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace; box-sizing:border-box;">
+                <input id="copyVarSaveNote" type="text" spellcheck="false" oninput="lnVarNamePreview()" placeholder="variation, e.g. attack the knight" title="The part after the colon" onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="flex:2; min-width:0; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace; box-sizing:border-box;">
+              </div>
+              <datalist id="copyVarCatList"></datalist>
+              <div id="copyVarNamePreview" style="color:#888; font-size:11px; margin-bottom:6px; min-height:14px;"></div>
+              <button id="copyVarSaveBtn" onclick="lnSaveVarToSupabase(this)" title="Append this variation to chess_variations as a new row" style="width:100%; padding:10px; background:#6c5ce7; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Append to chess_variations</button>
+              <div id="copyVarSaveStatus" style="font-size:11px; margin-top:6px; min-height:14px;"></div>
             </div>
             <button onclick="document.getElementById('copyVarResultModal').style.display='none'" style="width:100%; padding:10px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer; font-size:14px;">Close</button>
           </div>
@@ -1708,7 +1692,7 @@
             <div style="background:#16213e; border-radius:10px; padding:20px; max-width:480px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #ff9800; position:relative;">
               <button onclick="document.getElementById('hintsModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
               <div style="font-weight:bold; color:#ff9800; font-size:15px; margin-bottom:10px;">Keyboard hints</div>
-              <table style="font-size:13px; border-collapse:collapse;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">← / →</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next move (→ or PageDown or Space = next)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Space</kbd></td><td style="padding:4px 0; color:#ddd;">Next move</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">9</kbd></td><td style="padding:4px 0; color:#ddd;">Paste clipboard into the PGN box and Load to Board</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">0</kbd></td><td style="padding:4px 0; color:#ddd;">Go to move — type 48 + Enter (48b = Black's move)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↑</kbd></td><td style="padding:4px 0; color:#ddd;">Exit the variation back to the main line</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↓</kbd></td><td style="padding:4px 0; color:#ddd;">Step into a variation</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Tab</kbd></td><td style="padding:4px 0; color:#ddd;">Cycle variations (adds one if none)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Esc</kbd></td><td style="padding:4px 0; color:#ddd;">Remove the variation at this move / close a modal</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">/</kbd></td><td style="padding:4px 0; color:#ddd;">Toggle the coach note</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Enter</kbd></td><td style="padding:4px 0; color:#ddd;">Open the coach note (gold star)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">[ / ]</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next saved position</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">, / .</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next mistake (?, ??, ?!) by the side the ⚠ button names — click it to cycle White → Black → Both</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#00d4ff; font-family:monospace;">Add Var. 2</kbd></td><td style="padding:4px 0; color:#ddd;">Button. Paste a practice snippet (FEN position + moves) and it adds the line as a variation at the move that FEN matches, replacing that move's existing variations</td></tr></table>
+              <table style="font-size:13px; border-collapse:collapse;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">← / →</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next move (→ or PageDown or Space = next)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Space</kbd></td><td style="padding:4px 0; color:#ddd;">Next move</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">9</kbd></td><td style="padding:4px 0; color:#ddd;">Paste clipboard into the PGN box and Load to Board</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">0</kbd></td><td style="padding:4px 0; color:#ddd;">Go to move — type 48 + Enter (48b = Black's move)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↑</kbd></td><td style="padding:4px 0; color:#ddd;">Exit the variation back to the main line</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">↓</kbd></td><td style="padding:4px 0; color:#ddd;">Step into a variation</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Tab</kbd></td><td style="padding:4px 0; color:#ddd;">Cycle variations (adds one if none)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Esc</kbd></td><td style="padding:4px 0; color:#ddd;">Remove the variation at this move / close a modal</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">/</kbd></td><td style="padding:4px 0; color:#ddd;">Toggle the coach note</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">Enter</kbd></td><td style="padding:4px 0; color:#ddd;">Open the coach note (gold star)</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#ff9800; font-family:monospace;">, / .</kbd></td><td style="padding:4px 0; color:#ddd;">Previous / next mistake (?, ??, ?!) by the side the ⚠ button names — click it to cycle White → Black → Both</td></tr><tr><td style="padding:4px 10px 4px 0; white-space:nowrap;"><kbd style="background:#1a1a2e; border:1px solid #555; border-radius:4px; padding:1px 7px; color:#00d4ff; font-family:monospace;">Add Var. 2</kbd></td><td style="padding:4px 0; color:#ddd;">Button. Paste a practice snippet (FEN position + moves) and it adds the line as a variation at the move that FEN matches, replacing that move's existing variations</td></tr></table>
             </div>
           </div>
 
@@ -5561,10 +5545,8 @@
             lnLoadRow(ref);
         }
 
-        // ---- Key positions: one From Position PGN per flagged / commented move ----
-        // (lives in the Supabase Puzzles panel, so it reports to its own status line)
-        function lnPosMsg(msg) { const el = document.getElementById('lnPosStatus'); if (el) el.textContent = msg || ''; }
-
+        // ---- From Position PGN for one move: the move, its comment, alternatives and the
+        // next few moves. Feeds Copy Move Info, the variation snippet and Transfer to puzzles.
         const LN_POS_PLIES = 10; // the move itself + the next moves, up to 5 full moves
 
         // POST with the stored access code; asks once, and once more if the server says 401
@@ -5660,237 +5642,6 @@
             return headers + '\n\n' + lnSerializeLine(kids);
         }
 
-        // Default name for a game that has no Supabase home yet, from its PGN headers:
-        // the chess.com / Lichess game id when there is one (so re-saving the same game
-        // refreshes it), else White_vs_Black_date, else a timestamp.
-        function lnAutoGameName(prefix) {
-            const ta = document.getElementById('pgnInput');
-            const src = (ta && ta.value) || window.currentLoadedPgn || '';
-            const tag = n => { const m = src.match(new RegExp('\\[' + n + '\\s+"([^"]*)"\\]')); return m ? m[1].trim() : ''; };
-            const slug = t => t.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-            let m = (tag('Link') + ' ' + tag('Site')).match(/chess\.com\/(?:game\/)?(?:live|daily)\/(\d+)/i);
-            if (m) return 'chesscom_' + m[1];
-            m = (tag('Link') + ' ' + tag('Site')).match(/lichess\.org\/([A-Za-z0-9]{8})/i);
-            if (m) return 'lichess_' + m[1];
-            const white = slug(tag('White')), black = slug(tag('Black'));
-            const date = (tag('Date') || tag('UTCDate')).replace(/[^0-9]+/g, '-').replace(/^-+|-+$/g, '');
-            if (white && black && white !== '-' && black !== '-') return white + '_vs_' + black + (date ? '_' + date : '');
-            const d = new Date(), p2 = n => (n < 10 ? '0' : '') + n;
-            return (prefix || 'game') + '_' + d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + '_' + p2(d.getHours()) + p2(d.getMinutes());
-        }
-
-        // ---- Picker: choose which of the open game's moves to save ----
-        let lnPickCands = [];            // [{ key, kind, label, comment, node, pgn, saved }]
-        const lnPickChecked = new Map(); // key -> ticked? (your choices survive refreshes)
-        const lnPickTouched = new Set(); // moves whose tick you set yourself (those are never overridden)
-        let lnPickSig = '', lnPickTimer = null, lnPickTree = null;
-        let lnPickSavedAs = null;        // { tree, name }: this board's game is already stored under that name
-        const LN_KIND_COLOR = { blunder: '#ff6b6b', tactic: '#ffa94d', idea: '#ffd43b' };
-
-        function lnPickMsg(msg) { const el = document.getElementById('lnPickStatus'); if (el) el.textContent = msg || ''; }
-
-        // The chosen category: '' = none, or the dropdown's value, or the new name (normalised)
-        function lnPickCategoryValue() {
-            const sel = document.getElementById('lnPickCategory');
-            if (sel.value !== '__new__') return sel.value;
-            return document.getElementById('lnPickNewCategory').value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-        }
-
-        // Dropdown = the categories already in chess_positions, plus "+ New category…"
-        function lnPickLoadCategories() {
-            const sel = document.getElementById('lnPickCategory');
-            if (!sel) return;
-            let want = sel.value;
-            if (!want || want === '__new__') { try { want = localStorage.getItem('lnPosCategory') || ''; } catch (e) { want = ''; } }
-            const cats = Array.from(new Set(lnPosAll.map(x => x.category).filter(Boolean))).sort();
-            sel.innerHTML = '<option value="">(no category)</option>' +
-                cats.map(c => '<option value="' + pzEsc(c) + '">' + pzEsc(c) + '</option>').join('') +
-                '<option value="__new__">+ New category…</option>';
-            if (want === '' || cats.indexOf(want) !== -1) sel.value = want;
-            else { sel.value = '__new__'; document.getElementById('lnPickNewCategory').value = want; }
-            lnPickCategoryChanged(true);
-        }
-
-        function lnPickCategoryChanged(silent) {
-            const sel = document.getElementById('lnPickCategory');
-            document.getElementById('lnPickNewCategory').style.display = sel.value === '__new__' ? '' : 'none';
-            const v = lnPickCategoryValue();
-            if (!silent && (sel.value !== '__new__' || v)) { try { localStorage.setItem('lnPosCategory', v); } catch (e) { } }
-            lnPickRefreshSoon();
-        }
-
-        // The link the positions would point back at: its own ?game_id= link, or ?line=<name>
-        function lnPickGameLink() {
-            if (window.supabaseLoadedGame) return sbGetGameLink() || '';
-            const name = document.getElementById('lnPickGameName').value.trim();
-            return /^[A-Za-z0-9_.-]+$/.test(name) ? lnLineLink(lnTable(), { name, id: '' }) : '';
-        }
-
-        // Every main-line move worth saving (see lnPosKindFor), with its position PGN ready
-        function lnPickCandidates() {
-            const out = [];
-            if (!window.moveTree) return out;
-            const link = lnPickGameLink();
-            const savedKeys = new Set(lnPosAll.filter(r => link && r.game === link).map(r => lnFenKey(lnPosStartFen(r.pgn))));
-            let node = window.moveTree.children && window.moveTree.children[0];
-            while (node && node.san) {
-                const kind = lnPosKindFor(node);
-                if (kind && node.parent && node.parent.fen) {
-                    const key = lnFenKey(node.parent.fen);
-                    out.push({
-                        key, kind, node, saved: savedKeys.has(key),
-                        label: node.moveNumber + (node.isBlackMove ? '… ' : '. ') + node.san + (node.annotation || ''),
-                        comment: lnCleanComment(node.comment), pgn: lnPositionPgn(node)
-                    });
-                }
-                node = node.children && node.children[0];
-            }
-            return out;
-        }
-
-        function lnPickRefreshSoon() { clearTimeout(lnPickTimer); lnPickTimer = setTimeout(() => lnPickRefresh(false), 80); }
-
-        function lnPickRefresh(force) {
-            const list = document.getElementById('lnPickList');
-            if (!list) return;
-            // Game: a Supabase game is linked for you; any other game needs a name
-            const sb = window.supabaseLoadedGame;
-            const lab = document.getElementById('lnPickGameLabel'), nameIn = document.getElementById('lnPickGameName');
-            if (sb) { lab.style.display = ''; lab.textContent = 'game ' + sb.game_id + ' — in Supabase, linked automatically'; nameIn.style.display = 'none'; }
-            else { lab.style.display = 'none'; nameIn.style.display = ''; nameIn.placeholder = 'name this game (blank → ' + lnAutoGameName(lnPickCategoryValue()) + ')'; }
-
-            if (lnPickTree !== window.moveTree) { lnPickTree = window.moveTree; lnPickChecked.clear(); lnPickTouched.clear(); force = true; } // a different game: start fresh
-            const cands = lnPickCandidates();
-            const sig = lnPickGameLink() + '|' + cands.map(c => c.key + c.kind + (c.saved ? 's' : '') + c.comment.length + c.comment.slice(0, 24)).join(';');
-            if (force || sig !== lnPickSig) {
-                lnPickSig = sig; lnPickCands = cands;
-                // untouched moves are ticked unless already saved, and follow that if the saved list arrives later
-                cands.forEach(c => { if (!lnPickTouched.has(c.key)) lnPickChecked.set(c.key, !c.saved); });
-                lnPickRender();
-            }
-            lnPickMarkCurrent();
-        }
-
-        function lnPickRender() {
-            const list = document.getElementById('lnPickList');
-            list.innerHTML = '';
-            if (!lnPickCands.length) {
-                const empty = document.createElement('div');
-                empty.style.cssText = 'padding: 10px; color: #888;';
-                empty.textContent = window.moveTree ? 'No flagged (?, ??) or commented moves in this game yet — run Analyze Game / AI Comments, then press ↻.' : 'Load a game onto the board first.';
-                list.appendChild(empty);
-            }
-            lnPickCands.forEach(c => {
-                const row = document.createElement('div');
-                row.dataset.key = c.key;
-                row.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-bottom: 1px solid #1a1a2e; border-left: 3px solid transparent; cursor: pointer;';
-                row.title = 'Click to show this move on the board';
-                const cb = document.createElement('input');
-                cb.type = 'checkbox'; cb.checked = !!lnPickChecked.get(c.key);
-                cb.onclick = e => e.stopPropagation();
-                cb.onchange = () => { lnPickChecked.set(c.key, cb.checked); lnPickTouched.add(c.key); lnPickUpdateCount(); };
-                const label = document.createElement('span');
-                label.textContent = c.label;
-                label.style.cssText = 'font-weight: bold; min-width: 96px; color: ' + (getAnnotationColor(c.node.annotation) || '#eee') + ';';
-                const chip = document.createElement('span');
-                chip.textContent = c.kind;
-                chip.style.cssText = 'min-width: 58px; text-align: center; padding: 1px 6px; border-radius: 10px; font-size: 11px; color: #1a1a2e; background: ' + LN_KIND_COLOR[c.kind] + ';';
-                const text = document.createElement('span');
-                text.textContent = c.comment || '—';
-                text.title = c.comment;
-                text.style.cssText = 'flex: 1; color: #bbb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
-                row.appendChild(cb); row.appendChild(label); row.appendChild(chip); row.appendChild(text);
-                if (c.saved) {
-                    const tag = document.createElement('span');
-                    tag.textContent = '✓ saved';
-                    tag.style.cssText = 'color: #51cf66; font-size: 12px; white-space: nowrap;';
-                    row.appendChild(tag);
-                }
-                row.onclick = () => jumpToNode(c.node.nodeId);
-                list.appendChild(row);
-            });
-            lnPickUpdateCount();
-            lnPickMarkCurrent();
-        }
-
-        // Cue: the row of the move highlighted on the board gets a gold edge
-        function lnPickMarkCurrent() {
-            const cur = window.currentMoveNode;
-            document.querySelectorAll('#lnPickList [data-key]').forEach(row => {
-                const c = lnPickCands.find(x => x.key === row.dataset.key);
-                const isCur = !!(cur && c && c.node === cur);
-                row.style.borderLeftColor = isCur ? '#ffd700' : 'transparent';
-                row.style.background = isCur ? 'rgba(255,215,0,0.10)' : '';
-            });
-        }
-
-        function lnPickUpdateCount() {
-            const btn = document.getElementById('lnPickSaveBtn');
-            const n = lnPickCands.filter(c => lnPickChecked.get(c.key)).length;
-            btn.textContent = '💾 Save ' + n + ' selected';
-            btn.style.opacity = n ? '1' : '0.55';
-        }
-
-        // mode: 'all' | 'none' | a kind (tick only that kind)
-        function lnPickSelect(mode) {
-            lnPickCands.forEach(c => { lnPickChecked.set(c.key, mode === 'all' ? true : mode === 'none' ? false : c.kind === mode); lnPickTouched.add(c.key); });
-            lnPickRender();
-        }
-
-        // Save the ticked moves. A game that isn't in Supabase is stored in chess_lines first.
-        async function lnPickSave() {
-            if (!window.moveTree) { showToast('Load a game to the board first'); return; }
-            lnPickRefresh(false);
-            const picked = lnPickCands.filter(c => lnPickChecked.get(c.key));
-            if (!picked.length) { showToast('Tick at least one move first'); return; }
-            const category = lnPickCategoryValue();
-            try { localStorage.setItem('lnPosCategory', category); } catch (e) { }
-
-            try {
-                let game;
-                if (window.supabaseLoadedGame) {
-                    game = sbGetGameLink(); // already lives in Supabase: just point back at it
-                } else {
-                    const nameEl = document.getElementById('lnPickGameName');
-                    const name = nameEl.value.trim() || lnAutoGameName(category);
-                    const pgn = lnBoardPgn(name);
-                    lnPickMsg('Saving the game to ' + lnTable() + '…');
-                    const again = !!(lnPickSavedAs && lnPickSavedAs.tree === window.moveTree && lnPickSavedAs.name === name); // same game, same name: update quietly
-                    let out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn, replace: again || undefined });
-                    if (out.cancelled) { lnPickMsg('Save cancelled — no access code'); return; }
-                    if (out.res.status === 409) {
-                        if (!await lnConfirmModal('Overwrite the saved game?', '"' + name + '" already exists in ' + lnTable() + '.\n\nOverwrite its PGN with the game on the board? The positions you saved earlier are kept.', 'Overwrite')) {
-                            lnPickMsg('Cancelled — nothing saved');
-                            return;
-                        }
-                        out = await lnPost('/api/lines', { action: 'save', table: lnTable(), name, pgn, replace: true });
-                        if (out.cancelled) { lnPickMsg('Save cancelled — no access code'); return; }
-                    }
-                    if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
-                    lnPickSavedAs = { tree: window.moveTree, name: out.data.row.name };
-                    nameEl.value = out.data.row.name;
-                    game = lnLineLink(lnTable(), out.data.row);
-                    lnShowLink(lnTable(), out.data.row);
-                    lnLoadRows();
-                }
-
-                lnPickMsg('Saving ' + picked.length + ' position' + (picked.length === 1 ? '' : 's') + '…');
-                const out2 = await lnPost('/api/positions', {
-                    action: 'save', mode: 'merge', game, category: category || null,
-                    rows: picked.map(c => ({ kind: c.kind, pgn: c.pgn }))
-                });
-                if (out2.cancelled) { lnPickMsg('Save cancelled — no access code'); return; }
-                if (!out2.res.ok) throw new Error(out2.data.error || ('HTTP ' + out2.res.status) + ' (has chess_positions been created? see chess-rag/sql/chess_positions.sql)');
-                const d = out2.data;
-                lnPickMsg('Saved ' + d.saved + ' (' + d.added + ' new, ' + d.updated + ' updated)' + (category ? ' in "' + category + '"' : '') + ' for ' + lnPosGameLabel(game));
-                showToast('Saved ' + d.saved + ' position' + (d.saved === 1 ? '' : 's'));
-                await lnPosLoad(); // refreshes Browse, the category list and the "✓ saved" marks
-            } catch (e) {
-                lnPickMsg('Save failed: ' + e.message);
-                showToast('Save failed: ' + e.message);
-            }
-        }
-
         // Open / close the side pane (☰ / ✕); remembered across reloads
         function lnPaneToggle(force) {
             const open = typeof force === 'boolean' ? force : !document.body.classList.contains('lnpane-open');
@@ -5901,89 +5652,10 @@
             try { if (localStorage.getItem('lnPaneOpen') === '1') lnPaneToggle(true); } catch (e) { }
         });
 
-        // Hide / show the Positions panel (remembered across reloads)
-        function lnPosToggle(force) {
-            const body = document.getElementById('lnPosBody'), btn = document.getElementById('lnPosToggleBtn');
-            if (!body || !btn) return;
-            const hide = typeof force === 'boolean' ? force : body.style.display !== 'none';
-            body.style.display = hide ? 'none' : 'block';
-            btn.textContent = hide ? 'Show ▾' : 'Hide ▴';
-            try { localStorage.setItem('lnPosHidden', hide ? '1' : '0'); } catch (e) { }
-        }
-
-        // ---- Cycle through the saved positions ----
-        let lnPosAll = [], lnPosView = [], lnPosIdx = -1;
-
-        function lnFenKey(fen) { return String(fen || '').split(' ').slice(0, 4).join(' '); }
         function lnPosStartFen(pgn) { const m = String(pgn || '').match(/\[FEN\s+"([^"]+)"\]/); return m ? m[1] : ''; }
         function lnPosFirstMove(pgn) {
             const m = String(pgn || '').split(/\n\s*\n/).slice(1).join(' ').match(/^\s*(\d+\.(?:\.\.)?)\s*(\S+)/);
             return m ? m[1] + ' ' + m[2] : '';
-        }
-        function lnPosGameLabel(game) {
-            if (!game) return '(no game)';
-            try {
-                const u = new URL(game);
-                return u.searchParams.get('line') || ('game ' + u.searchParams.get('game_id'));
-            } catch (e) { return game; }
-        }
-
-        async function lnPosLoad() {
-            try {
-                const r = await fetch('/api/positions?action=list');
-                const rows = await r.json();
-                if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
-                lnPosAll = rows;
-                const sel = document.getElementById('lnPosGame');
-                const prev = sel.value;
-                const csel = document.getElementById('lnPosCategory');
-                const prevCat = csel.value;
-                const cats = Array.from(new Set(rows.map(x => x.category || '__none__'))).sort();
-                csel.innerHTML = '<option value="">all categories</option>' +
-                    cats.map(c => '<option value="' + pzEsc(c) + '">' + pzEsc(c === '__none__' ? 'uncategorized' : c) + '</option>').join('');
-                if (cats.indexOf(prevCat) !== -1) csel.value = prevCat;
-                const games = Array.from(new Set(rows.map(x => x.game || '')));
-                sel.innerHTML = '<option value="">all games</option>' +
-                    games.map(g => '<option value="' + pzEsc(g) + '">' + pzEsc(lnPosGameLabel(g)) + '</option>').join('');
-                if (games.indexOf(prev) !== -1) sel.value = prev;
-            } catch (e) {
-                lnPosAll = [];
-            }
-            lnPosFilterChanged();
-            lnPickLoadCategories();
-            lnPickRefresh(true);
-        }
-
-        // Filters change the list; nothing is loaded onto the board until you step
-        function lnPosFilterChanged() {
-            const kind = document.getElementById('lnPosKind').value;
-            const game = document.getElementById('lnPosGame').value;
-            const cat = document.getElementById('lnPosCategory').value;
-            lnPosView = lnPosAll.filter(x => (!kind || x.kind === kind) && (!game || (x.game || '') === game) &&
-                (!cat || (x.category || '__none__') === cat));
-            lnPosIdx = -1;
-            document.getElementById('lnPosCounter').textContent = '0/' + lnPosView.length;
-            document.getElementById('lnPosInfo').textContent = '';
-        }
-
-        function lnPosStep(d) {
-            if (!lnPosView.length) { showToast('No saved positions'); return; }
-            lnPosIdx = lnPosIdx < 0 ? (d > 0 ? 0 : lnPosView.length - 1) : (lnPosIdx + d + lnPosView.length) % lnPosView.length;
-            const row = lnPosView[lnPosIdx];
-            applyPgnStringToBoard(row.pgn);
-            window.currentLoadedPgn = row.pgn;
-            const ta = document.getElementById('pgnInput');
-            if (ta) ta.value = row.pgn;
-            document.getElementById('lnPosCounter').textContent = (lnPosIdx + 1) + '/' + lnPosView.length;
-            document.getElementById('lnPosInfo').textContent = '#' + row.id + ' · ' + row.kind + (row.category ? ' · ' + row.category : '') + ' · ' + lnPosGameLabel(row.game) +
-                (lnPosFirstMove(row.pgn) ? ' · ' + lnPosFirstMove(row.pgn) : '');
-        }
-
-        // « : back to the first position of the current filter
-        function lnPosFirst() {
-            if (!lnPosView.length) { showToast('No saved positions'); return; }
-            lnPosIdx = 0;
-            lnPosStep(0); // shows the position at lnPosIdx
         }
 
         // One position as a comma-delimited row for the `puzzles` bulk-paste tool: fen,note
@@ -6039,21 +5711,6 @@
             }
         }
 
-        async function lnPosExportRow(btn) {
-            const row = lnPosView[lnPosIdx];
-            if (!row) { showToast('Step to a position first'); return; }
-            await lnCopyText(lnPosRow(row), btn, '✓ Copied', 'Copied position #' + row.id + ' — paste it into the Transfer box');
-            lnPosMsg('Copied #' + row.id + ' as fen,note' + (row.category ? ' — category: ' + row.category : ''));
-        }
-
-        // Every listed position (filters respected), one fen,note row after another
-        async function lnPosExportAll(btn) {
-            if (!lnPosView.length) { showToast('No saved positions listed'); return; }
-            const n = lnPosView.length;
-            await lnCopyText(lnPosView.map(lnPosRow).join('\n'), btn, '✓ Copied ' + n, 'Copied ' + n + ' row' + (n === 1 ? '' : 's') + ' — paste into the Transfer box');
-            lnPosMsg('Copied ' + n + ' row' + (n === 1 ? '' : 's') + ' as fen,note');
-        }
-
         // Link back to the game on the board: its ?game_id= link when it lives in Supabase, else the
         // [Link "…"] header of the PGN (chess.com / Lichess), else nothing.
         function lnCurrentGameLink() {
@@ -6063,8 +5720,8 @@
             return m ? m[1] : '';
         }
 
-        // The highlighted move in the move list as a fen,note row (what a saved position would
-        // give), or null when no move is selected. Works on any move, main line or variation.
+        // The highlighted move in the move list as a fen,note row (the shape Transfer to
+        // puzzles takes), or null when no move is selected. Any move, main line or variation.
         function lnMoveInfoRow() {
             const node = window.currentMoveNode;
             if (!node || !node.san || !node.parent || !node.parent.fen) return null;
@@ -6121,6 +5778,10 @@
             document.getElementById('copyVarOneLineOut').value = '';
             document.getElementById('copyVarOneLineWrap').style.display = 'none';
             document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
+            document.getElementById('copyVarSaveNote').value = '';
+            lnVarSaveMsg('');
+            lnVarNamePreview();
+            lnVarLoadCategories(false);
             document.getElementById('copyVarResultModal').style.display = 'flex';
         }
 
@@ -6147,10 +5808,289 @@
             if (!text) { showToast('Open a variation snippet first'); return; }
             await lnCopyText(text, btn, '✓ Copied', 'Copied the variation as one line');
         }
+        // ---- Save a variation to Supabase, in the two-column shape vercel_fen_saver uses for
+        // chess_puzzles_redone: one `name` cell carrying "category: variation", and the snippet
+        // in `pgn`. LN_SEP matches that repo's SB_SEP, so names round-trip between the two apps.
+        // /api/lines reaches any chess_* table with name + pgn columns, so no endpoint is needed.
+        const LN_VAR_TABLE = 'chess_variations';
+        const LN_SEP = ': ';
+
+        function lnJoinName(category, note) {
+            const c = String(category || '').trim(), n = String(note || '').trim();
+            return c && n ? c + LN_SEP + n : (c || n);
+        }
+
+        // The split takes the FIRST separator, so a variation may itself contain ": ".
+        function lnSplitName(name) {
+            const s = String(name || '');
+            const i = s.indexOf(LN_SEP);
+            return i === -1 ? { category: s, note: '' }
+                            : { category: s.slice(0, i), note: s.slice(i + LN_SEP.length) };
+        }
+
+        function lnVarSaveMsg(msg, ok) {
+            const el = document.getElementById('copyVarSaveStatus');
+            if (!el) return;
+            el.textContent = msg || '';
+            el.style.color = ok ? '#27ae60' : '#e91e63';
+        }
+
+        // Shows the row's `name` exactly as it will be stored, as you type.
+        function lnVarNamePreview() {
+            const el = document.getElementById('copyVarNamePreview');
+            if (!el) return;
+            const name = lnJoinName(document.getElementById('copyVarSaveCat').value,
+                                    document.getElementById('copyVarSaveNote').value);
+            el.textContent = name ? 'name \u2192 ' + name : '';
+        }
+
+        // Existing categories (the part of `name` before the first ": ") autocomplete in the
+        // category box, the way the puzzles page suggests them. Cached per page load.
+        let lnVarCats = [];
+        async function lnVarLoadCategories(force) {
+            if (lnVarCats.length && !force) return;
+            try {
+                const q = new URLSearchParams({ action: 'list', table: LN_VAR_TABLE });
+                const r = await fetch('/api/lines?' + q);
+                const rows = await r.json();
+                if (!r.ok || !Array.isArray(rows)) return;
+                lnVarCats = Array.from(new Set(rows.map(x => lnSplitName(x.name).category).filter(Boolean))).sort();
+                const dl = document.getElementById('copyVarCatList');
+                if (dl) dl.innerHTML = lnVarCats.map(c => '<option value="' + pzEsc(c) + '"></option>').join('');
+            } catch (e) { /* suggestions are optional */ }
+        }
+
+        async function lnSaveVarToSupabase(btn) {
+            const catEl = document.getElementById('copyVarSaveCat');
+            const noteEl = document.getElementById('copyVarSaveNote');
+            const name = lnJoinName(catEl && catEl.value, noteEl && noteEl.value);
+            const snippet = document.getElementById('copyVarResultText').value.trim();
+            if (!snippet) { lnVarSaveMsg('Open a variation snippet first'); return; }
+            if (!name) { lnVarSaveMsg('Fill in a category or a variation \u2014 together they are the name'); if (catEl) catEl.focus(); return; }
+            if (/^\d+$/.test(name)) { lnVarSaveMsg('The name can\'t be all digits \u2014 a number means the row #'); return; }
+            // Store it flattened, one line per row, like the rows kept in the sheet.
+            const pgn = snippet.replace(/\s+/g, ' ').trim().replace(/\]\s+\[/g, '][');
+            if (btn) btn.disabled = true;
+            lnVarSaveMsg('Saving\u2026');
+            try {
+                const out = await lnPost('/api/lines', { action: 'save', table: LN_VAR_TABLE, name: name, pgn: pgn });
+                if (out.cancelled) { lnVarSaveMsg('Needs the access code to save'); return; }
+                const data = out.data || {};
+                if (!out.res.ok) { lnVarSaveMsg(data.error || ('Save failed (HTTP ' + out.res.status + ')')); return; }
+                const id = data.row && data.row.id;
+                lnVarSaveMsg('Saved "' + name + '"' + (id ? ' as row #' + id : '') + ' to ' + LN_VAR_TABLE, true);
+                showToast('Saved "' + name + '"');
+                if (noteEl) noteEl.value = '';   // the category stays, for the next variation in it
+                lnVarNamePreview();
+                lnVarLoadCategories(true);
+            } catch (e) {
+                lnVarSaveMsg('Save failed: ' + e.message);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
         window.lnOpenVarSnippetModal = lnOpenVarSnippetModal;
         window.lnCopyVarResult = lnCopyVarResult;
         window.lnShowVarFlatten = lnShowVarFlatten;
         window.lnCopyVarOneLine = lnCopyVarOneLine;
+        window.lnSaveVarToSupabase = lnSaveVarToSupabase;
+        window.lnVarNamePreview = lnVarNamePreview;
+
+        // ---- Grid view of a chess_* table: sortable, filterable, click a row to load it.
+        // One request pulls id + name + pgn (action=list&cols=full), so sorting and filtering
+        // happen here with no further round trips. Opened by the View button in the Lines panel.
+        let lnGridRows = [], lnGridTableName = '', lnGridSort = { key: 'id', dir: -1 }, lnGridIdx = -1;
+
+        function lnGridMsg(msg) { const el = document.getElementById('lnGridStatus'); if (el) el.textContent = msg || ''; }
+
+        // The moves without the [Variant]/[FEN] headers — snippets are saved on one line,
+        // so there is no blank line to split on the way a full PGN has.
+        function lnGridMoves(pgn) {
+            return String(pgn || '').replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        function lnGridSide(pgn) {
+            const f = lnPosStartFen(pgn).split(' ');
+            return f.length > 1 ? (f[1] === 'b' ? 'black' : 'white') : '';
+        }
+
+        // Pull a table into lnGridRows. Used both by the grid and by Next \u25b6, which steps
+        // through the rows without opening it, so the fetch is separate from the modal.
+        async function lnGridFetch(table) {
+            lnGridTableName = table || lnGridTableName || lnTable() || LN_VAR_TABLE;
+            try {
+                const q = new URLSearchParams({ action: 'list', table: lnGridTableName, cols: 'full' });
+                const r = await fetch('/api/lines?' + q);
+                const rows = await r.json();
+                if (!r.ok) throw new Error(rows.error || ('HTTP ' + r.status));
+                lnGridRows = rows.map(x => {
+                    const parts = lnSplitName(x.name);
+                    return {
+                        id: x.id, name: x.name || '', pgn: x.pgn || '',
+                        category: parts.category, note: parts.note,
+                        side: lnGridSide(x.pgn), moves: lnGridMoves(x.pgn)
+                    };
+                });
+                return '';
+            } catch (e) {
+                lnGridRows = [];
+                return 'Could not load ' + lnGridTableName + ': ' + e.message;
+            }
+        }
+
+        async function lnGridOpen(table) {
+            if (table && table !== lnGridTableName) lnGridIdx = -1;  // a different table restarts Next
+            lnGridTableName = table || lnGridTableName || lnTable() || LN_VAR_TABLE;
+            document.getElementById('lnGridTitle').textContent = lnGridTableName;
+            document.getElementById('lnGridModal').style.display = 'flex';
+            lnGridMsg('Loading\u2026');
+            lnGridLoadTableList();
+            const err = await lnGridFetch(lnGridTableName);
+            lnGridMsg(err || (lnGridRows.length ? '' : 'No rows yet in ' + lnGridTableName));
+            lnGridRender();
+        }
+
+        // Every chess_* table with name + pgn columns, so the grid can switch between
+        // chess_variations and the puzzle database (chess_puzzles_redone) without closing.
+        async function lnGridLoadTableList() {
+            const sel = document.getElementById('lnGridTableSel');
+            if (!sel) return;
+            try {
+                const r = await fetch('/api/lines?action=tables');
+                const names = await r.json();
+                if (!r.ok || !Array.isArray(names) || !names.length) throw new Error('no tables');
+                if (names.indexOf(lnGridTableName) === -1) names.unshift(lnGridTableName);
+                sel.innerHTML = names.map(n => '<option value="' + pzEsc(n) + '">' + pzEsc(n) + '</option>').join('');
+            } catch (e) {
+                sel.innerHTML = '<option value="' + pzEsc(lnGridTableName) + '">' + pzEsc(lnGridTableName) + '</option>';
+            }
+            sel.value = lnGridTableName;
+        }
+
+        function lnGridSortBy(key) {
+            lnGridSort = { key: key, dir: lnGridSort.key === key ? -lnGridSort.dir : (key === 'id' ? -1 : 1) };
+            lnGridRender();
+        }
+
+        // The rows as the grid currently shows them: the search box applied, then the chosen
+        // sort. Next \u25b6 walks this same list, so what you see is the order you step through.
+        function lnGridView() {
+            const box = document.getElementById('lnGridSearch');
+            const term = ((box && box.value) || '').trim().toLowerCase();
+            const view = lnGridRows.filter(r => !term ||
+                r.name.toLowerCase().indexOf(term) !== -1 || r.moves.toLowerCase().indexOf(term) !== -1);
+            const k = lnGridSort.key, dir = lnGridSort.dir;
+            return view.sort((a, b) => {
+                const x = a[k], y = b[k];
+                const c = (k === 'id') ? (x - y) : String(x).localeCompare(String(y), undefined, { numeric: true });
+                return c * dir;
+            });
+        }
+
+        function lnGridRender() {
+            const body = document.getElementById('lnGridBody');
+            if (!body) return;
+            const view = lnGridView();
+            const dir = lnGridSort.dir;
+
+            [['id', '#'], ['category', 'category'], ['note', 'variation'], ['side', 'turn'], ['moves', 'moves']].forEach(pair => {
+                const th = document.getElementById('lnGridTh_' + pair[0]);
+                if (th) th.textContent = pair[1] + (lnGridSort.key === pair[0] ? (dir > 0 ? ' \u25b2' : ' \u25bc') : '');
+            });
+
+            document.getElementById('lnGridCount').textContent = view.length + ' row' + (view.length === 1 ? '' : 's') +
+                (view.length !== lnGridRows.length ? ' of ' + lnGridRows.length : '');
+
+            if (!view.length) {
+                body.innerHTML = '<tr><td colspan="6" style="padding:14px; color:#888; text-align:center;">' +
+                    (lnGridRows.length ? 'Nothing matches that filter' : 'No rows yet') + '</td></tr>';
+                return;
+            }
+            const cell = 'padding:7px 10px; border-bottom:1px solid #1a1a2e;', btn = 'padding:4px 9px; background:#0f3460; color:#eee; border:1px solid #1a1a2e; border-radius:4px; cursor:pointer; font-family:monospace; font-size:12px;';
+            body.innerHTML = view.map(r =>
+                '<tr onclick="lnGridLoadRow(' + r.id + ')" title="Load this row on the board" ' +
+                'onmouseover="this.style.background=\'#16213e\'" onmouseout="this.style.background=\'\'" ' +
+                'style="cursor:pointer;">' +
+                '<td style="' + cell + ' color:#888; white-space:nowrap;">' + r.id + '</td>' +
+                '<td style="' + cell + ' color:#6c5ce7; white-space:nowrap;">' + pzEsc(r.category) + '</td>' +
+                '<td style="' + cell + ' color:#eee;">' + pzEsc(r.note) + '</td>' +
+                '<td style="' + cell + ' white-space:nowrap; color:' + (r.side === 'black' ? '#ffd43b' : '#00d4ff') + ';">' + (r.side || '\u2014') + '</td>' +
+                '<td style="' + cell + ' color:#aaa; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + pzEsc(r.moves) + '</td>' +
+                '<td style="' + cell + ' white-space:nowrap;">' +
+                '<button onclick="event.stopPropagation(); lnGridCopy(' + r.id + ', this)" title="Copy this row\'s snippet" style="' + btn + '">\ud83d\udccb</button> ' +
+                '<button onclick="event.stopPropagation(); lnGridDelete(' + r.id + ')" title="Delete this row" style="' + btn + ' color:#ff6b6b;">\ud83d\uddd1</button>' +
+                '</td></tr>').join('');
+        }
+
+        async function lnGridLoadRow(id) {
+            const row = lnGridRows.find(r => r.id === id);
+            document.getElementById('lnGridModal').style.display = 'none';
+            lnGridIdx = lnGridView().findIndex(r => r.id === id);  // Next \u25b6 carries on from here
+            const ok = await lnLoadRow(String(id), lnGridTableName);
+            if (ok && row) showToast('Loaded "' + row.name + '"');
+        }
+
+        // Next \u25b6 beside Copy Var: load the next saved row on the board without opening the
+        // grid. Follows the grid's current table, filter and sort, and wraps at the end.
+        async function lnGridNext(btn) {
+            if (btn) btn.disabled = true;
+            try {
+                if (!lnGridRows.length) {
+                    const err = await lnGridFetch(lnGridTableName || LN_VAR_TABLE);
+                    if (err) { showToast(err); return; }
+                }
+                const view = lnGridView();
+                if (!view.length) { showToast('Nothing saved in ' + lnGridTableName + ' yet'); return; }
+                lnGridIdx = (lnGridIdx + 1) % view.length;
+                const row = view[lnGridIdx];
+                const ok = await lnLoadRow(String(row.id), lnGridTableName);
+                if (ok) showToast((lnGridIdx + 1) + '/' + view.length + ' \u2014 ' + row.name);
+            } finally {
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function lnGridCopy(id, btn) {
+            const row = lnGridRows.find(r => r.id === id);
+            if (!row) return;
+            await lnCopyText(row.pgn, btn, '\u2713', 'Copied "' + row.name + '"');
+        }
+
+        // DELETE /api/lines?table=…&id=… — the access code goes in the X-Access-Code header
+        // (the endpoint takes it there or in a POST body; a DELETE has no body to put it in).
+        async function lnGridDelete(id) {
+            const row = lnGridRows.find(r => r.id === id);
+            if (!row) return;
+            if (!await lnConfirmModal('Delete this row?', '#' + id + ' \u2014 ' + row.name + '\n\nFrom ' + lnGridTableName + '. This cannot be undone.', '\ud83d\uddd1 Delete')) return;
+            let code = lnAccessCode(false);
+            if (!code) { lnGridMsg('Needs the access code to delete'); return; }
+            lnGridMsg('Deleting #' + id + '\u2026');
+            try {
+                const q = new URLSearchParams({ table: lnGridTableName, id: String(id) });
+                const r = await fetch('/api/lines?' + q, { method: 'DELETE', headers: { 'X-Access-Code': code } });
+                const data = await r.json().catch(() => ({}));
+                if (r.status === 401) {
+                    try { localStorage.removeItem('sbReportAccessCode'); } catch (e) { }
+                    lnGridMsg('Wrong access code \u2014 it has been forgotten, try the delete again');
+                    return;
+                }
+                if (!r.ok) { lnGridMsg(data.error || ('Delete failed (HTTP ' + r.status + ')')); return; }
+                lnGridRows = lnGridRows.filter(x => x.id !== id);
+                lnGridIdx = -1;
+                lnGridMsg('Deleted #' + id + ' \u2014 ' + row.name);
+                lnGridRender();
+                if (lnGridTableName === LN_VAR_TABLE) lnVarCats = [];  // a category may be gone now
+            } catch (e) {
+                lnGridMsg('Delete failed: ' + e.message);
+            }
+        }
+        window.lnGridOpen = lnGridOpen;
+        window.lnGridSortBy = lnGridSortBy;
+        window.lnGridRender = lnGridRender;
+        window.lnGridLoadRow = lnGridLoadRow;
+        window.lnGridCopy = lnGridCopy;
+        window.lnGridDelete = lnGridDelete;
+        window.lnGridNext = lnGridNext;
 
         // ---- Transfer to puzzles: collect fen,note rows, then paste them into vercel_fen_saver's
         // "Bulk add rows" box. Nothing is written to the puzzles table from here: that app keeps
@@ -6358,58 +6298,6 @@
             });
         }
 
-        // Trash the saved position shown now, then move on to the next one
-        async function lnPosDelete() {
-            const row = lnPosView[lnPosIdx];
-            if (!row) { showToast('Step to a position first'); return; }
-            const label = '#' + row.id + ' · ' + row.kind + (row.category ? ' · ' + row.category : '') + ' · ' + lnPosGameLabel(row.game) +
-                (lnPosFirstMove(row.pgn) ? ' · ' + lnPosFirstMove(row.pgn) : '');
-            if (!await lnConfirmModal('Delete this saved position?', label + '\n\nThe full game stays saved.', '🗑 Delete')) return;
-            try {
-                const out = await lnPost('/api/positions', { action: 'delete', id: row.id });
-                if (out.cancelled) { lnPosMsg('Delete cancelled — no access code'); return; }
-                if (!out.res.ok) throw new Error(out.data.error || ('HTTP ' + out.res.status));
-                lnPosAll = lnPosAll.filter(x => x.id !== row.id);
-                lnPosView = lnPosView.filter(x => x.id !== row.id);
-                lnPosMsg('Deleted ' + label);
-                if (!lnPosView.length) {
-                    lnPosIdx = -1;
-                    document.getElementById('lnPosCounter').textContent = '0/0';
-                    document.getElementById('lnPosInfo').textContent = '';
-                } else {
-                    if (lnPosIdx >= lnPosView.length) lnPosIdx = 0;
-                    lnPosStep(0); // show the one that slid into this slot
-                }
-            } catch (e) {
-                showToast('Delete failed: ' + e.message);
-            }
-        }
-
-        // Load the full game this position came from, then jump to the move by matching its FEN
-        async function lnPosOpenGame() {
-            const row = lnPosView[lnPosIdx];
-            if (!row) { showToast('Step to a position first'); return; }
-            if (!row.game) { showToast('This position has no game to open'); return; }
-            let u;
-            try { u = new URL(row.game); } catch (e) { showToast('Bad game link: ' + row.game); return; }
-            let ok = false;
-            const line = u.searchParams.get('line');
-            const gameId = u.searchParams.get('game_id') || u.searchParams.get('gameId');
-            if (line) {
-                ok = await lnLoadRow(line, u.searchParams.get('table') || 'chess_lines');
-            } else if (gameId) {
-                ok = await sbLoadGameByIdAndSource(u.searchParams.get('source') || sbInferSourceFromGameId(gameId), gameId);
-            } else { showToast('Unrecognised game link'); return; }
-            if (!ok) { showToast('Could not open the game'); return; }
-            const key = lnFenKey(lnPosStartFen(row.pgn));
-            let node = window.moveTree && window.moveTree.children && window.moveTree.children[0];
-            while (node && node.san) {
-                if (node.parent && lnFenKey(node.parent.fen) === key) { jumpToNode(node.nodeId); return; }
-                node = node.children && node.children[0];
-            }
-            showToast('Game opened, but this position was not found in it');
-        }
-
         // Deep link: /?line=12 or /?line=chessable_cheesecake_1 (optionally
         // &table=chess_other) loads that row onto the board on page open. Waits
         // for the board like the ?game_id= loader.
@@ -6434,13 +6322,9 @@
         window.lnLoadLineFromUrlParam = lnLoadLineFromUrlParam; // callable from devtools for debugging
 
         document.addEventListener('DOMContentLoaded', lnLoadTables);
-        document.addEventListener('DOMContentLoaded', function () {
-            try { if (localStorage.getItem('lnPosHidden') === '1') lnPosToggle(true); } catch (e) { }
-            lnPosLoad();
-        });
         document.addEventListener('DOMContentLoaded', lnLoadLineFromUrlParam);
 
-        // HTML-escape helper, shared by the Supabase Lines and Positions panels
+        // HTML-escape helper, shared by the Supabase Lines and Transfer panels
         function pzEsc(t) {
             return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         }
@@ -6734,7 +6618,6 @@
         function sbRefreshGameLink() {
             const el = document.getElementById('sbGameLink');
             if (el) el.textContent = sbGetGameLink() || '';
-            if (typeof lnPickRefreshSoon === 'function') lnPickRefreshSoon();
         }
         window.sbRefreshGameLink = sbRefreshGameLink;
 
@@ -11061,7 +10944,6 @@
 
         function updateAllCommentsDisplay() {
             updateAllCommentsDisplayCore();
-            if (typeof lnPickRefreshSoon === 'function') lnPickRefreshSoon(); // the pick list follows the board's comments
             // The comments just changed (comment editor, AI Comments, play-out), so the
             // ⭐ for the move you are standing on is restated now instead of only after
             // you navigate away and back. Guarded: updateCoachNoteButton calls back here
@@ -13609,53 +13491,6 @@
                 });
             }
 
-            // Load Current — loads selected game's clean PGN into textarea, clears report
-            const loadCurrentBtn = document.getElementById('loadCurrentBtn');
-            if (loadCurrentBtn) {
-                loadCurrentBtn.addEventListener('click', function() {
-                    // Try game dropdown first, then fall back to current board PGN
-                    let pgn = '';
-                    const selectedLabel = document.getElementById('game-dropdown').value;
-                    const gameData = window.fetchedGames && selectedLabel && window.fetchedGames[selectedLabel];
-                    if (gameData) {
-                        pgn = gameData.pgn || gameData.fullPgn || '';
-                    } else if (window.moveTree) {
-                        pgn = moveTreeToPgn(window.moveTree);
-                    } else {
-                        pgn = window.currentLoadedPgn || window.annotatedPgnWithVariations || '';
-                    }
-                    if (!pgn) {
-                        log('No PGN available to load', 'warn');
-                        return;
-                    }
-                    document.getElementById('pgnInput').value = pgn;
-                    // Clear report and board state for fresh analysis
-                    clearResults();
-                    window.moveTree = null;
-                    window.currentMoveNode = null;
-                    window.moveNodeRegistry = {};
-                    window.cycleVarSequence = [];
-                    window.cycleVarIndex = -1;
-                    window.positionEvalMap = {};
-                    window.positionEvalMap2 = {};
-                    const moveTableContainer = document.getElementById('moveTableContainer');
-                    if (moveTableContainer) moveTableContainer.innerHTML = '';
-                    clearBoard2Arrows();
-                    updateEvalBar(null);
-                    log(`Loaded: ${selectedLabel}`, 'success');
-                    loadCurrentBtn.textContent = 'Loaded!';
-                    setTimeout(() => {
-                        loadCurrentBtn.textContent = 'Load Current';
-                    }, 1500);
-                });
-            }
-
-            // Load PGN to Board from textarea
-            const loadToBoardBtn = document.getElementById('loadToBoard');
-            if (loadToBoardBtn) {
-                loadToBoardBtn.addEventListener('click', loadPgnToBoard);
-            }
-
             // Copy PGN to clipboard
             const copyPgnBtn = document.getElementById('copyPgnBtn');
             if (copyPgnBtn) {
@@ -14469,11 +14304,6 @@
                         return;
                     }
                     enterVariationDown();
-                    e.preventDefault();
-                } else if ((e.key === '[' || e.key === ']') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-                    // [ / ] = previous / next saved position (the ◀ ▶ buttons in the Positions
-                    // panel). With ⌘ / Ctrl held they fall through to the browser (⌘[ = Back).
-                    lnPosStep(e.key === '[' ? -1 : 1);
                     e.preventDefault();
                 } else if ((e.key === ',' || e.key === '.') && !e.metaKey && !e.ctrlKey && !e.altKey) {
                     // , / . = previous / next mistake by the side the ⚠ button names
