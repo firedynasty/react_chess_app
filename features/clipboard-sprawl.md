@@ -2,14 +2,15 @@
 
 **Verdict: COLLAPSE to three functions.**
 
-`index.html` has **27 `clipboard.writeText` calls** and **14 `clipboard.readText` calls**, behind **35 buttons**. They move three shapes of thing:
+`index.html` has **29 `clipboard.writeText` calls** and **14 `clipboard.readText` calls**, behind **39 buttons**. They move three shapes of thing:
 
 1. **a FEN** — `copyExportedFen`, `mmCopyFen`, `gdriveCopyCell`, the three `fenLichessModal` URL buttons
 2. **a From-Position snippet** — `lnCopyVarResult`, `practiceCopy`, `mmCopySnippet`, and the
    `lnShowVarFlatten` / `practiceToggleFlatten` pair
 3. **a PGN or a one-line move list** — `copyPgnToClipboard`, `coachPgnCopy`, `lnCopyVarOneLine`,
    `practiceCopyOneLine`, `copyTextViewOneLine`, `copyTextViewFormatted`, `oneLineCopy`,
-   `copyEvalsForPaste`, `lnCopyMoveInfo`, `mmCopy`, `mmNote`, `lnXferCopy`, `gdriveCopyAll`
+   `copyEvalsForPaste`, `lnCopyMoveInfo`, `mmCopy`, `mmNote`, `lnXferCopy`, `gdriveCopyAll`,
+   `sbCopyReport`, `sbCopyReportSection`
 
 Four of them copy a one-line move list: `copyTextViewOneLine` (20-text-view),
 `oneLineCopy` (07-variations), `lnCopyVarOneLine` (04-supabase-lines) and
@@ -22,16 +23,13 @@ substantial cut available — and it removes the most felt clutter per line chan
 The three `📋 Paste from Clipboard` buttons (`index.html:1060`, `1245`, `1272`) and the
 fourth at `1468` are the same story on the read side.
 
-**Done so far.** Four of these went with the Supabase game library
-([03-supabase-games.md](03-supabase-games.md)) rather than with this cut: `#sbCopyGameLinkBtn`,
-`#sbCopySectionBtn`, the report modal's `Copy All`, and the mini bar's `#copyGameLinkBtnMini`.
-That is two `writeText` calls and the only two copies that produced a URL rather than a FEN,
-a snippet or a PGN — so the three-function collapse below now covers every remaining copy button.
-
-## All 35 copy buttons
+## All 41 copy buttons
 
 | line | id | label | handler | feature |
 |---:|---|---|---|---|
+| 926 | `sbCopyGameLinkBtn` | 📋 Copy URL | `sbCopyGameLink` | [supabase-games](03-supabase-games.md) |
+| 938 | `sbCopySectionBtn` | Copy Selected | `sbCopyReportSection` | [supabase-games](03-supabase-games.md) |
+| 939 | `—` | Copy All | `sbCopyReport` | [supabase-games](03-supabase-games.md) |
 | 1037 | `copyReportText` | Copy Text | `function @15481` | [study-tool-report](17-study-tool-report.md) |
 | 1100 | `—` | 📋 Copy all rows | `lnXferCopy` | [puzzles-transfer](05-puzzles-transfer.md) |
 | 1413 | `—` | Copy + Lichess Editor | `copyTypedStatusAndOpenEditor` | [typed-move](19-typed-move.md) |
@@ -39,6 +37,7 @@ a snippet or a PGN — so the three-function collapse below now covers every rem
 | 1521 | `copyBoardPgnBtnMini` | Copy PGN | `copyPgnToClipboard` | [core-board](01-core-board.md) |
 | 1522 | `copyMoveInfoBtnMini` | Copy Move Info | `lnCopyMoveInfo` | [supabase-lines](04-supabase-lines.md) |
 | 1523 | `copyVarBtnMini` | Copy Var | `lnOpenVarSnippetModal` | [supabase-lines](04-supabase-lines.md) |
+| 1527 | `copyGameLinkBtnMini` | 📋 Copy URL | `sbCopyGameLink` | [supabase-games](03-supabase-games.md) |
 | 1539 | `copyVarResultCopyBtn` | Copy snippet | `lnCopyVarResult` | [supabase-lines](04-supabase-lines.md) |
 | 1540 | `copyVarFlattenBtn` | Flatten | `lnShowVarFlatten` | [supabase-lines](04-supabase-lines.md) |
 | 1545 | `copyVarOneLineCopyBtn` | Copy line | `lnCopyVarOneLine` | [supabase-lines](04-supabase-lines.md) |

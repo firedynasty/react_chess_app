@@ -29,6 +29,7 @@ INDEX = os.path.join(ROOT, 'index.html')
 # First match wins, so order matters: narrow prefixes before broad words.
 RULES = [
  ('game-sources',      r'fetchChesscomGames|fetchLichessGames|openChesscomGameById|fetch-games-btn|fetch-lichess-btn|open-game-btn'),
+ ('supabase-games',    r'\bsb[A-Z]\w*'),
  ('puzzles-transfer',  r'lnXfer'),
  ('supabase-lines',    r'\bln[A-Z]\w*'),
  ('puzzles-save',      r'\bpz[A-Z]\w*|PuzzleSaveModal'),
@@ -195,7 +196,7 @@ def classify(btns, lines):
             continue
         # The <script type="text/babel"> block is the Coach Chat React
         # component, end to end. Do not walk out of it looking for a rule --
-        # every button in it is the coach's own.
+        # it reuses sbReportAccessCode, which would drag in supabase-games.
         if b['jsx']:
             b['feature'], b['guessed'] = 'coach-ai', True
             continue
