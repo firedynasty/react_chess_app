@@ -1417,6 +1417,8 @@
             <button title="Open Chess Coach Chat" onclick="openChessCoachChatModal()" style="padding: 8px 14px; border-radius: 6px; border: none; font-size: 13px; font-weight: 500; cursor: pointer; background: #e91e63; color: white; white-space: nowrap;">💬 Coach Chat</button>
             <button onclick="document.getElementById('flip_board2').click()" style="background: #00d4ff; color: #1a1a2e; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Flip Board</button>
             <button onclick="document.getElementById('lichessLinksBtn').click()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Lichess Links</button>
+            <!-- One tap out to Lichess on the move highlighted in the move list, with the side to move taken from that move's own FEN (works on mobile, where the move list's right-click menu never fires) -->
+            <button title="Open the highlighted move's position on the Lichess analysis board. The side to move is whatever it really is there — highlight 1...e6 and you get the position after e6 with White to move." onclick="openLichessHere()" style="background: #629924; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; white-space: nowrap;">↗ Lichess this position</button>
             <button id="showOpeningBtn" title="Look up the ECO opening for the currently loaded game" onclick="showOpeningToast()" style="background: #0f3460; color: #a8d8ea; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📖 Opening</button>
             <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
@@ -11653,23 +11655,58 @@
                 status.style.color = '#2ecc71';
             };
 
+            // The position every Lichess link uses: standing on a move (not the game start),
+            // it is the position BEFORE that move, so you play out the ALTERNATIVE to it.
+            // Shared by the Lichess Links modal and the one-tap White/Black buttons so the
+            // two can never drift apart.
+            window.lichessLinkTargets = function () {
+                if (!window.board2) return null;
+                const clickedNode = window.currentMoveNode;
+                const altNode = clickedNode && clickedNode.parent && clickedNode.san && clickedNode.parent.fen ? clickedNode : null;
+                const boardFen = altNode ? altNode.parent.fen.split(' ')[0] : window.board2.fen();
+                const turn = altNode ? altNode.parent.fen.split(' ')[1] : (window.fenExportColor || 'w');
+                const baseFen = boardFen.replace(/ /g, '_');
+                const colorName = turn === 'w' ? 'white' : 'black';
+                return {
+                    altNode: altNode,
+                    boardFen: boardFen,
+                    turn: turn,
+                    fullFen: boardFen + ' ' + turn + ' KQkq - 0 1',
+                    w: `https://lichess.org/analysis/${baseFen}_w_KQkq_-_0_1`,
+                    b: `https://lichess.org/analysis/${baseFen}_b_KQkq_-_0_1`,
+                    editor: `https://lichess.org/editor/${baseFen}_${turn}_KQkq_-_0_1?color=${colorName}`
+                };
+            };
+
+            // One tap straight out to Lichess with the position that is actually selected:
+            // the FEN of the highlighted move (e6 highlighted -> the position AFTER e6) and
+            // the side that really is to move there, read out of that FEN instead of chosen
+            // by hand. Same builder as the move list's right-click menu, so castling rights
+            // come from the real FEN. On mobile the modal's copy-a-URL step is awkward and a
+            // right-click menu never fires, so this is the only way out to Lichess there;
+            // window.open runs inside the tap itself, so it is not treated as a pop-up.
+            window.openLichessHere = function () {
+                const node = window.currentMoveNode;
+                let fen = node && node.fen ? node.fen : null;
+                if (!fen) {                                  // no move selected: use the board
+                    if (!window.board2) { alert('No board available.'); return; }
+                    fen = window.board2.fen() + ' ' + (window.fenExportColor || 'w') + ' KQkq - 0 1';
+                }
+                const u = typeof window.mmLichessUrls === 'function' ? window.mmLichessUrls(fen) : null;
+                const url = u ? (u.turn === 'b' ? u.b : u.w)
+                              : 'https://lichess.org/analysis/' + fen.replace(/ /g, '_');
+                window.open(url, '_blank', 'noopener');
+            };
+
             // Lichess Links button - shows modal with analysis + editor URLs
             const lichessLinksBtn = document.getElementById('lichessLinksBtn');
             if (lichessLinksBtn) {
                 lichessLinksBtn.addEventListener('click', function() {
-                    if (!window.board2) { alert('No board available.'); return; }
-                    // On a move (not the start), play out the ALTERNATIVE to it: all links and the
-                    // From Position block use the position before that move
-                    const clickedNode = window.currentMoveNode;
-                    const altNode = clickedNode && clickedNode.parent && clickedNode.san && clickedNode.parent.fen ? clickedNode : null;
-                    const boardFen = altNode ? altNode.parent.fen.split(' ')[0] : window.board2.fen();
-                    const turn = altNode ? altNode.parent.fen.split(' ')[1] : (window.fenExportColor || 'w');
-                    const fullFen = boardFen + ' ' + turn + ' KQkq - 0 1';
-                    const baseFen = boardFen.replace(/ /g, '_');
-                    const colorName = turn === 'w' ? 'white' : 'black';
-                    const whiteUrl = `https://lichess.org/analysis/${baseFen}_w_KQkq_-_0_1`;
-                    const blackUrl = `https://lichess.org/analysis/${baseFen}_b_KQkq_-_0_1`;
-                    const editorUrl = `https://lichess.org/editor/${baseFen}_${turn}_KQkq_-_0_1?color=${colorName}`;
+                    const t = window.lichessLinkTargets();
+                    if (!t) { alert('No board available.'); return; }
+                    // Position before the move you are on (see lichessLinkTargets)
+                    const altNode = t.altNode, boardFen = t.boardFen, turn = t.turn;
+                    const fullFen = t.fullFen, whiteUrl = t.w, blackUrl = t.b, editorUrl = t.editor;
                     document.getElementById('fenLichessModalFen').textContent = fullFen;
                     document.getElementById('fenLichessWhiteLink').href = whiteUrl;
                     document.getElementById('fenLichessWhiteLink').textContent = whiteUrl;
