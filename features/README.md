@@ -1,10 +1,10 @@
 # Feature inventory
 
-`index.html` is 19,242 lines with **280 buttons** and **25 `…Modal` overlays**
+`index.html` is 19,318 lines with **282 buttons** and **25 `…Modal` overlays**
 (`grep -c 'id="[^"]*[Mm]odal"'`). This directory maps every
 button to the feature that owns it, so a cut is a lookup instead of a hunt.
 
-- **[BUTTONS.md](BUTTONS.md)** — all 280 buttons, sorted by line, each linked to its feature file.
+- **[BUTTONS.md](BUTTONS.md)** — all 282 buttons, sorted by line, each linked to its feature file.
   Generated. Rerun `python3 features/extract_buttons.py` after every edit; line numbers move.
 - **`NN-<feature>.md`** — one file per feature: its buttons, its API endpoints, its localStorage
   keys, its other files, and a keep/cut verdict. Hand-written. These are yours to argue with.
@@ -60,7 +60,7 @@ Not feature count. **Duplicate paths to four jobs:**
 | 01 | [Core board + move navigation](01-core-board.md) | 22 | KEEP |
 | 02 | [chess.com / Lichess fetchers](02-game-sources.md) | 3 | CUT (keep one) |
 | 03 | [Supabase game library](03-supabase-games.md) | — | **REMOVED** |
-| 04 | [Supabase Lines pane](04-supabase-lines.md) | 20 | KEEP |
+| 04 | [Supabase Lines pane](04-supabase-lines.md) | 22 | KEEP |
 | 05 | [Transfer to puzzles](05-puzzles-transfer.md) | 4 | KEEP |
 | 06 | [Save → Puzzles](06-puzzles-save.md) | 3 | MERGE into 05 |
 | 07 | [Variation adders](07-variations.md) | 34 | CUT — keep 2 of 8 |

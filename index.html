@@ -1391,6 +1391,7 @@
             <button id="cycleVarBtn" style="background: #17a2b8; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Cycle Var.</button>
             <button title="Exit the variation back to the main line (same as the ↑ key)" onclick="if(!exitVariationToBranchMainLineMove()) showToast('Already on the main line');" style="background: #17a2b8; color: white; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">↑ Up Out</button>
             <button id="copyVarBtnMini" title="Open the current variation, or the first alternative attached to the highlighted main-line move, as a From Position snippet to copy or flatten" onclick="lnOpenVarSnippetModal()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Var</button>
+            <button id="pasteVarBtnMini" title="The other way round: paste a From Position snippet copied from lichess.org/analysis, type a name, and press Enter to append it to chess_variations" onclick="lnOpenVarPasteModal()" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Paste Var</button>
             <button id="viewVarBtnMini" title="Browse the saved rows as a sortable grid (chess_variations, or whichever table you last viewed)" onclick="lnGridOpen()" style="background: #0f3460; color: #6c5ce7; border: 1px solid #6c5ce7; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">📊 View</button>
             <button title="Choose a recent Google Sheet or search by name, then load a game card onto the board" onclick="gdriveOpenPicker()" style="background: #137333; color: white; border: 1px solid #34a853; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sheets ▾</button>
             <button id="coachNoteBtnMini" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
@@ -1432,12 +1433,13 @@
         <div id="copyVarResultModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:10000; justify-content:center; align-items:center;" onclick="if(event.target===this)this.style.display='none'">
           <div style="background:#16213e; border-radius:10px; padding:24px; max-width:560px; width:90%; max-height:90vh; overflow-y:auto; border:1px solid #e91e63; position:relative;">
             <button onclick="document.getElementById('copyVarResultModal').style.display='none'" style="position:absolute; top:10px; right:12px; background:none; border:none; color:#aaa; font-size:20px; cursor:pointer;">✕</button>
-            <div style="font-weight:bold; margin-bottom:6px; color:#e91e63; font-size:15px;">Variation snippet</div>
-            <div style="color:#aaa; font-size:12px; margin-bottom:10px;">Copy the snippet as shown, or flatten it to one line.</div>
-            <textarea id="copyVarResultText" readonly rows="7" spellcheck="false" onclick="this.select()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;"></textarea>
+            <div id="copyVarModalTitle" style="font-weight:bold; margin-bottom:6px; color:#e91e63; font-size:15px;">Variation snippet</div>
+            <div id="copyVarModalHint" style="color:#aaa; font-size:12px; margin-bottom:10px;">Copy the snippet as shown, or flatten it to one line.</div>
+            <textarea id="copyVarResultText" readonly rows="7" spellcheck="false" onclick="if(this.readOnly)this.select()" onkeydown="event.stopPropagation()" style="width:100%; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-family:monospace; font-size:12px; margin-bottom:10px;"></textarea>
             <div style="display:flex; gap:8px; margin-bottom:8px;">
               <button id="copyVarResultCopyBtn" onclick="lnCopyVarResult(this)" title="Copy the snippet exactly as it reads in the box" style="flex:2; padding:10px; background:#27ae60; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Copy snippet</button>
               <button id="copyVarFlattenBtn" onclick="lnShowVarFlatten()" title="Show the same variation as one line in its own box below" style="flex:1; padding:10px; background:#0f3460; color:#e91e63; border:1px solid #e91e63; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Flatten</button>
+              <button id="copyVarPasteInBtn" onclick="lnVarPasteIn(this)" title="Read the From Position snippet off the clipboard into the box above (Cmd/Ctrl+V in the box works too)" style="display:none; flex:1; padding:10px; background:#0f3460; color:#6c5ce7; border:1px solid #6c5ce7; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Paste in</button>
             </div>
             <div id="copyVarOneLineWrap" style="display:none; margin-bottom:10px;">
               <div style="color:#e91e63; font-size:12px; margin-bottom:4px;">One line — copy from here</div>
@@ -5075,10 +5077,65 @@
             document.getElementById('copyVarOneLineOut').value = '';
             document.getElementById('copyVarOneLineWrap').style.display = 'none';
             document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
+            lnVarSnippetMode(false);
             lnVarResetName();
             lnVarSaveMsg('');
             lnVarLoadNames(false);
             document.getElementById('copyVarResultModal').style.display = 'flex';
+        }
+
+        // The same modal, the other direction: the snippet box becomes yours to type into so a
+        // From Position snippet copied out of lichess.org/analysis can go straight into
+        // chess_variations. Everything below it (flatten, copy, name, append) is unchanged.
+        function lnVarSnippetMode(paste) {
+            const box = document.getElementById('copyVarResultText');
+            const title = document.getElementById('copyVarModalTitle');
+            const hint = document.getElementById('copyVarModalHint');
+            const pasteBtn = document.getElementById('copyVarPasteInBtn');
+            if (box) {
+                box.readOnly = !paste;
+                box.removeAttribute('readonly');            // the HTML attribute wins over .readOnly in some paths
+                if (!paste) box.setAttribute('readonly', '');
+                box.style.borderColor = paste ? '#6c5ce7' : '#555';
+                box.placeholder = paste ? '[Variant "From Position"]\n[FEN "\u2026"]\n\n1... Qc3 2. Re1 d4' : '';
+            }
+            if (pasteBtn) pasteBtn.style.display = paste ? 'block' : 'none';
+            if (title) title.textContent = paste ? 'Paste a variation from Lichess' : 'Variation snippet';
+            if (hint) hint.textContent = paste
+                ? 'Paste the From Position snippet from lichess.org/analysis into the box \u2014 Cmd/Ctrl+V, or the Paste in button \u2014 then name it below and press Enter.'
+                : 'Copy the snippet as shown, or flatten it to one line.';
+        }
+
+        // Nothing reads the clipboard on open: Chrome's own "see text you copied" permission
+        // bubble locks the page until it is answered, which reads as a dead textarea. The box is
+        // plainly editable; this button is here for when the keyboard is not.
+        async function lnVarPasteIn(btn) {
+            const box = document.getElementById('copyVarResultText');
+            try {
+                const t = await navigator.clipboard.readText();
+                if (!t || !t.trim()) { lnVarSaveMsg('The clipboard is empty'); return; }
+                box.value = t.trim();
+                lnVarSaveMsg('Pasted \u2014 name it below and press Enter', true);
+                const nameEl = document.getElementById('copyVarSaveName');
+                if (nameEl) nameEl.focus();
+            } catch (e) {
+                lnVarSaveMsg('Chrome blocked the clipboard read \u2014 click in the box and press Cmd/Ctrl+V');
+                box.focus();
+            }
+        }
+
+        function lnOpenVarPasteModal() {
+            const box = document.getElementById('copyVarResultText');
+            box.value = '';
+            document.getElementById('copyVarOneLineOut').value = '';
+            document.getElementById('copyVarOneLineWrap').style.display = 'none';
+            document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
+            lnVarSnippetMode(true);
+            lnVarResetName();
+            lnVarSaveMsg('');
+            lnVarLoadNames(false);
+            document.getElementById('copyVarResultModal').style.display = 'flex';
+            box.focus();
         }
 
         async function lnCopyVarResult(btn) {
@@ -5151,6 +5208,10 @@
             if (!snippet) { lnVarSaveMsg('Open a variation snippet first'); return; }
             if (!name) { lnVarSaveMsg('Give the row a name'); if (nameEl) nameEl.focus(); return; }
             if (/^\d+$/.test(name)) { lnVarSaveMsg('The name can\'t be all digits \u2014 a number means the row #'); return; }
+            if (!/\[FEN\s+"[^"]+"\]/.test(snippet)) {
+                lnVarSaveMsg('That snippet has no [FEN "\u2026"] tag \u2014 paste the whole From Position block from Lichess');
+                return;
+            }
             // Store it flattened, one line per row, like the rows kept in the sheet.
             const pgn = snippet.replace(/\s+/g, ' ').trim().replace(/\]\s+\[/g, '][');
             if (btn) btn.disabled = true;
@@ -5172,6 +5233,8 @@
             }
         }
         window.lnOpenVarSnippetModal = lnOpenVarSnippetModal;
+        window.lnOpenVarPasteModal = lnOpenVarPasteModal;
+        window.lnVarPasteIn = lnVarPasteIn;
         window.lnCopyVarResult = lnCopyVarResult;
         window.lnShowVarFlatten = lnShowVarFlatten;
         window.lnCopyVarOneLine = lnCopyVarOneLine;
