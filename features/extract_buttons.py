@@ -61,7 +61,7 @@ RULES = [
                        r'|toggleBoardBorder|openHintsModal|hintsModal|clearResults|flip_board2'
                        r'|board2PrevMove|board2NextMove|loadCurrentBtn'
                        r'|toggleMoveTable|toggleAddVarBtn|toggleNavBtnsBtn|showOpeningToast'
-                       r'|toggleChatBtn|loadAndAnalyze|lichessLinks|showOpening'),
+                       r'|toggleChatBtn|loadAndAnalyze|lichessLinks|openLichessHere|showOpening'),
 ]
 
 NOISE = {'if','for','while','return','function','setTimeout','typeof','String','Number','alert'}

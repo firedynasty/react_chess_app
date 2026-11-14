@@ -19,11 +19,11 @@ The board itself: load a PGN, step through moves, flip, sound, signals, opening 
 | 858 | `analyzeBtn` | Analyze Game | `analyzeGame` |
 | 860 | `—` | Hints | `openHintsModal` |
 | 861 | `—` | Clear | `clearResults` |
+| 1420 | `—` | ↗ Lichess this position | `openLichessHere` |
 | 1468 | `toggleNavBtnsBtn` | ▶ Show Nav Buttons | `getElementById, getElementById` |
 | 1486 | `loadToBoardMini` | Load to Board | `loadPgnToBoard` |
 | 1495 | `toggleSoundBtnMini` | Sound On | `toggleChessSound` |
 | 1496 | `toggleBorderBtnMini` | Signals On | `toggleBoardBorder` |
-| 1500 | `—` | Lichess Links | `proxy → `#lichessLinksBtn`` |
 | 1501 | `showOpeningBtn` | 📖 Opening | `showOpeningToast` |
 | 1502 | `—` | Reanalyze | `proxy → `#analyzeGameBtn`` |
 | 1504 | `copyBoardPgnBtnMini` | Copy PGN | `copyPgnToClipboard` |
@@ -45,6 +45,14 @@ The board itself: load a PGN, step through moves, flip, sound, signals, opening 
 - But see `duplicate-controls.md` — a third of these buttons exist twice.
 
 ## Culled
+
+- **The mini-bar `Lichess Links` proxy** — removed. A `#-` button in the mini quick-access bar
+  whose whole body was `document.getElementById('lichessLinksBtn').click()`; see
+  `duplicate-controls.md`. The real `#lichessLinksBtn` (control row) and its modal are untouched.
+  Replaced by **↗ Lichess this position** (`openLichessHere`), which skips the modal and opens
+  the highlighted move's own FEN on the Lichess analysis board, with the side to move read out of
+  that FEN. The modal's copy-a-URL step and the move list's right-click menu are both unusable on
+  mobile, which is what this is for.
 
 - **`copyPgnBtn` "Copy PGN"** — removed, the one in the paste-PGN row above `Clear`. Element was
   at `index.html:861`; binding block and anonymous handler at `index.html:12845-12868` (24 lines).

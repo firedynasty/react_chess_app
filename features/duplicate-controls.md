@@ -13,9 +13,10 @@ Nothing here is a feature decision. It is the same feature, wired twice.
 **Done so far.** `#loadToBoard` (the **load to board** pair) is culled — see
 [01-core-board.md](01-core-board.md) `## Culled` — and all 11 Dropbox buttons went with the
 feature ([15-dropbox.md](15-dropbox.md)), which also took three of the five hidden-but-revealed
-ones. Line numbers below are pre-cull; work from the ids.
+ones. The mini-bar **lichess links** proxy is culled too — see [01-core-board.md](01-core-board.md)
+`## Culled`. Line numbers below are pre-cull; work from the ids.
 
-## 11 buttons whose only job is clicking another button
+## 10 buttons whose only job is clicking another button
 
 Pure indirection. Move the real handler onto the visible button, delete the target.
 
@@ -26,7 +27,6 @@ Pure indirection. Move the real handler onto the visible button, delete the targ
 | 1490 | Next → | `#board2NextMove` |
 | 1508 | Export FEN | `#exportFenBtn` |
 | 1516 | Flip Board | `#flip_board2` |
-| 1517 | Lichess Links | `#lichessLinksBtn` |
 | 1519 | Reanalyze | `#analyzeGameBtn` |
 | 1520 | Get Eval | `#getEvalBtn` |
 | 2090 | ⬆ Load JSON | `#plJsonInput` |
@@ -85,7 +85,7 @@ independent reason to start there. Deleting these eight changes nothing on scree
 | 1607 | `updateReportBtn` | Update Report | `updateReportWithPgn` |
 | 1627 | `reportAppendVariantBtn` | Report Append Variant | `function @14740` |
 
-## 29 labels appearing on more than one button
+## 28 labels appearing on more than one button
 
 `Clear`, `Close`, `Cancel`, `Save`, `Load` repeat because each modal has its own — that is fine.
 The ones to act on are marked **identical handler**: two buttons, one function, no reason.
@@ -200,11 +200,6 @@ Two more went with the Supabase game library ([03-supabase-games.md](03-supabase
 
 - `index.html:1241` `#insert-variation-btn` → `insertPastedVariation` · [variations](07-variations.md)
 - `index.html:1464` `#-` → `getElementById, getElementById, insertPastedVariation, getElementById` · [variations](07-variations.md)
-
-**lichess links** — 2 buttons
-
-- `index.html:1517` `#-` → `proxy → #lichessLinksBtn` · [core-board](01-core-board.md)
-- `index.html:1611` `#lichessLinksBtn` → `function @13455` · [core-board](01-core-board.md)
 
 **next →** — 2 buttons
 
