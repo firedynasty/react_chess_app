@@ -1449,8 +1449,12 @@
             <div style="border-top:1px solid #333; margin-bottom:10px; padding-top:12px;">
               <div style="color:#6c5ce7; font-size:12px; font-weight:bold; margin-bottom:2px;">Save to Supabase</div>
               <div style="color:#aaa; font-size:11px; margin-bottom:6px;">Appends a row to <code style="color:#ddd;">chess_variations</code>, which has two columns: the box below is the row's <code style="color:#ddd;">name</code>, the snippet (one line) goes in <code style="color:#ddd;">pgn</code>.</div>
-              <input id="copyVarSaveName" list="copyVarNameList" type="text" spellcheck="false" placeholder="name, e.g. stonewall_attack_the_knight" title="The row&#39;s name in chess_variations. Existing names autocomplete." onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="width:100%; box-sizing:border-box; margin-bottom:6px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace;">
+              <div style="display:flex; gap:6px; margin-bottom:6px;">
+                <input id="copyVarSaveName" list="copyVarNameList" type="text" spellcheck="false" placeholder="name, e.g. stonewall_attack_the_knight" title="The row&#39;s name in chess_variations. Type to filter the list below, or pick a name from it." oninput="lnVarNamesFilter(this.value)" onkeydown="if(event.key===&#39;Enter&#39;){event.preventDefault();lnSaveVarToSupabase(document.getElementById(&#39;copyVarSaveBtn&#39;));}" style="flex:1; min-width:0; box-sizing:border-box; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:8px; font-size:13px; font-family:monospace;">
+                <button id="copyVarNamesBtn" onclick="lnVarNamesToggle()" title="Show every name already in chess_variations — click one to reuse it" style="flex-shrink:0; padding:8px 10px; background:#0f3460; color:#6c5ce7; border:1px solid #6c5ce7; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold; white-space:nowrap;">▾ names</button>
+              </div>
               <datalist id="copyVarNameList"></datalist>
+              <div id="copyVarNamesPanel" style="display:none; max-height:190px; overflow-y:auto; background:#121a33; border:1px solid #6c5ce7; border-radius:4px; padding:4px; margin-bottom:6px;"></div>
               <button id="copyVarSaveBtn" onclick="lnSaveVarToSupabase(this)" title="Append this variation to chess_variations as a new row" style="width:100%; padding:10px; background:#6c5ce7; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:bold; font-size:14px;">Append to chess_variations</button>
               <div id="copyVarSaveStatus" style="font-size:11px; margin-top:6px; min-height:14px;"></div>
             </div>
@@ -5079,6 +5083,7 @@
             document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
             lnVarSnippetMode(false);
             lnVarResetName();
+            lnVarNamesClose();
             lnVarSaveMsg('');
             lnVarLoadNames(false);
             document.getElementById('copyVarResultModal').style.display = 'flex';
@@ -5132,6 +5137,7 @@
             document.getElementById('copyVarFlattenBtn').textContent = 'Flatten';
             lnVarSnippetMode(true);
             lnVarResetName();
+            lnVarNamesClose();
             lnVarSaveMsg('');
             lnVarLoadNames(false);
             document.getElementById('copyVarResultModal').style.display = 'flex';
@@ -5187,18 +5193,114 @@
 
         // Existing names autocomplete in the box, the way the puzzles page suggests them.
         // Cached per page load; the grid's delete clears it.
-        let lnVarNames = [];
+        let lnVarNames = [], lnVarNameCounts = {}, lnVarNamesErr = '';
         async function lnVarLoadNames(force) {
-            if (lnVarNames.length && !force) return;
+            if (lnVarNames.length && !force) { lnVarNamesBtnLabel(); return; }
             try {
                 const q = new URLSearchParams({ action: 'list', table: LN_VAR_TABLE });
                 const r = await fetch('/api/lines?' + q);
                 const rows = await r.json();
-                if (!r.ok || !Array.isArray(rows)) return;
-                lnVarNames = Array.from(new Set(rows.map(x => x.name).filter(Boolean))).sort();
+                if (!r.ok || !Array.isArray(rows)) { lnVarNamesErr = 'HTTP ' + r.status; lnVarNamesBtnLabel(); return; }
+                lnVarNamesErr = '';
+                lnVarNameCounts = {};
+                rows.forEach(x => { if (x && x.name) lnVarNameCounts[x.name] = (lnVarNameCounts[x.name] || 0) + 1; });
+                lnVarNames = Object.keys(lnVarNameCounts).sort((a, b) => a.localeCompare(b));
                 const dl = document.getElementById('copyVarNameList');
                 if (dl) dl.innerHTML = lnVarNames.map(n => '<option value="' + pzEsc(n) + '"></option>').join('');
-            } catch (e) { /* suggestions are optional */ }
+            } catch (e) { lnVarNamesErr = e.message || 'fetch failed'; }
+            lnVarNamesBtnLabel();
+            const panel = document.getElementById('copyVarNamesPanel');
+            if (panel && panel.style.display !== 'none') lnVarNamesRender();
+        }
+
+        // ---- The names already in chess_variations, as a list you can read and click.
+        // The datalist only ever showed itself once you had typed the right first letters, which
+        // is no help when the question is "what did I call these last time?". The ▾ names button
+        // opens the whole list with a row count per name; typing in the box filters it. Shared by
+        // Copy Var and Paste Var, since both open this one modal.
+        function lnVarNamesBtnLabel() {
+            const btn = document.getElementById('copyVarNamesBtn');
+            if (!btn) return;
+            const panel = document.getElementById('copyVarNamesPanel');
+            const open = !!panel && panel.style.display !== 'none';
+            const n = lnVarNames.length;
+            btn.textContent = (open ? '\u25b4 ' : '\u25be ') + (n ? n + ' name' + (n === 1 ? '' : 's') : 'names');
+        }
+
+        function lnVarNamesMsgRow(text) {
+            const d = document.createElement('div');
+            d.textContent = text;
+            d.style.cssText = 'padding:6px 7px; color:#888; font-size:11.5px;';
+            return d;
+        }
+
+        function lnVarNamesRender(filter) {
+            const panel = document.getElementById('copyVarNamesPanel');
+            const nameEl = document.getElementById('copyVarSaveName');
+            if (!panel) return;
+            const q = String(filter === undefined ? (nameEl ? nameEl.value : '') : filter).trim().toLowerCase();
+            panel.innerHTML = '';
+            if (!lnVarNames.length) {
+                panel.appendChild(lnVarNamesMsgRow(lnVarNamesErr
+                    ? 'Could not read ' + LN_VAR_TABLE + ' (' + lnVarNamesErr + ') \u2014 type the name by hand'
+                    : 'No rows in ' + LN_VAR_TABLE + ' yet \u2014 this one will be the first'));
+                return;
+            }
+            const hits = q ? lnVarNames.filter(n => n.toLowerCase().indexOf(q) !== -1) : lnVarNames;
+            if (!hits.length) {
+                panel.appendChild(lnVarNamesMsgRow('No existing name contains "' + q + '" \u2014 saving makes it a new one'));
+                return;
+            }
+            hits.forEach(n => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; justify-content:space-between; align-items:baseline; gap:8px; padding:5px 7px; border-radius:4px; cursor:pointer;';
+                const label = document.createElement('span');
+                label.textContent = n;
+                label.style.cssText = 'color:#ddd; font-family:monospace; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+                const count = document.createElement('span');
+                count.textContent = '\u00d7' + lnVarNameCounts[n];
+                count.style.cssText = 'color:#6c5ce7; font-size:11px; flex-shrink:0;';
+                count.title = lnVarNameCounts[n] + ' row' + (lnVarNameCounts[n] === 1 ? '' : 's') + ' already use this name';
+                row.appendChild(label); row.appendChild(count);
+                row.onmouseenter = () => { row.style.background = '#0f3460'; };
+                row.onmouseleave = () => { row.style.background = 'transparent'; };
+                row.onclick = () => lnVarPickName(n);
+                panel.appendChild(row);
+            });
+        }
+
+        function lnVarNamesToggle() {
+            const panel = document.getElementById('copyVarNamesPanel');
+            if (!panel) return;
+            if (panel.style.display === 'none') {
+                lnVarNamesRender();
+                panel.style.display = 'block';
+                lnVarLoadNames(true);          // refresh while it is on screen
+            } else {
+                panel.style.display = 'none';
+            }
+            lnVarNamesBtnLabel();
+        }
+
+        function lnVarNamesClose() {
+            const panel = document.getElementById('copyVarNamesPanel');
+            if (panel) panel.style.display = 'none';
+            lnVarNamesBtnLabel();
+        }
+
+        // Typing filters the list, but only while it is open — no surprise panel mid-type.
+        function lnVarNamesFilter(v) {
+            const panel = document.getElementById('copyVarNamesPanel');
+            if (panel && panel.style.display !== 'none') lnVarNamesRender(v);
+        }
+
+        function lnVarPickName(n) {
+            const nameEl = document.getElementById('copyVarSaveName');
+            if (!nameEl) return;
+            nameEl.value = n;
+            lnVarNamesClose();
+            nameEl.focus();
+            lnVarSaveMsg('Reusing "' + n + '" \u2014 ' + lnVarNameCounts[n] + ' row' + (lnVarNameCounts[n] === 1 ? '' : 's') + ' already have it. Enter to append.', true);
         }
 
         async function lnSaveVarToSupabase(btn) {
@@ -5235,6 +5337,8 @@
         window.lnOpenVarSnippetModal = lnOpenVarSnippetModal;
         window.lnOpenVarPasteModal = lnOpenVarPasteModal;
         window.lnVarPasteIn = lnVarPasteIn;
+        window.lnVarNamesToggle = lnVarNamesToggle;
+        window.lnVarNamesFilter = lnVarNamesFilter;
         window.lnCopyVarResult = lnCopyVarResult;
         window.lnShowVarFlatten = lnShowVarFlatten;
         window.lnCopyVarOneLine = lnCopyVarOneLine;

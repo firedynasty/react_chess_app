@@ -6,7 +6,7 @@ The ☰ side pane: save the board PGN as a named line, load by row # or name, br
 
 **Entry point.** `☰` (index.html:990) opens `#supabase_fens_pgns`; `Copy Var` (index.html:1393) opens the snippet modal on the board's variation and `Paste Var` (index.html:1394) opens the same modal with the box editable, both ending in `Append to chess_variations`.
 
-**Footprint.** 22 buttons · 348 lines of `index.html` match the owning pattern (see `extract_buttons.py` RULES)
+**Footprint.** 23 buttons · 383 lines of `index.html` match the owning pattern (see `extract_buttons.py` RULES)
 
 **API.** `/api/lines`
 
@@ -36,8 +36,9 @@ The ☰ side pane: save the board PGN as a named line, load by row # or name, br
 | 1441 | `copyVarFlattenBtn` | Flatten | `lnShowVarFlatten` |
 | 1442 | `copyVarPasteInBtn` | Paste in *(hidden until paste mode)* | `lnVarPasteIn` |
 | 1447 | `copyVarOneLineCopyBtn` | Copy line | `lnCopyVarOneLine` |
-| 1454 | `copyVarSaveBtn` | Append to chess_variations | `lnSaveVarToSupabase` |
-| 1457 | `—` | Close *(~inherited)* | `getElementById` |
+| 1454 | `copyVarNamesBtn` | ▾ names | `lnVarNamesToggle` |
+| 1458 | `copyVarSaveBtn` | Append to chess_variations | `lnSaveVarToSupabase` |
+| 1461 | `—` | Close *(~inherited)* | `getElementById` |
 | 5362 | `—` | 📋 | `stopPropagation, lnGridCopy` |
 | 5363 | `—` | 🗑 | `stopPropagation, lnGridDelete` |
 
@@ -56,6 +57,25 @@ The ☰ side pane: save the board PGN as a named line, load by row # or name, br
   grid's current order and filter — is no longer next to the `📊 View` that fills it.
 
 ## Added
+
+- **`▾ names` (`copyVarNamesBtn`, index.html:1454) — the existing names, as a list you can read.**
+  The `#copyVarSaveName` box has always had a `<datalist>`, but a datalist only appears once you
+  have typed the matching first letters, which is no use when the question is *what did I call
+  these last time?* The button now carries the count (`▾ 5 names`) and opens
+  `#copyVarNamesPanel`: every name in `chess_variations`, alphabetical, with `×N` for how many
+  rows already use it. Click one and it fills the box, closes the panel, and the status line says
+  how many rows share it; typing in the box filters the panel live (`oninput="lnVarNamesFilter"`),
+  but only while it is open, so nothing pops up mid-type.
+  **State.** `lnVarLoadNames()` now builds `lnVarNameCounts` from the same `/api/lines?action=list`
+  response it already fetched — no new endpoint, no second request — with `lnVarNames` derived from
+  its keys and `lnVarNamesErr` holding why a load failed, which the panel shows in place of the
+  list instead of coming up blank. Opening the panel refreshes it.
+  **New:** `lnVarNamesToggle()`, `lnVarNamesRender()`, `lnVarNamesFilter()`, `lnVarNamesClose()`,
+  `lnVarNamesBtnLabel()`, `lnVarNamesMsgRow()`, `lnVarPickName()`; `lnVarNamesToggle` and
+  `lnVarNamesFilter` are the two on `window` (the rest have no inline caller). Rows are built as
+  DOM nodes, not an `innerHTML` string, so a name holding a quote cannot break the panel.
+  Both openers call `lnVarNamesClose()`, so the modal always arrives with it shut. Because Copy Var
+  and Paste Var are the same modal, this lands on both at once — the datalist stays as well.
 
 - **`Paste Var` (`pasteVarBtnMini`, index.html:1394) — the snippet modal run backwards.** `Copy Var`
   takes the variation on the board *out* to Lichess; this takes a line built *at*
