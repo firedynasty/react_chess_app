@@ -686,38 +686,51 @@
             margin-top: 6px;
         }
         .gdrive-cell-input:focus { outline: none; border-color: #00d4ff; }
-        /* Comment bubble on the board (chess.com-style): the ⭐ toggles it.
-           Shows the comment for the move you are standing on — PGN comments
-           (AI Comments → PGN, your own {…}) and coach-doc notes alike. */
-        #coachNoteBubble {
-            position: absolute;
-            z-index: 12;
-            width: 220px;
+        /* Comment note for the move you are standing on, in #coachNoteSlot under
+           the board. The ⭐ toggles it. Shows PGN comments (your own {…},
+           AI Comments → PGN) and coach-doc notes alike. */
+        /* Fixed height whether or not there is a note, so the controls below the
+           board never jump as you step through moves (matters most on mobile) */
+        #coachNoteSlot { min-height: 30px; }
+        #coachNoteSlot:empty::before {
+            content: 'No comment on this move';
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 30px;
             box-sizing: border-box;
-            padding: 8px 10px;
+            border: 1px dashed #2a2a4e;
+            border-radius: 6px;
+            color: #555;
+            font-size: 11px;
+        }
+        #coachNoteBubble {
+            position: relative;
+            min-height: 30px;
+            box-sizing: border-box;
+            padding: 4px 26px 4px 8px;
             background: #16213e;
             border: 2px solid #ffd700;
-            border-radius: 8px;
-            box-shadow: 0 4px 14px rgba(0,0,0,0.55);
+            border-radius: 6px;
             color: #eee;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
             font-size: 12px;
-            line-height: 1.35;
+            line-height: 1.4;
             text-align: left;
             cursor: pointer;
-            pointer-events: auto;
         }
         #coachNoteBubble .cb-head {
             color: #ffd700;
             font-weight: bold;
             font-size: 11px;
             font-family: monospace;
-            margin-bottom: 3px;
-            padding-right: 14px;
+            margin-right: 6px;
         }
         #coachNoteBubble .cb-close {
             position: absolute;
-            top: 3px;
-            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            right: 8px;
             color: #888;
             font-size: 13px;
             line-height: 1;
@@ -726,30 +739,11 @@
         #coachNoteBubble:hover .cb-close { color: #ffd700; }
         #coachNoteBubble .cb-text {
             display: -webkit-box;
-            -webkit-line-clamp: 4;
+            -webkit-line-clamp: 3;     /* one line usually; a long note grows a little */
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
         #coachNoteBubble .cb-more { color: #888; font-size: 10px; margin-top: 4px; }
-        /* tail: a diamond rotated 45°, borders on the two outward sides only */
-        #coachNoteBubble .cb-tail {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            background: #16213e;
-            transform: rotate(45deg);
-            margin-left: -6px;
-        }
-        #coachNoteBubble.cb-above .cb-tail {
-            bottom: -7px;
-            border-right: 2px solid #ffd700;
-            border-bottom: 2px solid #ffd700;
-        }
-        #coachNoteBubble.cb-below .cb-tail {
-            top: -7px;
-            border-left: 2px solid #ffd700;
-            border-top: 2px solid #ffd700;
-        }
             body.signals-off #boardCommentBar { display: none !important; }
             /* the green variation arrows show where a variation branches off */
             body.signals-off #board2ArrowSvg .arrow-line { display: none !important; }
@@ -1279,7 +1273,8 @@
             <button onclick="practiceBack()" title="Leave practice and return to the move you started from" style="flex: 1; padding: 7px; background: #0f3460; color: #eee; border: 1px solid #555; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px;">Back to game</button>
           </div>
         </div>
-        <p style="color: #666; font-size: 11px; margin: 6px 0 0 0;">← → or PageDown = moves | Enter = ⭐ coach note | ↓ = step into a variation | ↑ = exit variation (closes note if open) | Tab or / = cycle variation (adds one if none) | Esc = close note / clear variation</p>
+        <!-- Comment note for the move you are standing on (renderCoachNoteBubble) -->
+        <div id="coachNoteSlot" style="width: 100%; max-width: 400px; box-sizing: border-box; margin-top: 6px;"></div>
       </div>
 
       <!-- Move Table Container with File Section Header -->
@@ -2431,64 +2426,43 @@
         // the way chess.com shows a comment on a reviewed move. Click it for the
         // full note. Entry is null when there is nothing to show (or bubbles are off).
         function renderCoachNoteBubble(entry) {
-            var wrap = document.getElementById('board2Wrap');
-            if (!wrap) return;
+            var wrap = document.getElementById('coachNoteSlot');
             var bub = document.getElementById('coachNoteBubble');
-            if (!entry) { if (bub) bub.remove(); return; }
+            function drop() { if (bub) bub.remove(); }
+            if (!wrap) { drop(); return; }
+            if (!entry) { drop(); return; }
             // Hidden by a click on the bubble, until you step onto another move
             var curId = (window.currentMoveNode && window.currentMoveNode.nodeId) || 'flat';
             if (window._coachBubbleHidden && window._coachBubbleHidden !== curId) {
                 window._coachBubbleHidden = null;   // a different move — start showing again
             }
-            if (window._coachBubbleHidden === curId) { if (bub) bub.remove(); return; }
+            if (window._coachBubbleHidden === curId) { drop(); return; }
             if (!bub) {
                 bub = document.createElement('div');
                 bub.id = 'coachNoteBubble';
                 bub.title = 'Click to hide this bubble — right-click for the full note (Enter or / too)';
                 bub.onclick = function () { hideCoachNoteBubble(); };
                 bub.oncontextmenu = function (e) { e.preventDefault(); openCoachNoteForCurrentMove(); return false; };
-                wrap.appendChild(bub);
             }
+            if (bub.parentNode !== wrap) wrap.appendChild(bub);
             var text = String(entry.text || '').replace(/\s+/g, ' ').trim();
-            if (!text) { bub.remove(); return; }
-            var short = text.length > 240 ? text.slice(0, 240).replace(/\S*$/, '') + '…' : text;
+            if (!text) { drop(); return; }
             bub.innerHTML = '';
-            var head = document.createElement('div');
+            // One line: "💬 10. Nf3  the comment…" — label and text share the line
+            var body = document.createElement('div');
+            body.className = 'cb-text';
+            var head = document.createElement('span');
             head.className = 'cb-head';
             head.textContent = '💬 ' + (entry.label || '').trim();
-            bub.appendChild(head);
+            body.appendChild(head);
+            body.appendChild(document.createTextNode(text));
+            bub.appendChild(body);
             var close = document.createElement('span');
             close.className = 'cb-close';
             close.textContent = '✕';
             close.title = 'Hide this bubble';
             close.onclick = function (e) { e.stopPropagation(); hideCoachNoteBubble(); };
             bub.appendChild(close);
-            var body = document.createElement('div');
-            body.className = 'cb-text';
-            body.textContent = short;
-            bub.appendChild(body);
-            if (short !== text) {
-                var more = document.createElement('div');
-                more.className = 'cb-more';
-                more.textContent = 'right-click for all of it';
-                bub.appendChild(more);
-            }
-            var tail = document.createElement('div');
-            tail.className = 'cb-tail';
-            bub.appendChild(tail);
-
-            // Pin above the square the move landed on — below it instead when the
-            // square is near the top edge, and nudged so a 220px card stays on the board
-            var sq = coachNoteSquare();
-            var c = sq ? board2SquareToCoords(sq) : { x: 200, y: 400 };
-            var above = c.y > 150;
-            var cx = Math.min(Math.max(c.x, 112), 288);
-            bub.classList.toggle('cb-above', above);
-            bub.classList.toggle('cb-below', !above);
-            bub.style.left = (cx / 4) + '%';
-            bub.style.top = ((above ? c.y - 28 : c.y + 28) / 4) + '%';
-            bub.style.transform = 'translateX(-50%)' + (above ? ' translateY(-100%)' : '');
-            tail.style.left = (50 + (c.x - cx) / 2.2) + '%';
         }
 
         // ---- + Comment: the comment for the move you are standing on, written
