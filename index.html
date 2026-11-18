@@ -1182,6 +1182,24 @@
         <p style="color: #666; font-size: 11px; margin: 8px 0 0 0;">Just type text to attach to current move (works in variations too). Or use: "5, comment" for white's 5th, "5..., comment" for black's 5th.</p>
     </div>
 
+    <!-- + Comment CLI — many comments at once, addressed by move number: "10. text" / "25... text" -->
+    <div id="commentCliModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 10000; align-items: center; justify-content: center;" onclick="if (event.target === this) closeCommentCliModal()">
+      <div style="background: #16213e; border: 1px solid #2ecc71; border-radius: 10px; padding: 16px; width: 620px; max-width: 92vw; box-shadow: 0 10px 40px rgba(0,0,0,0.6);">
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px;">
+          <span style="color: #2ecc71; font-weight: bold; font-size: 14px;">💬 Comment CLI <span id="commentCliCurrent" style="font-family: monospace; color: #888; font-weight: normal; font-size: 12px;"></span></span>
+          <button onclick="closeCommentCliModal()" style="background: none; border: none; color: #888; font-size: 20px; cursor: pointer; line-height: 1;">✕</button>
+        </div>
+        <textarea id="commentCliInput" rows="8" spellcheck="false" placeholder='10. "blunder because forgot to guard"&#10;25. attack the rook with pawn&#10;25... had a tactic there&#10;12. +adds to the comment already on 12.' style="width: 100%; box-sizing: border-box; background: #0f3460; color: #eee; border: 1px solid #1a1a2e; border-radius: 6px; padding: 10px; font-family: monospace; font-size: 13px; line-height: 1.5; resize: vertical;"></textarea>
+        <div style="display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap;">
+          <button onclick="runCommentCli()" style="padding: 8px 16px; background: #2ecc71; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">Apply</button>
+          <button onclick="navigator.clipboard.readText().then(function (t) { var ta = document.getElementById('commentCliInput'); ta.value = (ta.value.trim() ? ta.value.replace(/\s+$/, '') + '\n' : '') + (t || '').trim(); ta.focus(); })" style="padding: 8px 15px; background: #3498db; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">📋 Paste</button>
+          <button onclick="document.getElementById('commentCliInput').value = ''; document.getElementById('commentCliInput').focus();" style="padding: 8px 15px; background: #333; color: #888; border: none; border-radius: 6px; cursor: pointer;">Clear</button>
+        </div>
+        <div id="commentCliStatus" style="font-size: 12px; margin-top: 8px; white-space: pre-wrap; font-family: monospace;"></div>
+        <p style="color: #666; font-size: 11px; margin: 10px 0 0 0;"><b>10.</b> = White's 10th, <b>10...</b> = Black's 10th (main line). Quotes optional. A line with no number goes on the move you are standing on (works in variations). <b>+text</b> adds to an existing comment instead of replacing it; a number with nothing after it clears that comment. Lines that can't be placed stay in the box. Cmd/Ctrl+Enter applies, Esc closes.</p>
+      </div>
+    </div>
+
     <!-- + Comment — write the comment for the move you are standing on, straight into the PGN -->
     <div id="moveCommentModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); z-index: 10000; align-items: center; justify-content: center;" onclick="if (event.target === this) closeMoveCommentModal()">
       <div style="background: #16213e; border: 1px solid #2ecc71; border-radius: 10px; padding: 16px; width: 560px; max-width: 92vw; box-shadow: 0 10px 40px rgba(0,0,0,0.6);">
@@ -1398,7 +1416,7 @@
             <button id="mstSideBtn" title="Whose mistakes the , and . keys hop between — click to cycle White → Black → Both. The number is how many ?, ?? and ?! moves that side has on the main line of this game" onclick="mstToggleSide()" style="background: #0f3460; color: #eeeeee; border: 1px solid #eeeeee; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ White (0)</button>
             <button id="mstPrevBtn" title="Jump back to that side's previous mistake (same as the , key)" onclick="mstStep(-1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">, ◀ ⚠</button>
             <button id="mstNextBtn" title="Jump to that side's next mistake (same as the . key)" onclick="mstStep(1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ ▶ .</button>
-            <button id="addCommentBtn" title="Write or edit the comment on the move you are standing on (variations too). It goes into the PGN itself, so Copy PGN keeps it and it comes back when you load that PGN again" onclick="openMoveCommentModal()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">💬 + Comment</button>
+            <button id="addCommentBtn" title="Type comments by move number, one per line: 10. text / 25... text. A line with no number goes on the move you are standing on (variations too). They go into the PGN itself, so Copy PGN keeps them" onclick="openCommentCliModal()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">💬 + Comment CLI</button>
             <button id="addVar2Btn" title="Paste a practice snippet (FEN + moves): it finds the move the FEN matches and adds the line there as the single variation" onclick="openAddVar2()" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Add Var. 2</button>
             <button id="playout-btn" title="Engine plays both sides from this position to the end (mate/stalemate/draw) and adds the line as a variation, replacing an earlier play-out. Click again to stop." onclick="playOutToEnd()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Play Out</button>
             <button id="practice-btn" title="Play Stockfish from this move (or the move before) and copy the moves as a From Position snippet. Your game stays loaded." onclick="openPracticeModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Practice</button>
@@ -2545,6 +2563,112 @@
             if (!modal || modal.style.display !== 'flex') return;
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveMoveComment(); }
             else if (e.key === 'Escape') { e.preventDefault(); closeMoveCommentModal(); }
+        });
+
+        // ---- + Comment CLI: "10. text" / "25... text", one per line ----
+        function commentCliLabel(node) {
+            return node.moveNumber + (node.isBlackMove ? '... ' : '. ') + node.san;
+        }
+
+        function openCommentCliModal() {
+            var cur = window.moveTree && window.currentMoveNode;
+            document.getElementById('commentCliCurrent').textContent =
+                (cur && cur.san) ? '(no number → ' + commentCliLabel(cur) + ')' : '';
+            document.getElementById('commentCliStatus').textContent = '';
+            document.getElementById('commentCliModal').style.display = 'flex';
+            var ta = document.getElementById('commentCliInput');
+            setTimeout(function () { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+        }
+        window.openCommentCliModal = openCommentCliModal;
+
+        function closeCommentCliModal() {
+            document.getElementById('commentCliModal').style.display = 'none';
+        }
+        window.closeCommentCliModal = closeCommentCliModal;
+
+        function runCommentCli() {
+            var ta = document.getElementById('commentCliInput');
+            var statusEl = document.getElementById('commentCliStatus');
+            if (!window.moveTree) { statusEl.style.color = '#ff6b6b'; statusEl.textContent = 'No game loaded'; return; }
+
+            function findMainline(num, black) {
+                var n = window.moveTree.children && window.moveTree.children[0];
+                while (n) {
+                    if (n.san && n.moveNumber === num && !!n.isBlackMove === black) return n;
+                    n = n.children && n.children[0];
+                }
+                return null;
+            }
+            function clean(t) {
+                t = t.trim();
+                var q = t.match(/^["“'](.*)["”']$/);
+                if (q) t = q[1].trim();
+                return t.replace(/[{}]/g, '').replace(/\s+/g, ' ').trim();
+            }
+
+            // Several lines for the same move are joined, in order
+            var edits = [];          // { node, append, parts[] }
+            var failed = [], errors = [];
+            ta.value.split('\n').forEach(function (raw) {
+                var line = raw.trim();
+                if (!line) return;
+                var node, body;
+                var m = line.match(/^(\d+)\s*(\.\.\.|…|\.|,)\s*(.*)$/);
+                if (m) {
+                    var black = m[2] === '...' || m[2] === '…';
+                    node = findMainline(parseInt(m[1], 10), black);
+                    if (!node) { failed.push(raw); errors.push('no main-line move ' + m[1] + (black ? '...' : '.')); return; }
+                    body = m[3];
+                } else {
+                    node = window.currentMoveNode;
+                    if (!node || !node.san) { failed.push(raw); errors.push('no move number and not standing on a move: "' + line.slice(0, 30) + '"'); return; }
+                    body = line;
+                }
+                body = body.trim();
+                var append = /^\+/.test(body);
+                if (append) body = body.slice(1);
+                var text = clean(body);
+                var e = edits.find(function (x) { return x.node === node; });
+                if (!e) { e = { node: node, append: append, parts: [] }; edits.push(e); }
+                if (text) e.parts.push(text);
+            });
+
+            edits.forEach(function (e) {
+                var old = String(e.node.comment || '');
+                var tags = (old.match(/\[%(?:eval|clk)[^\]]*\]/g) || []).join(' ');
+                var prev = e.append ? old.replace(/\[%(?:eval|clk)[^\]]*\]/g, '').replace(/\s+/g, ' ').trim() : '';
+                e.node.comment = [tags, prev, e.parts.join(' ')].filter(Boolean).join(' ');
+            });
+
+            if (edits.length) {
+                updateAllCommentsDisplay();
+                var pgn = moveTreeToPgn(window.moveTree);
+                if (window.currentLoadedPgn) window.currentLoadedPgn = pgn;
+                window.annotatedPgnWithVariations = pgn;
+                renderMoveTable(window.moveTree);
+                if (typeof updateReportWithPgn === 'function') updateReportWithPgn();
+                if (window.updateCoachNoteButton) window.updateCoachNoteButton();
+                if (window.mmRerender) window.mmRerender();
+            }
+
+            var done = edits.map(function (e) { return commentCliLabel(e.node) + (e.parts.length ? '' : ' (cleared)'); });
+            ta.value = failed.join('\n');
+            var msg = done.length ? '✓ ' + done.join(', ') : '';
+            if (errors.length) msg += (msg ? '\n' : '') + '✗ ' + errors.join('\n✗ ');
+            statusEl.style.color = errors.length ? '#ffb347' : '#2ecc71';
+            statusEl.textContent = msg || 'Nothing to apply';
+            if (done.length && !errors.length) {
+                if (typeof showToast === 'function') showToast('Comments saved on ' + done.join(', ') + ' — Copy PGN keeps them');
+                closeCommentCliModal();
+            }
+        }
+        window.runCommentCli = runCommentCli;
+
+        document.addEventListener('keydown', function (e) {
+            var modal = document.getElementById('commentCliModal');
+            if (!modal || modal.style.display !== 'flex') return;
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runCommentCli(); }
+            else if (e.key === 'Escape') { e.preventDefault(); closeCommentCliModal(); }
         });
 
         // Click on a bubble = put this one away. It comes back as soon as you
