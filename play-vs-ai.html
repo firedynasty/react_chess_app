@@ -162,6 +162,11 @@ label.tg{display:flex;gap:6px;align-items:center;color:var(--muted)}
         </div>
         <button class="primary" id="newBtn">New game</button>
       </div>
+      <div class="row" style="margin-top:10px">
+        <input type="text" id="startFenInput" placeholder="Start from FEN (blank = normal start)" spellcheck="false" style="flex:1;min-width:0;font-family:monospace;font-size:12px;padding:6px 8px">
+        <button id="startFenClear" title="Back to the normal starting position">✕</button>
+      </div>
+      <div class="empty" id="startFenMsg" style="font-size:12px;margin-top:4px"></div>
     </div>
 
     <div class="card" id="coachCard">
@@ -309,7 +314,7 @@ function lineText(fen, moves){
   });
   return s.trim();
 }
-function moveLabel(ply, san){ return `${Math.floor(ply / 2) + 1}${ply % 2 ? '…' : '.'} ${san}`; }
+function moveLabel(ply, san){ return `${plyMoveNo(ply)}${plyIsWhite(ply) ? '.' : '…'} ${san}`; }
 
 function levelConfig(L){
   const elo = Math.round(400 + (L - 1) * 90);
@@ -345,6 +350,23 @@ async function findThreat(engine, fen, baseLine){
 }
 
 /* ======================= State ======================= */
+// Start position: null = normal start. Set from ?fen= (index.html "Play vs AI from here")
+// or the FEN box; New game keeps using it. plyBase/moveBase keep move numbers and
+// whose-move parity right when the game starts mid-game or with Black to move.
+let startFen = null, plyBase = 0, moveBase = 1;
+function newChess(){ return startFen ? new Chess(startFen) : new Chess(); }
+function setStartFen(fen){
+  fen = (fen || '').trim();
+  if (!fen) { startFen = null; plyBase = 0; moveBase = 1; return true; }
+  const v = new Chess().validate_fen(fen);
+  if (!v.valid) return false;
+  const f = fen.split(/\s+/);
+  startFen = fen; plyBase = f[1] === 'b' ? 1 : 0; moveBase = Math.max(1, parseInt(f[5], 10) || 1);
+  return true;
+}
+const absPly = i => i + plyBase;                       // game ply index -> ply counted from White's move 1 of moveBase
+const plyIsWhite = i => absPly(i) % 2 === 0;
+const plyMoveNo = i => moveBase + Math.floor(absPly(i) / 2);
 let game = new Chess();
 let mode = 'play';              // 'play' | 'analyze'
 let userColor = 'w', orientation = 'w', colorPref = 'w';
@@ -375,7 +397,7 @@ function savePrefs(){
 /* ======================= Position helpers ======================= */
 const mainLen = () => game.history().length;
 const isLive = () => !explore && viewPly == null;
-function posAtPly(p){ const c = new Chess(), h = game.history(); for (let i = 0; i < p; i++) c.move(h[i]); return c; }
+function posAtPly(p){ const c = newChess(), h = game.history(); for (let i = 0; i < p; i++) c.move(h[i]); return c; }
 function displayChess(){ return explore ? explore.chess : viewPly != null ? posAtPly(viewPly) : game; }
 function displayPly(){ return explore ? explore.chess.history().length : viewPly != null ? viewPly : mainLen(); }
 function sideName(c){ return mode === 'play' ? (c === userColor ? 'you' : 'Stockfish') : (c === 'w' ? 'White' : 'Black'); }
@@ -453,13 +475,13 @@ function renderMoves(){
   const GLYPH = { best: '★', excellent: '!', good: '', inaccuracy: '?!', mistake: '?', blunder: '??' };
   const cur = explore ? explore.base : displayPly();
   let html = '';
-  for (let i = 0; i < h.length; i += 2) {
+  for (let i = -plyBase; i < h.length; i += 2) {
     const cell = j => {
-      if (j >= h.length) return '<span></span>';
+      if (j < 0 || j >= h.length) return j < 0 ? '<span class="empty">…</span>' : '<span></span>';
       const m = meta[j] || {};
       return `<span class="mv${cur === j + 1 ? ' cur' : ''}" data-ply="${j + 1}">${esc(h[j])}${m.cls ? ` <b class="c-${m.cls}">${GLYPH[m.cls]}</b>` : ''}</span>`;
     };
-    html += `<span class="n">${i / 2 + 1}.</span>${cell(i)}${cell(i + 1)}`;
+    html += `<span class="n">${plyMoveNo(Math.max(i, 0))}.</span>${cell(i)}${cell(i + 1)}`;
   }
   el.innerHTML = html || '<span class="empty" style="grid-column:1/-1">No moves yet.</span>';
   const curEl = el.querySelector('.cur');
@@ -480,8 +502,8 @@ function renderNav(){
   $('navNext').disabled = !!explore || viewPly == null;
   $('navLast').disabled = isLive();
   let where = '';
-  if (explore) where = `Side line from move ${Math.floor(explore.base / 2) + 1}`;
-  else if (viewPly != null) where = `Viewing ${viewPly ? moveLabel(viewPly - 1, game.history()[viewPly - 1]) : 'start'} · game is at move ${Math.floor((n - 1) / 2) + 1}`;
+  if (explore) where = `Side line from move ${plyMoveNo(explore.base)}`;
+  else if (viewPly != null) where = `Viewing ${viewPly ? moveLabel(viewPly - 1, game.history()[viewPly - 1]) : 'start'} · game is at move ${plyMoveNo(Math.max(n - 1, 0))}`;
   $('navWhere').textContent = where;
   const canResume = !isLive() && !displayChess().game_over();
   $('resumeBtn').style.display = canResume ? '' : 'none';
@@ -664,7 +686,7 @@ function addTip({ cls, title, sub, body, ply, actions = [] }){
 async function newGame(){
   token++; opp.cancel(); coach.cancel();
   aiThinking = false; gameOverMsg = '';
-  game = new Chess(); meta = []; selected = null; targets = []; arrows = []; viewPly = null; explore = null;
+  game = newChess(); meta = []; selected = null; targets = []; arrows = []; viewPly = null; explore = null;
   tipsGiven = new Set(); hintsUsed = 0; pre = null;
   setMode('play', true);
   userColor = colorPref === 'r' ? (Math.random() < .5 ? 'w' : 'b') : colorPref;
@@ -787,6 +809,7 @@ const PRAISE = ['Top engine choice.', 'Exactly what Stockfish would play.', 'Spo
 const pickPraise = () => PRAISE[Math.floor(Math.random() * PRAISE.length)];
 
 function openingTip(move, ply){
+  if (startFen) return null;
   const once = (key, txt) => { if (tipsGiven.has(key)) return null; tipsGiven.add(key); return txt; };
   const mine = game.history({ verbose: true }).slice(0, ply).filter(m => m.color === userColor);
   const n = mine.length + 1;
@@ -845,7 +868,7 @@ function finishGame(silent){
   setTimeout(() => {
     if (tok !== token) return;
     const counts = {};
-    meta.forEach((m, i) => { if (m && m.cls && (i % 2 === 0) === (userColor === 'w')) counts[m.cls] = (counts[m.cls] || 0) + 1; });
+    meta.forEach((m, i) => { if (m && m.cls && plyIsWhite(i) === (userColor === 'w')) counts[m.cls] = (counts[m.cls] || 0) + 1; });
     const order = ['best', 'excellent', 'good', 'inaccuracy', 'mistake', 'blunder'];
     const summary = order.filter(k => counts[k]).map(k => `<span class="c-${k}">${counts[k]} ${k}</span>`).join(' · ');
     addTip({ cls: 'info', title: 'Game over', sub: 'Level ' + level,
@@ -859,7 +882,7 @@ function restartFrom(sans){
   token++; opp.cancel(); coach.cancel();
   aiThinking = false; gameOverMsg = ''; pre = null;
   const keep = (() => { const h = game.history(); let i = 0; while (i < sans.length && i < h.length && sans[i] === h[i]) i++; return i; })();
-  game = new Chess(); sans.forEach(s => game.move(s));
+  game = newChess(); sans.forEach(s => game.move(s));
   meta.length = Math.min(meta.length, keep);
   document.querySelectorAll('#feed .tip').forEach(t => { if (t.dataset.ply != null && +t.dataset.ply >= keep) t.remove(); });
   explore = null; viewPly = null; selected = null; targets = []; arrows = [];
@@ -870,7 +893,7 @@ function restartFrom(sans){
 function takeback(toPly){
   const h = game.history();
   let target = toPly;
-  if (target == null) { target = -1; for (let i = h.length - 1; i >= 0; i--) if ((i % 2 === 0) === (userColor === 'w')) { target = i; break; } }
+  if (target == null) { target = -1; for (let i = h.length - 1; i >= 0; i--) if (plyIsWhite(i) === (userColor === 'w')) { target = i; break; } }
   if (target < 0) return;
   restartFrom(h.slice(0, target));
 }
@@ -972,7 +995,19 @@ document.querySelectorAll('#colorSeg button').forEach(b => {
   b.classList.toggle('on', b.dataset.c === colorPref);
   b.onclick = () => { colorPref = b.dataset.c; document.querySelectorAll('#colorSeg button').forEach(x => x.classList.toggle('on', x === b)); savePrefs(); };
 });
-$('newBtn').onclick = newGame;
+$('newBtn').onclick = () => {
+  if (!setStartFen($('startFenInput').value)) { $('startFenMsg').textContent = 'That FEN is not valid — fix it or clear the box.'; return; }
+  showStartMsg(); newGame();
+};
+$('startFenClear').onclick = () => { $('startFenInput').value = ''; setStartFen(''); showStartMsg(); newGame(); };
+function showStartMsg(){
+  $('startFenMsg').textContent = startFen ? `New game starts from this position (${startFen.split(/\s+/)[1] === 'w' ? 'White' : 'Black'} to move).` : '';
+}
+{
+  const q = new URLSearchParams(location.search).get('fen');
+  if (q && setStartFen(q)) { $('startFenInput').value = q; showStartMsg(); }
+  else if (q) $('startFenMsg').textContent = 'The FEN in the link was not valid — starting from the normal position.';
+}
 $('undoBtn').onclick = () => takeback();
 $('flipBtn').onclick = () => { orientation = other(orientation); buildBoard(); updateTags(); render(); };
 ['optReview', 'optThreat'].forEach(id => $(id).onchange = savePrefs);
@@ -989,7 +1024,7 @@ $('hintBtn').onclick = async () => {
   arrows = [{ from: m.from, to: m.to, color: 'green' }];
   render();
   const hintText = m.captured ? `Look at capturing on ${m.to}.` : m.san.includes('+') ? 'There is a strong check.' : `Consider moving your ${NAME[m.piece]} on ${m.from}.`;
-  addTip({ cls: 'info', title: '💡 Hint', sub: 'move ' + (Math.floor(mainLen() / 2) + 1), ply: mainLen(),
+  addTip({ cls: 'info', title: '💡 Hint', sub: 'move ' + plyMoveNo(mainLen()), ply: mainLen(),
     body: hintText + ` (Engine: <b>${esc(m.san)}</b>, ${fmt(toCp(res.lines[0]))})` });
 };
 
@@ -1175,7 +1210,7 @@ $('lmMoves').addEventListener('click', e => { const s = e.target.closest('.s'); 
 
 /* ======================= Copy PGN ======================= */
 function buildPgn(){
-  const c = new Chess();
+  const c = newChess();
   game.history().forEach(m => c.move(m));
   const d = new Date(), pad = n => String(n).padStart(2, '0');
   let result = '*';

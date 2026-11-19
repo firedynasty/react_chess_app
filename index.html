@@ -1437,6 +1437,7 @@
             <button title="Re-run Stockfish analysis on the game currently on the board" onclick="document.getElementById('analyzeGameBtn').click()" style="background: linear-gradient(90deg, #e91e63, #9c27b0); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Reanalyze</button>
             <button id="getEvalBtnMini" title="Fill in Stockfish evals for every position in the loaded game" onclick="document.getElementById('getEvalBtn').click()" style="background: linear-gradient(90deg, #f57f17, #ff6f00); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Get Eval</button>
             <button id="copyBoardPgnBtnMini" title="Copy the PGN on the board (with variations) to the clipboard" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy PGN</button>
+            <button id="playFromHereBtnMini" title="Open Play vs AI in a new tab starting from the position after the move you clicked in the move list (no move clicked = the game's starting position). Pick your colour there and press New game to restart from it." onclick="playVsAiFromHere()" style="background: linear-gradient(90deg, #3b6fd8, #1f9d55); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">▶ Play vs AI from here</button>
             <button id="copyMoveInfoBtnMini" title="Copy the highlighted move as one fen,note row — the position before it as a From Position PGN with its comment, plus a note (kind, move, game link) — to paste into your puzzles bulk-paste tool. Nothing is saved." onclick="lnCopyMoveInfo(this)" style="background: #6c5ce7; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Copy Move Info</button>
             <button id="nextVarBtnMini" title="Load the next saved row on the board, in the grid's current order and filter. Wraps around at the end." onclick="lnGridNext(this)" style="background: #0f3460; color: #00d4ff; border: 1px solid #00d4ff; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Next ▶</button>
             <button id="savePuzzleBtnMini" title="Save to the puzzles table: the highlighted move's position, the current bare FEN, or the whole game PGN — with a category and note" onclick="openPuzzleSaveModal()" style="background: #629924; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Save → Puzzles</button>
@@ -1519,6 +1520,7 @@
             <button id="gdriveRowCopyBtn" style="background: #27ae60; color: white; border: none; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: middle;">Copy</button>
           </div>
           <button id="copyBoardPgnBtn" onclick="copyPgnToClipboard()" style="background: #27ae60; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 10px;">Copy PGN</button>
+          <button id="playFromHereBtn" title="Open Play vs AI from the position after the move you clicked in the move list" onclick="playVsAiFromHere()" style="background: linear-gradient(90deg, #3b6fd8, #1f9d55); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">▶ Play vs AI from here</button>
           <button id="downloadPgnBtn" onclick="downloadPgn()" style="background: #2980b9; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Download PGN</button>
           <button id="updateReportBtn" onclick="updateReportWithPgn()" style="display: none; background: #e67e22; color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Update Report</button>
           <button id="loadFenBtn" style="background: linear-gradient(90deg, #ff6f00, #ff9800); color: white; border: none; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; margin-left: 5px;">Load FEN</button>
@@ -3969,6 +3971,18 @@
             }).catch(err => {
                 log('Failed to copy: ' + err.message, 'error');
             });
+        }
+
+        // Open Play vs AI starting from the position after the highlighted move
+        // (or the tree's starting position when nothing is highlighted).
+        function playVsAiFromHere() {
+            const node = window.currentMoveNode || window.moveTree;
+            const fen = node && node.fen;
+            if (!fen) {
+                if (typeof showToast === 'function') showToast('Load a game and click a move first');
+                return;
+            }
+            window.open('/play-vs-ai.html?fen=' + encodeURIComponent(fen), '_blank');
         }
 
         function triggerPgnFileDownload(pgnText) {
