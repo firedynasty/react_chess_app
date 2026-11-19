@@ -91,7 +91,27 @@ label.tg{display:flex;gap:6px;align-items:center;color:var(--muted)}
 .pos-eval small{font-size:12px;color:var(--muted);font-weight:500;margin-left:6px}
 .pv{padding:4px 6px;border-radius:6px;font-size:13px;margin-top:2px}
 .pv b{display:inline-block;min-width:46px;font-variant-numeric:tabular-nums}
-.pv.click{cursor:pointer} .pv.click:hover{background:var(--bg)}
+.pv .n{color:var(--muted)}
+.pvm{cursor:pointer;border-radius:3px;padding:0 2px}
+.pvm:hover{background:var(--accent);color:#fff}
+.pvshow{padding:0 7px;font-size:11px;margin-left:4px;vertical-align:1px}
+.mini{display:grid;grid-template-columns:repeat(8,1fr);aspect-ratio:1;border-radius:4px;overflow:hidden}
+.msq{position:relative;aspect-ratio:1}
+.msq.l{background:var(--light)} .msq.d{background:var(--dark)}
+.msq.last{box-shadow:inset 0 0 0 999px rgba(205,210,106,.6)}
+.msq img{position:absolute;inset:0;width:100%;height:100%}
+#miniPop{position:fixed;z-index:80;display:none;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 6px 24px rgba(0,0,0,.25);width:212px}
+#miniPop .cap{font-size:12px;font-weight:600;margin-bottom:4px}
+.modal-bg{position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px}
+.modal-bg.open{display:flex}
+.modal{background:var(--panel);border-radius:12px;padding:14px;width:min(420px,100%);box-shadow:0 10px 40px rgba(0,0,0,.35)}
+.modal-hd{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;font-weight:700}
+.modal-hd button{padding:2px 9px}
+.lm-moves{margin-top:10px;font-size:13px;line-height:1.9}
+.lm-moves .n{color:var(--muted)}
+.lm-moves .s{cursor:pointer;padding:1px 4px;border-radius:4px}
+.lm-moves .s.cur{background:var(--accent);color:#fff}
+.lm-ctrl{justify-content:center;margin-top:10px}
 .threatbox{margin-top:8px;padding:6px 8px;border-radius:6px;background:var(--bg);font-size:13px}
 .threatbox.on{background:color-mix(in srgb,var(--blunder) 10%,var(--bg))}
 .threatbox button{padding:1px 8px;font-size:12px;margin-left:6px}
@@ -166,6 +186,17 @@ label.tg{display:flex;gap:6px;align-items:center;color:var(--muted)}
   </div>
 </div>
 
+<div id="miniPop"><div class="cap" id="miniCap"></div><div id="miniBoard"></div></div>
+<div class="modal-bg" id="lineModal">
+  <div class="modal">
+    <div class="modal-hd"><span id="lmTitle">Line</span><button id="lmClose" title="Close (Esc)">✕</button></div>
+    <div id="lmBoard"></div>
+    <div class="lm-moves" id="lmMoves"></div>
+    <div class="row lm-ctrl">
+      <button id="lmFirst">⏮</button><button id="lmPrev">◀</button><button id="lmPlay">⏸</button><button id="lmNext">▶</button><button id="lmLast">⏭</button>
+    </div>
+  </div>
+</div>
 <script src="chess.min.js"></script>
 <script>
 /* ======================= Engine wrapper (UCI over Worker) ======================= */
@@ -507,6 +538,15 @@ $('navNext').onclick = () => step(1);
 $('navLast').onclick = () => setView(null);
 $('moves').addEventListener('click', e => { const m = e.target.closest('.mv'); if (m) setView(+m.dataset.ply); });
 document.addEventListener('keydown', e => {
+  if (lm.open) {
+    if (e.key === 'Escape') closeLine();
+    else if (e.key === 'ArrowLeft') lmGo(lm.i - 1);
+    else if (e.key === 'ArrowRight') lmGo(lm.i + 1);
+    else if (e.key === 'Home') lmGo(0);
+    else if (e.key === 'End') lmGo(lm.steps.length - 1);
+    else return;
+    e.preventDefault(); return;
+  }
   if (e.target.matches('input, textarea, select')) return;
   if (e.key === 'ArrowLeft') { step(-1); e.preventDefault(); }
   else if (e.key === 'ArrowRight') { step(1); e.preventDefault(); }
@@ -571,7 +611,8 @@ function renderPos(){
     const top = e.lines && e.lines[0];
     html += `<div class="pos-eval">${top ? fmt(whitePov(toCp(top), fen)) : '…'}<small>${top ? 'depth ' + e.depth : 'analyzing'}</small></div>`;
     (e.lines || []).forEach(l => {
-      html += `<div class="pv${mode === 'analyze' ? ' click' : ''}" data-u="${esc(l.pv[0])}" title="${mode === 'analyze' ? 'Play this line\'s first move' : ''}"><b>${fmt(whitePov(toCp(l), fen))}</b> ${esc(lineText(fen, pvSan(fen, l.pv, 8)))}</div>`;
+      const lid = 'p' + e.lines.indexOf(l);
+      html += `<div class="pv"><b>${fmt(whitePov(toCp(l), fen))}</b> ${lineLink(fen, pvSan(fen, l.pv, 10), lid)}<button class="pvshow" data-lid="${lid}" title="Play this line out on a board">▶ Show</button></div>`;
     });
     const side = sideName(g.turn());
     let tb;
@@ -592,8 +633,6 @@ $('posBody').addEventListener('click', e => {
     renderBoard(); renderPos(); return;
   }
   if (e.target.id === 'optBest') { showBest = e.target.checked; renderBoard(); return; }
-  const pv = e.target.closest('.pv.click');
-  if (pv && mode === 'analyze') { const u = pv.dataset.u; boardMove(u.slice(0, 2), u.slice(2, 4)); }
 });
 
 /* ======================= Tips feed ======================= */
@@ -712,14 +751,14 @@ function review(move, ply, fenBefore, fenAfter, preRes, postRes){
     const reasons = [];
     const reply = postRes && postRes.lines[0] ? pvSan(fenAfter, postRes.lines[0].pv, 4) : [];
     if (postRes && postRes.lines[0] && postRes.lines[0].mate > 0)
-      reasons.push(`This allows mate in ${postRes.lines[0].mate}: ${esc(lineText(fenAfter, reply))}.`);
+      reasons.push(`This allows mate in ${postRes.lines[0].mate}: ${lineLink(fenAfter, reply)}.`);
     else if (reply[0] && reply[0].captured)
       reasons.push(`It lets them play <b>${esc(reply[0].san)}</b>, taking your ${NAME[reply[0].captured]}.`);
     else if (reply[0])
-      reasons.push(`Their strong reply is <b>${esc(reply[0].san)}</b> (${esc(lineText(fenAfter, reply))}).`);
-    if (bestLine.mate > 0) reasons.push(`You had mate in ${bestLine.mate}: <b>${esc(lineText(fenBefore, bestMoves))}</b>.`);
+      reasons.push(`Their strong reply is <b>${esc(reply[0].san)}</b> (${lineLink(fenAfter, reply)}).`);
+    if (bestLine.mate > 0) reasons.push(`You had mate in ${bestLine.mate}: <b>${lineLink(fenBefore, bestMoves)}</b>.`);
     else if (bestMoves[0] && bestMoves[0].captured) reasons.push(`<b>${esc(bestSan)}</b> would have won a ${NAME[bestMoves[0].captured]}.`);
-    else reasons.push(`Better was <b>${esc(bestSan)}</b> — ${esc(lineText(fenBefore, bestMoves.slice(0, 4)))}.`);
+    else reasons.push(`Better was <b>${esc(bestSan)}</b> — ${lineLink(fenBefore, bestMoves)}.`);
     if (move.captured && VAL[move.piece] > VAL[move.captured] && reply[0] && reply[0].to === move.to)
       reasons.push(`Check the trade first: your ${NAME[move.piece]} (${VAL[move.piece]}) for a ${NAME[move.captured]} (${VAL[move.captured]}).`);
     body = reasons.join(' ') + ' ' + evalNote;
@@ -730,6 +769,8 @@ function review(move, ply, fenBefore, fenAfter, preRes, postRes){
   const actions = [];
   if (cls !== 'best' && bestMoves[0]) {
     actions.push(['Show better move', () => setView(ply, [{ from: bestMoves[0].from, to: bestMoves[0].to, color: 'blue' }])]);
+    const bestLid = 't' + (++lineSeq); lineReg.set(bestLid, { fen: fenBefore, moves: bestMoves });
+    actions.push(['▶ Play line', () => openLine(bestLid)]);
     if (cls === 'mistake' || cls === 'blunder') actions.push(['Takeback', () => takeback(ply)]);
   }
   addTip({ cls, title: `<span class="c-${cls}">${TITLE[cls]}</span> · ${esc(moveLabel(ply, move.san))}`, ply, body, actions });
@@ -944,6 +985,129 @@ $('hintBtn').onclick = async () => {
   addTip({ cls: 'info', title: '💡 Hint', sub: 'move ' + (Math.floor(mainLen() / 2) + 1), ply: mainLen(),
     body: hintText + ` (Engine: <b>${esc(m.san)}</b>, ${fmt(toCp(res.lines[0]))})` });
 };
+
+/* ======================= Engine-line hover boards + line player ======================= */
+let lineSeq = 0;
+const lineReg = new Map();      // id -> { fen, moves }   ('p0'..'p2' = position panel, 't…' = tips)
+function lineLink(fen, moves, id){
+  id = id || 't' + (++lineSeq);
+  lineReg.set(id, { fen, moves });
+  const parts = fen.split(' ');
+  let num = +parts[5], white = parts[1] === 'w', s = '';
+  moves.forEach((m, i) => {
+    if (white) s += `<span class="n">${num}.</span> `;
+    else if (i === 0) s += `<span class="n">${num}…</span> `;
+    s += `<span class="pvm" data-lid="${id}" data-k="${i}">${esc(m.san)}</span> `;
+    if (!white) num++;
+    white = !white;
+  });
+  return s.trim();
+}
+function lineSteps(id){
+  const L = lineReg.get(id);
+  if (!L) return [];
+  const c = new Chess(L.fen), steps = [{ fen: L.fen, last: null, san: null, ply: c.history().length }];
+  const parts = L.fen.split(' ');
+  let num = +parts[5], white = parts[1] === 'w';
+  for (const m of L.moves) {
+    const r = c.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+    if (!r) break;
+    steps.push({ fen: c.fen(), last: r, san: r.san, label: (white ? num + '. ' : num + '… ') + r.san, num, white });
+    if (!white) num++;
+    white = !white;
+  }
+  return steps;
+}
+function miniBoard(fen, last){
+  const c = new Chess(fen);
+  let h = '';
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    const sq = xyToSq(x, y), f = sq.charCodeAt(0) - 97, r = +sq[1], p = c.get(sq);
+    const isLast = last && (sq === last.from || sq === last.to);
+    h += `<div class="msq ${(f + r) % 2 ? 'l' : 'd'}${isLast ? ' last' : ''}">${p ? `<img src="img/chesspieces/wikipedia/${p.color}${p.type.toUpperCase()}.png" alt="">` : ''}</div>`;
+  }
+  return `<div class="mini">${h}</div>`;
+}
+
+// hover popup
+const pop = $('miniPop');
+document.addEventListener('mouseover', e => {
+  const m = e.target.closest && e.target.closest('.pvm');
+  if (!m || lm.open) return;
+  const st = lineSteps(m.dataset.lid)[+m.dataset.k + 1];
+  if (!st) return;
+  $('miniCap').textContent = 'After ' + st.label;
+  $('miniBoard').innerHTML = miniBoard(st.fen, st.last);
+  pop.style.display = 'block';
+  placePop(e.clientX, e.clientY);
+});
+document.addEventListener('mousemove', e => { if (pop.style.display === 'block') placePop(e.clientX, e.clientY); });
+document.addEventListener('mouseout', e => {
+  const m = e.target.closest && e.target.closest('.pvm');
+  if (m && !(e.relatedTarget && e.relatedTarget.closest && e.relatedTarget.closest('.pvm'))) pop.style.display = 'none';
+});
+function placePop(x, y){
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let left = x + 16, top = y + 16;
+  if (left + w > innerWidth - 8) left = x - w - 16;
+  if (top + h > innerHeight - 8) top = y - h - 16;
+  pop.style.left = Math.max(8, left) + 'px'; pop.style.top = Math.max(8, top) + 'px';
+}
+// click a move: analyze mode on the position panel -> play the line up to it on the board; otherwise open the player there
+document.addEventListener('click', e => {
+  const show = e.target.closest && e.target.closest('.pvshow');
+  if (show) { e.stopPropagation(); openLine(show.dataset.lid); return; }
+  const m = e.target.closest && e.target.closest('.pvm');
+  if (!m) return;
+  e.stopPropagation();
+  pop.style.display = 'none';
+  const id = m.dataset.lid, k = +m.dataset.k;
+  if (mode === 'analyze' && id[0] === 'p') {
+    const L = lineReg.get(id);
+    for (const mv of L.moves.slice(0, k + 1)) if (!boardMove(mv.from, mv.to)) break;
+  } else openLine(id, k + 1, false);
+}, true);
+
+// line player modal
+const lm = { open: false, steps: [], i: 0, timer: null, id: null };
+function openLine(id, at = 0, autoplay = true){
+  const steps = lineSteps(id);
+  if (steps.length < 2) return;
+  pop.style.display = 'none';
+  Object.assign(lm, { open: true, steps, id, i: at });
+  $('lmTitle').textContent = (at === 0 && autoplay ? 'Playing: ' : 'Line: ') + steps[1].label + (steps.length > 2 ? ' …' : '');
+  $('lineModal').classList.add('open');
+  lmRender();
+  autoplay ? lmPlay() : lmStop();
+}
+function closeLine(){ lmStop(); lm.open = false; $('lineModal').classList.remove('open'); }
+function lmGo(i){ lm.i = Math.max(0, Math.min(lm.steps.length - 1, i)); lmRender(); }
+function lmRender(){
+  const st = lm.steps[lm.i];
+  $('lmBoard').innerHTML = miniBoard(st.fen, st.last);
+  let h = '';
+  lm.steps.slice(1).forEach((s, j) => {
+    if (s.white) h += `<span class="n">${s.num}.</span> `;
+    else if (j === 0) h += `<span class="n">${s.num}…</span> `;
+    h += `<span class="s${j + 1 === lm.i ? ' cur' : ''}" data-i="${j + 1}">${esc(s.san)}</span> `;
+  });
+  $('lmMoves').innerHTML = h;
+}
+function lmStop(){ clearInterval(lm.timer); lm.timer = null; $('lmPlay').textContent = '▶ Play'; }
+function lmPlay(){
+  lmStop();
+  if (lm.i >= lm.steps.length - 1) lmGo(0);
+  $('lmPlay').textContent = '⏸ Pause';
+  lm.timer = setInterval(() => { if (lm.i >= lm.steps.length - 1) { lmStop(); return; } lmGo(lm.i + 1); }, 900);
+}
+$('lmPlay').onclick = () => lm.timer ? lmStop() : lmPlay();
+$('lmFirst').onclick = () => { lmStop(); lmGo(0); };
+$('lmPrev').onclick = () => { lmStop(); lmGo(lm.i - 1); };
+$('lmNext').onclick = () => { lmStop(); lmGo(lm.i + 1); };
+$('lmLast').onclick = () => { lmStop(); lmGo(lm.steps.length - 1); };
+$('lmClose').onclick = closeLine;
+$('lineModal').addEventListener('click', e => { if (e.target.id === 'lineModal') closeLine(); });
+$('lmMoves').addEventListener('click', e => { const s = e.target.closest('.s'); if (s) { lmStop(); lmGo(+s.dataset.i); } });
 
 /* ======================= Copy PGN ======================= */
 function buildPgn(){
