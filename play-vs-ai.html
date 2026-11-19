@@ -199,7 +199,7 @@ label.tg{display:flex;gap:6px;align-items:center;color:var(--muted)}
     <div class="lm-moves" id="lmMoves"></div>
     <div class="row lm-ctrl">
       <button id="lmFirst">⏮</button><button id="lmPrev">◀</button><button id="lmPlay">⏸</button><button id="lmNext">▶</button><button id="lmLast">⏭</button>
-      <button id="lmPlayout" title="Engine plays both sides from the end of this line until mate/stalemate/draw. Click again to stop.">⏩ Play out</button>
+      <button id="lmPlayout" title="Engine plays both sides for 10 more moves from the end of this line (stops early on mate/stalemate/draw). Click again to stop.">⏩ Play out</button>
     </div>
     <div id="lmStatus"></div>
   </div>
@@ -619,7 +619,7 @@ function renderPos(){
     html += `<div class="pos-eval">${top ? fmt(whitePov(toCp(top), fen)) : '…'}<small>${top ? 'depth ' + e.depth : 'analyzing'}</small></div>`;
     (e.lines || []).forEach(l => {
       const lid = 'p' + e.lines.indexOf(l);
-      html += `<div class="pv"><b>${fmt(whitePov(toCp(l), fen))}</b> ${lineLink(fen, pvSan(fen, l.pv, 10), lid)}<button class="pvshow" data-lid="${lid}" title="Step through this line on a board">▶ Show</button><button class="pvshow pvplay" data-lid="${lid}" title="Engine keeps playing both sides from the end of this line until mate/stalemate/draw">⏩ Play out</button></div>`;
+      html += `<div class="pv"><b>${fmt(whitePov(toCp(l), fen))}</b> ${lineLink(fen, pvSan(fen, l.pv, 10), lid)}<button class="pvshow" data-lid="${lid}" title="Step through this line on a board">▶ Show</button><button class="pvshow pvplay" data-lid="${lid}" title="Engine plays both sides for 10 more moves from the end of this line (stops early on mate/stalemate/draw)">⏩ Play out</button></div>`;
     });
     const side = sideName(g.turn());
     let tb;
@@ -1114,8 +1114,8 @@ function lmPlay(){
   $('lmPlay').textContent = '⏸ Pause';
   lm.timer = setInterval(() => { if (lm.i >= lm.steps.length - 1) { lmStop(); return; } lmGo(lm.i + 1); }, 900);
 }
-// Play out: engine plays both sides from the end of the line until the game ends
-const PLAYOUT_DEPTH = 12, PLAYOUT_MAX = 200;
+// Play out: engine plays both sides from the end of the line, 10 moves per click (stops early on mate/draw)
+const PLAYOUT_DEPTH = 12, PLAYOUT_CHUNK = 20;   // 10 moves (20 plies) per click
 let poEngine = null;
 const po = { running: false, stop: false };
 function stopPlayout(){ if (po.running) { po.stop = true; if (poEngine) poEngine.cancel(); } }
@@ -1135,8 +1135,8 @@ async function playOut(srcId){
   Object.assign(po, { running: true, stop: false });
   $('lmPlayout').classList.add('running'); $('lmPlayout').textContent = '■ Stop';
   let added = 0;
-  while (!c.game_over() && added < PLAYOUT_MAX && !po.stop) {
-    $('lmStatus').textContent = `Engine playing both sides at depth ${PLAYOUT_DEPTH}… +${added} plies`;
+  while (!c.game_over() && added < PLAYOUT_CHUNK && !po.stop) {
+    $('lmStatus').textContent = `Engine playing both sides at depth ${PLAYOUT_DEPTH}… ${added}/${PLAYOUT_CHUNK} plies`;
     const res = await poEngine.analyze(c.fen(), { depth: PLAYOUT_DEPTH });
     if (po.stop || !res || !res.bestmove) break;
     const m = c.move(uciObj(res.bestmove));
@@ -1157,8 +1157,11 @@ async function playOut(srcId){
   else if (c.in_threefold_repetition()) end = '<b>Draw by repetition</b>';
   else if (c.insufficient_material()) end = '<b>Draw — insufficient material</b>';
   else if (c.in_draw()) end = '<b>Draw (50-move rule)</b>';
-  else end = added >= PLAYOUT_MAX ? `Stopped at the ${PLAYOUT_MAX}-ply limit` : 'Stopped';
-  if (lm.open && lm.id === id) $('lmStatus').innerHTML = `${end} · added ${added} plies`;
+  else end = null;
+  const moves = (added / 2).toFixed(added % 2 ? 1 : 0);
+  if (lm.open && lm.id === id) $('lmStatus').innerHTML = end
+    ? `${end} · added ${added} plies`
+    : `${po.stop ? 'Stopped' : 'Added'} ${added} plies (${moves} moves) · click <b>⏩ Play out</b> for 10 more`;
 }
 $('lmPlayout').onclick = () => po.running ? stopPlayout() : playOut(lm.id);
 $('lmPlay').onclick = () => lm.timer ? lmStop() : lmPlay();
