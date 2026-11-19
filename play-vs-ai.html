@@ -112,6 +112,10 @@ label.tg{display:flex;gap:6px;align-items:center;color:var(--muted)}
 .lm-moves .s{cursor:pointer;padding:1px 4px;border-radius:4px}
 .lm-moves .s.cur{background:var(--accent);color:#fff}
 .lm-ctrl{justify-content:center;margin-top:10px}
+#lmStatus{margin-top:8px;font-size:13px;color:var(--muted);text-align:center;min-height:18px}
+#lmStatus b{color:var(--ink)}
+#lmPlayout,.pvplay{color:var(--best);border-color:var(--best)}
+#lmPlayout.running{background:var(--best);color:#fff}
 .threatbox{margin-top:8px;padding:6px 8px;border-radius:6px;background:var(--bg);font-size:13px}
 .threatbox.on{background:color-mix(in srgb,var(--blunder) 10%,var(--bg))}
 .threatbox button{padding:1px 8px;font-size:12px;margin-left:6px}
@@ -194,7 +198,9 @@ label.tg{display:flex;gap:6px;align-items:center;color:var(--muted)}
     <div class="lm-moves" id="lmMoves"></div>
     <div class="row lm-ctrl">
       <button id="lmFirst">⏮</button><button id="lmPrev">◀</button><button id="lmPlay">⏸</button><button id="lmNext">▶</button><button id="lmLast">⏭</button>
+      <button id="lmPlayout" title="Engine plays both sides from the end of this line until mate/stalemate/draw. Click again to stop.">⏩ Play out</button>
     </div>
+    <div id="lmStatus"></div>
   </div>
 </div>
 <script src="chess.min.js"></script>
@@ -612,7 +618,7 @@ function renderPos(){
     html += `<div class="pos-eval">${top ? fmt(whitePov(toCp(top), fen)) : '…'}<small>${top ? 'depth ' + e.depth : 'analyzing'}</small></div>`;
     (e.lines || []).forEach(l => {
       const lid = 'p' + e.lines.indexOf(l);
-      html += `<div class="pv"><b>${fmt(whitePov(toCp(l), fen))}</b> ${lineLink(fen, pvSan(fen, l.pv, 10), lid)}<button class="pvshow" data-lid="${lid}" title="Play this line out on a board">▶ Show</button></div>`;
+      html += `<div class="pv"><b>${fmt(whitePov(toCp(l), fen))}</b> ${lineLink(fen, pvSan(fen, l.pv, 10), lid)}<button class="pvshow" data-lid="${lid}" title="Step through this line on a board">▶ Show</button><button class="pvshow pvplay" data-lid="${lid}" title="Engine keeps playing both sides from the end of this line until mate/stalemate/draw">⏩ Play out</button></div>`;
     });
     const side = sideName(g.turn());
     let tb;
@@ -1056,7 +1062,11 @@ function placePop(x, y){
 // click a move: analyze mode on the position panel -> play the line up to it on the board; otherwise open the player there
 document.addEventListener('click', e => {
   const show = e.target.closest && e.target.closest('.pvshow');
-  if (show) { e.stopPropagation(); openLine(show.dataset.lid); return; }
+  if (show) {
+    e.stopPropagation();
+    if (show.classList.contains('pvplay')) playOut(show.dataset.lid); else openLine(show.dataset.lid);
+    return;
+  }
   const m = e.target.closest && e.target.closest('.pvm');
   if (!m) return;
   e.stopPropagation();
@@ -1077,10 +1087,11 @@ function openLine(id, at = 0, autoplay = true){
   Object.assign(lm, { open: true, steps, id, i: at });
   $('lmTitle').textContent = (at === 0 && autoplay ? 'Playing: ' : 'Line: ') + steps[1].label + (steps.length > 2 ? ' …' : '');
   $('lineModal').classList.add('open');
+  if (!po.running) $('lmStatus').textContent = '';
   lmRender();
   autoplay ? lmPlay() : lmStop();
 }
-function closeLine(){ lmStop(); lm.open = false; $('lineModal').classList.remove('open'); }
+function closeLine(){ stopPlayout(); lmStop(); lm.open = false; $('lineModal').classList.remove('open'); }
 function lmGo(i){ lm.i = Math.max(0, Math.min(lm.steps.length - 1, i)); lmRender(); }
 function lmRender(){
   const st = lm.steps[lm.i];
@@ -1100,6 +1111,53 @@ function lmPlay(){
   $('lmPlay').textContent = '⏸ Pause';
   lm.timer = setInterval(() => { if (lm.i >= lm.steps.length - 1) { lmStop(); return; } lmGo(lm.i + 1); }, 900);
 }
+// Play out: engine plays both sides from the end of the line until the game ends
+const PLAYOUT_DEPTH = 12, PLAYOUT_MAX = 200;
+let poEngine = null;
+const po = { running: false, stop: false };
+function stopPlayout(){ if (po.running) { po.stop = true; if (poEngine) poEngine.cancel(); } }
+async function playOut(srcId){
+  if (po.running) { stopPlayout(); return; }
+  const src = lineReg.get(srcId);
+  if (!src) return;
+  // copy the line so panel re-renders don't overwrite it; extending a play-out line keeps extending it
+  const id = srcId[0] === 'x' ? srcId : 'x' + (++lineSeq);
+  if (id !== srcId) lineReg.set(id, { fen: src.fen, moves: src.moves.slice() });
+  const L = lineReg.get(id);
+  openLine(id, Math.max(0, lineSteps(id).length - 1), false);
+  $('lmTitle').textContent = 'Play out: ' + (lm.steps[1] ? lm.steps[1].label + ' …' : '');
+  const c = new Chess(L.fen);
+  for (const m of L.moves) c.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+  if (!poEngine) poEngine = makeEngine();
+  Object.assign(po, { running: true, stop: false });
+  $('lmPlayout').classList.add('running'); $('lmPlayout').textContent = '■ Stop';
+  let added = 0;
+  while (!c.game_over() && added < PLAYOUT_MAX && !po.stop) {
+    $('lmStatus').textContent = `Engine playing both sides at depth ${PLAYOUT_DEPTH}… +${added} plies`;
+    const res = await poEngine.analyze(c.fen(), { depth: PLAYOUT_DEPTH });
+    if (po.stop || !res || !res.bestmove) break;
+    const m = c.move(uciObj(res.bestmove));
+    if (!m) break;
+    L.moves.push(m); added++;
+    if (lm.open && lm.id === id) {
+      const follow = lm.i === lm.steps.length - 1;
+      lm.steps = lineSteps(id);
+      if (follow) lm.i = lm.steps.length - 1;
+      lmRender();
+    }
+  }
+  po.running = false;
+  $('lmPlayout').classList.remove('running'); $('lmPlayout').textContent = '⏩ Play out';
+  let end;
+  if (c.in_checkmate()) end = `<b>Checkmate — ${c.turn() === 'w' ? 'Black' : 'White'} wins</b>`;
+  else if (c.in_stalemate()) end = '<b>Stalemate</b>';
+  else if (c.in_threefold_repetition()) end = '<b>Draw by repetition</b>';
+  else if (c.insufficient_material()) end = '<b>Draw — insufficient material</b>';
+  else if (c.in_draw()) end = '<b>Draw (50-move rule)</b>';
+  else end = added >= PLAYOUT_MAX ? `Stopped at the ${PLAYOUT_MAX}-ply limit` : 'Stopped';
+  if (lm.open && lm.id === id) $('lmStatus').innerHTML = `${end} · added ${added} plies`;
+}
+$('lmPlayout').onclick = () => po.running ? stopPlayout() : playOut(lm.id);
 $('lmPlay').onclick = () => lm.timer ? lmStop() : lmPlay();
 $('lmFirst').onclick = () => { lmStop(); lmGo(0); };
 $('lmPrev').onclick = () => { lmStop(); lmGo(lm.i - 1); };
