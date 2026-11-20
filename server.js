@@ -2,6 +2,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// OPENAI_API_KEY / ACCESS_CODE for the OpenAI path, the same as Vercel's
+for (const f of ['.env.local', '.env']) {
+    try { process.loadEnvFile(path.join(__dirname, f)); break; } catch (e) { }
+}
+
 const PORT = process.env.PORT || 8000;
 
 const mimeTypes = {
@@ -18,7 +23,8 @@ const mimeTypes = {
 
 // ── Local AI: /api/chat and /api/rag-chess answered by Ollama ──────────────
 // Only under `npm start`. On Vercel the api/ functions still go to OpenAI.
-// The page still asks for an access code / key; anything works here, it's ignored.
+// Except a request marked provider: 'openai', which goes to OpenAI as on Vercel.
+// (What went wrong's Explain calls Ollama from the browser itself, not this.)
 //   OLLAMA_URL   default http://localhost:11434
 //   OLLAMA_MODEL default: the largest installed model with "qwen" in its name
 //   OLLAMA_CTX   context window, default 32768 (knowledge base alone is ~10k tokens)
@@ -89,6 +95,19 @@ async function handleLocalAi(req, res, route) {
     };
     try {
         const body = await readJson(req);
+        // The page asked for OpenAI explicitly (the "Local Ollama" box is
+        // unchecked): run the real Vercel function, with the keys from .env.local
+        if (route === '/api/chat' && body.provider === 'openai') {
+            const { default: openaiChat } = await import('./api/chat.js');
+            let code = 200;
+            const shim = {
+                setHeader() { }, end() { res.end(); },
+                status(c) { code = c; return shim; },
+                json(o) { send(code, o); },
+            };
+            await openaiChat({ method: 'POST', body }, shim);
+            return;
+        }
         let messages = Array.isArray(body.messages) ? body.messages.slice() : [];
         if (route === '/api/rag-chess') {
             if (body.query) messages.push({ role: 'user', content: body.query });
