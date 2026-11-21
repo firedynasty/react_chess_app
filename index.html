@@ -18198,8 +18198,11 @@ ${contentToAnalyze}`;
           <label title="Checked: Explain asks Ollama on this computer (localhost:11434) straight from the browser, no key needed. Unchecked: OpenAI, with your access code. On the Vercel site Ollama must allow it: launchctl setenv OLLAMA_ORIGINS https://your-site.vercel.app"
                  style="color:#888; font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer; margin-left:8px;">
             <input type="checkbox" id="mmUseOllama" onchange="mmSetProvider(this.checked)">
-            Local Ollama <span id="mmOllamaInfo" style="color:#666;"></span>
+            Local Ollama
           </label>
+          <select id="mmOllamaPick" onchange="mmPickModel(this.value)" title="Which Ollama model Explain asks. Remembered."
+                  style="display:none; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:2px 4px; font-size:12px;"></select>
+          <span id="mmOllamaInfo" style="color:#666; font-size:12px;"></span>
           <span id="mmStatus" style="color:#ffa94d; font-size:12px; flex:1;"></span>
           <button onclick="mmClose()" style="background:none; border:none; color:#c0392b; font-size:20px; cursor:pointer;">&times;</button>
         </div>
@@ -19343,16 +19346,22 @@ ${contentToAnalyze}`;
             return /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'ollama' : 'openai';
         }
 
-        let mmOllama;                        // undefined = not checked, else { model } or { error }
+        let mmOllama;                        // undefined = not checked, else { model, all } or { error }
         async function mmOllamaModel(force) {
             if (mmOllama === undefined || force) {
                 try {
                     const r = await fetch(OLLAMA_URL + '/api/tags');
                     const { models = [] } = await r.json();
-                    // the biggest qwen, else the biggest of anything
+                    // the one picked in the dropdown, else Inkling 2 Mini (most accurate on the
+                    // gxh6 test, ~1 min at medium thinking), else the biggest qwen, else the biggest
+                    let saved = null;
+                    try { saved = localStorage.getItem('mmOllamaModel'); } catch (e) { }
                     const pick = l => l.slice().sort((x, y) => y.size - x.size)[0];
-                    const m = pick(models.filter(x => /qwen/i.test(x.name))) || pick(models);
-                    mmOllama = m ? { model: m.name } : { error: 'no models pulled' };
+                    const m = models.find(x => x.name === saved)
+                        || pick(models.filter(x => /^inkling-2-mini/i.test(x.name)))
+                        || pick(models.filter(x => /qwen/i.test(x.name))) || pick(models);
+                    mmOllama = m ? { model: m.name, all: models.map(x => x.name).sort() }
+                                 : { error: 'no models pulled' };
                 } catch (e) { mmOllama = { error: 'not reachable' }; }
                 mmShowProvider();
             }
@@ -19360,14 +19369,28 @@ ${contentToAnalyze}`;
         }
 
         function mmShowProvider() {
-            const box = $m('mmUseOllama'), info = $m('mmOllamaInfo');
+            const box = $m('mmUseOllama'), info = $m('mmOllamaInfo'), sel = $m('mmOllamaPick');
             const on = mmProvider() === 'ollama';
             if (box) box.checked = on;
-            if (!info) return;
-            info.textContent = !on || !mmOllama ? ''
-                : mmOllama.model ? '(' + mmOllama.model + ')' : '(' + mmOllama.error + ')';
-            info.style.color = on && mmOllama && mmOllama.error ? '#ff6b6b' : '#666';
+            const ok = on && mmOllama && mmOllama.model;
+            if (sel) {
+                sel.style.display = ok ? '' : 'none';
+                if (ok) {
+                    sel.innerHTML = mmOllama.all.map(n => '<option>' + esc(n) + '</option>').join('');
+                    sel.value = mmOllama.model;
+                }
+            }
+            if (info) {
+                info.textContent = on && mmOllama && mmOllama.error ? '(' + mmOllama.error + ')' : '';
+                info.style.color = '#ff6b6b';
+            }
         }
+
+        window.mmPickModel = function (name) {
+            try { localStorage.setItem('mmOllamaModel', name); } catch (e) { }
+            if (mmOllama && mmOllama.model) mmOllama.model = name;
+            if (lastReview.length) render(lastReview, lastMine, lastThreshold);   // relabel
+        };
 
         window.mmSetProvider = function (useOllama) {
             try { localStorage.setItem('mmAiProvider', useOllama ? 'ollama' : 'openai'); } catch (e) { }
@@ -19395,7 +19418,10 @@ ${contentToAnalyze}`;
             const r = await fetch(OLLAMA_URL + '/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ model: o.model, messages, stream: false, options: { num_ctx: OLLAMA_CTX } })
+                body: JSON.stringify(Object.assign({ model: o.model, messages, stream: false, options: { num_ctx: OLLAMA_CTX } },
+                    // Inkling thinks at "high" by default: 6+ minutes per Explain for the
+                    // same answer "medium" gives in about one (measured on the gxh6 note)
+                    /^inkling/i.test(o.model) ? { think: 'medium' } : {}))
             });
             const text = await r.text();
             if (!r.ok) throw new Error('Ollama: ' + text);

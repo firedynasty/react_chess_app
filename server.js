@@ -26,7 +26,7 @@ const mimeTypes = {
 // Except a request marked provider: 'openai', which goes to OpenAI as on Vercel.
 // (What went wrong's Explain calls Ollama from the browser itself, not this.)
 //   OLLAMA_URL   default http://localhost:11434
-//   OLLAMA_MODEL default: the largest installed model with "qwen" in its name
+//   OLLAMA_MODEL default: inkling-2-mini if installed, else the largest "qwen" model
 //   OLLAMA_CTX   context window, default 32768 (knowledge base alone is ~10k tokens)
 const OLLAMA_URL = (process.env.OLLAMA_URL || 'http://localhost:11434').replace(/\/$/, '');
 const OLLAMA_CTX = parseInt(process.env.OLLAMA_CTX || '32768', 10);
@@ -55,22 +55,27 @@ async function ollamaModel() {
     if (resolvedModel) return resolvedModel;
     const r = await fetch(OLLAMA_URL + '/api/tags');
     const { models = [] } = await r.json();
-    const qwen = models.filter(m => /qwen/i.test(m.name)).sort((a, b) => b.size - a.size);
-    if (!qwen.length) throw new Error('No qwen model in Ollama — set OLLAMA_MODEL');
-    resolvedModel = qwen[0].name;
+    const bySize = l => l.slice().sort((a, b) => b.size - a.size);
+    const pick = bySize(models.filter(m => /^inkling-2-mini/i.test(m.name)))[0]
+              || bySize(models.filter(m => /qwen/i.test(m.name)))[0];
+    if (!pick) throw new Error('No inkling-2-mini or qwen model in Ollama — set OLLAMA_MODEL');
+    resolvedModel = pick.name;
     console.log('Local AI model:', resolvedModel);
     return resolvedModel;
 }
 
 async function ollamaChat(messages) {
+    const model = await ollamaModel();
     const r = await fetch(OLLAMA_URL + '/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            model: await ollamaModel(),
+            model,
             messages,
             stream: false,
             options: { num_ctx: OLLAMA_CTX },
+            // Inkling defaults to "high" thinking: 6+ min vs ~1 min at medium, same answer
+            ...(/^inkling/i.test(model) ? { think: 'medium' } : {}),
         }),
     });
     const text = await r.text();
