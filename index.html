@@ -810,6 +810,7 @@
         <select id="game-dropdown" onchange="loadSelectedGame()">
             <option value="">-- Select a game --</option>
         </select>
+        <button type="button" id="aiCommentsFetchedBtn" title="Send the game on the board to the AI and add one-line comments on its key moves. Under npm start this is the local Ollama model; Copy PGN carries the comments out." onclick="aiCommentKeyMoves(this)" style="margin-left:8px; background:#9b59b6; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">💬 AI comments → PGN</button>
         <div id="game-details"></div>
     </div>
 
@@ -5934,13 +5935,23 @@
         // grafting is done here by move number + SAN, so moves/evals/
         // variations can never be altered. Copy PGN / Download then carry
         // the comments out.
-        async function aiCommentKeyMoves() {
-            const btn = document.getElementById('aiCommentsBtn');
+        // Served by `npm start` (localhost, a .local name like mac-studio.local, or a
+        // LAN IP): server.js answers /api/chat with Ollama and ignores the key.
+        function aiIsLocalServer() {
+            const h = location.hostname;
+            return h === 'localhost' || h === '127.0.0.1' || /\.local$/.test(h) ||
+                   /^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h);
+        }
+
+        async function aiCommentKeyMoves(btnArg) {
+            const btn = (btnArg && btnArg.nodeType === 1) ? btnArg : document.getElementById('aiCommentsBtn');
+            const btnId = btn && btn.id;
             if (!window.moveTree) { showToast('Load a game to the board first'); return; }
-            // (button lives in the coach modal; React may re-render it away mid-call)
+            // (button may live in the coach modal; React may re-render it away mid-call)
 
             let key = '';
             try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
+            if (!key && aiIsLocalServer()) key = 'local';
             if (!key) {
                 key = (prompt('AI comments need an access code (or your own OpenAI API key, sk-…):') || '').trim();
                 if (key) { try { localStorage.setItem('sbReportAccessCode', key); } catch (e) { } }
@@ -5969,7 +5980,7 @@
                                 'Rules:\n' +
                                 '- Comment only the 6-12 most instructive moves (turning points, strategic ideas, critical mistakes). Skip routine moves.\n' +
                                 '- ONE short sentence per comment, about 15 words max, evocative and thematic.\n' +
-                                '- Use the [%eval] tags to find the real turning points.\n' +
+                                '- If there are [%eval] tags, use them to find the real turning points.\n' +
                                 '- No markdown, no fences, no extra text — just the lines.\n\n' +
                                 pgn
                         }]
@@ -5987,7 +5998,7 @@
                 showToast('AI comments failed: ' + e.message);
                 log('AI comments failed: ' + e.message, 'warning');
             } finally {
-                const btnNow = document.getElementById('aiCommentsBtn');
+                const btnNow = btnId ? document.getElementById(btnId) : null;
                 if (btnNow) { btnNow.disabled = false; btnNow.textContent = origText || btnNow.textContent; }
             }
         }
