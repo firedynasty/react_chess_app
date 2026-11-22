@@ -9564,9 +9564,15 @@
             else if (currentFlatIndex !== undefined && currentFlatIndex !== null) curPly = currentFlatIndex + 1;
             let highlightIdx = -1;
             let bestPly = Infinity;
+            // Inside a variation, only that move's own comment shows: looking ahead
+            // would pull in a main-line comment for a move you are not on.
+            let inVariation = false;
+            for (let n = curNode; n && n.parent; n = n.parent) {
+                if (n.parent.children && n.parent.children[0] !== n) { inVariation = true; break; }
+            }
             comments.forEach((c, i) => {
                 if (c.nodeId && c.nodeId === currentNodeId) { highlightIdx = i; bestPly = -1; return; }
-                if (bestPly === -1 || c.isMainLine === false) return;
+                if (inVariation || bestPly === -1 || c.isMainLine === false) return;
                 const ply = c.flatIndex !== undefined ? c.flatIndex + 1 : plyOf(c.moveNumber, c.isBlackMove);
                 if (ply >= curPly && ply < bestPly) { bestPly = ply; highlightIdx = i; }
             });
@@ -9574,7 +9580,8 @@
             // Only ONE card shows: the highlighted comment (the current move's, else the
             // next one ahead). Past the last comment the final one stays up.
             const shownIdx = new Set();
-            shownIdx.add(highlightIdx >= 0 ? highlightIdx : comments.length - 1);
+            if (highlightIdx >= 0) shownIdx.add(highlightIdx);
+            else if (!inVariation) shownIdx.add(comments.length - 1);
 
             comments.forEach((c, idx) => {
                 const commentDiv = document.createElement('div');
