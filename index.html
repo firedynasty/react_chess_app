@@ -9591,11 +9591,13 @@
                 if (ply >= curPly && ply < bestPly) { bestPly = ply; highlightIdx = i; }
             });
 
-            // Only ONE card shows: the highlighted comment (the current move's, else the
-            // next one ahead). Past the last comment the final one stays up.
+            // The card shows only the current move's own comment, like the move
+            // tooltip: step off that move and the card goes away (no look-ahead).
             const shownIdx = new Set();
-            if (highlightIdx >= 0) shownIdx.add(highlightIdx);
-            else if (!inVariation) shownIdx.add(comments.length - 1);
+            const ownIdx = comments.findIndex(c => c.nodeId
+                ? c.nodeId === currentNodeId
+                : (!inVariation && c.flatIndex !== undefined && c.flatIndex + 1 === curPly));
+            if (ownIdx >= 0) shownIdx.add(ownIdx);
 
             comments.forEach((c, idx) => {
                 const commentDiv = document.createElement('div');
