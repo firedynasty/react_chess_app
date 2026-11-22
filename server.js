@@ -168,4 +168,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
     console.log(`Chess Analyzer running at http://localhost:${PORT}`);
+    // Say up front which model the AI buttons will use (Studio or laptop)
+    ollamaBackend().catch(e => console.log('Local AI not available yet:', e.message || e));
 });
