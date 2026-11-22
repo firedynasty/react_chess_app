@@ -810,7 +810,7 @@
         <select id="game-dropdown" onchange="loadSelectedGame()">
             <option value="">-- Select a game --</option>
         </select>
-        <button type="button" id="aiCommentsFetchedBtn" title="Send the game on the board to the AI and add one-line comments on its key moves. Under npm start this is the local Ollama model; Copy PGN carries the comments out." onclick="aiCommentKeyMoves(this)" style="margin-left:8px; background:#9b59b6; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">💬 AI comments → PGN</button>
+        <button type="button" id="aiCommentsFetchedBtn" title="Send the game on the board to the AI and add a one-line comment on every main-line move that has a variation, comparing it with the alternative (moves that already have a comment are left alone). Under npm start this is the local Ollama model; Copy PGN carries the comments out." onclick="aiCommentKeyMoves(this, { variations: true })" style="margin-left:8px; background:#9b59b6; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">💬 AI comments on variation moves</button>
         <div id="game-details"></div>
     </div>
 
@@ -5943,7 +5943,15 @@
                    /^(10|192\.168|172\.(1[6-9]|2\d|3[01]))\./.test(h);
         }
 
-        async function aiCommentKeyMoves(btnArg) {
+        async function aiCommentKeyMoves(btnArg, opts) {
+            const onVars = !!(opts && opts.variations);
+            // Main-line moves that have a sibling variation (an alternative to that move)
+            const varMoves = [];
+            for (let n = window.moveTree && window.moveTree.children && window.moveTree.children[0]; n && n.san; n = n.children && n.children[0]) {
+                if (n.parent && n.parent.children && n.parent.children.length > 1) varMoves.push(n);
+            }
+            const mvLabel = n => n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san;
+            if (onVars && window.moveTree && !varMoves.length) { showToast('No main-line move on the board has a variation — run the analysis first'); return; }
             const btn = (btnArg && btnArg.nodeType === 1) ? btnArg : document.getElementById('aiCommentsBtn');
             const btnId = btn && btn.id;
             if (!window.moveTree) { showToast('Load a game to the board first'); return; }
@@ -5978,7 +5986,10 @@
                                 '8. c4 { Classical cheesecake style. }\n' +
                                 '10... Ne4 { Reasonable idea but easily rebuffed. }\n' +
                                 'Rules:\n' +
-                                '- Comment only the 6-12 most instructive moves (turning points, strategic ideas, critical mistakes). Skip routine moves.\n' +
+                                (onVars
+                                    ? '- Comment EXACTLY these main-line moves, one line each, no others: ' + varMoves.map(mvLabel).join(', ') + '.\n' +
+                                      '- Each has an alternative line in ( ) right after it in the PGN. Say why the played move is worse or better than that alternative.\n'
+                                    : '- Comment only the 6-12 most instructive moves (turning points, strategic ideas, critical mistakes). Skip routine moves.\n') +
                                 '- ONE short sentence per comment, about 15 words max, evocative and thematic.\n' +
                                 '- If there are [%eval] tags, use them to find the real turning points.\n' +
                                 '- No markdown, no fences, no extra text — just the lines.\n\n' +
@@ -5989,7 +6000,14 @@
                 const data = await r.json().catch(function () { return {}; });
                 if (!r.ok || data.error) throw new Error(data.error || ('HTTP ' + r.status));
                 const { applied, already } = graftAiComments(data.content || '');
-                const keptNote = already ? ' (' + already + ' already had a comment, left as is)' : '';
+                let keptNote = already ? ' (' + already + ' already had a comment, left as is)' : '';
+                if (onVars) {
+                    const bare = varMoves.filter(n => !lnCleanComment(n.comment));
+                    if (bare.length) {
+                        keptNote += ' — ' + bare.length + ' of ' + varMoves.length + ' variation moves still have none: ' + bare.map(mvLabel).join(', ');
+                        log('AI comments: no comment yet on ' + bare.map(mvLabel).join(', '), 'warning');
+                    }
+                }
                 showToast(applied > 0 ? ('AI comments added to ' + applied + ' move' + (applied > 1 ? 's' : '') + keptNote)
                                       : already > 0 ? ('Nothing added: ' + already + ' of those moves already have a comment')
                                                     : 'No comment lines parsed from the AI reply');
