@@ -2,6 +2,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
+// OPENAI_API_KEY / ACCESS_CODE for the OpenAI path, the same as Vercel's
+for (const f of ['.env.local', '.env']) {
+    try { process.loadEnvFile(path.join(__dirname, f)); break; } catch (e) { }
+}
+
 const PORT = process.env.PORT || 8000;
 
 const mimeTypes = {
@@ -18,6 +23,8 @@ const mimeTypes = {
 
 // ── Local AI: /api/chat and /api/rag-chess answered by Ollama ──────────────
 // Only under `npm start`. On Vercel the api/ functions still go to OpenAI.
+// Except a request marked provider: 'openai', which goes to OpenAI as on Vercel.
+// (What went wrong's Explain calls Ollama from the browser itself, not this.)
 // The page still asks for an access code / key; anything works here, it's ignored.
 // Same routing as `lf`: try the Mac Studio first (bigger model, ~3 s connect
 // timeout), fall back to this laptop's Ollama.
@@ -25,7 +32,7 @@ const mimeTypes = {
 //   STUDIO_URL    default http://Stanleys-Mac-Studio.local:11434
 //   STUDIO_MODEL  default inkling-2-mini
 //   OLLAMA_MODEL  force a model; otherwise Studio -> STUDIO_MODEL,
-//                 laptop -> the largest installed model with "qwen" in its name
+//                 laptop -> inkling-2-mini if installed, else the largest "qwen" model
 //   OLLAMA_CTX    context window, default 32768 (knowledge base alone is ~10k tokens)
 const STUDIO_URL = (process.env.STUDIO_URL || 'http://Stanleys-Mac-Studio.local:11434').replace(/\/$/, '');
 const STUDIO_MODEL = process.env.STUDIO_MODEL || 'inkling-2-mini';
@@ -65,8 +72,10 @@ async function ollamaBackend() {
     const pick = (url, models, preferred) => {
         if (process.env.OLLAMA_MODEL) return process.env.OLLAMA_MODEL;
         if (preferred && models.some(m => m.name === preferred || m.name === preferred + ':latest')) return preferred;
-        const qwen = models.filter(m => /qwen/i.test(m.name)).sort((a, b) => b.size - a.size);
-        if (qwen.length) return qwen[0].name;
+        const bySize = l => l.slice().sort((a, b) => b.size - a.size);
+        const fallback = bySize(models.filter(m => /^inkling-2-mini/i.test(m.name)))[0]
+                      || bySize(models.filter(m => /qwen/i.test(m.name)))[0];
+        if (fallback) return fallback.name;
         throw new Error('No usable model at ' + url + ' — set OLLAMA_MODEL');
     };
     if (process.env.OLLAMA_URL) {
@@ -95,8 +104,9 @@ async function ollamaChat(messages) {
             model,
             messages,
             stream: false,
-            think: false,
             options: { num_ctx: OLLAMA_CTX },
+            // Inkling defaults to "high" thinking: 6+ min vs ~1 min at medium, same answer
+            think: /^inkling/i.test(model) ? 'medium' : false,
         }),
         });
     } catch (e) { backend = null; throw e; }
@@ -122,6 +132,19 @@ async function handleLocalAi(req, res, route) {
     };
     try {
         const body = await readJson(req);
+        // The page asked for OpenAI explicitly (the "Local Ollama" box is
+        // unchecked): run the real Vercel function, with the keys from .env.local
+        if (route === '/api/chat' && body.provider === 'openai') {
+            const { default: openaiChat } = await import('./api/chat.js');
+            let code = 200;
+            const shim = {
+                setHeader() { }, end() { res.end(); },
+                status(c) { code = c; return shim; },
+                json(o) { send(code, o); },
+            };
+            await openaiChat({ method: 'POST', body }, shim);
+            return;
+        }
         let messages = Array.isArray(body.messages) ? body.messages.slice() : [];
         if (route === '/api/rag-chess') {
             if (body.query) messages.push({ role: 'user', content: body.query });

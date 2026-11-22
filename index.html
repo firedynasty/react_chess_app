@@ -18247,6 +18247,14 @@ ${contentToAnalyze}`;
                  title="How many plies a Play out adds to a line. 0 = carry on to mate or a draw."
                  style="width:58px; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:4px 6px; font-size:13px;">
           <span style="color:#888; font-size:12px;">plies</span>
+          <label title="Checked: Explain asks Ollama on this computer (localhost:11434) straight from the browser, no key needed. Unchecked: OpenAI, with your access code. On the Vercel site Ollama must allow it: launchctl setenv OLLAMA_ORIGINS https://your-site.vercel.app"
+                 style="color:#888; font-size:12px; display:flex; align-items:center; gap:4px; cursor:pointer; margin-left:8px;">
+            <input type="checkbox" id="mmUseOllama" onchange="mmSetProvider(this.checked)">
+            Local Ollama
+          </label>
+          <select id="mmOllamaPick" onchange="mmPickModel(this.value)" title="Which Ollama model Explain asks. Remembered."
+                  style="display:none; background:#1a1a2e; color:#eee; border:1px solid #555; border-radius:4px; padding:2px 4px; font-size:12px;"></select>
+          <span id="mmOllamaInfo" style="color:#666; font-size:12px;"></span>
           <span id="mmStatus" style="color:#ffa94d; font-size:12px; flex:1;"></span>
           <button onclick="mmClose()" style="background:none; border:none; color:#c0392b; font-size:20px; cursor:pointer;">&times;</button>
         </div>
@@ -18412,7 +18420,7 @@ ${contentToAnalyze}`;
 
         function branch(baseFen, sanList, label, source) {
             if (!sanList || !sanList.length) return null;
-            return { base: posBase(baseFen), san: sanList, label: label, source: source,
+            return { fen: baseFen, base: posBase(baseFen), san: sanList, label: label, source: source,
                      note: fromPos(baseFen, sanList), plies: buildPlies(baseFen, sanList) };
         }
 
@@ -19034,7 +19042,7 @@ ${contentToAnalyze}`;
                         + '<span style="color:#888; font-size:12px;">' + pawns(f.side === 'w' ? f.before : -f.before)
                         + ' → ' + pawns(f.side === 'w' ? f.after : -f.after) + '</span>'
                         + '<span style="flex:1;"></span>'
-                        + '<button onclick="mmExplain(' + i + ')" title="Ask OpenAI why this move was bad, using only the facts and lines here" style="background:#0f3460; color:#ffd43b; border:1px solid #ffd43b; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">'
+                        + '<button onclick="mmExplain(' + i + ')" title="Ask ' + esc(mmAiName()) + ' why this move was bad, using only the facts and lines here" style="background:#0f3460; color:#ffd43b; border:1px solid #ffd43b; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">'
                         + (f.explaining ? '…' : f.explain ? 'Re-explain' : 'Explain') + '</button>'
                         + '<button onclick="mmNote(' + i + ')" title="Copy just this mistake as branch notes for an LLM" style="background:#0f3460; color:#4caf50; border:1px solid #4caf50; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">Copy notes</button>'
                         + '<button onclick="mmComment(' + i + ')" title="Write this onto the move as a PGN comment, the same editor as 💬 + Comment. Copy PGN carries it, it comes back when you load that PGN again, and the ⭐ bubble shows it on the board. An explanation above seeds the box." style="background:#0f3460; color:#2ecc71; border:1px solid #2ecc71; border-radius:4px; padding:3px 10px; cursor:pointer; font-size:12px;">'
@@ -19151,6 +19159,89 @@ ${contentToAnalyze}`;
                    + ' → ' + pts[pts.length - 1].label + ' = ' + materialWord(to);
         }
 
+        // Files and pawn squares, read off the board rather than left to the
+        // model. Given only moves and numbers, a model fills the gap with
+        // plausible chess: "the open h-file" after gxh6 (the g-file opened),
+        // "Black pawns on d4 and e4" (d4 is White's). Same idea as branchGain:
+        // work it out here, hand over the answer.
+        const FILES = 'abcdefgh';
+        function boardFacts(fen) {
+            let b; try { b = new Chess(fen); } catch (e) { return null; }
+            const P = { w: [], b: [] }, K = {};
+            b.board().forEach((row, r) => row.forEach((sq, c) => {
+                if (!sq) return;
+                const name = FILES[c] + (8 - r);
+                if (sq.type === 'p') P[sq.color].push(name);
+                else if (sq.type === 'k') K[sq.color] = name;
+            }));
+            P.w.sort(); P.b.sort();
+            const has = (col, f) => P[col].some(x => x[0] === f);
+            const state = {};
+            for (const f of FILES) {
+                state[f] = !has('w', f) && !has('b', f) ? 'open'
+                         : !has('w', f) ? 'half-open for White'      // only a Black pawn on it
+                         : !has('b', f) ? 'half-open for Black'
+                         : 'closed';
+            }
+            return { P, K, state };
+        }
+
+        function kingZone(bf, col) {
+            const k = bf.K[col]; if (!k) return '';
+            const i = FILES.indexOf(k[0]);
+            const fs = FILES.slice(Math.max(0, i - 1), i + 2).split('');
+            // its own pawns in front of it: a file with none is a hole in the shield
+            const who = col === 'w' ? 'White' : 'Black';
+            return who + ' king ' + k + ', its own pawns on the files beside it: '
+                 + fs.map(f => {
+                       const own = bf.P[col].filter(x => x[0] === f);
+                       return own.length ? own.join(' ') : f + '-file has no ' + who + ' pawn';
+                   }).join(', ');
+        }
+
+        function structureText(fen) {
+            const bf = boardFacts(fen); if (!bf) return '';
+            const list = st => FILES.split('').filter(f => bf.state[f] === st);
+            const parts = [
+                'White pawns ' + (bf.P.w.join(' ') || 'none'),
+                'Black pawns ' + (bf.P.b.join(' ') || 'none'),
+                'open files: ' + (list('open').join(' ') || 'none'),
+                'half-open for White: ' + (list('half-open for White').join(' ') || 'none'),
+                'half-open for Black: ' + (list('half-open for Black').join(' ') || 'none'),
+                kingZone(bf, 'w'), kingZone(bf, 'b')
+            ];
+            return parts.filter(Boolean).join('; ');
+        }
+
+        // Who played each move and what it took. SAN alone hides both: the
+        // model read "1. Nd2 Bg5" as White's bishop, and the x in gxh6 as a
+        // pawn given up "for nothing" when it took a bishop. Replaying the
+        // line answers both.
+        const PIECE = { p: 'pawn', n: 'knight', b: 'bishop', r: 'rook', q: 'queen', k: 'king' };
+        const SIDE = { w: 'White', b: 'Black' };
+        function whoMoved(fen, sanList) {
+            let g; try { g = new Chess(fen); } catch (e) { return ''; }
+            const out = [];
+            for (const raw of sanList || []) {
+                const san = String(raw).replace(/[?!]+$/, '');
+                let m = null; try { m = g.move(san); } catch (e) { m = null; }
+                if (!m) break;
+                const opp = m.color === 'w' ? 'b' : 'w';
+                out.push(san + ' = ' + SIDE[m.color] + ' ' + PIECE[m.piece]
+                         + (m.captured ? ' takes ' + SIDE[opp] + ' ' + PIECE[m.captured] : '')
+                         + (m.promotion ? ', promotes to ' + PIECE[m.promotion] : ''));
+            }
+            return out.join('; ');
+        }
+
+        function fileChanges(fenA, fenB) {
+            const a = boardFacts(fenA), b = boardFacts(fenB);
+            if (!a || !b) return '';
+            const ch = FILES.split('').filter(f => a.state[f] !== b.state[f])
+                .map(f => f + '-file ' + a.state[f] + ' → ' + b.state[f]);
+            return ch.length ? ch.join('; ') : 'no file changes';
+        }
+
         // One mistake as branch notes: the facts, then the lines as From
         // Position snippets so an LLM (or Lichess) can replay each branch.
         function noteText(f) {
@@ -19161,6 +19252,14 @@ ${contentToAnalyze}`;
                      + pawns(f.side === 'w' ? f.after : -f.after) + ') ===');
             out.push('Cause: ' + (f.tags.length ? f.tags.map(t => t.tag).join(' + ') : 'untagged'));
             (f.tags || []).forEach(t => out.push('  ' + t.text));
+            if (f.fenBefore && f.fenAfter) {
+                const sb = structureText(f.fenBefore), sa = structureText(f.fenAfter);
+                if (sb) out.push('Board before ' + label(f.node) + ': ' + sb);
+                if (sa) out.push('Board after ' + label(f.node) + ': ' + sa);
+                if (sb && sa) out.push('What the move changed on the files: ' + fileChanges(f.fenBefore, f.fenAfter));
+                const w = whoMoved(f.fenBefore, [f.node.san]);
+                if (w) out.push('The move itself: ' + w);
+            }
             if (f.escaped) {
                 out.push('Not punished: they replied ' + label(f.reply) + ' and gave back ' + pawns(f.replyLoss) + ' pawns.');
             } else if (f.reply) {
@@ -19173,6 +19272,8 @@ ${contentToAnalyze}`;
                       + (b.playout.evalEnd === null ? '' : ', ending ' + pawns(b.playout.evalEnd) + ' from White’s view') + ']'
                     : '';
                 out.push('', b.label + ': ' + b.san.join(' ') + ' (' + b.source + ')' + tail + ':', b.note);
+                const who = b.fen ? whoMoved(b.fen, b.san) : '';
+                if (who) out.push('who moved: ' + who);
                 // Stockfish's own number wherever it moves, when Eval line has
                 // been run — the hardest evidence on offer, and the thing to
                 // check an explanation against. It goes FIRST because it is the
@@ -19184,6 +19285,8 @@ ${contentToAnalyze}`;
                 if (net) out.push('net material: ' + net);
                 const trail = materialTrail(b);
                 if (trail) out.push('material snapshots along this line (NOT gains — only "net material" above is): ' + trail);
+                const end = b.plies && b.plies.length ? structureText(b.plies[b.plies.length - 1].fen) : '';
+                if (end) out.push('board at the end of this line: ' + end);
             });
             return out.join('\n');
         }
@@ -19228,7 +19331,7 @@ ${contentToAnalyze}`;
             }
             // An explanation already in words is the obvious first draft, but it
             // only ever seeds an empty box, and the status line says where it came from
-            openMoveCommentModal(n, f.explain || '', 'Seeded from the OpenAI explanation — edit it down before saving');
+            openMoveCommentModal(n, f.explain || '', 'Seeded from the ' + mmAiName() + ' explanation — edit it down before saving');
         };
 
         // Saving a comment re-renders the cards so the note shows up here too
@@ -19259,6 +19362,9 @@ ${contentToAnalyze}`;
             'You are a chess coach explaining ONE move that an engine flagged.',
             'Use ONLY the facts and the lines you are given.',
             'Never name a piece, square or tactic that does not appear in those lines.',
+            'Whose piece moved and what it captured: use ONLY the "who moved" and "The move itself" lines.',
+            'Files and pawn squares: use ONLY the "Board" lines, which are read off the real position.',
+            'Never call a file open or half-open, or place a pawn on a square, unless a Board line says so.',
             // The engine number is the verdict. Everything below is only allowed
             // to qualify it, because a model handed a material count will always
             // reach for a tactic even when the line is dead level.
@@ -19278,6 +19384,103 @@ ${contentToAnalyze}`;
             'Answer in 3-6 plain sentences. No markdown, no headings, no preamble.'
         ].join(' ');
 
+        // Which model Explain asks, chosen by the "Local Ollama" checkbox and
+        // remembered. Ollama is called straight from the browser, so it works
+        // on localhost and on the Vercel site alike, as long as Ollama is
+        // running on this computer (and, for Vercel, OLLAMA_ORIGINS allows it).
+        // OpenAI goes through /api/chat with the access code, as before.
+        const OLLAMA_URL = 'http://localhost:11434';
+        const OLLAMA_CTX = 32768;            // the note plus the system prompt fit easily
+        function mmProvider() {
+            let v = null;
+            try { v = localStorage.getItem('mmAiProvider'); } catch (e) { }
+            if (v === 'ollama' || v === 'openai') return v;
+            return /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? 'ollama' : 'openai';
+        }
+
+        let mmOllama;                        // undefined = not checked, else { model, all } or { error }
+        async function mmOllamaModel(force) {
+            if (mmOllama === undefined || force) {
+                try {
+                    const r = await fetch(OLLAMA_URL + '/api/tags');
+                    const { models = [] } = await r.json();
+                    // the one picked in the dropdown, else Inkling 2 Mini (most accurate on the
+                    // gxh6 test, ~1 min at medium thinking), else the biggest qwen, else the biggest
+                    let saved = null;
+                    try { saved = localStorage.getItem('mmOllamaModel'); } catch (e) { }
+                    const pick = l => l.slice().sort((x, y) => y.size - x.size)[0];
+                    const m = models.find(x => x.name === saved)
+                        || pick(models.filter(x => /^inkling-2-mini/i.test(x.name)))
+                        || pick(models.filter(x => /qwen/i.test(x.name))) || pick(models);
+                    mmOllama = m ? { model: m.name, all: models.map(x => x.name).sort() }
+                                 : { error: 'no models pulled' };
+                } catch (e) { mmOllama = { error: 'not reachable' }; }
+                mmShowProvider();
+            }
+            return mmOllama;
+        }
+
+        function mmShowProvider() {
+            const box = $m('mmUseOllama'), info = $m('mmOllamaInfo'), sel = $m('mmOllamaPick');
+            const on = mmProvider() === 'ollama';
+            if (box) box.checked = on;
+            const ok = on && mmOllama && mmOllama.model;
+            if (sel) {
+                sel.style.display = ok ? '' : 'none';
+                if (ok) {
+                    sel.innerHTML = mmOllama.all.map(n => '<option>' + esc(n) + '</option>').join('');
+                    sel.value = mmOllama.model;
+                }
+            }
+            if (info) {
+                info.textContent = on && mmOllama && mmOllama.error ? '(' + mmOllama.error + ')' : '';
+                info.style.color = '#ff6b6b';
+            }
+        }
+
+        window.mmPickModel = function (name) {
+            try { localStorage.setItem('mmOllamaModel', name); } catch (e) { }
+            if (mmOllama && mmOllama.model) mmOllama.model = name;
+            if (lastReview.length) render(lastReview, lastMine, lastThreshold);   // relabel
+        };
+
+        window.mmSetProvider = function (useOllama) {
+            try { localStorage.setItem('mmAiProvider', useOllama ? 'ollama' : 'openai'); } catch (e) { }
+            mmShowProvider();
+            if (useOllama) mmOllamaModel(true);
+            if (lastReview.length) render(lastReview, lastMine, lastThreshold);   // relabel
+        };
+
+        mmShowProvider();
+        if (mmProvider() === 'ollama') mmOllamaModel();
+
+        function mmAiName() {
+            if (mmProvider() !== 'ollama') return 'OpenAI';
+            return (mmOllama && mmOllama.model ? mmOllama.model : 'Ollama') + ' (local)';
+        }
+
+        async function mmKey() {
+            return mmProvider() === 'ollama' ? 'local' : mmCredential();
+        }
+
+        async function ollamaChat(messages) {
+            const o = await mmOllamaModel(mmOllama && mmOllama.error);   // retry if it was down
+            if (!o.model) throw new Error('Ollama ' + o.error + ' at ' + OLLAMA_URL
+                + ' — is it running? (on Vercel, set OLLAMA_ORIGINS)');
+            const r = await fetch(OLLAMA_URL + '/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(Object.assign({ model: o.model, messages, stream: false, options: { num_ctx: OLLAMA_CTX } },
+                    // Inkling thinks at "high" by default: 6+ minutes per Explain for the
+                    // same answer "medium" gives in about one (measured on the gxh6 note)
+                    /^inkling/i.test(o.model) ? { think: 'medium' } : {}))
+            });
+            const text = await r.text();
+            if (!r.ok) throw new Error('Ollama: ' + text);
+            const content = (JSON.parse(text).message || {}).content || '';
+            return content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+        }
+
         function mmCredential() {
             let key = '';
             try { key = (localStorage.getItem('sbReportAccessCode') || '').trim(); } catch (e) { }
@@ -19289,11 +19492,11 @@ ${contentToAnalyze}`;
         }
 
         function explainHtml(f) {
-            if (f.explaining) return '<div style="margin-top:7px; color:#ffd43b; font-size:12px;">Asking OpenAI…</div>';
+            if (f.explaining) return '<div style="margin-top:7px; color:#ffd43b; font-size:12px;">Asking ' + esc(mmAiName()) + '…</div>';
             if (f.explainError) return '<div style="margin-top:7px; color:#ff6b6b; font-size:12px;">Explain failed: ' + esc(f.explainError) + '</div>';
             if (!f.explain) return '';
             return '<div style="margin-top:8px; border-left:2px solid #ffd43b; padding:2px 0 2px 9px;">'
-                + '<div style="color:#ffd43b; font-size:11px; font-weight:bold; margin-bottom:2px;">OpenAI, from the facts above</div>'
+                + '<div style="color:#ffd43b; font-size:11px; font-weight:bold; margin-bottom:2px;">' + esc(mmAiName()) + ', from the facts above</div>'
                 + '<div style="color:#eee; font-size:12.5px; white-space:pre-wrap;">' + esc(f.explain) + '</div></div>';
         }
 
@@ -19348,6 +19551,8 @@ ${contentToAnalyze}`;
                         + ' Ground every claim in the lines and the numbers shown above.' }
                 ]
             };
+            if (mmProvider() === 'ollama') return ollamaChat(body.messages);
+            body.provider = 'openai';        // under npm start, server.js passes this on to OpenAI
             if (key.indexOf('sk-') === 0) body.userApiKey = key; else body.accessCode = key;
             const r = await fetch('/api/chat', {
                 method: 'POST',
@@ -19362,7 +19567,7 @@ ${contentToAnalyze}`;
         window.mmExplain = async function (i) {
             const f = lastReview[i];
             if (!f || f.explaining) return;
-            const key = mmCredential();
+            const key = await mmKey();
             if (!key) { if (typeof showToast === 'function') showToast('Explain cancelled — no access code'); return; }
             f.explaining = true; f.explainError = null;
             render(lastReview, lastMine, lastThreshold);
@@ -19385,7 +19590,7 @@ ${contentToAnalyze}`;
             if (!lastReview.length) { if (typeof showToast === 'function') showToast('Run the review first'); return; }
             const todo = lastReview.map((f, i) => ({ f, i })).filter(x => !x.f.tags.length && !x.f.explain);
             if (!todo.length) { if (typeof showToast === 'function') showToast('No untagged move left to explain'); return; }
-            const key = mmCredential();
+            const key = await mmKey();
             if (!key) { if (typeof showToast === 'function') showToast('Explain cancelled — no access code'); return; }
             for (const x of todo) {
                 x.f.explaining = true; x.f.explainError = null;
