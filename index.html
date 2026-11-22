@@ -810,7 +810,6 @@
         <select id="game-dropdown" onchange="loadSelectedGame()">
             <option value="">-- Select a game --</option>
         </select>
-        <button type="button" id="aiCommentsFetchedBtn" title="Send the game on the board to the AI and add a one-line comment on every main-line move that has a variation, comparing it with the alternative (moves that already have a comment are left alone). Under npm start this is the local Ollama model; Copy PGN carries the comments out." onclick="aiCommentKeyMoves(this, { variations: true })" style="margin-left:8px; background:#9b59b6; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-weight:bold;">💬 AI comments on variation moves</button>
         <div id="game-details"></div>
     </div>
 
@@ -852,6 +851,7 @@
 
             <div style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
                 <button id="analyzeBtn" onclick="analyzeGame()" disabled>Analyze Game</button>
+                <button type="button" id="aiCommentsFetchedBtn" title="Send the game on the board to the AI and add a one-line comment on every main-line move that has a variation, comparing it with the alternative (moves that already have a comment are left alone). Under npm start this is the local Ollama model; Copy PGN carries the comments out." onclick="aiCommentKeyMoves(this, { variations: true })" style="background:#9b59b6; color:white; border:none; padding:6px 14px; border-radius:6px; font-size:13px; cursor:pointer; font-weight:bold;">💬 AI comments on variation moves</button>
                 <button id="analyzeFenBtn" onclick="analyzeFen()" disabled style="background: #0f3460; color: #00d4ff; display: none;">Analyze Position</button>
                 <button class="hintsBtn" title="Keyboard shortcuts" onclick="openHintsModal()" style="background: #0f3460; color: #ff9800; border: 1px solid #ff9800;">Hints</button>
                 <button onclick="clearResults()" style="background: #dc3545; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-left: auto;">Clear</button>
