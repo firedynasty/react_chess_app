@@ -5952,6 +5952,20 @@
             }
             const mvLabel = n => n.moveNumber + (n.isBlackMove ? '... ' : '. ') + n.san;
             if (onVars && window.moveTree && !varMoves.length) { showToast('No main-line move on the board has a variation — run the analysis first'); return; }
+            // One click asks for at most AI_VAR_CAP moves (the reply length is what makes
+            // the local model slow): the biggest eval drops among the ones still without a
+            // comment. Clicking again picks up the next batch.
+            const AI_VAR_CAP = 8;
+            const evm = window.positionEvalMap || {};
+            const dropOf = n => {
+                const a = n.parent && evm[n.parent.fen], b = evm[n.fen];
+                if (a === undefined || b === undefined) return -Infinity;
+                return n.isBlackMove ? b - a : a - b;   // centipawns the mover gave away
+            };
+            const todo = varMoves.filter(n => !lnCleanComment(n.comment));
+            if (onVars && !todo.length) { showToast('Every variation move already has a comment'); return; }
+            const batch = todo.slice().sort((x, y) => dropOf(y) - dropOf(x)).slice(0, AI_VAR_CAP);
+            batch.sort((x, y) => varMoves.indexOf(x) - varMoves.indexOf(y));   // back in game order
             const btn = (btnArg && btnArg.nodeType === 1) ? btnArg : document.getElementById('aiCommentsBtn');
             const btnId = btn && btn.id;
             if (!window.moveTree) { showToast('Load a game to the board first'); return; }
@@ -5987,7 +6001,7 @@
                                 '10... Ne4 { Reasonable idea but easily rebuffed. }\n' +
                                 'Rules:\n' +
                                 (onVars
-                                    ? '- Comment EXACTLY these main-line moves, one line each, no others: ' + varMoves.map(mvLabel).join(', ') + '.\n' +
+                                    ? '- Comment EXACTLY these main-line moves, one line each, no others: ' + batch.map(mvLabel).join(', ') + '.\n' +
                                       '- Each has an alternative line in ( ) right after it in the PGN. Say why the played move is worse or better than that alternative.\n'
                                     : '- Comment only the 6-12 most instructive moves (turning points, strategic ideas, critical mistakes). Skip routine moves.\n') +
                                 '- ONE short sentence per comment, about 15 words max, evocative and thematic.\n' +
@@ -6004,7 +6018,7 @@
                 if (onVars) {
                     const bare = varMoves.filter(n => !lnCleanComment(n.comment));
                     if (bare.length) {
-                        keptNote += ' — ' + bare.length + ' of ' + varMoves.length + ' variation moves still have none: ' + bare.map(mvLabel).join(', ');
+                        keptNote += ' — ' + bare.length + ' of ' + varMoves.length + ' variation moves still have none (click again for the next ' + Math.min(AI_VAR_CAP, bare.length) + ')';
                         log('AI comments: no comment yet on ' + bare.map(mvLabel).join(', '), 'warning');
                     }
                 }
