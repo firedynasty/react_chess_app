@@ -1411,6 +1411,7 @@
             <button title="Choose a recent Google Sheet or search by name, then load a game card onto the board" onclick="gdriveOpenPicker()" style="background: #137333; color: white; border: 1px solid #34a853; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">Sheets ▾</button>
             <button id="coachNoteBtnMini" title="Comment bubbles on the board: on/off. Gold = this move has a comment. Click a bubble to put it away; right-click ⭐ or a bubble (or Enter / ) for the full note" onclick="toggleCoachBubbles()" oncontextmenu="openCoachNoteForCurrentMove(); return false;" style="background: #4a4a4a; color: #ccc; border: none; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; white-space: nowrap;">⭐</button>
             <button id="mstSideBtn" title="Whose mistakes the , and . keys hop between — click to cycle White → Black → Both. The number is how many ?, ?? and ?! moves that side has on the main line of this game" onclick="mstToggleSide()" style="background: #0f3460; color: #eeeeee; border: 1px solid #eeeeee; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ White (0)</button>
+            <button id="pressureBtn" title="Square pressure: how many pieces of the ⚠ side (White / Black / Both) attack each square. Hover a square to see who attacks it and what the piece on it attacks" onclick="togglePressure()" style="background: #0f3460; color: #aaa; border: 1px solid #666; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">👁 Pressure</button>
             <button id="mstPrevBtn" title="Jump back to that side's previous mistake (same as the , key)" onclick="mstStep(-1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">, ◀ ⚠</button>
             <button id="mstNextBtn" title="Jump to that side's next mistake (same as the . key)" onclick="mstStep(1)" style="background: #0f3460; color: #ff6b6b; border: 1px solid #ff6b6b; padding: 10px 14px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">⚠ ▶ .</button>
             <button id="addCommentBtn" title="Type comments by move number, one per line: 10. text / 25... text. A line with no number goes on the move you are standing on (variations too). They go into the PGN itself, so Copy PGN keeps them" onclick="openCommentCliModal()" style="background: #0f3460; color: #2ecc71; border: 1px solid #2ecc71; padding: 10px 18px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: bold; white-space: nowrap;">💬 + Comment CLI</button>
@@ -10460,6 +10461,7 @@
         function mstToggleSide() {
             window.mstSide = window.mstSide === 'w' ? 'b' : (window.mstSide === 'b' ? 'both' : 'w');
             mstSyncBtn();            // the button's own label is the feedback
+            if (window.drawPressure) window.drawPressure();
         }
 
         // Called from renderMoveTable — every load path funnels through it, so
@@ -19782,6 +19784,194 @@ ${contentToAnalyze}`;
                            siblingLines, noteText, boardSvgMm, materialHtml, materialTrail, materialNet, materialSign,
                            mmEvalOf, evalTrail, branchGain, materialPoints, branch, mmLichessUrls, askOpenAI, playOutFrom, review: () => lastReview,
                            pane: () => pane };
+    })();
+    </script>
+    <script>
+    // ── Square pressure: who attacks what, for the ⚠ side picker ──────
+    // "Attacks" is board control: pawns hit diagonally only, a defended own
+    // piece counts, sliders stop at the first piece. Pins are ignored and a
+    // battery behind another piece (x-ray) is not counted.
+    (function () {
+        var FILES = 'abcdefgh';
+        var KNIGHT = [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+        var DIAG = [[1,1],[1,-1],[-1,1],[-1,-1]];
+        var LINE = [[1,0],[-1,0],[0,1],[0,-1]];
+        var GLYPH = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙' };
+        var RGB = { w: '46,204,113', b: '231,76,60' };
+        var on = false, lastKey = '', map = null, queued = false;
+
+        function sqName(f, r) {
+            return (f < 0 || f > 7 || r < 0 || r > 7) ? null : FILES[f] + (r + 1);
+        }
+
+        // pos is chessboard.js's { h2: 'wP', ... }
+        function attacksFrom(pos, from) {
+            var pc = pos[from], color = pc[0], type = pc[1];
+            var f = FILES.indexOf(from[0]), r = +from[1] - 1, out = [];
+            function step(d) { var s = sqName(f + d[0], r + d[1]); if (s) out.push(s); }
+            function slide(d) {
+                for (var i = 1; i < 8; i++) {
+                    var s = sqName(f + d[0] * i, r + d[1] * i);
+                    if (!s) return;
+                    out.push(s);
+                    if (pos[s]) return;
+                }
+            }
+            if (type === 'P') { var dr = color === 'w' ? 1 : -1; step([-1, dr]); step([1, dr]); }
+            else if (type === 'N') KNIGHT.forEach(step);
+            else if (type === 'K') DIAG.concat(LINE).forEach(step);
+            if (type === 'B' || type === 'Q') DIAG.forEach(slide);
+            if (type === 'R' || type === 'Q') LINE.forEach(slide);
+            return out;
+        }
+
+        function buildMap(pos) {
+            var m = { w: {}, b: {}, from: {}, pos: pos };
+            Object.keys(pos).forEach(function (from) {
+                m.from[from] = attacksFrom(pos, from);
+                m.from[from].forEach(function (to) {
+                    (m[pos[from][0]][to] = m[pos[from][0]][to] || []).push(from);
+                });
+            });
+            return m;
+        }
+
+        function sides() { return window.mstSide === 'both' ? ['w', 'b'] : [window.mstSide || 'w']; }
+
+        function el(css, cls) {
+            var d = document.createElement('div');
+            d.className = cls;
+            d.style.cssText = 'position:absolute;pointer-events:none;' + (cls === 'pr-ov' ? '' : 'z-index:2;') + css;
+            return d;
+        }
+
+        function clearMarks(cls) {
+            document.querySelectorAll('#myBoard2 .' + cls).forEach(function (n) { n.remove(); });
+        }
+
+        function squareEl(sq) { return document.querySelector('#myBoard2 .square-55d63[data-square="' + sq + '"]'); }
+
+        function draw(force) {
+            var board = document.getElementById('myBoard2');
+            if (!board || !window.board2 || !window.board2.position) return;
+            var pos = on ? window.board2.position() : {};
+            var key = on + '|' + window.mstSide + '|' + JSON.stringify(pos);
+            if (!force && key === lastKey && (!on || board.querySelector('.pr-ov') || !Object.keys(pos).length)) return;
+            lastKey = key;
+            clearMarks('pr-ov'); clearMarks('pr-hi'); hideTip();
+            map = null;
+            if (!on) return;
+            map = buildMap(pos);
+            var shown = sides();
+            board.querySelectorAll('.square-55d63').forEach(function (cell) {
+                var sq = cell.getAttribute('data-square');
+                var nw = (map.w[sq] || []).length, nb = (map.b[sq] || []).length;
+                var n = { w: nw, b: nb };
+                if (!shown.some(function (c) { return n[c]; })) return;
+                // one side: deeper = more attackers. Both: colour of whoever has more, amber if even
+                var rgb, depth;
+                if (shown.length === 1) { rgb = RGB[shown[0]]; depth = n[shown[0]]; }
+                else { rgb = nw > nb ? RGB.w : (nb > nw ? RGB.b : '142,68,173'); depth = Math.abs(nw - nb) || 1; }
+                var ov = el('inset:0;background:rgba(' + rgb + ',' + (rgb === RGB.b ? Math.min(0.5 + 0.12 * depth, 0.85) : Math.min(0.28 + 0.12 * depth, 0.7)) + ');', 'pr-ov');
+                shown.forEach(function (c) {
+                    if (!n[c]) return;
+                    var badge = el((c === 'w' ? 'left:1px;top:1px;background:#fff;color:#000;' : 'right:1px;top:1px;background:#000;color:#fff;')
+                        + 'font:bold 11px/14px sans-serif;min-width:14px;text-align:center;border-radius:7px;', 'pr-n');
+                    badge.textContent = n[c];
+                    ov.appendChild(badge);
+                });
+                cell.appendChild(ov);
+            });
+        }
+
+        function tipEl() {
+            var t = document.getElementById('pressureTip');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'pressureTip';
+                t.style.cssText = 'position:fixed;z-index:10001;pointer-events:none;display:none;background:#16213e;color:#eee;border:1px solid #00d4ff;border-radius:6px;padding:6px 10px;font:13px/1.5 sans-serif;white-space:nowrap;';
+                document.body.appendChild(t);
+            }
+            return t;
+        }
+
+        function hideTip() {
+            var t = document.getElementById('pressureTip');
+            if (t) t.style.display = 'none';
+            clearMarks('pr-hi');
+        }
+
+        function label(sq) { return GLYPH[map.pos[sq][1]] + sq; }
+
+        function showTip(cell) {
+            hideTip();
+            if (!map) return;
+            var sq = cell.getAttribute('data-square');
+            var name = { w: 'White', b: 'Black' };
+            var lines = ['<b>' + sq + '</b>'];
+            sides().forEach(function (c) {
+                var a = map[c][sq] || [];
+                lines.push(name[c] + ' attackers: <b>' + a.length + '</b>' + (a.length ? ' — ' + a.map(label).join(', ') : ''));
+                a.forEach(function (from) { mark(from, 'inset 0 0 0 3px rgb(' + RGB[c] + ')'); });
+            });
+            // The piece standing here: where it reaches (any side, h2 pawn → g3)
+            if (map.pos[sq]) {
+                var hits = map.from[sq];
+                lines.push(label(sq) + ' attacks: ' + (hits.length ? hits.join(', ') : 'nothing'));
+                hits.forEach(function (to) { mark(to, 'inset 0 0 0 3px #00d4ff'); });
+            }
+            var t = tipEl(), box = cell.getBoundingClientRect();
+            t.innerHTML = lines.join('<br>');
+            t.style.display = 'block';
+            t.style.left = Math.max(4, Math.min(box.left, window.innerWidth - t.offsetWidth - 4)) + 'px';
+            var above = box.top - t.offsetHeight - 6;
+            t.style.top = (above > 4 ? above : box.bottom + 6) + 'px';
+        }
+
+        function mark(sq, shadow) {
+            var cell = squareEl(sq);
+            if (cell) cell.appendChild(el('inset:0;box-shadow:' + shadow + ';', 'pr-hi'));
+        }
+
+        // chessboard.js has no "position changed" event, and many paths move
+        // the board, so watch its DOM instead (ignoring our own overlay nodes)
+        function watch() {
+            var board = document.getElementById('myBoard2');
+            if (!board) return;
+            var style = document.createElement('style');
+            style.textContent = '#myBoard2 .square-55d63 img.piece-417db { position: relative; z-index: 1; }'
+                // the yellow last-move fill would repaint the tint, so outline it instead
+                + ' body.pressure-on #board2ArrowSvg .move-highlight { fill: none; stroke: #ffeb3b; stroke-width: 3px; }';
+            document.head.appendChild(style);
+            new MutationObserver(function (muts) {
+                if (!on || queued) return;
+                var mine = function (n) { return n.classList && /(^| )pr-/.test(n.className); };
+                var foreign = muts.some(function (m) {
+                    return Array.prototype.some.call(m.addedNodes, function (n) { return !mine(n); }) ||
+                           Array.prototype.some.call(m.removedNodes, function (n) { return !mine(n); });
+                });
+                if (!foreign) return;
+                queued = true;
+                setTimeout(function () { queued = false; draw(); }, 30);
+            }).observe(board, { childList: true, subtree: true });
+            board.addEventListener('mouseover', function (e) {
+                var cell = on && e.target.closest('.square-55d63');
+                if (cell) showTip(cell);
+            });
+            board.addEventListener('mouseleave', hideTip);
+            board.addEventListener('mousedown', hideTip);
+        }
+
+        window.togglePressure = function () {
+            on = !on;
+            document.body.classList.toggle('pressure-on', on);
+            var b = document.getElementById('pressureBtn');
+            if (b) { b.style.color = on ? '#00d4ff' : '#aaa'; b.style.borderColor = on ? '#00d4ff' : '#666'; }
+            draw(true);
+        };
+        window.drawPressure = function () { draw(true); };
+        window.pressureDebug = { buildMap: buildMap };
+        watch();
     })();
     </script>
 </body>
